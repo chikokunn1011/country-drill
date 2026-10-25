@@ -145,6 +145,9 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
 
 // タイムアタックは問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
 export const settle = page => page.waitForFunction(() => G.kind !== 'ta' || performance.now() - G.shownAt >= TA_GUARD_MS);
+// 結果画面も出した直後（TA_GUARD_MS の間）は結果のボタンを押せない。その間が過ぎるまで待つ
+// （resultAt が無い変更前のコードでは待たない。GEOM_BASE の比較で clearTimeAttack を古いコードにも使うため）
+export const settleResult = page => page.waitForFunction(() => typeof resultAt === 'undefined' || performance.now() - resultAt >= TA_GUARD_MS);
 
 // いま出ている問題に正解／不正解で答える
 export async function answerCorrect(page) {
@@ -159,10 +162,12 @@ export async function answerWrong(page) {
 }
 
 // タイムアタックを最後までノーミスで解いて結果画面まで進める。opts は pickSetup と同じ（省略時は 国旗→国名・全世界・5問）
+// 結果のボタンがすぐ押せるように、結果画面を出した直後の待ち（settleResult）まで済ませて返す
 export async function clearTimeAttack(page, opts = {}) {
   await pickSetup(page, { mode: 'f2n', region: 'all', count: 5, ...opts, kind: 'ta' });
   await page.click('#start');
   const n = await page.evaluate(() => G.set.length);
   for (let i = 0; i < n; i++) await answerCorrect(page);
   await page.locator('#scr-result').waitFor();
+  await settleResult(page);
 }

@@ -867,6 +867,8 @@ function factsHTML(c) {
     <dt>面積</dt><dd class="mono">${fmt(c.ar)} km²</dd>
     <dt>ISO</dt><dd class="mono">${c.a.toUpperCase()}</dd></dl></div>`;
 }
+// 結果画面を出した時刻。最後の問題の連打が結果のボタンに当たらないように使う（TA_GUARD_MS）
+let resultAt = 0;
 function showResult() {
   const n = G.set.length, missed = [...G.missed].map(a => byA.get(a));
   let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}`;
@@ -897,10 +899,19 @@ function showResult() {
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
   show('result');
+  resultAt = performance.now();
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
   if (taForm) taResult(RANKING.boardKey(G.mode.k, S.region, P.count), G.timeMs, n);
 }
+// 結果画面を出した直後のクリックは結果カードのボタンに届かせない。キャプチャで止めるので onclick もフォームの送信も起きない
+$('rcard').addEventListener('click', e => {
+  if (performance.now() - resultAt < TA_GUARD_MS && e.target.closest('button')) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+// 結果のボタンはキーの押しっぱなし（自動リピート）でも押さない。入力欄は対象外
+document.addEventListener('keydown', e => {
+  if (e.repeat && !$('scr-result').hidden && e.target.closest?.('#rcard button')) e.preventDefault();
+}, true);
 // タイムアタックの結果画面：何位相当かの問い合わせと、ランキングへの登録。
 // 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
 function taResult(board, timeMs, questions) {
