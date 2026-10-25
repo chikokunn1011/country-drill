@@ -248,6 +248,8 @@ footer { font-size: .75rem; color: var(--muted); text-align: center; }
 .cols, .col { display: flex; flex-direction: column; gap: 14px; }
 .qmain { display: flex; flex-direction: column; gap: 18px; align-items: center; width: 100%; }
 .home .flags img:nth-child(n+15) { display: none; }
+.rslot { display: none; }
+.rside { display: contents; }
 @media (min-width: 900px) {
   body { padding-block: 28px 48px; padding-inline: 32px; }
   .wrap { max-width: 1200px; gap: 20px; }
@@ -337,6 +339,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <div class="wrap">
   <div class="topbar" id="topbar" hidden>
     <button class="brand" id="brand"><small>FLAGS · NAMES · MAP</small>195か国ドリル</button>
+    <div id="topbar-extra" class="row"></div>
     <div class="row"><button class="linkbtn" id="to-book">図鑑</button><button class="linkbtn" id="to-settings">設定</button></div>
   </div>
 
@@ -381,7 +384,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="field" id="nameopt-field">
         <label class="switch"><input type="checkbox" id="nameopt"> 国名も表示する（ヒントあり）</label>
       </div>
-      <div class="field">
+      <div class="field" id="kinds-field">
         <span class="lbl">あそび方</span>
         <div class="kind" id="kinds"></div>
       </div>
@@ -686,6 +689,7 @@ const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COM
 const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book', 'ranking'];
 function show(name) {
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
+  document.body.dataset.screen = name;
   $('topbar').hidden = name === 'home';
   if (name === 'settings') renderSettings();
   if (name === 'setup') renderSetup();
@@ -796,6 +800,7 @@ function nextQuestion() {
   // タイムアタックは出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
   ch.onclick = e => { if (G.kind === 'ta' && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
+  box.insertAdjacentHTML('beforeend', '<div class="rslot" aria-hidden="true"><p class="rslot-hint">答えたら、ここに国のプロフィールが出るよ</p><p class="rslot-keys"><kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる ・ <kbd>Enter</kbd> で次へ</p></div>');
   G.shownAt = performance.now();
   updateProgress();
   if (G.kind === 'ta' && G.done === 0) startTimer();
@@ -869,7 +874,8 @@ function answer(a) {
     back.className = 'btn ghost'; back.textContent = 'モード選択へ'; back.onclick = () => show('setup');
     row.className = 'row end'; row.append(back, nx); r.append(row);
   } else r.append(nx);
-  $('qcard').append(r);
+  const slot = $('qcard').querySelector('.rslot');
+  if (slot) slot.replaceWith(r); else $('qcard').append(r);
   updateProgress(true);
   nx.focus({ preventScroll: true });
   r.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -927,10 +933,9 @@ function showResult() {
   const taForm = G.kind === 'ta' && RANKING.enabled;
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
     <p class="hint">${cond}</p></div>
-    ${taForm ? `<div class="tabox"><form class="field" id="ta-form" novalidate><label for="ta-name">ランキングに載せる？</label>
+    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><form class="field" id="ta-form" novalidate><label for="ta-name">ランキングに載せる？</label>
       <div class="row"><input id="ta-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）"><button class="btn" id="ta-submit">載せる</button></div></form>
-      <p class="tamsg" id="ta-msg" role="status"></p><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}
-    ${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}
+      <p class="tamsg" id="ta-msg" role="status"></p><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}</div>
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
