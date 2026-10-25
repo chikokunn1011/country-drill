@@ -11,3 +11,11 @@
 - 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）
 - 地図: [world-atlas](https://github.com/topojson/world-atlas)（Natural Earth, ISC）
 - 国データ: [world-countries](https://github.com/mledoze/countries)（ODbL）
+
+## テクスチャ
+
+`textures/` に地図帳風のテクスチャ（SVG）を置いている。
+
+- `paper.svg` … 紙の繊維。画面全体に薄く敷く（CSS マスクで色をテーマに合わせる）
+- `contour.svg` … 等高線。ホームの背景
+- `ocean-light.svg` / `ocean-dark.svg` … 銅版画風の海の波線。地図の海
