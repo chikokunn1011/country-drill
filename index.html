@@ -67,6 +67,7 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 .chip { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 14px; font-size: .9rem; cursor: pointer; }
 .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 .chip:disabled { opacity: .45; cursor: default; }
+.chip .mono { font-size: .72rem; opacity: .75; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .panel h2 { font-family: var(--font-display); font-weight: 900; font-size: 1.25rem; margin: 0; text-wrap: balance; }
 .field { display: flex; flex-direction: column; gap: 8px; }
@@ -227,9 +228,13 @@ footer { font-size: .75rem; color: var(--muted); text-align: center; }
         <div class="kind" id="kinds"></div>
       </div>
       <div class="field">
+        <span class="lbl">出題する地域</span>
+        <div class="chips" id="regions"></div>
+        <p class="hint">「場所」の地図も、この地域だけを映す。</p>
+      </div>
+      <div class="field">
         <span class="lbl">問題数</span>
         <div class="chips" id="counts"></div>
-        <p class="hint" id="pool-hint"></p>
       </div>
       <div class="row end"><button class="btn" id="start">スタート</button></div>
     </div>
@@ -407,13 +412,14 @@ function renderSetup() {
   $('nameopt-field').hidden = !modeOf(P.mode).nameOpt;
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
+  $('regions').innerHTML = [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === S.region}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
   const n = poolFor(S.region).length;
   if (P.count !== 'all' && P.count > n) P.count = 'all';
   $('counts').innerHTML = COUNTS.map(c => `<button class="chip" aria-pressed="${c === P.count}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
-  $('pool-hint').innerHTML = `出題地域: <b>${regionLabel(S.region)}</b>（${n}か国）。地域は設定で変えられる。`;
 }
 $('modes').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.mode = b.dataset.k; store.set('setup', P); renderSetup(); };
 $('kinds').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.kind = b.dataset.k; store.set('setup', P); renderSetup(); };
+$('regions').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; S.region = b.dataset.r; store.set('settings', S); renderSetup(); };
 $('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
