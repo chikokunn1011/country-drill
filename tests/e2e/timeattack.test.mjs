@@ -129,6 +129,27 @@ t('enter_key_on_fail_screen', async page => {
   assert.equal(await page.evaluate(() => G.failed), false);
 });
 
+// 正解するとすぐ同じ場所に次の問題が出るので、ダブルクリックの2回目やキーの押しっぱなしで次の問題に答えてしまわないこと
+t('ta_double_click', async page => {
+  await startTa(page);
+  const a = await page.evaluate(() => G.cur.c.a);
+  await page.dblclick(`.choice[data-a="${a}"]`);
+  assert.equal(await page.evaluate(() => G.done), 1);
+  assert.equal(await page.evaluate(() => G.failed), false);
+  assert.equal(await text(page, '#pnum'), '2 / 5');
+});
+
+t('ta_held_number_key', async page => {
+  await startTa(page);
+  const key = String(await page.evaluate(() => G.cur.opts.findIndex(o => o.a === G.cur.c.a)) + 1);
+  await page.keyboard.down(key);
+  await page.keyboard.down(key); // 2回目は e.repeat が true（押しっぱなしの自動リピート）
+  await page.keyboard.up(key);
+  assert.equal(await page.evaluate(() => G.done), 1);
+  assert.equal(await page.evaluate(() => G.failed), false);
+  assert.equal(await text(page, '#pnum'), '2 / 5');
+});
+
 t('practice_unchanged', async page => {
   await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
   await page.click('#start');

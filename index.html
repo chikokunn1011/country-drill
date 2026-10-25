@@ -713,7 +713,8 @@ function nextQuestion() {
     if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
     ch.append(b);
   });
-  ch.onclick = e => { const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
+  // タイムアタックは正解するとすぐ同じ場所に次の問題が出る。ダブルクリック／ダブルタップの2回目で次の問題に答えないよう、連続クリックは無視する
+  ch.onclick = e => { if (G.kind === 'ta' && e.detail > 1) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
   updateProgress();
   if (G.kind === 'ta' && G.done === 0) startTimer();
@@ -853,7 +854,8 @@ function showResult() {
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
-  if (/^[1-4]$/.test(e.key)) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
+  // タイムアタックでは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
+  if (/^[1-4]$/.test(e.key) && !(e.repeat && G.kind === 'ta')) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
 });
 
