@@ -473,6 +473,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
 const S = Object.assign({ region: 'all', dopa: false, sound: true }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
@@ -645,6 +646,7 @@ const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COM
 /* ---------- 画面切り替え ---------- */
 const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book', 'ranking'];
 function show(name) {
+  if (name !== 'quiz' && name !== 'result' && G && !G.ended) endGame('quit'); // クイズを途中で離れた（やめる・トップバー）
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
   document.body.dataset.screen = name;
   $('topbar').hidden = name === 'home';
@@ -714,11 +716,16 @@ let G;
 // 問題を出してからこの時間（ミリ秒）のクリックは無視する。人がこの速さで新しい問題を見て答えることはない
 const TA_GUARD_MS = 250;
 function startGame() {
+  if (G && !G.ended) endGame('quit');
   const pool = poolFor(S.region);
   const n = P.count === 'all' ? pool.length : Math.min(P.count, pool.length);
   const set = shuffle(pool).slice(0, n);
   // t0/timeMs/failed/shownAt はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか・いまの問題を出した時刻）
   G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0 };
+  // sid の乱数は Math.random から取らない（テストで Math.random を固定したとき、出題の並びが変わらないように）
+  G.sid = Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 4);
+  G.hint = !!(G.mode.nameOpt && P.name && G.kind !== 'ta');
+  emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: S.region, n: set.length, hint: G.hint });
   $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
   nextQuestion();
@@ -796,6 +803,7 @@ function answer(a) {
     b.disabled = true;
     if (b.dataset.a === c.a) b.classList.add('ok'); else if (b.dataset.a === a) b.classList.add('ng');
   });
+  const mb = misses[c.a] || 0;
   if (right) {
     G.done++; G.streak++; G.best = Math.max(G.best, G.streak);
     if (first) G.firstTry++;
@@ -806,6 +814,8 @@ function answer(a) {
     if (G.kind === 'practice') G.queue.push(c); // 後半にまわす
   }
   store.set('misses', misses);
+  emit('drill:answer', { sid: G.sid, a: c.a, right, first, missesBefore: mb, missesAfter: misses[c.a] || 0,
+    mode: G.mode.k, kind: G.kind, region: S.region, hint: G.hint, streak: G.streak });
   if (S.dopa) dopaAnswer(right);
   // タイムアタック: 正解なら解説を出さずにすぐ次へ、最後の問題ならタイム確定。不正解はその場で失格
   if (G.kind === 'ta' && right) {
@@ -813,7 +823,7 @@ function answer(a) {
     G.timeMs = now - G.t0;
     return showResult();
   }
-  if (G.kind === 'ta') { G.failed = true; $('ptime').textContent = RANKING.formatTime(now - G.t0); }
+  if (G.kind === 'ta') { G.failed = true; $('ptime').textContent = RANKING.formatTime(now - G.t0); endGame('fail'); }
   const r = document.createElement('div');
   r.className = 'reveal';
   let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : G.kind === 'ta' ? `失格…\u3000正解は「${esc(c.n)}」` : `ざんねん。正解は「${esc(c.n)}」`;
@@ -867,6 +877,13 @@ function factsHTML(c) {
     <dt>面積</dt><dd class="mono">${fmt(c.ar)} km²</dd>
     <dt>ISO</dt><dd class="mono">${c.a.toUpperCase()}</dd></dl></div>`;
 }
+function endGame(outcome) {            // 1回のゲームにつき必ず1回だけ drill:result を出す
+  if (!G || G.ended) return;
+  G.ended = true;
+  emit('drill:result', { sid: G.sid, outcome, mode: G.mode.k, kind: G.kind, region: S.region,
+    n: G.set.length, done: G.done, firstTry: G.firstTry, wrongs: G.wrongs, attempts: G.attempts,
+    best: G.best, timeMs: G.timeMs ?? null, hint: G.hint, missed: [...G.missed] });
+}
 // 結果画面を出した時刻。最後の問題の連打が結果のボタンに当たらないように使う（TA_GUARD_MS）
 let resultAt = 0;
 function showResult() {
@@ -898,6 +915,7 @@ function showResult() {
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
+  endGame('clear');
   show('result');
   resultAt = performance.now();
   $('r-again').focus({ preventScroll: true });

@@ -171,3 +171,22 @@ export async function clearTimeAttack(page, opts = {}) {
   await page.locator('#scr-result').waitFor();
   await settleResult(page);
 }
+
+// 練習・挑戦を結果画面まで進める（正解して「次へ」をくり返す）。結果画面を出した直後の待ち（settleResult）はしないので、結果のボタンを押すなら呼ぶ側で待つ
+export async function clearByAnswering(page) {
+  const max = await page.evaluate(() => G.set.length * 3);
+  for (let i = 0; i < max && await page.evaluate(() => $('scr-result').hidden); i++) {
+    await answerCorrect(page);
+    await page.click('#next');
+  }
+  if (await page.evaluate(() => $('scr-result').hidden)) throw new Error('clearByAnswering: no result');
+}
+
+// index.html が document に出すイベントを window.__ev に順に積む（{ type, ...detail }）。ページを開いた直後に1回呼ぶ
+const EVENTS = ['drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
+export const recordEvents = page => page.evaluate(types => {
+  window.__ev = [];
+  for (const type of types) document.addEventListener(type, e => window.__ev.push({ type: e.type, ...e.detail }));
+}, EVENTS);
+// 積んだイベント。type を渡せばその種類だけ
+export const events = (page, type) => page.evaluate(type => window.__ev.filter(e => !type || e.type === type), type);
