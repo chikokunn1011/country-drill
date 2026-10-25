@@ -17,19 +17,28 @@ create index if not exists scores_board_time_ms on scores (board, time_ms);
 alter table scores enable row level security;
 revoke all on scores from anon, authenticated;
 
+-- 関数はどれも search_path を public, pg_temp に固定する（security definer の関数が別のスキーマの同名の物を拾わないように）
+
 -- NGワード（ranking.js の NG_WORDS と同じ中身。NFKC＋小文字にした名前に部分一致したらだめ）
 create or replace function ng_words() returns text[]
-language sql immutable set search_path = public as $$
+language sql immutable set search_path = public, pg_temp as $$
   select array['死ね', 'しね', 'シネ', '殺す', 'ころす', 'ちんこ', 'ちんぽ', 'まんこ', 'うんこ',
                'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人']
 $$;
 revoke all on function ng_words() from public, anon, authenticated;
 
+-- 「今週」の始まり＝日本時間の月曜0時（rank_of と top_scores の区切りをここ1か所にまとめる）
+create or replace function jst_week_start() returns timestamptz
+language sql stable set search_path = public, pg_temp as $$
+  select date_trunc('week', now() at time zone 'Asia/Tokyo') at time zone 'Asia/Tokyo'
+$$;
+revoke all on function jst_week_start() from public, anon, authenticated;
+
 -- 自分より速い自己ベストを持つ人数＋1（歴代と今週）。同タイムは数えない
 create or replace function rank_of(p_board text, p_time_ms int) returns jsonb
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare
-  week_start timestamptz := date_trunc('week', now() at time zone 'Asia/Tokyo') at time zone 'Asia/Tokyo';
+  week_start timestamptz := jst_week_start();
 begin
   return jsonb_build_object(
     'rank_all', (select count(*) + 1 from (
@@ -42,7 +51,7 @@ grant execute on function rank_of(text, int) to anon;
 
 -- 記録を受け付ける。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank_all":n,"rank_week":n}
 create or replace function submit_score(p_board text, p_nickname text, p_time_ms int, p_questions int) returns jsonb
-language plpgsql volatile security definer set search_path = public as $$
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
   v_cnt text := split_part(p_board, ':', 3);
   -- 前後の空白は JS の trim() と同じ文字（全角空白なども）を落とす
@@ -81,10 +90,10 @@ grant execute on function submit_score(text, text, int, int) to anon;
 -- 上位50件（同じ名前は最速1件）。p_period は 'all'（歴代）か 'week'（日本時間の月曜0時から）。それ以外は空
 create or replace function top_scores(p_board text, p_period text)
 returns table(nickname text, time_ms int, created_at timestamptz)
-language plpgsql stable security definer set search_path = public as $$
+language plpgsql stable security definer set search_path = public, pg_temp as $$
 #variable_conflict use_column
 declare
-  week_start timestamptz := date_trunc('week', now() at time zone 'Asia/Tokyo') at time zone 'Asia/Tokyo';
+  week_start timestamptz := jst_week_start();
 begin
   if p_period is null or p_period not in ('all', 'week') then return; end if;
   return query

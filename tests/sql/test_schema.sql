@@ -140,6 +140,33 @@ do $$ begin
   assert rank_of('f2n:asia:10', 9200) = '{"rank_all":3,"rank_week":2}'::jsonb, format('rank_of 9200: %s', rank_of('f2n:asia:10', 9200));
 end $$;
 
+\echo '- jst_week_start'
+reset role;
+-- week_boundary と同じ別計算の月曜0時（日本時間）と一致し、日本時間の区切りはこの関数1か所にだけ書いてある
+do $$ declare ws timestamptz := ((now() at time zone 'Asia/Tokyo')::date
+                                 - (extract(isodow from now() at time zone 'Asia/Tokyo')::int - 1))::timestamp at time zone 'Asia/Tokyo';
+begin
+  assert jst_week_start() = ws, format('jst_week_start: %s / 期待 %s', jst_week_start(), ws);
+  assert (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%Asia/Tokyo%') = 1,
+    format('Asia/Tokyo を書いている関数: %s',
+      (select string_agg(proname, ', ') from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%Asia/Tokyo%'));
+end $$;
+
+\echo '- functions_pin_search_path'
+reset role;
+-- security definer の関数（と、そこから呼ぶ関数）は search_path を public, pg_temp に固定する
+do $$ declare f record; begin
+  for f in select p.oid::regprocedure::text as name, p.proconfig from pg_proc p
+           where p.pronamespace = 'public'::regnamespace
+             and p.proname in ('ng_words', 'jst_week_start', 'rank_of', 'submit_score', 'top_scores') loop
+    assert f.proconfig = array['search_path=public, pg_temp'], format('%s: %s', f.name, f.proconfig);
+  end loop;
+  assert (select count(*) from pg_proc where pronamespace = 'public'::regnamespace
+          and proname in ('ng_words', 'jst_week_start', 'rank_of', 'submit_score', 'top_scores')) = 5, '5つともある';
+  assert (select bool_and(prosecdef) from pg_proc where pronamespace = 'public'::regnamespace
+          and proname in ('rank_of', 'submit_score', 'top_scores')), 'anon が呼ぶ3つは security definer';
+end $$;
+
 \echo '- rank_of_counts_faster_bests'
 reset role; truncate scores;
 insert into scores (board, nickname, time_ms, questions) values
@@ -190,6 +217,8 @@ end $$;
 set role anon;
 do $$ begin
   begin perform ng_words(); raise exception 'anon が ng_words() を呼べた';
+  exception when insufficient_privilege then null; end;
+  begin perform jst_week_start(); raise exception 'anon が jst_week_start() を呼べた';
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;

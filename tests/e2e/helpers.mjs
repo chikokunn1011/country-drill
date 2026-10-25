@@ -34,7 +34,7 @@ export async function startServer() {
   return { url: lastUrl, close: () => new Promise(ok => server.close(ok)) };
 }
 
-// 日本時間の月曜0時（supabase/schema.sql の week_start と同じ区切り）
+// 日本時間の月曜0時（supabase/schema.sql の jst_week_start() と同じ区切り）
 const weekStart = (now = Date.now()) => {
   const jst = new Date(now + 9 * 3600e3), back = (jst.getUTCDay() + 6) % 7;
   return Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate() - back) - 9 * 3600e3;
