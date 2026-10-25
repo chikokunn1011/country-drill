@@ -21,6 +21,7 @@
   };
 
   // RPC を1回呼ぶ。8秒で打ち切り。通信失敗・HTTP エラー・壊れた応答はぜんぶ例外になる
+  // HTTP エラーのときは状態と応答本文（PostgREST が原因を書いてくる）をエラーに入れる
   async function rpc(name, args) {
     const ac = new AbortController(), timer = setTimeout(() => ac.abort(), TIMEOUT);
     try {
@@ -31,7 +32,7 @@
         body: JSON.stringify(args),
         signal: ac.signal,
       });
-      if (!res.ok) throw new Error(`${name}: HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`${name}: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}`);
       return await res.json();
     } finally { clearTimeout(timer); }
   }
@@ -52,12 +53,15 @@
       if (NG_WORDS.some(w => norm.includes(w))) return { ok: false, reason: 'ng_name' };
       return { ok: true, name };
     },
-    // 記録を送る。失敗しても例外は投げず { ok:false, reason } で返す
+    // 記録を送る。失敗しても例外は投げず { ok:false, reason } で返す（原因はコンソールに残す）
     async submit({ board, nickname, timeMs, questions }) {
       try {
         const r = await rpc('submit_score', { p_board: board, p_nickname: nickname, p_time_ms: wholeMs(timeMs), p_questions: questions });
         return r.ok ? { ok: true, rankAll: r.rank_all, rankWeek: r.rank_week } : { ok: false, reason: r.reason };
-      } catch { return { ok: false, reason: 'network' }; }
+      } catch (e) {
+        console.warn('ranking submit', e);
+        return { ok: false, reason: 'network' };
+      }
     },
     // 上位50件。period は 'all'（歴代）か 'week'（今週）。失敗したら reject
     async top({ board, period }) {

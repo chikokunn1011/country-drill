@@ -91,7 +91,7 @@ async function supabaseRoute(route, db) {
 }
 
 // 新しいブラウザコンテキストでサイトを開く。supabase: 'fake'（偽DB）か 'down'（つながらない）
-// 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外
+// 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字
 export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
   const context = await browser.newContext({ viewport });
@@ -105,10 +105,17 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (new URL(target).hostname.endsWith('.supabase.co')) return supabaseRoute(route, db);
     return route.abort(); // フォントなどその他の外部通信はしない
   });
-  const page = await context.newPage(), errors = [];
+  const page = await context.newPage(), errors = [], warnings = [];
   page.on('pageerror', e => errors.push(e));
+  page.on('console', m => { if (m.type() === 'warning') warnings.push(m.text()); });
   await page.goto(url);
-  return { page, context, db, errors, close: () => context.close() };
+  return { page, context, db, errors, warnings, close: () => context.close() };
+}
+
+// console.warn はページから少し遅れて届くので、re に合うものが来るまで（最大2秒）待つ。来たら true
+export async function warned(warnings, re) {
+  for (let i = 0; i < 100 && !warnings.some(w => re.test(w)); i++) await new Promise(ok => setTimeout(ok, 20));
+  return warnings.some(w => re.test(w));
 }
 
 // モード選択画面で条件を選ぶ（スタートは押さない）。mode/kind はキー（f2n・ta など）、region は 'all' か地域名

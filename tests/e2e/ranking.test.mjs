@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, clearTimeAttack, PC } from './helpers.mjs';
+import { startServer, openApp, pickSetup, clearTimeAttack, warned, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -164,10 +164,12 @@ t('empty_state', async page => {
   assert.deepEqual([saved[0].mode, saved[0].kind, saved[0].count, saved[1].region], ['m2f', 'ta', 5, 'ヨーロッパ']);
 });
 
-t('error_and_retry', async (page, { db }) => {
+t('error_and_retry', async (page, { db, warnings }) => {
   await page.click('#home-rank');
   await page.locator('#rk-error').waitFor();
   assert.match(await text(page, '#rk-error'), /ランキングに接続できなかった/);
+  // オフラインと設定ミスを見分けられるよう、原因はコンソールに残る
+  assert.ok(await warned(warnings, /^ranking top /), warnings.join('\n'));
   assert.equal(await text(page, '#rk-retry'), '再読み込み');
   assert.equal(await page.isHidden('#rk-empty'), true);
   assert.equal(await page.locator('#rk-list li').count(), 0);

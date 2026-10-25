@@ -9,18 +9,19 @@ const SRC = read('ranking.js');
 const RPC = 'https://vgdkklvhtvcamtxwjpke.supabase.co/rest/v1/rpc/';
 const KEY = 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV';
 
-// ranking.js を新しい環境に読み込む。fetch に渡された内容は calls に残る
+// ranking.js を新しい環境に読み込む。fetch に渡された内容は calls に、console.warn の引数は warns に残る
 function load(fetchImpl = () => Promise.reject(new Error('fetch がスタブされていない'))) {
-  const calls = [];
+  const calls = [], warns = [];
   const ctx = {
     fetch: (url, opts) => { calls.push({ url, opts }); return fetchImpl(url, opts); },
+    console: { warn: (...a) => warns.push(a) },
     AbortController,
     // 呼ぶたびに今の setTimeout を見る（mock.timers で差し替えた後でも効くように）
     setTimeout: (...a) => setTimeout(...a),
     clearTimeout: (...a) => clearTimeout(...a),
   };
   vm.runInNewContext(SRC, ctx);
-  return { R: ctx.RANKING, calls };
+  return { R: ctx.RANKING, calls, warns };
 }
 // 決まった JSON を返す fetch スタブ
 const reply = (body, status = 200) => () =>
@@ -112,8 +113,9 @@ test('submit_sends_whole_ms', async () => {
 });
 
 test('submit_passes_reason', async () => {
-  const { R } = load(reply({ ok: false, reason: 'too_soon' }));
+  const { R, warns } = load(reply({ ok: false, reason: 'too_soon' }));
   assert.deepEqual(plain(await R.submit(SCORE)), { ok: false, reason: 'too_soon' });
+  assert.equal(warns.length, 0); // 断られたのは正常な返事なのでコンソールには出さない
 });
 
 test('submit_network', async () => {
@@ -122,6 +124,28 @@ test('submit_network', async () => {
   assert.deepEqual(plain(await load(reply({ message: 'boom' }, 500)).R.submit(SCORE)), network);
   // JSON でない応答も通信失敗あつかい
   assert.deepEqual(plain(await load(() => Promise.resolve(new Response('<html>'))).R.submit(SCORE)), network);
+});
+
+test('submit_warns_on_failure', async () => {
+  // 本物の Supabase で 404（関数が無い）・401（キー）・400（引数違い）が返っても、オフラインと見分けられるようにコンソールに残す
+  const { R, warns } = load(reply({ message: 'Could not find the function public.submit_score' }, 404));
+  assert.deepEqual(plain(await R.submit(SCORE)), { ok: false, reason: 'network' });
+  assert.equal(warns.length, 1);
+  assert.equal(warns[0][0], 'ranking submit');
+  assert.match(String(warns[0][1]), /submit_score: HTTP 404/);
+  assert.match(String(warns[0][1]), /Could not find the function public\.submit_score/);
+  // 通信そのものの失敗も同じく残す
+  const down = load(() => Promise.reject(new TypeError('Failed to fetch')));
+  await down.R.submit(SCORE);
+  assert.match(String(down.warns[0]?.[1]), /Failed to fetch/);
+});
+
+test('rpc_error_has_status_and_body', async () => {
+  // top / rankOf は reject する（コンソールに出すのは呼び出し側）。エラーには HTTP の状態と応答本文が入る
+  const { R, warns } = load(reply({ message: 'No API key found in request' }, 401));
+  await assert.rejects(R.top({ board: 'f2n:all:10', period: 'all' }), /top_scores: HTTP 401 .*No API key found/);
+  await assert.rejects(R.rankOf({ board: 'f2n:all:10', timeMs: 8000 }), /rank_of: HTTP 401 .*No API key found/);
+  assert.equal(warns.length, 0);
 });
 
 test('submit_timeout', async t => {

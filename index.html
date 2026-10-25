@@ -933,7 +933,8 @@ function taResult(board, timeMs, questions) {
   const ranks = r => `歴代${r.rankAll}位・今週${r.rankWeek}位`;
   const say = (text, cls = '') => { msg.textContent = text; msg.className = `tamsg ${cls}`; };
   name.value = store.get('nickname', '');
-  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, () => {}); // 失敗したら何も出さない
+  // 失敗したら画面には何も出さない（原因はコンソールに残す。オフラインと設定ミスを見分けるため）
+  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, e => console.warn('ranking rankOf', e));
   form.onsubmit = async e => {
     e.preventDefault();
     const fail = reason => { say(RANKING.message(reason), 'ng'); btn.textContent = 'もう一回送る'; };
@@ -986,7 +987,7 @@ async function loadRanking() {
   const seq = ++RK.seq, list = $('rk-list');
   list.setAttribute('aria-busy', true); $('rk-retry').disabled = true;
   let rows = null;
-  try { rows = await RANKING.top({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch {}
+  try { rows = await RANKING.top({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch (e) { console.warn('ranking top', e); }
   if (seq !== RK.seq) return;
   list.setAttribute('aria-busy', false); $('rk-retry').disabled = false;
   $('rk-error').hidden = !!rows;

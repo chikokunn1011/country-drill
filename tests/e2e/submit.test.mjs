@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, clearTimeAttack } from './helpers.mjs';
+import { startServer, openApp, clearTimeAttack, warned } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -129,10 +129,13 @@ t('double_click_submits_once', async (page, { db }) => {
   assert.equal(db.rows.length, 1);
 });
 
-t('network_down', async (page, { db }) => {
+t('network_down', async (page, { db, warnings }) => {
   await clearTimeAttack(page);
   await send(page, 'チコ');
   await msgShown(page, 'ランキングに接続できなかった');
+  // 原因はコンソールに残る（順位の問い合わせと送信の両方）
+  assert.ok(await warned(warnings, /^ranking rankOf /), warnings.join('\n'));
+  assert.ok(await warned(warnings, /^ranking submit /), warnings.join('\n'));
   // 順位の問い合わせは送信より先に失敗しているので、ここで空のままなら「失敗したら出さない」
   assert.equal(await page.locator('#ta-rank').textContent(), '');
   assert.equal(await text(page, '#ta-submit'), 'もう一回送る');
@@ -144,10 +147,12 @@ t('network_down', async (page, { db }) => {
   assert.equal(db.rows.length, 1);
 }, { supabase: 'down' });
 
-t('rank_preview_failure_keeps_form', async (page, { db }) => {
+t('rank_preview_failure_keeps_form', async (page, { db, warnings }) => {
   delete db.rpc.rank_of; // rank_of だけ 404 にする
   await clearTimeAttack(page);
   assert.equal(await page.isVisible('#ta-form'), true);
+  // 画面には出さないが、HTTP の状態つきでコンソールに残る
+  assert.ok(await warned(warnings, /^ranking rankOf .*rank_of: HTTP 404/), warnings.join('\n'));
   await send(page, 'チコ');
   await msgShown(page, '載せたよ！');
   assert.equal(await text(page, '#ta-msg'), '載せたよ！ 歴代1位・今週1位');
