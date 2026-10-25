@@ -189,6 +189,20 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .misslist li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; text-align: left; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .misslist img { width: 48px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
 
+/* ランキング：条件のボタン・歴代/今週のタブ・上位の表。読み込み中は表を薄くするだけ */
+#rk-tabs { display: flex; }
+#rk-tabs button { flex: 1; padding-block: 8px; }
+.rklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; transition: opacity .15s; }
+.rklist[aria-busy="true"] { opacity: .45; }
+.rklist li { display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.rklist .no { font: 900 1rem var(--font-display); color: var(--muted); text-align: right; }
+.rklist .top .no { font-size: 1.2rem; color: var(--accent); }
+.rklist .nick { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.rklist .at { font-size: .75rem; color: var(--muted); }
+.rkempty { margin: 0; padding: 20px 0; text-align: center; font: 700 1.05rem var(--font-display); }
+.rkerror { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; text-align: center; }
+.rkerror p { margin: 0; color: var(--ng); font-weight: 700; }
+
 /* 図鑑 */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; cursor: pointer; text-align: left; color: var(--ink); min-width: 0; }
@@ -254,6 +268,7 @@ footer { font-size: .75rem; color: var(--muted); text-align: center; }
   .cols > .col + .col { border-left: 1px dashed var(--line); padding-left: 32px; }
   .modecard { padding: 16px 18px; }
   .modecard b { font-size: 1.08rem; }
+  #scr-ranking .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); } /* ランキングは表のほうを広く */
 
   /* クイズ：左に問題、右に選択肢。答えたあとの解説は下に横長で出す */
   .qcard { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px 36px; align-items: center; padding: 32px; }
@@ -332,6 +347,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div class="flags" id="home-flags"></div>
     <div class="menu">
       <button class="btn" id="home-play">プレイ</button>
+      <button class="btn ghost" id="home-rank">ランキング</button>
       <button class="btn ghost" id="home-settings">設定</button>
     </div>
     <button class="linkbtn" id="home-book">国旗図鑑を見る</button>
@@ -396,6 +412,37 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
   <!-- 結果 -->
   <section id="scr-result" class="wrap" hidden>
     <div class="qcard" id="rcard"></div>
+  </section>
+
+  <!-- ランキング -->
+  <section id="scr-ranking" class="wrap" hidden>
+    <div class="panel">
+      <h2>ランキング</h2>
+      <div class="cols">
+      <div class="col">
+      <div class="field">
+        <span class="lbl">モード</span>
+        <div class="chips" id="rk-modes"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">地域</span>
+        <div class="chips" id="rk-regions"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">問題数</span>
+        <div class="chips" id="rk-counts"></div>
+      </div>
+      </div>
+      <div class="col">
+      <div class="seg" id="rk-tabs" role="group" aria-label="期間"><button type="button" data-p="all">歴代</button><button type="button" data-p="week">今週</button></div>
+      <p class="hint">上位50人まで。同じニックネームは自己ベストだけ。「今週」は月曜0時（日本時間）から。</p>
+      <ol class="rklist" id="rk-list" aria-busy="false"></ol>
+      <p class="rkempty" id="rk-empty" hidden>まだ誰もいない。1位のチャンス！</p>
+      <div class="rkerror" id="rk-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="rk-retry">再読み込み</button></div>
+      </div>
+      </div>
+      <div class="row end"><button class="btn" id="rk-play">この条件で遊ぶ</button></div>
+    </div>
   </section>
 
   <!-- 図鑑 -->
@@ -627,17 +674,20 @@ const PRAISE = ['正解！！', 'ナイス！', '天才！？', 'すごすぎ！
 const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COMBO⚡` : n >= 5 ? `🔥${n} COMBO🔥` : `${n} COMBO!`;
 
 /* ---------- 画面切り替え ---------- */
-const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book'];
+const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book', 'ranking'];
 function show(name) {
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
   $('topbar').hidden = name === 'home';
   if (name === 'settings') renderSettings();
   if (name === 'setup') renderSetup();
   if (name === 'book') renderBook();
+  if (name === 'ranking') renderRanking();
   window.scrollTo({ top: 0 });
 }
 $('brand').onclick = () => show('home');
 $('home-play').onclick = () => show('setup');
+$('home-rank').onclick = () => openRanking();
+$('home-rank').hidden = !RANKING.enabled; // 接続先が未設定ならランキングは出さない
 $('home-settings').onclick = () => show('settings');
 $('home-book').onclick = () => show('book');
 $('to-book').onclick = () => show('book');
@@ -663,16 +713,22 @@ $('set-reset').onclick = () => { misses = {}; store.set('misses', misses); rende
 $('set-done').onclick = () => show('home');
 
 /* ---------- モード選択 ---------- */
+// 地域と問題数のボタン（モード選択とランキングで共通）。その地域の国の数より多い問題数は選べない
+const regionChips = sel => [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === sel}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
+const fitCount = (count, region) => count !== 'all' && count > poolFor(region).length ? 'all' : count;
+function countChips(region, sel) {
+  const n = poolFor(region).length;
+  return COUNTS.map(c => `<button class="chip" aria-pressed="${c === sel}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
+}
 function renderSetup() {
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
   // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
   $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || P.kind === 'ta';
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
-  $('regions').innerHTML = [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === S.region}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
-  const n = poolFor(S.region).length;
-  if (P.count !== 'all' && P.count > n) P.count = 'all';
-  $('counts').innerHTML = COUNTS.map(c => `<button class="chip" aria-pressed="${c === P.count}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
+  $('regions').innerHTML = regionChips(S.region);
+  P.count = fitCount(P.count, S.region);
+  $('counts').innerHTML = countChips(S.region, P.count);
 }
 $('modes').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.mode = b.dataset.k; store.set('setup', P); renderSetup(); };
 $('kinds').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.kind = b.dataset.k; store.set('setup', P); renderSetup(); };
@@ -890,8 +946,8 @@ function taResult(board, timeMs, questions) {
     store.set('nickname', chk.name);
     form.hidden = true;
     say(`載せたよ！ ${ranks(r)}`, 'ok');
-    // ランキング画面（openRanking）がまだ無い間はボタンを出さない
-    if (typeof openRanking === 'function') { open.hidden = false; open.onclick = () => openRanking(board); }
+    open.hidden = false; open.onclick = () => openRanking(board);
+    open.focus({ preventScroll: true }); // フォームを隠すとフォーカスが迷子になるので、出したボタンへ
   };
 }
 document.addEventListener('keydown', e => {
@@ -900,6 +956,58 @@ document.addEventListener('keydown', e => {
   if (/^[1-4]$/.test(e.key) && !(e.repeat && G.kind === 'ta')) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
 });
+
+/* ---------- ランキング ---------- */
+// ランキング画面で見ている条件。モード選択の P/S とは別に持ち、「この条件で遊ぶ」を押したときだけ P/S に入れる
+const RK = { mode: 'f2n', region: 'all', count: 10, period: 'all', seq: 0 };
+// board（'f2n:asia:10' など）→ 条件。読めない board なら null
+function boardConds(board) {
+  const [mode, , c] = String(board).split(':'), count = c === 'all' ? 'all' : +c;
+  const region = ['all', ...REGIONS].find(r => RANKING.boardKey(mode, r, count) === board);
+  return modeOf(mode) && COUNTS.includes(count) && region ? { mode, region, count } : null;
+}
+// board を渡せばその条件、無ければ前回モード選択で選んだ条件で開く
+function openRanking(board) {
+  Object.assign(RK, (board && boardConds(board)) || { mode: P.mode, region: S.region, count: P.count });
+  show('ranking');
+}
+function renderRanking() {
+  RK.count = fitCount(RK.count, RK.region);
+  $('rk-modes').innerHTML = MODES.map(m => `<button class="chip" aria-pressed="${m.k === RK.mode}" data-k="${m.k}">${m.label}</button>`).join('');
+  $('rk-regions').innerHTML = regionChips(RK.region);
+  $('rk-counts').innerHTML = countChips(RK.region, RK.count);
+  for (const b of $('rk-tabs').children) b.setAttribute('aria-pressed', b.dataset.p === RK.period);
+  loadRanking();
+}
+// 日付は日本時間で（「今週」の区切りとそろえる）
+const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+// 読み込み中は表を薄くするだけ。返事が前後しても、最後に頼んだ条件の表だけを出す
+async function loadRanking() {
+  const seq = ++RK.seq, list = $('rk-list');
+  list.setAttribute('aria-busy', true); $('rk-retry').disabled = true;
+  let rows = null;
+  try { rows = await RANKING.top({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch {}
+  if (seq !== RK.seq) return;
+  list.setAttribute('aria-busy', false); $('rk-retry').disabled = false;
+  $('rk-error').hidden = !!rows;
+  $('rk-empty').hidden = !rows || rows.length > 0;
+  let no = 0;
+  list.innerHTML = (rows ?? []).map((r, i) => {
+    if (!i || r.timeMs !== rows[i - 1].timeMs) no = i + 1; // 同じタイムは同じ順位（rank_of の「自分より速い人数＋1」とそろえる）
+    return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}</span><span class="mono">${RANKING.formatTime(r.timeMs)}</span><span class="mono at">${jstDay(r.at)}</span></li>`;
+  }).join('');
+}
+$('rk-modes').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; RK.mode = b.dataset.k; renderRanking(); };
+$('rk-regions').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; RK.region = b.dataset.r; renderRanking(); };
+$('rk-counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; RK.count = b.dataset.c === 'all' ? 'all' : +b.dataset.c; renderRanking(); };
+$('rk-tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; RK.period = b.dataset.p; renderRanking(); };
+$('rk-retry').onclick = () => loadRanking();
+// この条件のタイムアタックとしてモード選択へ
+$('rk-play').onclick = () => {
+  Object.assign(P, { mode: RK.mode, kind: 'ta', count: RK.count }); S.region = RK.region;
+  store.set('setup', P); store.set('settings', S);
+  show('setup');
+};
 
 /* ---------- 図鑑 ---------- */
 let bregion = 'all', bview = store.get('bview', 'list'), bsel = null, bmapKey = '';

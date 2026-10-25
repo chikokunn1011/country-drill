@@ -3,8 +3,16 @@
 国旗・首都・地図の位置を4択クイズと図鑑で覚える学習サイト。
 
 - 対象: 国連加盟193か国＋バチカン・コソボ（195か国）
-- クイズ: 国旗→国名 / 国名→首都 / 地図→国名 / 首都→国名 / ミックス
+- クイズ: 国旗→国名 / 国名→首都 / 地図→国名 / 首都→国名 / ミックス。タイムアタック（1ミスで失格、クリアタイムでランキングに挑戦）もある
 - 図鑑: 国旗一覧・検索・首都かくしモード
+
+## ランキング（Supabase）
+
+タイムアタックの記録は Supabase に保存する（接続先は `ranking.js` の先頭）。
+
+- 準備: Supabase の SQL Editor に `supabase/schema.sql` を貼って実行する（何度流しても大丈夫）
+- 記録の消し方: Table Editor で `scores` テーブルを開き、消したい行を削除する
+- テスト: 初回だけ `cd tests/e2e && npm install`。そのあとリポジトリ直下で `node --test 'tests/unit/*.test.mjs' 'tests/e2e/*.test.mjs'`（Playwright と Chromium が必要）と `bash tests/sql/run.sh`（PostgreSQL 16 が必要）
 
 ## クレジット
 
