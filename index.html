@@ -120,7 +120,7 @@ select, input[type="search"] { font: inherit; font-size: .88rem; color: var(--in
 .card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); }
 .card b { font-family: var(--font-display); font-size: .95rem; line-height: 1.3; }
 .card span { font-size: .78rem; color: var(--muted); line-height: 1.3; }
-.card.hide-cap span { visibility: hidden; }
+.grid.hide-cap .card span { visibility: hidden; }
 .count { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); }
 .toggle { display: flex; align-items: center; gap: 6px; font-size: .85rem; color: var(--muted); }
 
@@ -183,7 +183,8 @@ footer a { color: inherit; }
 const C = window.COUNTRIES;
 const byA = new Map(C.map(c => [c.a, c]));
 const feats = topojson.feature(WORLD, WORLD.objects.countries).features;
-const featById = new Map(feats.map(f => [String(f.id), f]));
+const featById = new Map();
+for (const f of feats) { const k = String(f.id), prev = featById.get(k); if (!prev || d3.geoArea(f) > d3.geoArea(prev)) featById.set(k, f); } // 同じIDが複数ある国（豪州と周辺の島）は本土を代表にする
 const featOf = c => featById.get(c.a === 'xk' ? 'XK' : c.id);
 const flagCache = {};
 const flag = a => flagCache[a] ||= 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(FLAGS[a]);
@@ -225,7 +226,7 @@ function drawMap(svg, c) {
   let out = `<path class="graticule" d="${path(graticule)}"></path>`;
   for (const g of feats) {
     const d = path(g);
-    if (d) out += `<path d="${d}"${g === f ? ' class="on"' : ''}></path>`;
+    if (d) out += `<path d="${d}"${f && String(g.id) === String(f.id) ? ' class="on"' : ''}></path>`;
   }
   if (small) {
     const q = proj([c.ll[1], c.ll[0]]);
@@ -250,7 +251,7 @@ function renderSettings() {
   const weakN = Object.values(misses).filter(v => v > 0).length;
   const opts = [['all', '全世界（195か国）'], ...REGIONS.map(r => [r, `${r}（${C.filter(c => c.r === r).length}）`])];
   if (weakN >= 4) opts.push(['weak', `苦手な国（${weakN}）`]);
-  if (region === 'weak' && weakN < 4) region = 'all';
+  if (region === 'weak' && weakN < 4) { region = 'all'; store.set('region', region); }
   $('region').innerHTML = opts.map(([v, l]) => `<option value="${v}"${v === region ? ' selected' : ''}>${l}</option>`).join('');
 }
 $('modes').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; mode = b.dataset.k; store.set('mode', mode); renderSettings(); startRound(); };
@@ -291,10 +292,10 @@ function showQuestion() {
   box.append(ch);
   updateProgress();
 }
-function updateProgress() {
+function updateProgress(answered) {
   const { qs, i, score, streak } = quiz;
-  $('pnum').textContent = `${Math.min(i + 1, qs.length)} / ${qs.length}`;
-  $('pbar').style.width = (i / qs.length * 100) + '%';
+  $('pnum').textContent = `${i + 1} / ${qs.length}`;
+  $('pbar').style.width = ((i + (answered ? 1 : 0)) / qs.length * 100) + '%';
   $('pscore').textContent = `正解 ${score}`;
   $('pstreak').textContent = streak >= 2 ? `${streak}連続！` : '';
 }
@@ -320,7 +321,7 @@ function answer(v) {
   nx.onclick = next;
   r.append(nx);
   $('qcard').append(r);
-  quiz.i++; updateProgress(); quiz.i--;
+  updateProgress(true);
   nx.focus({ preventScroll: true });
   r.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
@@ -340,6 +341,7 @@ function next() {
 function showResult() {
   const { qs, score, best, missed } = quiz;
   $('pbar').style.width = '100%';
+  renderSettings();
   const msg = score === qs.length ? 'パーフェクト！' : score >= qs.length * .7 ? 'いい感じ！' : 'もう一回いってみよう';
   const box = $('qcard');
   box.innerHTML = `<div class="result"><p class="qlabel">${msg}</p><p class="score">${score}<small> / ${qs.length}</small></p><p class="qsub" style="margin:6px 0 0">最高連続正解 ${best}</p></div>
@@ -352,7 +354,7 @@ function showResult() {
 document.addEventListener('keydown', e => {
   if ($('view-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
   if (/^[1-4]$/.test(e.key)) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
-  if (e.key === 'Enter' && document.activeElement?.id !== 'next' && $('next')) $('next').click();
+  if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
 });
 
 /* ---------- 図鑑 ---------- */
