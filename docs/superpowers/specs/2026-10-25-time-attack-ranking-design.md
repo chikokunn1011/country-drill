@@ -58,7 +58,7 @@
 「board」（ランキングの区切り）は文字列 `モード:地域:問題数`。例 `f2n:asia:10`、`m2f:all:all`。
 地域の英字キー: `all, asia, europe, africa, namerica, samerica, oceania`。
 
-Supabase の接続先（プロジェクトURL・公開用 anon キー）は `ranking.js` の先頭に定数で書く。anon キーはブラウザに載せる前提の鍵なので公開してよい（書き込み制限は下の権限設定で守る）。
+Supabase の接続先は `ranking.js` の先頭に定数で書く（URL `https://vgdkklvhtvcamtxwjpke.supabase.co`、publishable キー `sb_publishable_...`）。publishable キーはブラウザに載せる前提の鍵なので公開してよい（書き込み制限は下の権限設定で守る）。新形式のキーはJWTではないので、リクエストには `apikey` ヘッダーだけ付ける。
 
 ## 4. データと不正対策（Supabase 側）
 
@@ -74,7 +74,7 @@ Supabase の接続先（プロジェクトURL・公開用 anon キー）は `ran
 | created_at | timestamptz | 登録日時（サーバーの時刻） |
 
 権限:
-- `scores` は RLS 有効、anon からの直接 SELECT / INSERT / UPDATE / DELETE はすべて不可。
+- `scores` は RLS 有効、anon（publishable キーでのアクセス） からの直接 SELECT / INSERT / UPDATE / DELETE はすべて不可。
 - anon が呼べるのは下の3つの関数だけ（`security definer`）。
 
 関数:
@@ -107,4 +107,4 @@ Supabase の接続先（プロジェクトURL・公開用 anon キー）は `ran
 
 1. Supabase でプロジェクト作成（Region: Northeast Asia (Tokyo)、Free）
 2. SQL Editor に `supabase/schema.sql` を貼って実行
-3. Project Settings → API の「Project URL」と「anon public」キーをチャットで教える
+3. ~~プロジェクトIDと publishable キーをチャットで教える~~（2026-10-25 受け取り済み）
