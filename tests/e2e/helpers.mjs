@@ -1,7 +1,7 @@
 // ブラウザテストの共通部品。サイトをローカルで配信し、CDN と Supabase をテスト用に差し替える
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { dirname, extname, join, normalize, sep } from 'node:path';
+import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -18,20 +18,23 @@ const LIBS = {
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png' };
 
 let lastUrl;
-// リポジトリ直下を配信する静的サーバー（空いているポートで立てる）
-export async function startServer() {
+// リポジトリ直下（root を渡したらそのフォルダ）を配信する静的サーバー（空いているポートで立てる）
+// root を渡したときは openApp の既定の url は変えない（変更前のコードと比べるときに使う）
+export async function startServer({ root } = {}) {
+  const dir = root ? resolve(root) : ROOT;
   const server = createServer(async (req, res) => {
-    const path = normalize(join(ROOT, decodeURIComponent(new URL(req.url, 'http://x').pathname)));
+    const path = normalize(join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname)));
     const file = path.endsWith(sep) ? join(path, 'index.html') : path;
-    if (!file.startsWith(ROOT + sep)) { res.writeHead(403).end(); return; }
+    if (!file.startsWith(dir + sep)) { res.writeHead(403).end(); return; }
     try {
       const body = await readFile(file);
       res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
     } catch { res.writeHead(404).end(); }
   });
   await new Promise(ok => server.listen(0, '127.0.0.1', ok));
-  lastUrl = `http://127.0.0.1:${server.address().port}/`;
-  return { url: lastUrl, close: () => new Promise(ok => server.close(ok)) };
+  const url = `http://127.0.0.1:${server.address().port}/`;
+  if (!root) lastUrl = url;
+  return { url, close: () => new Promise(ok => server.close(ok)) };
 }
 
 // 日本時間の月曜0時（supabase/schema.sql の jst_week_start() と同じ区切り）
@@ -91,11 +94,21 @@ async function supabaseRoute(route, db) {
 }
 
 // 新しいブラウザコンテキストでサイトを開く。supabase: 'fake'（偽DB）か 'down'（つながらない）
+// seed: Math.random を決まった列にする（mulberry32）。reducedMotion・colorScheme は newContext にそのまま渡す
+// storage: ページのスクリプトより前に localStorage へ入れておく値（キー → JSON にする値）
 // 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl } = {}) {
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, storage } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
-  const context = await browser.newContext({ viewport });
+  const context = await browser.newContext({ viewport, reducedMotion, colorScheme });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
+  if (seed !== undefined) await context.addInitScript(seed => {
+    let t = seed;
+    Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
+  }, seed);
+  // about:blank などでは localStorage が使えず例外になるので握りつぶす
+  if (storage) await context.addInitScript(storage => {
+    try { for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  }, storage);
   const db = fakeDb();
   db.down = supabase === 'down';
   const origin = new URL(url).origin;
