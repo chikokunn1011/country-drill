@@ -236,6 +236,11 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 dialog .inner { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 dialog .close { align-self: flex-end; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
 footer { font-size: .75rem; color: var(--muted); text-align: center; }
+#toasts { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%);
+  display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; box-shadow: 0 6px 20px rgb(0 0 0 / .15); }
+@media (min-width: 900px) { #toasts { left: auto; right: 16px; top: 72px; transform: none; } }
 
 @media (max-width: 480px) {
   .choices { grid-template-columns: 1fr 1fr; }
@@ -645,6 +650,18 @@ const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COM
 
 /* ---------- 画面切り替え ---------- */
 const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book', 'ranking'];
+const screenRender = {};
+function registerScreen(name, render) {             // 機能ファイルが自分の画面を足す。<section> を先に作ってから呼ぶこと
+  if (!$('scr-' + name)) throw new Error('no section scr-' + name);
+  if (!SCREENS.includes(name)) SCREENS.push(name);
+  if (render) screenRender[name] = render;
+}
+function toast(html, ms = 2800) {
+  let box = $('toasts');
+  if (!box) { box = document.createElement('div'); box.id = 'toasts'; box.setAttribute('aria-live', 'polite'); document.body.append(box); }
+  const el = document.createElement('div'); el.className = 'toast'; el.innerHTML = html; box.append(el);
+  setTimeout(() => el.remove(), ms);
+}
 function show(name) {
   if (name !== 'quiz' && name !== 'result' && G && !G.ended) endGame('quit'); // クイズを途中で離れた（やめる・トップバー）
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
@@ -654,6 +671,8 @@ function show(name) {
   if (name === 'setup') renderSetup();
   if (name === 'book') renderBook();
   if (name === 'ranking') renderRanking();
+  screenRender[name]?.();
+  emit('drill:screen', { name });
   window.scrollTo({ top: 0 });
 }
 $('brand').onclick = () => show('home');
@@ -681,7 +700,7 @@ $('set-dopa').onchange = e => {
   if (S.dopa) { FX.sfx('correct', 3); FX.confetti(e.target.getBoundingClientRect(), 80); FX.pop('ドパミン全開！'); }
 };
 $('set-sound').onchange = e => { S.sound = e.target.checked; store.set('settings', S); if (S.sound) FX.sfx('correct', 0); };
-$('set-reset').onclick = () => { misses = {}; store.set('misses', misses); renderSettings(); };
+$('set-reset').onclick = () => { misses = {}; store.set('misses', misses); emit('drill:misses-reset', {}); renderSettings(); };
 $('set-done').onclick = () => show('home');
 
 /* ---------- モード選択 ---------- */
@@ -1094,6 +1113,7 @@ function selectBook(a, tapped) {
   const c = a && byA.get(a);
   $('binfo').innerHTML = c ? factsHTML(c) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (c && tapped) emit('drill:book-open', { a });
 }
 $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
@@ -1103,6 +1123,7 @@ $('grid').onclick = e => {
   inner.append(mapSvg(c, `${c.n}の位置`));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
+  emit('drill:book-open', { a: c.a });
 };
 $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 
