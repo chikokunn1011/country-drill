@@ -118,13 +118,15 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .modecard b { font-family: var(--font-display); font-size: 1rem; }
 .modecard span { font-size: .78rem; color: var(--muted); }
 .modecard[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.kind { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kind { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; } /* 3つ並べる幅がなければ折り返す */
 
 /* クイズ */
 .progress { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--muted); gap: 12px; flex-wrap: wrap; }
 .bar { flex: 1 1 120px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
 .streak { color: var(--hl); font-weight: 500; }
+#ptime { color: var(--ink); font-size: .95rem; font-weight: 500; }
+#ptime:empty { display: none; }
 .qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 18px; align-items: center; }
 .qlabel { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; text-align: center; margin: 0; text-wrap: balance; }
 .qflag { width: min(280px, 70%); aspect-ratio: 4/3; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 10px rgb(0 0 0 / .08); object-fit: cover; }
@@ -248,6 +250,7 @@ footer { font-size: .75rem; color: var(--muted); text-align: center; }
   .qcard .reveal { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 36px; align-items: center; }
   .qcard .reveal > .verdict, .qcard .reveal > .next { grid-column: 1 / -1; }
   .qcard .reveal > .next { justify-self: end; }
+  .qcard .reveal > .row { grid-column: 1 / -1; }
   .qflag { width: min(380px, 90%); }
   .qbig { font-size: 3rem; }
   .qlabel { font-size: 1.3rem; }
@@ -373,7 +376,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 
   <!-- クイズ -->
   <section id="scr-quiz" class="wrap" hidden>
-    <div class="progress"><span id="pnum"></span><div class="bar"><i id="pbar" style="width:0"></i></div><span id="pscore"></span><span class="streak" id="pstreak"></span><span class="pts" id="ppts"></span></div>
+    <div class="progress"><span id="pnum"></span><span id="ptime" class="mono"></span><div class="bar"><i id="pbar" style="width:0"></i></div><span id="pscore"></span><span class="streak" id="pstreak"></span><span class="pts" id="ppts"></span></div>
     <div class="qcard" id="qcard"></div>
     <div class="row end"><button class="linkbtn" id="quit">やめてモード選択へ</button></div>
   </section>
@@ -409,6 +412,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="countries.js"></script>
 <script src="flags.js"></script>
 <script src="world.js"></script>
+<script src="ranking.js"></script>
 <script>
 /* ---------- データ ---------- */
 const C = window.COUNTRIES;
@@ -434,6 +438,7 @@ const MODES = [
 const KINDS = [
   { k: 'practice', label: '練習', desc: 'まちがえた問題は後半にもう一度出る。全部正解したら終了' },
   { k: 'challenge', label: '挑戦', desc: 'まちがえたら最初からやり直し。ノーミスでクリアを目指す' },
+  { k: 'ta', label: 'タイムアタック', desc: '1ミスで失格。クリアタイムでランキングに挑戦' },
 ];
 const COUNTS = [5, 10, 20, 'all'];
 const store = {
@@ -648,7 +653,8 @@ $('set-done').onclick = () => show('home');
 /* ---------- モード選択 ---------- */
 function renderSetup() {
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
-  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt;
+  // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
+  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || P.kind === 'ta';
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
   $('regions').innerHTML = [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === S.region}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
@@ -670,7 +676,9 @@ function startGame() {
   const pool = poolFor(S.region);
   const n = P.count === 'all' ? pool.length : Math.min(P.count, pool.length);
   const set = shuffle(pool).slice(0, n);
-  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false };
+  // t0/timeMs/failed はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか）
+  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false };
+  $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
   nextQuestion();
 }
@@ -688,7 +696,7 @@ function nextQuestion() {
   const m = G.mode, box = $('qcard');
   box.innerHTML = ''; box.className = `qcard q-${m.q} a-${m.a}`;
   const main = document.createElement('div'); main.className = 'qmain'; box.append(main);
-  const showName = m.nameOpt && P.name;
+  const showName = m.nameOpt && P.name && G.kind !== 'ta';
   // 国名ONのときは選択肢に国名を出す（問題文にも出すと名前合わせで解けてしまうので出さない）
   const labels = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？', f2m: 'この国旗の国はどこ？' };
   main.insertAdjacentHTML('beforeend', `<p class="qlabel">${esc(labels[m.k])}</p>`);
@@ -708,6 +716,17 @@ function nextQuestion() {
   ch.onclick = e => { const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
   updateProgress();
+  if (G.kind === 'ta' && G.done === 0) startTimer();
+}
+// タイムアタックの計測は1問目を出した瞬間から。クリア・失格・クイズ画面を離れたら表示の更新をやめる
+function startTimer() {
+  const g = G;
+  g.t0 = performance.now();
+  (function tick() {
+    if (G !== g || g.timeMs !== null || g.failed || $('scr-quiz').hidden) return;
+    $('ptime').textContent = RANKING.formatTime(performance.now() - g.t0);
+    requestAnimationFrame(tick);
+  })();
 }
 function updateProgress(answered) {
   const n = G.set.length, remaining = G.queue.length + (answered ? 0 : 1);
@@ -715,7 +734,7 @@ function updateProgress(answered) {
   if (G.kind === 'practice') {
     $('pnum').textContent = `覚えた ${G.done} / ${n}`;
     $('pscore').textContent = `残り ${remaining}問`;
-  } else {
+  } else { // 挑戦とタイムアタック（タイムアタックは挑戦回数が1のままなので #pscore は空）
     $('pnum').textContent = `${Math.min(G.done + 1, n)} / ${n}`;
     $('pscore').textContent = G.attempts > 1 ? `${G.attempts}回目の挑戦` : '';
   }
@@ -725,6 +744,7 @@ function updateProgress(answered) {
 }
 function answer(a) {
   if (G.answered) return;
+  const now = performance.now(); // タイムアタックは押した瞬間で計る（演出の時間は入れない）
   G.answered = true;
   const c = G.cur.c, right = a === c.a, first = !G.seen.has(c.a);
   G.seen.add(c.a);
@@ -743,9 +763,16 @@ function answer(a) {
   }
   store.set('misses', misses);
   if (S.dopa) dopaAnswer(right);
+  // タイムアタック: 正解なら解説を出さずにすぐ次へ、最後の問題ならタイム確定。不正解はその場で失格
+  if (G.kind === 'ta' && right) {
+    if (G.queue.length) return nextQuestion();
+    G.timeMs = now - G.t0;
+    return showResult();
+  }
+  if (G.kind === 'ta') { G.failed = true; $('ptime').textContent = RANKING.formatTime(now - G.t0); }
   const r = document.createElement('div');
   r.className = 'reveal';
-  let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : `ざんねん。正解は「${esc(c.n)}」`;
+  let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : G.kind === 'ta' ? `失格…\u3000正解は「${esc(c.n)}」` : `ざんねん。正解は「${esc(c.n)}」`;
   if (!right && G.kind === 'challenge') verdict += '。最初からやり直し！';
   if (!right && G.kind === 'practice') verdict += '。あとでもう一度出るよ';
   r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}`;
@@ -753,8 +780,13 @@ function answer(a) {
   const nx = document.createElement('button');
   nx.className = 'btn next'; nx.id = 'next';
   if (!right && G.kind === 'challenge') { nx.textContent = '最初から →'; nx.onclick = restartChallenge; }
+  else if (G.kind === 'ta') { nx.textContent = 'もう一回'; nx.onclick = startGame; }
   else { nx.textContent = G.queue.length ? '次の問題 →' : '結果を見る'; nx.onclick = nextQuestion; }
-  r.append(nx);
+  if (G.kind === 'ta') {
+    const back = document.createElement('button'), row = document.createElement('div');
+    back.className = 'btn ghost'; back.textContent = 'モード選択へ'; back.onclick = () => show('setup');
+    row.className = 'row end'; row.append(back, nx); r.append(row);
+  } else r.append(nx);
   $('qcard').append(r);
   updateProgress(true);
   nx.focus({ preventScroll: true });
@@ -797,6 +829,10 @@ function showResult() {
     head = G.wrongs === 0 ? 'パーフェクト！' : G.firstTry >= n * .7 ? 'いい感じ！' : '次はもっといけるはず';
     big = `${G.firstTry}<small> / ${n} 一発正解</small>`;
     stats = `<span>やり直し <b>${G.wrongs}</b>回</span><span>最高連続 <b>${G.best}</b></span>`;
+  } else if (G.kind === 'ta') { // 仮の表示。順位とランキング登録は次の段階で足す
+    head = 'クリア！';
+    big = RANKING.formatTime(G.timeMs);
+    stats = `<span><b>${n}</b>問ノーミス</span>`;
   } else {
     head = G.attempts === 1 ? 'ノーミスでクリア！' : 'クリア！';
     big = `${n}<small>問連続正解</small>`;
