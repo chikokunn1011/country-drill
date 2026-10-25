@@ -173,6 +173,18 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .score small { font-size: 1.2rem; color: var(--muted); }
 .stats { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
 .stats b { color: var(--ink); font-family: var(--font-mono); }
+/* タイムアタックの結果：順位相当（返事が来るまで1行ぶん空けておく）とランキング登録欄。
+   スマホだと結果カードは中身の幅に縮むので、登録欄があるときは横いっぱいにして、登録後にフォームが消えても幅が変わらないようにする */
+#scr-result:has(.tabox) { width: 100%; }
+.tarank { font: 700 1.05rem var(--font-display); color: var(--accent); margin: 0; min-height: 1.6em; }
+.tabox { width: min(460px, 100%); border-top: 1px dashed var(--line); padding-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tabox form { width: 100%; }
+.tabox input { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
+.tabox input::placeholder { font-size: .85rem; } /* スマホ幅でも「12文字まで」まで見えるように */
+.tabox .row { gap: 8px; } .tabox .btn { padding-inline: 16px; }
+.tamsg { margin: 0; font-weight: 700; text-align: center; }
+.tamsg:empty { display: none; }
+.tamsg.ok { color: var(--ok); } .tamsg.ng { color: var(--ng); }
 .misslist { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .misslist li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; text-align: left; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .misslist img { width: 48px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
@@ -825,15 +837,16 @@ function factsHTML(c) {
 }
 function showResult() {
   const n = G.set.length, missed = [...G.missed].map(a => byA.get(a));
-  let head, big, stats;
+  let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}`;
   if (G.kind === 'practice') {
     head = G.wrongs === 0 ? 'パーフェクト！' : G.firstTry >= n * .7 ? 'いい感じ！' : '次はもっといけるはず';
     big = `${G.firstTry}<small> / ${n} 一発正解</small>`;
     stats = `<span>やり直し <b>${G.wrongs}</b>回</span><span>最高連続 <b>${G.best}</b></span>`;
-  } else if (G.kind === 'ta') { // 仮の表示。順位とランキング登録は次の段階で足す
+  } else if (G.kind === 'ta') { // 順位相当は表示してから問い合わせて入れる（taResult）
     head = 'クリア！';
-    big = RANKING.formatTime(G.timeMs);
-    stats = `<span><b>${n}</b>問ノーミス</span>`;
+    big = `<span id="ta-time">${RANKING.formatTime(G.timeMs)}</span>`;
+    stats = '<p class="tarank" id="ta-rank"></p>';
+    cond = `${G.mode.label}／${regionLabel(S.region)}／${P.count === 'all' ? `全部（${n}問）` : `${n}問`}`;
   } else {
     head = G.attempts === 1 ? 'ノーミスでクリア！' : 'クリア！';
     big = `${n}<small>問連続正解</small>`;
@@ -842,8 +855,12 @@ function showResult() {
   const ratio = G.firstTry / n;
   const rank = G.kind === 'challenge' ? (G.attempts === 1 ? 'S' : G.attempts <= 3 ? 'A' : 'B') : ratio === 1 ? 'S' : ratio >= .8 ? 'A' : ratio >= .6 ? 'B' : 'C';
   const dopaHead = S.dopa ? `<p class="rank">RANK ${rank}</p><p class="pts">${fmt(G.pts)} pt</p>` : '';
+  const taForm = G.kind === 'ta' && RANKING.enabled;
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
-    <p class="hint">${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}</p></div>
+    <p class="hint">${cond}</p></div>
+    ${taForm ? `<div class="tabox"><form class="field" id="ta-form" novalidate><label for="ta-name">ランキングに載せる？</label>
+      <div class="row"><input id="ta-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）"><button class="btn" id="ta-submit">載せる</button></div></form>
+      <p class="tamsg" id="ta-msg" role="status"></p><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}
     ${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
@@ -851,6 +868,31 @@ function showResult() {
   show('result');
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
+  if (taForm) taResult(RANKING.boardKey(G.mode.k, S.region, P.count), G.timeMs, n);
+}
+// タイムアタックの結果画面：何位相当かの問い合わせと、ランキングへの登録。
+// 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
+function taResult(board, timeMs, questions) {
+  const rank = $('ta-rank'), form = $('ta-form'), name = $('ta-name'), btn = $('ta-submit'), msg = $('ta-msg'), open = $('ta-open');
+  const ranks = r => `歴代${r.rankAll}位・今週${r.rankWeek}位`;
+  const say = (text, cls = '') => { msg.textContent = text; msg.className = `tamsg ${cls}`; };
+  name.value = store.get('nickname', '');
+  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, () => {}); // 失敗したら何も出さない
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fail = reason => { say(RANKING.message(reason), 'ng'); btn.textContent = 'もう一回送る'; };
+    const chk = RANKING.checkName(name.value);
+    if (!chk.ok) return fail(chk.reason);
+    btn.disabled = true; say('送信中…'); // 連打・Enter 連打でも1回しか送らない（disabled の間は submit が起きない）
+    const r = await RANKING.submit({ board, nickname: chk.name, timeMs, questions });
+    btn.disabled = false;
+    if (!r.ok) return fail(r.reason);
+    store.set('nickname', chk.name);
+    form.hidden = true;
+    say(`載せたよ！ ${ranks(r)}`, 'ok');
+    // ランキング画面（openRanking）がまだ無い間はボタンを出さない
+    if (typeof openRanking === 'function') { open.hidden = false; open.onclick = () => openRanking(board); }
+  };
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;

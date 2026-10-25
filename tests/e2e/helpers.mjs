@@ -132,3 +132,12 @@ export async function answerWrong(page) {
   const a = await page.evaluate(() => G.cur.c.a);
   await page.locator(`.choice:not([data-a="${a}"])`).first().click();
 }
+
+// タイムアタックを最後までノーミスで解いて結果画面まで進める。opts は pickSetup と同じ（省略時は 国旗→国名・全世界・5問）
+export async function clearTimeAttack(page, opts = {}) {
+  await pickSetup(page, { mode: 'f2n', region: 'all', count: 5, ...opts, kind: 'ta' });
+  await page.click('#start');
+  const n = await page.evaluate(() => G.set.length);
+  for (let i = 0; i < n; i++) await answerCorrect(page);
+  await page.locator('#scr-result').waitFor();
+}
