@@ -1,8 +1,8 @@
-// 共通フックのイベント（drill:start / drill:answer / drill:result / drill:screen / drill:book-open / drill:misses-reset）と画面の登録・トースト。drill:result は1ゲームにつき必ず1回だけ。偽の Supabase・スマホ幅で確認する
+// 共通フックのイベント（drill:start / drill:answer / drill:result / drill:screen / drill:book-open / drill:misses-reset）と画面の登録・トースト・差し込み口（#r-ext・#topbar-extra）。drill:result は1ゲームにつき必ず1回だけ。偽の Supabase・スマホ幅（差し込み口は PC 幅も）で確認する
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong, settle, settleResult, clearTimeAttack, clearByAnswering, recordEvents, events } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, settle, settleResult, clearTimeAttack, clearByAnswering, recordEvents, events, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -364,4 +364,71 @@ t('ta_time_excludes_listener', async page => {
   await clearTimeAttack(page);
   const r = await page.evaluate(() => ({ timeMs: G.timeMs, limit: window.__t - G.t0 }));
   assert.ok(r.timeMs <= r.limit, JSON.stringify(r));
+});
+
+// 結果画面の差し込み口 #r-ext は #r-side の最後の子。空なら見えない
+t('r_ext_slot', async page => {
+  await play(page, { kind: 'practice' });
+  await clearByAnswering(page);
+  assert.deepEqual(await page.evaluate(() => {
+    const x = $('r-ext');
+    return { parent: x.parentElement.id, last: x === $('r-side').lastChild, nodes: x.childNodes.length, display: getComputedStyle(x).display };
+  }), { parent: 'r-side', last: true, nodes: 0, display: 'none' });
+});
+
+// drill:result（clear）のリスナーが走るときには #r-ext がもうあり、入れた中身が結果画面に出る
+t('r_ext_ready_on_clear', async page => {
+  await page.evaluate(() => document.addEventListener('drill:result', e => { if (e.detail.outcome === 'clear') $('r-ext').textContent = 'EXT'; }));
+  await play(page, { kind: 'practice' });
+  await clearByAnswering(page);
+  assert.equal(await page.isVisible('#r-ext'), true);
+  assert.equal(await page.innerText('#r-ext'), 'EXT');
+});
+
+// PC の結果画面: 右列が空の #r-ext だけなら1列のまま。まちがえた国や #r-ext の中身があれば2列
+t('r_ext_layout_pc', async page => {
+  await page.evaluate(() => document.addEventListener('drill:result', e => { if (window.__ext && e.detail.outcome === 'clear') $('r-ext').textContent = 'EXT'; }));
+  const layout = () => page.evaluate(() => ({ card: getComputedStyle($('rcard')).display, side: getComputedStyle($('r-side')).display }));
+  await play(page, { kind: 'practice' });
+  await clearByAnswering(page);
+  const one = await layout();
+  assert.notEqual(one.card, 'grid');
+  assert.equal(one.side, 'none');
+  await play(page, { kind: 'practice' });
+  await answerWrong(page);
+  await page.click('#next');
+  await clearByAnswering(page);
+  assert.equal((await layout()).card, 'grid');
+  await page.evaluate(() => { window.__ext = true; });
+  await play(page, { kind: 'practice' });
+  await clearByAnswering(page);
+  assert.equal(await page.innerText('#r-ext'), 'EXT');
+  assert.equal(await page.evaluate(() => G.wrongs), 0); // ノーミスでも
+  assert.equal((await layout()).card, 'grid');
+}, { viewport: PC });
+
+// トップバーの差し込み口 #topbar-extra は #brand の次。空なら見えず、ほかのボタンの位置もトップバーの高さも変えない
+t('topbar_extra', async page => {
+  assert.deepEqual(await page.evaluate(() => {
+    const x = $('topbar-extra');
+    return { second: x === $('topbar').children[1], nodes: x.childNodes.length, display: getComputedStyle(x).display };
+  }), { second: true, nodes: 0, display: 'none' });
+  await page.evaluate(() => show('setup')); // ホームではトップバーが隠れている
+  for (const vp of [PHONE, PC]) {
+    await page.setViewportSize(vp);
+    const r = await page.evaluate(() => {
+      const ids = ['brand', 'to-book', 'to-settings'], x = $('topbar-extra');
+      const measure = () => ({ topbar: $('topbar').getBoundingClientRect().height,
+        ...Object.fromEntries(ids.map(id => { const { x, y, width, height } = $(id).getBoundingClientRect(); return [id, { x, y, width, height }]; })) });
+      const display = getComputedStyle(x).display, before = measure();
+      x.remove();
+      const after = measure();
+      $('brand').after(x); // 元に戻す
+      return { display, before, after, zero: ids.filter(id => !before[id].width) };
+    });
+    const at = `${vp.width}×${vp.height}`;
+    assert.equal(r.display, 'none', at);
+    assert.deepEqual(r.zero, [], at);
+    assert.deepEqual(r.after, r.before, at);
+  }
 });

@@ -154,7 +154,7 @@ test('rside_contents', { timeout: 120_000 }, async () => {
     assert.deepEqual(await page.evaluate(() => [$('r-side').previousElementSibling.matches('.result'), $('r-side').nextElementSibling.matches('.row.center')]), [true, true]);
   });
   await scene('result', async page => {
-    assert.equal(await page.evaluate(() => $('r-side').childNodes.length), 0); // ノーミスなら空（:empty が効く）
+    assert.equal(await page.evaluate(() => $('r-side').children.length === 1 && $('r-ext').childNodes.length === 0), true); // ノーミスなら中身は空の #r-ext だけ（右列は出ない）
   });
   await scene('ta_result', async (page, count) => {
     assert.equal(await count('#r-side .tabox #ta-form'), 1);
@@ -419,7 +419,7 @@ test('laptop_150pct_fits', { timeout: 120_000 }, async () => {
 // 結果の右列が空なら、1列で真ん中に出す（ランキング未設定のタイムアタックと、練習のノーミス）
 test('result_single_column_when_side_empty', { timeout: 120_000 }, async () => {
   const centered = async page => {
-    assert.equal(await page.evaluate(() => $('r-side').childNodes.length), 0);
+    assert.equal(await page.evaluate(() => $('r-side').children.length === 1 && $('r-ext').childNodes.length === 0), true);
     const [card, res] = await rects(page, '#rcard', '#rcard > .result'), mid = r => (r.left + r.right) / 2;
     assert.ok(Math.abs(mid(card) - mid(res)) <= 2, `真ん中にない: ${json({ card, res })}`);
   };

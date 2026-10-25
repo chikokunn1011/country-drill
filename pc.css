@@ -121,7 +121,7 @@ body[data-screen="result"] #scr-result { flex: 1 0 auto; }
 #rcard { flex: 1 0 auto; padding: var(--card-pad); justify-content: center; }
 #rcard .score { font-size: clamp(3.4rem, calc(1.6rem + 2.4vw), 5.2rem); }
 #rcard .rside { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; }
-#rcard .rside:empty { display: none; }
+#rcard .rside:not(:has(> :not(.r-ext:empty))) { display: none; }
 .misslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
 
 /* ---------- 図鑑 ---------- */
@@ -220,13 +220,13 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #rcard .score { font-size: clamp(4rem, calc(1.6rem + 3vw), 6.4rem); }
   #rcard .stats { font-size: 1.02rem; gap: 24px; }
   #rcard .row.center .btn { min-width: 200px; padding-block: 14px; }
-  #rcard:has(> .rside:not(:empty)) {
+  #rcard:has(> .rside > :not(.r-ext:empty)) {
     display: grid; grid-template-columns: minmax(320px, 560px) minmax(0, 760px); justify-content: center; align-content: center;
     column-gap: calc(var(--col-gap) * 1.5); row-gap: 28px;
   }
-  #rcard:has(> .rside:not(:empty)) > .result { grid-column: 1; grid-row: 1; align-self: end; }
-  #rcard:has(> .rside:not(:empty)) > .row.center { grid-column: 1; grid-row: 2; align-self: start; }
-  #rcard > .rside:not(:empty) { grid-column: 2; grid-row: 1 / span 2; align-self: center; align-items: stretch; border-left: 1px dashed var(--line); padding-left: calc(var(--col-gap) * 1.5); max-height: 100%; }
+  #rcard:has(> .rside > :not(.r-ext:empty)) > .result { grid-column: 1; grid-row: 1; align-self: end; }
+  #rcard:has(> .rside > :not(.r-ext:empty)) > .row.center { grid-column: 1; grid-row: 2; align-self: start; }
+  #rcard > .rside:has(> :not(.r-ext:empty)) { grid-column: 2; grid-row: 1 / span 2; align-self: center; align-items: stretch; border-left: 1px dashed var(--line); padding-left: calc(var(--col-gap) * 1.5); max-height: 100%; }
   #rcard > .rside > .qlabel { text-align: left; }
   #rcard > .rside > .tabox { width: 100%; max-width: 560px; align-self: center; border-top: 0; padding-top: 0; }
 
