@@ -130,12 +130,17 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
   if (count) await page.click(`#counts .chip[data-c="${count}"]`);
 }
 
+// タイムアタックは問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
+export const settle = page => page.waitForFunction(() => G.kind !== 'ta' || performance.now() - G.shownAt >= TA_GUARD_MS);
+
 // いま出ている問題に正解／不正解で答える
 export async function answerCorrect(page) {
+  await settle(page);
   const a = await page.evaluate(() => G.cur.c.a);
   await page.click(`.choice[data-a="${a}"]`);
 }
 export async function answerWrong(page) {
+  await settle(page);
   const a = await page.evaluate(() => G.cur.c.a);
   await page.locator(`.choice:not([data-a="${a}"])`).first().click();
 }

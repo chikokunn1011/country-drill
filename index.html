@@ -474,6 +474,15 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="ranking.js"></script>
 <script>
 /* ---------- データ ---------- */
+// ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ
+window.RANKING ??= {
+  enabled: false,
+  formatTime(ms) {
+    const pad2 = n => String(n).padStart(2, '0');
+    const cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = pad2(cs % 100);
+    return m ? `${m}分${pad2(s)}.${c}秒` : `${s}.${c}秒`;
+  },
+};
 const C = window.COUNTRIES;
 const byA = new Map(C.map(c => [c.a, c]));
 const feats = topojson.feature(WORLD, WORLD.objects.countries).features;
@@ -740,12 +749,15 @@ $('quit').onclick = () => show('setup');
 
 /* ---------- クイズ ---------- */
 let G;
+// タイムアタックは正解するとすぐ同じ場所に次の問題が出る。ダブルクリック／ダブルタップの2回目で次の問題に答えないよう、
+// 問題を出してからこの時間（ミリ秒）のクリックは無視する。人がこの速さで新しい問題を見て答えることはない
+const TA_GUARD_MS = 250;
 function startGame() {
   const pool = poolFor(S.region);
   const n = P.count === 'all' ? pool.length : Math.min(P.count, pool.length);
   const set = shuffle(pool).slice(0, n);
-  // t0/timeMs/failed はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか）
-  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false };
+  // t0/timeMs/failed/shownAt はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか・いまの問題を出した時刻）
+  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0 };
   $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
   nextQuestion();
@@ -781,9 +793,10 @@ function nextQuestion() {
     if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
     ch.append(b);
   });
-  // タイムアタックは正解するとすぐ同じ場所に次の問題が出る。ダブルクリック／ダブルタップの2回目で次の問題に答えないよう、連続クリックは無視する
-  ch.onclick = e => { if (G.kind === 'ta' && e.detail > 1) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
+  // タイムアタックは出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
+  ch.onclick = e => { if (G.kind === 'ta' && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
+  G.shownAt = performance.now();
   updateProgress();
   if (G.kind === 'ta' && G.done === 0) startTimer();
 }

@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, settle, clearTimeAttack } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -129,21 +129,45 @@ t('enter_key_on_fail_screen', async page => {
   assert.equal(await page.evaluate(() => G.failed), false);
 });
 
-// 正解するとすぐ同じ場所に次の問題が出るので、ダブルクリックの2回目やキーの押しっぱなしで次の問題に答えてしまわないこと
-t('ta_double_click', async page => {
+// 正解するとすぐ同じ場所に次の問題が出るので、ダブルクリックの2回目やキーの押しっぱなしで次の問題に答えてしまわないこと。
+// 問題を出してから TA_GUARD_MS の間のクリックは無視し、それを過ぎたクリックは速い連打（detail が 2）でも数える
+t('ta_click_guard', async page => {
   await startTa(page);
+  await settle(page);
   const a = await page.evaluate(() => G.cur.c.a);
-  await page.dblclick(`.choice[data-a="${a}"]`);
+  await page.dblclick(`.choice[data-a="${a}"]`); // 2回目は次の問題が出た直後に届く
   assert.equal(await page.evaluate(() => G.done), 1);
-  assert.equal(await page.evaluate(() => G.failed), false);
   assert.equal(await text(page, '#pnum'), '2 / 5');
+
+  // 出た直後の問題の正解を押しても数えない（同じ処理の中で続けて押すので、確実に直後になる）
+  await settle(page);
+  const done = await page.evaluate(() => {
+    const correct = () => document.querySelector(`.choice[data-a="${G.cur.c.a}"]`);
+    correct().click(); // 2問目に正解して、3問目が出る
+    correct().click(); // 3問目が出た直後なので無視
+    return G.done;
+  });
+  assert.equal(done, 2);
+  assert.equal(await text(page, '#pnum'), '3 / 5');
+
+  // 無視する時間を過ぎたら、ダブルクリックの2回目と同じ detail=2 のクリックでも答えになる
+  await settle(page);
+  const c = await page.evaluate(() => G.cur.c.a);
+  await page.locator(`.choice[data-a="${c}"]`).dispatchEvent('click', { detail: 2 });
+  assert.equal(await page.evaluate(() => G.done), 3);
+  assert.equal(await page.evaluate(() => G.failed), false);
+  assert.equal(await text(page, '#pnum'), '4 / 5');
 });
 
 t('ta_held_number_key', async page => {
   await startTa(page);
+  await settle(page);
   const key = String(await page.evaluate(() => G.cur.opts.findIndex(o => o.a === G.cur.c.a)) + 1);
   await page.keyboard.down(key);
-  await page.keyboard.down(key); // 2回目は e.repeat が true（押しっぱなしの自動リピート）
+  assert.equal(await page.evaluate(() => G.done), 1);
+  // 無視する時間が過ぎても、押しっぱなしの自動リピート（e.repeat が true）では次の問題に答えない
+  await settle(page);
+  await page.keyboard.down(key);
   await page.keyboard.up(key);
   assert.equal(await page.evaluate(() => G.done), 1);
   assert.equal(await page.evaluate(() => G.failed), false);
@@ -154,9 +178,42 @@ t('practice_unchanged', async page => {
   await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
   await page.click('#start');
   assert.equal(await text(page, '#ptime'), '');
-  await answerCorrect(page);
+  // 練習では問題が出た直後のクリックも無視しない
+  await page.evaluate(() => { startGame(); document.querySelector(`.choice[data-a="${G.cur.c.a}"]`).click(); });
+  assert.equal(await page.evaluate(() => G.done), 1);
   assert.equal(await page.locator('.reveal').count(), 1);
   assert.equal(await text(page, '#next'), '次の問題 →');
   await page.waitForTimeout(100);
   assert.equal(await text(page, '#ptime'), '');
+});
+
+// ranking.js が配信されていない・読めないときも、ランキングなしで練習もタイムアタックも遊べる
+t('works_without_ranking_js', async page => {
+  await page.route('**/ranking.js', route => route.abort());
+  await page.reload();
+  assert.equal(await page.evaluate(() => RANKING.enabled), false);
+  // 代わりの formatTime も ranking.js と同じ形で出す
+  assert.deepEqual(await page.evaluate(() => [0, 12349.9, 61234, 600000].map(RANKING.formatTime)), ['0.00秒', '12.34秒', '1分01.23秒', '10分00.00秒']);
+  assert.equal(await page.isVisible('#home-play'), true);
+  assert.equal(await page.isHidden('#home-rank'), true);
+
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  assert.equal(await text(page, '#next'), '次の問題 →');
+  await page.click('#quit');
+
+  await startTa(page);
+  assert.equal(await text(page, '#ptime'), '0.00秒');
+  await answerWrong(page);
+  assert.match(await text(page, '.reveal'), /失格/);
+  assert.match(await text(page, '#ptime'), /^\d+\.\d{2}秒$/);
+  await page.click('.reveal .btn.ghost');
+
+  await clearTimeAttack(page);
+  assert.match(await text(page, '#ta-time'), /^(\d+分)?\d+\.\d{2}秒$/);
+  assert.equal(await page.locator('#ta-form').count(), 0);
+  assert.equal(await page.isVisible('#r-again'), true);
+  await page.click('#brand');
+  assert.equal(await page.isHidden('#home-rank'), true);
 });
