@@ -149,14 +149,15 @@
   .bdg-result .bdg-row > .bdg-paid { grid-area: 1 / 3 / span 2; }
   .bdg-result .bdg-row > :is(.bdg-btn, .bdg-on) { grid-area: 1 / 4 / span 2; }
   /* まちがえた国の一覧とパネルが並ぶと #r-side が画面より高くなる。pc.css の上下まん中のままだと、#r-side が高いほど
-     左の点数と［もう一回］も下がって画面の外に出る（1280x577 で8か国から）ので、一覧が5か国以上のときだけ左も右も上にそろえる。
+     左の点数と［もう一回］も下がって画面の外に出る（バッジのパネルだけなら 1280x577 で8か国から、冒険のコインのパネル（#r-ext の中身。rpg.js）
+     だけなら10か国で）ので、パネルのどちらかがあって一覧が5か国以上のときは、左も右も上にそろえる。
      4か国までは上下まん中のままでも入る（1280x577 で［もう一回］は y 430〜480 ほど）。
-     冒険のコインのパネル（#r-ext の中身。rpg.js）も並ぶと #r-side はさらに約 200px 高くなり、1280x577 では3か国から［もう一回］が画面の外に出る
-     （2か国は 3px しか余らない）ので、そのときは2か国から上にそろえる */
-  #rcard:has(> #r-side > #r-badges):has(> #r-side > .misslist > li:nth-child(5)),
-  #rcard:has(> #r-side > #r-badges):has(> #r-side > #r-ext > *):has(> #r-side > .misslist > li:nth-child(2)) { grid-template-rows: auto 1fr; align-content: start; }
-  #rcard:has(> #r-side > #r-badges):has(> #r-side > .misslist > li:nth-child(5)) > #r-side,
-  #rcard:has(> #r-side > #r-badges):has(> #r-side > #r-ext > *):has(> #r-side > .misslist > li:nth-child(2)) > #r-side { align-self: start; }
+     パネルが2つとも並ぶと #r-side はさらに約 200px 高くなり、1280x577 では3か国から［もう一回］が画面の外に出る
+     （2か国は 3px しか余らない）ので、そのときは2か国から上にそろえる（badges.js はバッジのパネルを #r-ext の直前に入れる） */
+  #rcard:is(:has(> #r-side > :is(#r-badges, #r-ext:not(:empty))):has(> #r-side > .misslist > li:nth-child(5)),
+    :has(> #r-side > #r-badges + #r-ext:not(:empty)):has(> #r-side > .misslist > li:nth-child(2))) { grid-template-rows: auto 1fr; align-content: start; }
+  #rcard:is(:has(> #r-side > :is(#r-badges, #r-ext:not(:empty))):has(> #r-side > .misslist > li:nth-child(5)),
+    :has(> #r-side > #r-badges + #r-ext:not(:empty)):has(> #r-side > .misslist > li:nth-child(2))) > #r-side { align-self: start; }
 }
 /* 900〜1279 の PC: pc.css の #rcard は縦1列（点数 → まちがえた国 → ボタンの行）。パネルが入ると #r-side が高くなり、
    ［もう一回］が画面の外に出る（1024x600 では1か国でも）ので、パネルがあるときはボタンの行を点数のすぐ下に出す。

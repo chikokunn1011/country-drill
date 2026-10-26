@@ -5,7 +5,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, pickSetup } from './helpers.mjs';
+import { startServer, pickSetup, answerWrong, clearByAnswering } from './helpers.mjs';
+import { settleLayout } from './layout.mjs';
 import { openRpg, writeSave, saveWith, startBattle, battleAnswer, battleGuard, winBattle, flipAll } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -253,6 +254,32 @@ t('card_names_no_orphan', async page => {
   assert.deepEqual(await page.evaluate(() => ['li', 'pg', 'st', 'mk', 'jp'].map(a => RPG.cardHTML(a, RPG.get()).match(/<b class="rpg-card-name"[^>]*>(.*?)<\/b>/)[1])),
     ['リヒテン<wbr>シュタイン', 'パプア<wbr>ニューギニア', 'サントメ・<wbr>プリンシペ', '北マケドニア', '日本']);
 });
+
+// 背の低い PC の結果画面で、冒険のコインのパネル（#r-ext）だけ（バッジのパネルは無い）とまちがえた国の一覧が #r-side に並んでも、
+// ［もう一回］はスクロールなしで全部見える（1280x577 で10か国だと 9px 外に出ていた）。一覧が5か国以上なら左（点数と［もう一回］）も
+// 右も上にそろえる（badges.css。バッジのパネルだけのときと同じ）。4か国までは上下まん中のまま
+for (const [viewport, misses] of [[{ width: 1280, height: 577 }, 10], [{ width: 1280, height: 577 }, 5], [{ width: 1280, height: 577 }, 4],
+  [{ width: 1366, height: 657 }, 10], [{ width: 1366, height: 657 }, 4], [{ width: 1536, height: 730 }, 10], [{ width: 1536, height: 730 }, 1]]) {
+  t(`result_rpg_panel_only_pc_fits_misses_${misses}_${viewport.width}x${viewport.height}`, async page => {
+    await writeSave(page, saveWith({ coins: 500 }));
+    await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 10 });
+    await page.click('#start');
+    for (let i = 0; i < misses; i++) { await answerWrong(page); await page.click('#next'); }
+    await clearByAnswering(page);
+    await settleLayout(page);
+    assert.deepEqual(await page.evaluate(() => [document.querySelectorAll('#r-side > #r-ext > .rpg-res').length, !!$('r-badges'), document.querySelectorAll('#r-side .misslist li').length]),
+      [1, false, misses]);
+    assert.ok(await noHScroll(page));
+    const g = await page.evaluate(() => {
+      const b = e => e.getBoundingClientRect(), again = b($('r-again'));
+      return { again: { top: again.top, bottom: again.bottom, right: again.right }, w: innerWidth, h: innerHeight, y: scrollY,
+        result: b($('rcard').querySelector(':scope > .result')).top, side: b($('r-side')).top };
+    });
+    assert.ok(g.y === 0 && g.again.top >= 0 && g.again.bottom <= g.h && g.again.right <= g.w, `［もう一回］が画面の外: ${JSON.stringify(g)}`);
+    if (misses >= 5) assert.ok(Math.abs(g.result - g.side) < 1, `上にそろっていない: ${JSON.stringify(g)}`);
+    else assert.ok(g.result - g.side > 20, `上にそろえている: ${JSON.stringify(g)}`);
+  }, { viewport });
+}
 
 t('pc_stage_fits', async page => {
   await writeSave(page, PARTY);
