@@ -580,6 +580,7 @@ for (const viewport of [{ width: 1366, height: 657 }, { width: 1280, height: 577
     await settleLayout(page);
     assert.equal(await count(page, '#r-badges .bdg-row'), 4);
     assert.match(await text(page, '#r-badges .bdg-more'), /ほか3個/);
+    assert.match(await text(page, '#r-badges'), /をつけたよ/);   // 自動でつけた称号は「ほか」に入れない
     assert.equal(await page.evaluate(() => $('r-badges').parentElement.id), 'r-side');
     assert.ok(await noHScroll(page));
     const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));

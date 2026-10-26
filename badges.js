@@ -556,6 +556,7 @@
       if (keys.length) { pending.push({ summary: keys.length }); flush(); }
     } else {
       const paid = pay(keys), items = keys.map(key => ({ key, paid: paid[key], auto: key === auto }));
+      items.sort((a, b) => b.auto - a.auto);   // 自動でつけた称号を先頭に（パネルの4行・トーストの上限で「ほか」に入らないように）
       if (res?.outcome === 'clear') { lastSid = res.sid; resultPanel(items, res); }   // パネルに出したものはトーストにしない
       else if (!$('scr-result').hidden && $('r-badges')?.dataset.sid === lastSid) panelAdd($('r-badges'), items);
       else { pending.push(...items); flush(); }
