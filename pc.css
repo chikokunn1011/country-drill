@@ -114,6 +114,12 @@ body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
   #qcard > .reveal > .next { grid-column: 3; grid-row: 1 / -1; align-self: end; }
   body.dopa #qcard > .reveal > .verdict { font-size: 1.3rem; }
   #qcard > .reveal > .row { grid-column: 3; grid-row: 1 / -1; align-self: end; flex-direction: column; align-items: stretch; gap: 8px; }
+  /* 豆知識は国の情報の下に1行（帯の高さは変えない。答えると問題と選択肢が動いてしまうため）。全文は title と図鑑で読める */
+  #qcard > .reveal:has(> .trivia) { grid-template-rows: auto minmax(0, 1fr) auto; }
+  #qcard > .reveal > .trivia { grid-column: 1; grid-row: 3; }
+  #qcard > .reveal:has(> .trivia) > .map { grid-row: 2 / -1; }
+  #qcard > .reveal > .trivia .tv { font-size: .76rem; line-height: 1.35; padding: 0 8px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+  #qcard > .reveal:has(> .trivia) > .facts dl { line-height: 1.35; } /* strip: make room for the 1-line trivia without changing the 150px height (R9) */
 }
 
 /* ---------- result ---------- */
@@ -138,7 +144,10 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
 .bmap { display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 420px); gap: 20px; align-items: center; }
 #scr-book > #bmap { flex: 1 1 0; min-height: 360px; container-type: size; }
 .bmap > .mapbox { width: min(100%, calc(100cqh * 16 / 9)); justify-self: center; }
-.binfo { min-height: 240px; }
+.binfo { min-height: 240px; max-height: 100cqh; overflow-y: auto; justify-content: flex-start; }
+/* 情報欄が地図の高さを超えたら中でスクロールする。中央そろえを margin でするので、はみ出しても先頭までスクロールできる */
+.binfo > :first-child { margin-top: auto; }
+.binfo > :last-child { margin-bottom: auto; }
 .binfo .facts { grid-template-columns: 1fr; } .binfo .facts img { width: 100%; max-width: 320px; }
 
 /* ---------- ranking (list screen: top-aligned, scrolls) ---------- */
@@ -211,6 +220,7 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #qcard > .reveal > .facts { grid-template-columns: clamp(84px, 6.5vw, 128px) minmax(0, 1fr); }
   #qcard > .reveal > .facts img { width: 100%; }
   #qcard > .reveal > .map { width: min(100%, calc((100cqh - 340px) * 16 / 9)); align-self: center; }
+  #qcard > .reveal:has(> .trivia) > .map { width: min(100%, calc((100cqh - 340px - 96px) * 16 / 9)); }  /* 豆知識3行ぶん、地図を小さくする */
   #qcard > .reveal > .next { align-self: stretch; }
   #qcard > .reveal > .row { flex-wrap: nowrap; }
   #qcard > .reveal > .row > .btn { flex: 1 1 0; padding-inline: 12px; }
@@ -244,6 +254,9 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #detail .inner > .close { grid-column: 1 / -1; justify-self: end; }
   #detail .inner > .facts { grid-template-columns: 1fr; }
   #detail .inner > .facts img { width: 100%; }
+  /* 豆知識があれば国の情報の下に置き、地図は右で2行ぶん */
+  #detail .inner > .trivia { grid-column: 1; }
+  #detail .inner:has(> .trivia) > .map { grid-column: 2; grid-row: 2 / span 2; }
 }
 
 /* ================= >= 1600 ================= */
@@ -260,4 +273,9 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #nameopt-field[hidden] { display: none !important; }
   .panel { gap: 14px; }
   .home .menu .btn { padding-block: 11px; }
+}
+
+/* 背の低い PC: 答えの地図を小さくしても高さが足りない（1280×577 では地図は幅 0）ので、豆知識を3行で切る（全文は title と図鑑で読める） */
+@media (min-width: 1280px) and (max-height: 760px) {
+  #qcard > .reveal > .trivia .tv { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 }

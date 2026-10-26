@@ -166,6 +166,9 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .facts dd { margin: 0; font-weight: 500; min-width: 0; }
 .facts .name { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; grid-column: 1 / -1; }
 .next { align-self: flex-end; }
+.trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tv { font-size: .88rem; line-height: 1.5; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--hl) 12%, var(--surface)); }
+.tv-k { font-size: .76rem; font-weight: 700; color: var(--muted); margin-right: .6em; white-space: nowrap; }
 
 /* 結果 */
 .result { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
@@ -440,6 +443,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="flags.js"></script>
 <script src="world.js"></script>
 <script src="ranking.js"></script>
+<script src="trivia.js"></script>
 <script>
 /* ---------- データ ---------- */
 // ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ
@@ -851,7 +855,7 @@ function answer(a) {
   let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : G.kind === 'ta' ? `失格…\u3000正解は「${esc(c.n)}」` : `ざんねん。正解は「${esc(c.n)}」`;
   if (!right && G.kind === 'challenge') verdict += '。最初からやり直し！';
   if (!right && G.kind === 'practice') verdict += '。あとでもう一度出るよ';
-  r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}`;
+  r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
   if (G.mode.q !== 'map' && G.mode.a !== 'map') r.append(mapSvg(c, `${c.n}の位置`, { region: S.region }));
   const nx = document.createElement('button');
   nx.className = 'btn next'; nx.id = 'next';
@@ -898,6 +902,31 @@ function factsHTML(c) {
     <dt>地域</dt><dd>${esc(c.r)}</dd>
     <dt>面積</dt><dd class="mono">${fmt(c.ar)} km²</dd>
     <dt>ISO</dt><dd class="mono">${c.a.toUpperCase()}</dd></dl></div>`;
+}
+/* 豆知識（trivia.js の window.TRIVIA = { 国: [{ k: 種類, t: 文 }] }）。読めない・形がおかしいときは何も出さない */
+const TRIVIA_LABEL = { flag: '🏳️ 国旗', geo: '🗺️ 地理', culture: '🍜 文化' };
+const triviaLast = {}; // 国ごとに前に出した文（メモリだけ。保存しない）
+const hasTriviaText = x => typeof x?.t === 'string' && x.t !== '';
+// 正解したときに出す1つ。2件以上あれば、その国で前に出した文を避けてランダムに。テストが差しかえるので TRIVIA は毎回読む
+function pickTrivia(a) {
+  const list = window.TRIVIA?.[a];
+  if (!Array.isArray(list)) return null;
+  const ok = list.filter(hasTriviaText);
+  if (!ok.length) return null;
+  const fresh = ok.length > 1 ? ok.filter(x => x.t !== triviaLast[a]) : ok, pool = fresh.length ? fresh : ok;
+  const x = pool[Math.random() * pool.length | 0];
+  triviaLast[a] = x.t;
+  return x;
+}
+// 豆知識の欄（種類のラベル付き）。全文は title にも入れる（PC の下の帯では1行で切るため）
+function triviaHTML(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  const li = items.filter(hasTriviaText).map(({ k, t }) => {
+    if (typeof k !== 'string') k = '';
+    const label = Object.hasOwn(TRIVIA_LABEL, k) ? `<span class="tv-k">${TRIVIA_LABEL[k]}</span>` : '';
+    return `<li class="tv" data-k="${esc(k)}" title="${esc(t)}">${label}${esc(t)}</li>`;
+  });
+  return li.length ? `<ul class="trivia">${li.join('')}</ul>` : '';
 }
 function endGame(outcome) {            // 1回のゲームにつき必ず1回だけ drill:result を出す
   if (!G || G.ended) return;
@@ -1114,7 +1143,7 @@ function selectBook(a, tapped) {
   bsel = a;
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
-  $('binfo').innerHTML = c ? factsHTML(c) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').innerHTML = c ? factsHTML(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   if (c && tapped) emit('drill:book-open', { a });
 }
@@ -1122,7 +1151,7 @@ $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
   const b = e.target.closest('.card'); if (!b) return;
   const c = byA.get(b.dataset.a), inner = $('detail-inner');
-  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}`;
+  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
   inner.append(mapSvg(c, `${c.n}の位置`));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
