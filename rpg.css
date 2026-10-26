@@ -207,7 +207,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-debug-lv { display: inline-flex; align-items: center; gap: 6px; font: 700 .85rem var(--font-mono); }
 #rpg-dbg-lv { width: 4.5em; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
 
-/* PC: 左に旅人の列（上に固定）、右に図版。1400px 以上は右にもう1列（手配書。Task 12 で小さい地図も） */
+/* PC: 左に旅人の列（上に固定）、右に図版。1400px 以上は右にもう1列（手配書と、仲間の小さい世界地図 #rpg-map。地図は下の「仲間の世界地図」） */
 @media (min-width: 900px) {
   #scr-rpg[data-view="home"] {
     display: grid; align-items: start; grid-template-columns: 320px minmax(0, 1fr);
@@ -225,7 +225,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   #scr-rpg .rpg-aside { position: sticky; top: 16px; }
 }
 
-/* ---- バトル（Task 9: rpg-battle.js の #scr-battle。部品の見た目。スマホの上部固定・短い画面・PC のステージは下の Task 10 のブロック） ---- */
+/* ---- バトル（rpg-battle.js の #scr-battle）の部品の見た目。スマホの上部固定・短い画面・PC のステージは下の「バトルの並べ方」 ---- */
 /* .rpg-stage の1つ目の子が上の列（.rpg-btop）、2つ目の子が問題の列（.rpg-bcol: 登場画面・.bq・答え合わせ・終わり） */
 .rpg-stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .rpg-btop {
@@ -262,7 +262,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-pc { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .75rem; }
 .rpg-pc img { width: 44px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
 .rpg-stars { color: var(--hl); letter-spacing: -.05em; }
-/* 取りもどした旗: 布（?）→ 本物の国旗。「旗 n/N」の文字は普段は隠す（Task 10 の短い画面で使う） */
+/* 取りもどした旗: 布（?）→ 本物の国旗。「旗 n/N」の文字は普段は隠す（短いスマホの1行の帯で使う） */
 .rpg-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .rpg-got, .rpg-cloth { width: 32px; aspect-ratio: 4 / 3; border-radius: 3px; }
 .rpg-got { object-fit: contain; border: 1px solid var(--line); background: var(--bg); }
@@ -295,7 +295,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-bend .misslist { text-align: left; }
 .rpg-bend .row { margin-top: 6px; }
 
-/* ---- バトルの並べ方（Task 10: スマホは上の列を画面の上に固定・短いスマホは上の列を1行・PC は画面の高さいっぱいの2列のステージ） ---- */
+/* ---- バトルの並べ方（スマホは上の列を画面の上に固定・短いスマホは上の列を1行・PC は画面の高さいっぱいの2列のステージ） ---- */
 .rpg-flags::before { content: "取りもどした旗"; content: "取りもどした旗" / ""; margin-right: 4px; font-size: .75rem; color: var(--muted); }
 /* スマホ（〜899px）: 上の列は画面の上に固定する横いっぱいの帯（背景は --surface、下に線）。
    中は［にげる］とダンジョン名・モンスター・敵の HP・旅人の HP とのこりミス・取りもどした旗・ログの最新1行（仲間は登場画面で見せる） */
@@ -424,7 +424,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   @keyframes rpg-dmg { 0% { opacity: 0; transform: translate(-50%, 0) scale(.7); } 20% { opacity: 1; transform: translate(-50%, -8px) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -48px); } }
 }
 
-/* ---- ガチャ・仲間（Task 11） ---- */
+/* ---- ガチャ・仲間（rpg-cards.js の #scr-gacha・#scr-cards と仲間のカード RPG.cardHTML） ---- */
 /* カードの枠の金属（★1 ブロンズ・★2 シルバー・★3 ゴールド）。ダークモードでも同じ色。★の記号も書くので、色だけで見分けなくてよい */
 :root { --rpg-b1: #b0793f; --rpg-b2: #9aa5ad; --rpg-b3: #d9a520; }
 @media (prefers-color-scheme: dark) {
@@ -502,7 +502,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-ga-res:empty { display: none; }
 #ga-flipall { align-self: center; padding: 8px 22px; font-size: .95rem; }
 
-/* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は rpg.js の RPG.worldMap。空のあいだは出さない） */
+/* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は rpg-cards.js の RPG.worldMap が描く。描く前の空のあいだは出さない） */
 .rpg-cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 #cd-map:empty { display: none; }
 
@@ -550,7 +550,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   .rpg-ga-res .rpg-lab { padding-inline: 2px; font-size: .6rem; letter-spacing: -.02em; }
 }
 
-/* ---- 仕上げ（Task 12）: 仲間の世界地図・シェア・演出 ---- */
+/* ---- 仲間の世界地図・シェア・演出（rpg-cards.js の RPG.worldMap・RPG.shareButton と RPG.drawShares・RPG.fx） ---- */
 /* 仲間の世界地図（RPG.worldMap。仲間の一覧の #cd-map と、冒険ホームの 1400px 以上の右の列の #rpg-map）。
    仲間の国は★の金属の色、まだの国は霧の色。小さい国は丸印。凡例の四角も同じ色 */
 .rpg-wmap .rpg-fog { fill: var(--rpg-fog); }

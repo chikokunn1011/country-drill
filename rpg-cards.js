@@ -280,7 +280,7 @@
     };
   };
 
-  // ---- 仲間の一覧（★の多い順 → 国名の順で固定。地図 #cd-map の中身は Task 12） ----
+  // ---- 仲間の一覧（★の多い順 → 国名の順で固定。上の地図 #cd-map は下の worldMap が描く。絞りこみに関係なく全世界） ----
   const CARDS_HTML = `<div class="rpg-head">${backBtn}<h2 class="rpg-h2" id="cd-count"></h2></div>`
     + `<div class="chips" id="cd-regions" role="group" aria-label="地域でしぼりこむ">${chipsHTML('すべて')}</div>`
     + '<div class="rpg-cd-map" id="cd-map"></div><div class="rpg-cd-grid" id="cd-grid"></div>';

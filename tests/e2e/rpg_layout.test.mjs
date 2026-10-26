@@ -1,7 +1,7 @@
 // 国旗クエストの見た目: 4つの大きさ（スマホ 390×844・短いスマホ 360×640・PC 1440×900・1280×720）で横にスクロールしない、
 // バトルはスマホで上の列が上に固定・短い画面で上の列が1行・PC は画面の高さいっぱいの2列のステージ（ページも列もスクロールしない）
 // どのテストも badges.js を止めて開く（openRpg）。大きさは page.setViewportSize で変えて1つのページで回す。
-// Task 11・12 もこのファイルにテストを足す（VIEWPORTS・noHScroll・noVScroll はここのものを使い、ほかのファイルから import しない）
+// ガチャ・仲間のカード・冒険ホームの見た目のテストもこのファイル（VIEWPORTS・noHScroll・noVScroll はここのものを使い、ほかのファイルから import しない）
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
