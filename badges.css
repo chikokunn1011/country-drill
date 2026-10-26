@@ -1,0 +1,7 @@
+/* バッジの画面・札・トースト。クラスは .bdg- で始める */
+/* 段の色（1 銅・2 銀・3 金・4 虹） */
+:root { --bdg-t1: #b0793f; --bdg-t2: #9aa5ad; --bdg-t3: #d9a520; --bdg-t4: conic-gradient(#ff5f6d, #ffc371, #47e891, #3fa9f5, #b06ab3, #ff5f6d); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bdg-t1: #c98d50; --bdg-t2: #b4bec5; --bdg-t3: #e8b830; }
+}
+:root[data-theme="dark"] { --bdg-t1: #c98d50; --bdg-t2: #b4bec5; --bdg-t3: #e8b830; }

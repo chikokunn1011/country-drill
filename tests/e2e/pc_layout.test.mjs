@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { rm } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, PHONE } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, PHONE, QUIET_BADGES } from './helpers.mjs';
 import { SCENES, openScene, settleLayout, measureFit, rectOf, pageGeometry, parseViewports, resolveGeomBase, extractTree } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -423,7 +423,7 @@ test('result_single_column_when_side_empty', { timeout: 120_000 }, async () => {
     const [card, res] = await rects(page, '#rcard', '#rcard > .result'), mid = r => (r.left + r.right) / 2;
     assert.ok(Math.abs(mid(card) - mid(res)) <= 2, `真ん中にない: ${json({ card, res })}`);
   };
-  const app = await openApp(browser, { viewport: W1366, seed: 1, reducedMotion: 'reduce' });
+  const app = await openApp(browser, { viewport: W1366, seed: 1, reducedMotion: 'reduce', storage: { badges: QUIET_BADGES } });
   try {
     const { page } = app;
     // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じ）

@@ -518,5 +518,101 @@
     createStore, pendingPay, payout };
   globalThis.BADGES_CORE = CORE;
   if (typeof document === 'undefined') return;   // node の vm ではここで終わる
-  // ---------- ブラウザ（Task 4 から） ----------
+
+  // ---------- ブラウザ ----------
+  // index.html のグローバルを確かめる。足りなければ何も作らない（クイズはそのまま動く）。
+  // 呼ぶときはいつもグローバルの名前で呼ぶ（参照を取っておかない）
+  const kinds = { C: typeof C, byA: typeof byA, REGIONS: typeof REGIONS, flag: typeof flag, esc: typeof esc, fmt: typeof fmt, $: typeof $,
+    store: typeof store, S: typeof S, P: typeof P, FX: typeof FX, show: typeof show, registerScreen: typeof registerScreen, emit: typeof emit, toast: typeof toast };
+  const lacking = Object.keys(kinds).filter(k => kinds[k] === 'undefined');
+  if (lacking.length) { console.error('[badges] 見つからない: ' + lacking.join(' ')); return; }
+
+  const X = makeX(C), CAT = makeCatalog(C);
+  const ctx = () => makeCtx(X, window.RPG);
+  // バッジのセーブ（index.html の store とは別）。localStorage には呼ぶたびにさわる（使えなくなっても例外は Store が受ける）
+  const bs = createStore({
+    storage: { getItem: k => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v), removeItem: k => localStorage.removeItem(k) },
+    X, cat: CAT, ctx, warn: m => console.warn(m),
+  });
+  let run = null;           // クイズ中なら { sid }。drill:start で作り、drill:result で捨てる（保留の判定に使う）
+  let battle = false;       // バトル画面にいる
+  let screen = document.body.dataset.screen || 'home';   // 最初の drill:screen は badges.js を読む前に出るので、body から読む
+  let lastPull = 0;         // 最後の rpg:pull の時刻（ガチャの演出中の保留）
+  const gate = sidGate();   // 同じゲームの結果は1回だけ数える
+  const pending = [];       // まだ出していないお知らせ
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 取れたステップを知らせる。auto（自動でつけた称号）は、ほかの commit が lastAuto を消す前に読む
+  function deliver(keys, opts = {}) {
+    const auto = 'auto' in opts ? opts.auto : bs.lastAuto;
+    if (auto) emitTitle(auto);
+    pending.push(...keys.map(key => ({ key, auto: key === auto })));
+    flush();
+    renderHome();
+    if (screen === 'badges') renderBadges();
+  }
+  function flush() {}           // 保留していたお知らせを出す（Task 6）
+  function renderHome() {}      // ホームの札とボタン（Task 5）
+  function renderBadges() {}    // バッジ画面（Task 5）
+  function pay(keys, retro = false) { return {}; }   // 冒険への支払い（Task 7）
+  // つける称号が変わった（key が null なら外した）。badge:title を出すのはここだけ
+  function emitTitle(key) {
+    emit('badge:title', key ? { key, title: stepInfo(CAT, key)?.t.title ?? '' } : { key: null, title: '' });
+  }
+
+  // ---------- イベントの受け取り（設計書 §3.3） ----------
+  const on = (type, fn) => document.addEventListener(type, e => fn(e.detail ?? {}));
+  on('drill:start', d => { run = { sid: d.sid }; });
+  on('drill:answer', d => {                    // 軽く！ op を1つ積むだけ。保存・判定・DOM はしない
+    try { bs.push(['ans', d.a, !!d.right, !!d.first, !!d.hint, d.mode, d.missesBefore | 0, d.missesAfter | 0]); }
+    catch (e) { console.error('[badges]', e); }
+  });
+  on('drill:result', d => {
+    try {
+      if (!gate(d.sid)) return;
+      run = null;
+      bs.push(['res', pickResult(d), !!S.dopa, today()]);
+      deliver(bs.commit(), { result: d });
+    } catch (e) { console.error('[badges]', e); }
+  });
+  on('drill:book-open', d => {
+    if (!X.codes.has(d.a) || bs.st.s.bk[d.a]) return;
+    bs.push(['book', d.a]); deliver(bs.commit());
+  });
+  on('drill:misses-reset', () => { bs.push(['wk-reset']); deliver(bs.commit()); });   // 苦手の印だけ消す。克服・バッジは消さない
+  on('drill:screen', d => {
+    const was = screen; screen = d.name;
+    if (d.name === 'battle') battle = true; else if (was === 'battle') battle = false;
+    if (d.name === 'home') renderHome();
+    flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
+  });
+  // 閉じる・隠れるときは、残っている op を保存だけする（判定は次の起動か次の結果で）
+  const save = () => { if (bs.pending()) bs.commit({ judge: false }); };
+  window.addEventListener('pagehide', save);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(); });
+  // ほかのタブが書いた。読み直して描き直すだけ（判定も保存もしない）
+  window.addEventListener('storage', e => {
+    if (e.key !== 'badges') return;
+    bs.reload(); renderHome();
+    if (screen === 'badges') renderBadges();
+  });
+
+  // ---------- window.BADGES（設計書 §9.3）。起動時の判定より先に置く（badge:title を受けた側が title() を読めるように） ----------
+  window.BADGES = {
+    title() { const { eq, got } = bs.st; return eq && own(got, eq) ? stepInfo(CAT, eq)?.t.title ?? '' : ''; },   // かっこなし
+    titleKey: () => bs.st.eq || null,
+    count: () => summarize(CAT, bs.st, ctx()),
+    list: () => listView(CAT, bs.st, ctx()),
+    open: id => show('badges'),                // Task 5 で詳細も開く
+  };
+  if (new URLSearchParams(location.search).get('bdgdebug') === '1') window.BADGES.debug = {   // E2E 用
+    grant(key) { bs.push(['got', key, Date.now()]); bs.commit({ judge: false }); renderHome(); },
+    set(field, value) { bs.push(['set', field, value]); deliver(bs.commit()); },
+    reset() { bs.reset(); renderHome(); },
+    dump: () => clone(bs.st),
+  };
+
+  // ---------- 起動時の判定（§3.4）。bootAuto はほかの commit より先に読む ----------
+  const boot = bs.commit(), bootAuto = bs.lastAuto;
+  deliver(boot, { startup: true, auto: bootAuto });
 })();

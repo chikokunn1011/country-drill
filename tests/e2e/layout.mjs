@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack } from './helpers.mjs';
+import { openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, QUIET_BADGES } from './helpers.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sh = s => `'${String(s).replaceAll("'", `'\\''`)}'`; // シェルに渡す文字をくくる
@@ -118,9 +118,12 @@ export const SCENES = {
 };
 
 // 場面を開いて落ち着くまで待つ。戻り値は openApp と同じ（閉じるのは呼んだ側）
-export async function openScene(browser, { scene, viewport, url, dopa, colorScheme } = {}) {
+// badges はバッジのセーブ（既定はバッジが出ない QUIET_BADGES。null なら入れない）
+export async function openScene(browser, { scene, viewport, url, dopa, colorScheme, badges = QUIET_BADGES } = {}) {
   if (!SCENES[scene]) throw new Error(`そんな場面はない: ${scene}`);
-  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, storage: dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {} });
+  const storage = dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {};
+  if (badges) storage.badges = badges;
+  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, storage });
   try {
     await SCENES[scene](app.page);
     await settleLayout(app.page);
