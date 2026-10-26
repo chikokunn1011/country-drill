@@ -150,6 +150,135 @@
   // 1万未満はそのまま（9,999）、1万から「1.2万」（小数1桁で切り捨て、.0 は付けない）
   const shortCoins = n => n < 10000 ? n.toLocaleString('ja-JP') : `${Math.floor(n / 1000) / 10}万`;
 
+  // ---- セーブの形・移行・掃除（設計書 §9） ----
+  const VERSION = 1;
+  const MIGRATE = { /* 1: d => ({ ...d, v: 2, … }) */ };
+  const BIG = 1e9;                                   // コイン・回数の上限
+  const CODES = new Set(C.map(c => c.a));            // index.html の byA と同じ国コード
+  const isCode = a => CODES.has(a);
+  const IDS = new Set(DUNGEONS.map(d => d.id));
+  const GAUGE_KEYS = new Set(DUNGEONS.flatMap(d => [1, 2, 3, 4, 5].map(f => `${d.id}:${f}`)));
+  const GR = new Set(['', ...DUNGEONS.map(d => d.r)]);   // 前回ガチャを引いた地域（'' か 'all' か地域名）
+
+  const fresh = todayStr => ({
+    v: VERSION, intro: false, show: true, coins: 0, earned: 0, lv: 1, av: 0,
+    cards: {}, fr: {}, mb: {}, fe: {}, wk: {}, lc: {}, ov: {}, floors: {}, gauge: {},
+    pity: 0, pulls: 0,
+    day: { d: todayStr, n: {}, first: false, free: false },
+    bounty: { d: '', a: [], done: [] },
+    paid: [],
+    st: { win: 0, lose: 0, flee: 0, revive: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
+    badgesPaid: [], gr: '',
+  });
+  const KNOWN = new Set(Object.keys(fresh('')));
+
+  const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const list = v => Array.isArray(v) ? v : [];
+  const uniq = a => [...new Set(a)];
+  // 数か数の文字列だけ Number() する。有限でなければ undefined、整数に丸めて lo..hi におさめる
+  const int = (v, lo, hi) => {
+    const n = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN;
+    return Number.isFinite(n) ? Math.min(hi, Math.max(lo, Math.round(n))) : undefined;
+  };
+  const num = (v, lo, hi) => int(v, lo, hi) ?? lo;
+  // ok なキーだけ1つずつ写した新しいオブジェクト（"__proto__" などはここで消える）。f が undefined を返したキーは捨てる
+  const keep = (o, ok, f) => {
+    const out = {};
+    if (isObj(o)) for (const k of Object.keys(o)) if (ok(k)) { const v = f(o[k]); if (v !== undefined) out[k] = v; }
+    return out;
+  };
+  const isCard = c => Array.isArray(c) && c.length === 2 && Number.isInteger(c[0]) && c[0] >= 1 && c[0] < TUNING.card.base.length
+    && Number.isInteger(c[1]) && c[1] >= 0 && c[1] <= TUNING.card.stackMax;
+  const isPaid = p => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && Number.isInteger(p[1]) && p[1] >= 0;
+
+  // 入力が何でも例外を出さずに fresh の形にそろえる。知らない最上位の項目は残す（新しい版から戻ったときに消さない）
+  const sanitize = (x, todayStr) => {
+    const s = isObj(x) ? x : {}, f = fresh(todayStr);
+    const day = isObj(s.day) ? s.day : {}, b = isObj(s.bounty) ? s.bounty : {}, st = isObj(s.st) ? s.st : {};
+    const d = {
+      v: Number.isInteger(s.v) && s.v >= 1 ? s.v : VERSION,
+      intro: s.intro === true,
+      show: s.show !== false,
+      coins: num(s.coins, 0, BIG),
+      earned: num(s.earned, 0, BIG),
+      lv: num(s.lv, 1, TUNING.hero.maxLv),
+      av: num(s.av, 0, AVATARS.length - 1),
+      cards: keep(s.cards, isCode, c => isCard(c) ? [c[0], c[1]] : undefined),
+      fr: keep(s.fr, isCode, v => int(v, 0, TUNING.card.frMax)),
+      mb: keep(s.mb, isCode, v => int(v, 0, 31)),   // MODE_BIT の5つ
+      fe: keep(s.fe, isCode, v => int(v, 0, 15)),   // クイズの4モード（cap は無い）
+      wk: keep(s.wk, isCode, v => v ? 1 : undefined),
+      lc: keep(s.lc, isCode, v => int(v, 0, 1e6)),
+      ov: keep(s.ov, isCode, v => v ? 1 : undefined),
+      floors: keep(s.floors, id => IDS.has(id), v => int(v, 0, 5)),
+      gauge: keep(s.gauge, k => GAUGE_KEYS.has(k), v => int(v, 0, TUNING.battle.gaugeMax)),
+      pity: num(s.pity, 0, TUNING.gacha.pity - 1),
+      pulls: num(s.pulls, 0, BIG),
+      // 今日でなければ今日の空のもの（day.n が増え続けない）
+      day: day.d === todayStr
+        ? { d: todayStr, n: keep(day.n, isCode, v => int(v, 0, 1e6)), first: day.first === true, free: day.free === true }
+        : f.day,
+      bounty: {
+        d: typeof b.d === 'string' ? b.d : '',
+        a: uniq(list(b.a).filter(isCode)).slice(0, 3),
+        done: uniq(list(b.done).filter(isCode)),
+      },
+      paid: list(s.paid).filter(isPaid).slice(-20).map(p => [p[0], p[1]]),
+      st: Object.fromEntries(Object.keys(f.st).map(k => [k, num(st[k], 0, BIG)])),
+      badgesPaid: uniq(list(s.badgesPaid).filter(id => typeof id === 'string')),
+      gr: GR.has(s.gr) ? s.gr : '',
+    };
+    for (const k of Object.keys(s)) if (!KNOWN.has(k) && k !== '__proto__') d[k] = s[k];
+    return d;
+  };
+
+  // raw は JSON.parse した値。backup = 壊れたかもしれない元の文字列を写す。readOnly = 新しい版のデータなので上書きしない
+  const migrate = (raw, todayStr, { version = VERSION, steps = MIGRATE } = {}) => {
+    const broken = () => ({ d: fresh(todayStr), readOnly: false, backup: true });
+    if (!isObj(raw)) return raw == null ? { d: fresh(todayStr), readOnly: false, backup: false } : broken();
+    let d = raw, backup = false;
+    // v だけ消えた → v1 とみなして救う（v1 からの移行も通す）
+    if (d.v === undefined) { d = { ...d, v: 1 }; backup = true; }
+    if (!Number.isInteger(d.v) || d.v < 1) return broken();
+    if (d.v > version) return { d: sanitize(d, todayStr), readOnly: true, backup: false };
+    while (d.v < version) {
+      const v = d.v, step = steps[v];
+      if (typeof step !== 'function') return broken();
+      d = step(d);
+      if (!isObj(d) || !Number.isInteger(d.v) || d.v <= v) return broken();   // v を進めない移行は止まらないので壊れた扱い
+    }
+    return { d: sanitize(d, todayStr), readOnly: false, backup };
+  };
+
+  // ---- 引き継ぎコード: 'CQ1.' + base64url(UTF-8 の JSON { rpg, m }) ----
+  const CODE_HEAD = 'CQ1.', CODE_MAX = 100 * 1024;
+  const toB64url = str => {
+    let bin = '';
+    for (const byte of new TextEncoder().encode(str)) bin += String.fromCharCode(byte);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  // base64url でない・UTF-8 でないときは例外
+  const fromB64url = s => {
+    const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4));
+    return new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(bin, ch => ch.charCodeAt(0)));
+  };
+  // misses: 知っている国コードだけ、0..999 の整数、0 は捨てる
+  const sanitizeMisses = x => keep(x, isCode, v => int(v, 0, 999) || undefined);
+  const encodeCode = (d, m) => CODE_HEAD + toB64url(JSON.stringify({ rpg: d, m }));
+  // 空白と改行を全部消してから読む。壊れている（migrate が写しを取る）・新しい版のコードは受け付けない
+  const decodeCode = (s, todayStr) => {
+    if (typeof s !== 'string') return { ok: false };
+    const t = s.replace(/\s+/g, ''), body = t.slice(CODE_HEAD.length);
+    if (!t.startsWith(CODE_HEAD) || t.length > CODE_MAX || !/^[A-Za-z0-9_-]+$/.test(body)) return { ok: false };
+    let o;
+    try { o = JSON.parse(fromB64url(body)); } catch { return { ok: false }; }
+    if (!isObj(o) || !isObj(o.rpg)) return { ok: false };
+    const r = migrate(o.rpg, todayStr);
+    if (r.readOnly || r.backup) return { ok: false };
+    const hasM = isObj(o.m);
+    return { ok: true, rpg: r.d, m: hasM ? sanitizeMisses(o.m) : {}, hasM };
+  };
+
   globalThis.RPG_CORE = {
     TUNING, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
     levelCost, maxLevelUp, heroStats,
@@ -159,5 +288,7 @@
     hitsNeeded, missesAllowed, judge,
     floorsOf, capOK,
     today, dayNum, shortCoins,
+    VERSION, MIGRATE, fresh, sanitize, migrate,
+    encodeCode, decodeCode, sanitizeMisses,
   };
 })();
