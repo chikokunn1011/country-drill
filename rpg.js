@@ -22,7 +22,7 @@
   const KEY = 'rpg', BROKEN = 'rpg-broken-';
   const KEEP_BROKEN = 3;      // 壊れたセーブの写しは新しいものから3つ（設計書 §9）
   const KEEP_BADGES = 500;    // badgesPaid は最新500件
-  const COIN = '<i class="coin" aria-hidden="true"></i>';
+  const COIN = '<i class="coin" aria-hidden="true"></i>';   // コインの丸（rpg-cards.js と rpg-battle.js は RPG.COIN を使う）
   const MSG = {
     broken: 'データを読めなかったので最初からになったよ',
     readOnly: '新しいバージョンのデータが見つかったよ。ページを再読み込みしてね',
@@ -125,7 +125,7 @@
   };
   // レシートの仲間・昇格・克服・手配書をイベントにする（tx が返ってから呼ぶ。バトルも使う）。owned と total はその時点の数
   const announce = (rc, d) => {
-    const owned = Object.keys(d.cards).length, st = d.st;
+    const owned = K.owned(d), st = d.st;
     rc.joined.forEach((a, i) => emit('rpg:join', { a, via: 'learn', owned: owned - (rc.joined.length - 1 - i) }));
     for (const a of rc.promoted) emit('rpg:promote', { a, star: 2, via: 'learn' });
     rc.overcome.forEach((a, i) => emit('rpg:overcome', { a, total: st.overcome - (rc.overcome.length - 1 - i) }));
@@ -299,8 +299,7 @@
   });
 
   /* ---------- 入口（ホームの［冒険］・トップバーのチップ・設定のスイッチ）と冒険ホーム（#scr-rpg） ---------- */
-  const DG = K.DUNGEONS, AV = K.AVATARS, TOTAL = C.length;
-  const REGION_DG = DG.filter(g => g.r !== 'all');   // 地域のダンジョン（地図喰いの巣をのぞく6つ）
+  const DG = K.DUNGEONS, REGION_DG = K.REGION_DUNGEONS, AV = K.AVATARS, TOTAL = C.length, owned = K.owned;
   const BOSS = 5;   // フロアは F1〜F4 とボス（5）
   const STORY = [
     '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。',
@@ -333,7 +332,6 @@
     return g ? { id: g.id, floor: cleared(d, g.id) + 1 } : null;
   };
   const judgeOf = (d, id, floor) => K.judge(K.battleStats(d, id, floor), K.enemy(id, floor));
-  const owned = d => Object.keys(d.cards).length;
   // ガチャ・仲間・バトルへはここを通す。その画面が無い（rpg-cards.js / rpg-battle.js が読み込めなかった）ときは、opts を置いて冒険ホームを開く
   const open = (name, opts = {}) => { RPG.opts = opts; show(SCREENS.includes(name) ? name : 'rpg'); };
   // ガチャ・仲間の画面があるか（rpg-cards.js が登録する。読み込めなかったときは、冒険ホームにガチャ・仲間の入口を出さない）
@@ -729,7 +727,7 @@
 
   /* ---------- window.RPG ---------- */
   const RPG = window.RPG = {
-    tx, get, emitCoins, announce, coinHTML,
+    tx, get, emitCoins, announce, coinHTML, COIN,
     get status() { return status; },
     get wrote() { return wrote; },             // 最後の tx の書きこみが届いたか
     get warn() { return WARN[status] || ''; },   // 保存の注意（新しい版のデータ・この端末では保存できない）。無ければ ''
@@ -776,7 +774,7 @@
   base = get();
   showCache = base.show;
   setupEntrances();
-  emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: Object.keys(base.cards).length });
+  emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: owned(base) });
   // 直リンク（index.html の起動処理は #rpg を知らないので、画面を登録したあとでここから開く）
   if (location.hash === '#rpg') show('rpg');
   // そのときはまだ後ろのスクリプト（rpg-cards.js のガチャ・仲間の入口と世界地図、badges.js の称号など）が無いので、読み込みが終わったらもう1回描く

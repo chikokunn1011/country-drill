@@ -46,6 +46,10 @@
   // mb（ヒントなしで正解したモード）のビット
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8, cap: 16 };
   const dungeonOf = id => DUNGEONS.find(d => d.id === id);
+  // 地域のダンジョン（地図喰いの巣をのぞく6つ。DUNGEONS と同じもの・同じ順）
+  const REGION_DUNGEONS = DUNGEONS.filter(g => g.r !== 'all');
+  // 仲間の数（セーブ d の cards の国の数）
+  const owned = d => Object.keys(d.cards).length;
 
   // ---- 旅人とレベル（ステータスはセーブせず、Lv から毎回計算する） ----
   // Lv L → L+1 の費用。上限の Lv から先は Infinity
@@ -596,7 +600,7 @@
   };
 
   globalThis.RPG_CORE = {
-    TUNING, BIG, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
+    TUNING, BIG, DUNGEONS, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
     levelCost, maxLevelUp, heroStats,
     stageOf, recLv, enemy, firstClearTotal,
     battleReward, damage,

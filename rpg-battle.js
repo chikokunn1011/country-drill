@@ -21,7 +21,7 @@
   const K = RPG_CORE, T = K.TUNING, TB = T.battle, DG = K.DUNGEONS, RPG = window.RPG;
   const BOSS = 5;             // フロアは F1〜F4 とボス（5）
   const LOG_LINES = 3;        // ログは直近3行
-  const COIN = '<i class="coin" aria-hidden="true"></i>';
+  const COIN = RPG.COIN;
   const LABEL = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？' };
   const MODES = new Set(['f2n', 'n2f', 'm2f', 'cap']);
   const ONGOING = new Set(['question', 'reveal', 'revive']);   // バトルが続いている（にげたら数える）
@@ -395,7 +395,7 @@
   };
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
-    const mates = `仲間 ${Object.keys(d.cards).length}/${C.length}か国 ${T.share.tag}`;
+    const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
   const drawEnd = ({ receipt: rc, coins, first, gauge, d, shares }) => {

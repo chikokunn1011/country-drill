@@ -10,15 +10,12 @@
   const RPG = window.RPG;
   if (typeof RPG?.tx !== 'function') return;
 
-  const K = RPG_CORE, T = K.TUNING, DG = K.DUNGEONS, TOTAL = C.length;
-  const COIN = '<i class="coin" aria-hidden="true"></i>';
-  const owned = d => Object.keys(d.cards).length;
+  const K = RPG_CORE, T = K.TUNING, REGION_DG = K.REGION_DUNGEONS, TOTAL = C.length, COIN = RPG.COIN, owned = K.owned;
   const restHint = rest => `あと${rest}回正解で仲間に（1回のゲームで1回ぶん）`;
 
   /* ---------- 仲間のカード・国旗ガチャ（#scr-gacha）・仲間の一覧（#scr-cards） ---------- */
   const STAR_NAME = ['', 'ブロンズ', 'シルバー', 'ゴールド'];
-  // 地域のダンジョン（地図喰いの巣をのぞく6つ）。地域のチップは全世界と、国の数が少ない順の6地域（ダンジョンの順）。値は S.region と同じ形（'all' か地域名）
-  const REGION_DG = DG.filter(g => g.r !== 'all');
+  // 地域のチップは全世界と、国の数が少ない順の6地域（地域のダンジョン REGION_DG の順）。値は S.region と同じ形（'all' か地域名）
   const AREAS = ['all', ...REGION_DG.map(g => g.r)];
   const AREA_N = Object.fromEntries(AREAS.map(r => [r, r === 'all' ? TOTAL : C.filter(c => c.r === r).length]));
   const inArea = (a, r) => r === 'all' || byA.get(a)?.r === r;
@@ -237,7 +234,7 @@
     if (!d || !RPG.wrote) { gaBusy = false; sayGacha(!RPG.wrote ? 'save' : free ? 'free' : 'coins'); drawGacha(); return; }
     sayGacha('');
     gaShares = milestones(Object.keys(before), Object.keys(d.cards));
-    let owned0 = Object.keys(d.cards).length - res.filter(r => r.out === 'new').length;
+    let owned0 = owned(d) - res.filter(r => r.out === 'new').length;
     emit('rpg:pull', { region, count, free, results: res.map(r => ({ ...r })), pity: d.pity, pulls: d.pulls });
     for (const r of res) {
       if (r.out === 'new') emit('rpg:join', { a: r.a, via: 'gacha', owned: ++owned0 });

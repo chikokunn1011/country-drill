@@ -64,6 +64,16 @@ test('tuning_and_tables', () => {
   assert.deepEqual(plain(K.MODE_BIT), { f2n: 1, n2f: 2, m2f: 4, f2m: 8, cap: 16 });
 });
 
+// rpg.js と rpg-cards.js が共有する部品: 地域のダンジョン（地図喰いの巣をのぞく6つ。DUNGEONS と同じもの・同じ順）と仲間の数
+test('region_dungeons_and_owned', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.REGION_DUNGEONS.map(g => g.id)), IDS.slice(0, 6));
+  assert.deepEqual(plain(K.REGION_DUNGEONS.map(g => g.r)), REGIONS);
+  assert.equal(K.REGION_DUNGEONS[0], K.DUNGEONS[0]);
+  assert.equal(K.owned(K.fresh('2026-10-26')), 0);
+  assert.equal(K.owned({ cards: { jp: [1, 0], br: [2, 1] } }), 2);
+});
+
 test('level_cost', () => {
   const K = loadCore();
   assert.equal(K.levelCost(1), 100);
