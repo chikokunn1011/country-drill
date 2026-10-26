@@ -46,6 +46,11 @@ t('home_button_order', async page => {
   assert.equal(await page.isVisible('#topbar'), true);
 }, { storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
+// 何も止めないとき（本物の rpg.js と badges.js）は プレイ / 冒険 / ランキング / バッジ / 設定（RPG 設計 §3.1「プレイの次に冒険」、バッジ設計 §6.1「設定の直前」）
+t('home_button_order_with_rpg', async page => {
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings']);
+}, { storage: { badges: QUIET_BADGES } });
+
 t('home_button_hidden_when_disabled', async page => {
   // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じやり方）
   await page.route('**/ranking.js', async route => {

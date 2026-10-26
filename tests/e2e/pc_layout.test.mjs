@@ -19,7 +19,7 @@ after(async () => { await browser?.close(); await server?.close(); });
 const SCREEN_OF = [
   [/^home$/, 'home'], [/^settings$/, 'settings'], [/^setup/, 'setup'],
   [/^(quiz|reveal|wrong|named|long)_|^ta_quiz$|^ta_fail/, 'quiz'],
-  [/^result|^ta_result$/, 'result'], [/^ranking$/, 'ranking'], [/^book_/, 'book'],
+  [/^result|^ta_result$/, 'result'], [/^ranking$/, 'ranking'], [/^book_/, 'book'], [/^badges$/, 'badges'],
   [/^rpg_/, 'rpg'], [/^battle_/, 'battle'], [/^gacha_/, 'gacha'], [/^cards$/, 'cards'],
 ];
 const screenOf = scene => SCREEN_OF.find(([re]) => re.test(scene))?.[1];
@@ -190,6 +190,18 @@ test('kinds_field_id', async () => {
     assert.equal(await app.page.locator('#kinds-field #kinds').count(), 1);
     noErrors(app);
   } finally { await app.close(); }
+});
+
+// openScene の badges（バッジのセーブ。既定は3個取ってあって札の無い QUIET_BADGES、null なら入れない）と blockScripts（止めるファイル）が両方効く
+test('open_scene_options', { timeout: 60_000 }, async () => {
+  const count = (page, sel) => page.locator(sel).count();
+  await inScene('home', PHONE, async page => {
+    assert.match(await page.locator('#home-badges').innerText(), /バッジ\s*3\/\d+/);
+    assert.deepEqual([await count(page, '#home-title'), await count(page, '#home-rpg')], [0, 1]);
+  });
+  await inScene('home', PHONE, async page => assert.match(await page.locator('#home-badges').innerText(), /バッジ\s*0\/\d+/), { badges: null });
+  await inScene('home', PHONE, async page => assert.deepEqual([await count(page, '#home-badges'), await count(page, '#home-rpg')], [0, 1]), { blockScripts: ['badges.js'] });
+  await inScene('home', PHONE, async page => assert.deepEqual([await count(page, '#home-badges'), await count(page, '#home-rpg')], [1, 0]), { blockScripts: RPG_FILES });
 });
 
 // 1〜4 キーで答えると #next にフォーカスが移り、Enter で次の問題へ進む（Task 3 が PC の大きさでも呼ぶ）

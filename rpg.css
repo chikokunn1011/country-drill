@@ -79,6 +79,12 @@
   body:not(.rpg-off) #topbar:has(#rpg-chip) { gap: 8px; }
   body:not(.rpg-off) #topbar:has(#rpg-chip) .row:has(> #to-book) { gap: 4px; }
 }
+/* 横に並ぶホーム（900〜1279）: ［冒険］と［バッジ］がそろって5つのときは、pc.css の min-width: 200px だと 4つ＋1つに折り返す（badges.css の flex-wrap）ので、
+   幅を均等（200px まで）にして1行に収める。4つまでと、冒険の表示が OFF のとき（#home-rpg は display: none）は変えない。称号の札（.bdg-titlerow）は幅 100% のまま自分の行 */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) { width: min(100%, 1040px); }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) > .btn { min-width: 0; flex: 1 1 0; }
+}
 /* 背の低い PC（1920×1080 を 150% など）のホームは縦1列のメニュー。［冒険］が増えても縦にスクロールしないように、ボタンを少し詰める */
 @media (min-width: 1280px) and (max-height: 760px) {
   body:not(.rpg-off) .home .menu:has(> #home-rpg) { gap: 6px; }

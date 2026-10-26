@@ -4,15 +4,18 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC, PHONE, QUIET_BADGES } from './helpers.mjs';
 import { measureFit, settleLayout, rectOf } from './layout.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 毎回まっさらなブラウザで ?bdgdebug=1 を付けて開き、最後にページで例外が出ていないかも見る。opts は openApp にそのまま渡す
+// 毎回まっさらなブラウザで ?bdgdebug=1 を付けて開き、最後にページで例外が出ていないかも見る。opts は openApp にそのまま渡す。
+// 既定で rpg.js（RPG_FILES）は止める: 本物の rpg.js は window.RPG を作り badge:earned の paid を書くので、偽の RPG（withRpg）や
+// 「冒険なし」の表示（26個・トーストの枚数）を見るテストは止めないと成り立たない。本物の rpg.js と組み合わせるテストは blockScripts: [] を渡す
 const t = (name, fn, opts = {}) => test(name, { timeout: 60_000 }, async () => {
-  const app = await openApp(browser, { url: server.url + '?bdgdebug=1', ...opts });
+  const app = await openApp(browser, { url: server.url + '?bdgdebug=1', blockScripts: RPG_FILES, ...opts });
   try {
     await fn(app.page, app);
     assert.deepEqual(app.errors.map(String), []);
@@ -130,7 +133,7 @@ t('ta_listener_fast', async page => {
   assert.ok(each < 0.2, `1回 ${each}ms`);
 });
 
-// localStorage が例外を投げても、クイズは動き、バッジはメモリの中で数える
+// localStorage が例外を投げても、クイズは動き、バッジはメモリの中で数える（本物の rpg.js も入ったまま。rpg.js はメモリだけで動く）
 test('storage_unavailable', { timeout: 60_000 }, async () => {
   const app = await openApp(browser, { url: server.url + '?bdgdebug=1' });
   try {
@@ -159,9 +162,9 @@ t('two_tabs', async (page, app) => {
   assert.deepEqual(errors2.map(String), []);
 });
 
-// index.html のグローバルが足りなければ、console.error を1回出して何も作らない。クイズはそのまま動く
+// index.html のグローバルが足りなければ、console.error を1回出して何も作らない。クイズはそのまま動く（rpg.js は止めて、badges.js の分だけ見る）
 test('missing_global_is_safe', { timeout: 60_000 }, async () => {
-  const app = await openApp(browser, { url: server.url });
+  const app = await openApp(browser, { url: server.url, blockScripts: RPG_FILES });
   const { page } = app, logs = [];
   try {
     page.on('console', m => { if (m.type() === 'error') logs.push(m.text()); });
@@ -185,12 +188,8 @@ test('missing_global_is_safe', { timeout: 60_000 }, async () => {
 const text = (page, sel) => page.locator(sel).innerText();
 const count = (page, sel) => page.locator(sel).count();
 const json = o => JSON.stringify(o);
-// 計画 D の冒険ボタンの代わりに、ダミーの「冒険」ボタンを #home-rank の前に足す（ボタン5つのホームを確かめる）
-const addAdvButton = page => page.evaluate(() => {
-  const b = document.createElement('button');
-  Object.assign(b, { className: 'btn ghost', id: 'home-adv', textContent: '冒険' });
-  $('home-rank').before(b);
-});
+// 称号〈ドリルの新人〉をつけてあるセーブ（ホームに札が出る）
+const TITLED = { v: 1, got: { 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'first-clear': 2 } };
 // 最初の .bdg-tiles の、先頭から n 個のタイルの top
 const tileTops = (page, n) => page.evaluate(n => [...document.querySelector('.bdg-tiles').children].slice(0, n).map(e => Math.round(e.getBoundingClientRect().top)), n);
 const listenTitle = page => page.evaluate(() => document.addEventListener('badge:title', e => (window.__bt ||= []).push(e.detail)));
@@ -471,9 +470,8 @@ t('hash_opens_badges', async page => {
   assert.equal(await page.evaluate(() => document.body.dataset.screen), 'badges');
 });
 
-// 横に並ぶホーム（900〜1279）でボタン5つと札がはみ出さず、札は自分の行に出る。≥1280 の2列ヒーローでは札を左に寄せる
+// 横に並ぶホーム（900〜1279）で、本物の［冒険］（rpg.js）を入れたボタン5つが1行に収まり（rpg.css）、札は自分の行に出る。≥1280 の2列ヒーローでは札を左に寄せる
 t('home_menu_pc', async page => {
-  await addAdvButton(page);
   await page.evaluate(() => { BADGES.debug.grant('first-clear@1'); BADGES.open('first-clear'); });
   await page.click('[data-bdg-equip="first-clear@1"]');
   await page.evaluate(() => { $('detail').close(); show('home'); });
@@ -482,18 +480,17 @@ t('home_menu_pc', async page => {
     const m = await page.evaluate(() => {
       const row = document.querySelector('.bdg-titlerow').getBoundingClientRect();
       const btns = [...document.querySelectorAll('.menu .btn')].map(b => b.getBoundingClientRect()).filter(r => r.width);
-      return { n: btns.length, inside: btns.every(r => r.right <= innerWidth), below: btns.every(r => row.bottom <= r.top) };
+      return { n: btns.length, inside: btns.every(r => r.right <= innerWidth), below: btns.every(r => row.bottom <= r.top), rows: new Set(btns.map(r => Math.round(r.top))).size };
     });
-    assert.deepEqual(m, { n: 5, inside: true, below: true }, `${width}x${height}`);
+    assert.deepEqual(m, { n: 5, inside: true, below: true, rows: 1 }, `${width}x${height}`);
     assert.ok(await noHScroll(page), `${width}x${height}`);
   }
   await page.setViewportSize({ width: 1366, height: 768 });
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bdg-titlerow')).justifyContent), 'flex-start');
-}, { viewport: { width: 900, height: 700 } });
+}, { viewport: { width: 900, height: 700 }, blockScripts: [] });
 
-// 背の低い PC（150% 表示のノートなど）と、高さ 760 を少し超える PC で、ボタン5つと札があってもホームが縦にスクロールしない
+// 背の低い PC（150% 表示のノートなど）と、高さ 760 を少し超える PC で、本物の［冒険］を入れたボタン5つと札があってもホームが縦にスクロールしない
 t('home_short_pc_fits', async page => {
-  await addAdvButton(page);
   for (const [i, viewport] of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }, { width: 1366, height: 768 }, { width: 1920, height: 800 }].entries()) {
     const key = `${viewport.width}x${viewport.height}`;
     if (i) await page.setViewportSize(viewport);
@@ -506,7 +503,41 @@ t('home_short_pc_fits', async page => {
     assert.ok(bottoms.every(b => b <= viewport.height), `${key}: ${bottoms}`);
     assert.equal(await page.isVisible('#home-title'), true, key);
   }
-}, { viewport: { width: 1280, height: 577 }, storage: { badges: { v: 1, got: { 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'first-clear': 2 } } } });
+}, { viewport: { width: 1280, height: 577 }, blockScripts: [], storage: { badges: TITLED } });
+
+// 本物の rpg.js と badges.js: ホームのボタン5つ（プレイ・冒険・ランキング・バッジ・設定）と称号の札が、PC の5サイズで
+// 横にも縦にもスクロールせず、たがいに重ならず、画面の中にあり、ボタンの文字は1行（NEW とコインの小さい字もふくめて）
+t('home_five_buttons_pc', async page => {
+  const hit = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
+  for (const [width, height] of [[900, 700], [1024, 768], [1280, 577], [1366, 657], [1920, 1080]]) {
+    const key = `${width}x${height}`;
+    await page.setViewportSize({ width, height });
+    await settleLayout(page);
+    const m = await page.evaluate(() => {
+      const box = el => { const r = el.getBoundingClientRect(); return { id: el.id, l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+      const btns = [...document.querySelectorAll('.home .menu > .btn')].filter(b => b.getBoundingClientRect().width);
+      // 文字のノードの行の箱が全部たがいに縦に重なっていれば1行（position: absolute の .bdg-dot は文字が無いので入らない）
+      const oneLine = b => {
+        const rs = [];
+        for (const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); w.nextNode();) {
+          const rg = document.createRange(); rg.selectNodeContents(w.currentNode); rs.push(...rg.getClientRects());
+        }
+        const live = rs.filter(r => r.width);
+        return live.length > 0 && Math.max(...live.map(r => r.top)) < Math.min(...live.map(r => r.bottom));
+      };
+      return { ids: btns.map(b => b.id), boxes: [...btns, $('home-title')].map(box), wrapped: btns.filter(b => !oneLine(b)).map(b => b.id),
+        hscroll: document.documentElement.scrollWidth > innerWidth, docH: document.documentElement.scrollHeight, iw: innerWidth, ih: innerHeight };
+    });
+    assert.deepEqual(m.ids, ['home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings'], key);
+    assert.deepEqual(m.wrapped, [], `${key}: ボタンの文字が2行になっている`);
+    assert.equal(m.hscroll, false, key);
+    assert.ok(m.docH <= m.ih, `${key}: 縦にスクロールする ${m.docH}/${m.ih}`);
+    for (const p of m.boxes) {
+      assert.ok(p.l >= 0 && p.t >= 0 && p.r <= m.iw && p.b <= m.ih, `${key}: ${p.id} が画面の外 ${json(p)}`);
+      for (const q of m.boxes) if (p !== q) assert.ok(!hit(p, q), `${key}: ${p.id} と ${q.id} が重なる ${json({ p, q })}`);
+    }
+  }
+}, { viewport: { width: 900, height: 700 }, blockScripts: [], storage: { badges: TITLED } });
 
 // いちばん長い称号でも 320px のホームからはみ出さない。[data-bdg-equip] は document のクリックで受ける（どこに置いたボタンでも）
 t('home_long_title_320', async page => {
@@ -809,6 +840,19 @@ for (const [viewport, misses] of [[{ width: 1024, height: 600 }, 1], [{ width: 1
   }, { viewport });
 }
 
+// 本物の rpg.js と badges.js: 背の低い PC で、まちがえた国の一覧・バッジのパネル・冒険のコインのパネル（#r-ext）が #r-side に並んでも、
+// ［もう一回］はスクロールなしで押せる。冒険のパネルがあるときは2か国から左右を上にそろえる（1か国までは上下まん中のまま）
+for (const [viewport, misses] of [[{ width: 1280, height: 577 }, 1], [{ width: 1280, height: 577 }, 2], [{ width: 1280, height: 577 }, 4], [{ width: 1366, height: 657 }, 4]]) {
+  t(`result_panels_with_rpg_pc_fits_misses_${misses}_${viewport.width}x${viewport.height}`, async page => {
+    await playMisses(page, misses);
+    assert.equal(await count(page, '#r-side > #r-ext > .rpg-res'), 1);
+    await againInView(page);
+    const top = await page.evaluate(() => ({ result: $('rcard').querySelector(':scope > .result').getBoundingClientRect().top, side: $('r-side').getBoundingClientRect().top }));
+    if (misses >= 2) assert.ok(Math.abs(top.result - top.side) < 1, `上にそろっていない: ${json(top)}`);
+    else assert.ok(top.result - top.side > 20, `上にそろえている: ${json(top)}`);
+  }, { viewport, blockScripts: [] });
+}
+
 // 起動時の判定で取れたものは、まとめて1枚。称号は取ったなかでいちばん上の段（同じ色なら後ろ）
 t('startup_summary', async page => {
   const ts = page.locator('#toasts .toast');
@@ -854,7 +898,7 @@ t('dialog_blocks_toast', async page => {
 });
 
 /* ---------- 冒険（rpg.js）との連携（設計書 §2.7、§3.3、§3.4、§8.2〜§8.4） ---------- */
-// 偽の rpg.js（window.RPG.snapshot() と、badge:earned で払う）を入れて読み直す。
+// 偽の rpg.js（window.RPG.snapshot() と、badge:earned で払う）を入れて読み直す（本物の rpg.js は t が止めているので、偽のほうが効く）。
 // 払う額は sessionStorage の pay があればそちら（reload しても残るので、途中で払える／払えないを切りかえられる）
 async function withRpg(app, snap = {}, paid = 50) {
   await app.context.addInitScript(([snap, paid]) => {

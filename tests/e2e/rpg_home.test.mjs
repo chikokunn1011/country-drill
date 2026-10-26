@@ -5,7 +5,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
 import { startServer, events } from './helpers.mjs';
 import { openRpg, toastTexts, readSave, writeSave, saveWith, localToday, playPractice } from './rpg_helpers.mjs';
 
@@ -14,12 +13,9 @@ let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 計画 C の badges.js（ブラウザ部分）を index.html が読み込んでいるか（無ければ badges_real_integration は飛ばす）
-const HAS_BADGES = readFileSync(new URL('../../index.html', import.meta.url), 'utf8').includes('<script src="badges.js?v=1">');
-
 // 毎回まっさらなブラウザで開いて fn を実行する。最後にページの例外と、[rpg] で始まる console.error が無いことを見る
-// （opts.rpgErrorOk で console.error の確認だけ外せる。opts.skip は node:test の skip。ほかの opts は openRpg にそのまま渡す）
-const t = (name, fn, { rpgErrorOk = false, skip, ...opts } = {}) => test(name, { timeout: 60_000, skip }, async () => {
+// （opts.rpgErrorOk で console.error の確認だけ外せる。ほかの opts は openRpg にそのまま渡す）
+const t = (name, fn, { rpgErrorOk = false, ...opts } = {}) => test(name, { timeout: 60_000 }, async () => {
   const app = await openRpg(browser, opts);
   try {
     await fn(app.page, app);
@@ -622,7 +618,7 @@ t('badges_real_integration', async page => {
   assert.equal(s.coins, 1050);
   assert.equal(s.badgesPaid.filter(id => id === 'rpg-start@1').length, 1);
   assert.equal((await events(page, 'rpg:coins')).filter(e => e.reason === 'badge').length, 0);
-}, { blockScripts: [], skip: HAS_BADGES ? false : '計画 C の badges.js（ブラウザ部分）が index.html に無い' });
+}, { blockScripts: [] });
 
 /* ---------- RPG.snapshot()・タブ2つ ---------- */
 t('snapshot_shape', async page => {

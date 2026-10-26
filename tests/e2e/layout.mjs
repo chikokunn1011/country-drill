@@ -152,6 +152,8 @@ export const SCENES = {
     await page.click('#grid .card[data-a="jp"]');
     await page.waitForSelector('#detail[open]');
   },
+  // バッジ画面（badges.js。QUIET_BADGES の3個を取ってある状態）
+  badges: async page => { await page.click('#home-badges'); await page.waitForSelector('#bdg-list .bdg-tile'); },
   ...Object.fromEntries(Object.entries(RPG_SCENES).map(([name, go]) => [name, async page => { await go(page); await noToasts(page); }])),
 };
 
