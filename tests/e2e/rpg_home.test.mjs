@@ -191,6 +191,21 @@ t('hash_link', async page => {
   assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
 });
 
+// #rpg の直リンクで開いた冒険ホームにも入口がそろう。rpg.js の読み込み中（rpg-cards.js がまだ無い）に描いたあと、
+// 読み込みが終わってから描き直すので、［国旗ガチャ］［仲間］があり、つぎにやることもガチャの10連をすすめる
+t('hash_link_entrances', async page => {
+  await writeSave(page, saveWith({ coins: 1000 }));
+  await page.goto('about:blank');
+  await page.goto(server.url + '#rpg');
+  await page.waitForFunction(() => document.readyState === 'complete');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
+  for (const sel of ['#rpg-hero', '#rpg-lvup', '#rpg-next', '#rpg-to-gacha', '#rpg-to-cards', '#rpg-dgs .rpg-plate'])
+    assert.ok(await page.locator(sel).count() >= 1 && await visible(page, sel), `${sel} が無い`);
+  assert.ok((await text(page, '#rpg-next')).includes('まずは国旗ガチャ10連'), await text(page, '#rpg-next'));
+  await page.click('#rpg-to-cards');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'cards');
+});
+
 // #rpg の直リンクでは rpg.js の読み込み中に旅人カードを描く。あとから読み込まれる badges.js の称号も出る
 // （badges.js の代わりに、rpg.js より後の rpg-battle.js の末尾で window.BADGES を作る）
 t('hash_link_title', async page => {
