@@ -1,5 +1,6 @@
 // 国旗クエスト（rpg.js）の土台: セーブ（壊れた・新しい版・保存できない）、クイズのコイン（#pcoin・受け取り・途中の受け取り）、結果のパネル、バッジの支払い
-// どのテストも badges.js を止めて開く（openRpg）。コインの額を確かめるテストは、最初に writeSave(page, saveWith({intro:false})) してから始める
+// どのテストも openRpg で開く（既定で badges.js を止める。本物の badges.js とつなぐのは blockScripts: [] のものだけ）。
+// コインの額を確かめるテストは、最初に writeSave(page, saveWith({intro:false})) してから始める
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -471,3 +472,13 @@ t('badge_payment', async page => {
     assert.deepEqual(mem.errors.map(String), []);
   } finally { await mem.close(); }
 });
+
+// 本物の badges.js と rpg.js: まっさらで初クリアすると「はじめの一歩」の ●50 が同じ結果で払われる。
+// 結果のパネルの「いま」はそれを足した額（rpg.js の drill:result が先にパネルを描き、badges.js の支払いはあと）
+t('result_now_includes_badge', async page => {
+  await playPractice(page);
+  await frames(page);
+  const s = await readSave(page);
+  assert.ok(s.badgesPaid.includes('first-clear@1'), JSON.stringify(s.badgesPaid));
+  assert.equal(await page.innerText('#rpg-res .rpg-now'), `いま ${await page.evaluate(n => fmt(n), s.coins)}`);
+}, { blockScripts: [] });

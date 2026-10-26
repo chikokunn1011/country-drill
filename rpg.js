@@ -648,12 +648,15 @@
     if (focus) $(focus)?.focus({ preventScroll: true });
   };
 
-  // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・いまの冒険の画面を描き直す（ガチャの結果は消さない）
+  // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・結果のパネルの「いま」・いまの冒険の画面を描き直す（ガチャの結果は消さない）
   const refresh = () => {
     const d = get(), screen = document.body.dataset.screen;
     document.body.classList.toggle('rpg-off', d.show === false);
     drawEntrances(d);
     if ($('set-rpg')) $('set-rpg').checked = d.show !== false;
+    // パネルを描いたあとに払ったバッジのコイン（badges.js の drill:result はこちらのあと）も「いま」に入れる
+    const now = document.querySelector('#rpg-res .rpg-now');
+    if (now) now.textContent = `いま ${fmt(d.coins)}`;
     if (screen === 'rpg') renderHome();
     RPG.redraw(screen, d);   // ガチャ・仲間の画面（rpg-cards.js）
   };

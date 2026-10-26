@@ -10,8 +10,10 @@ const MODULES = join(HERE, 'node_modules');
 export const PHONE = { width: 390, height: 844 };
 export const PC = { width: 1280, height: 800 };
 // badges.js が入っても、レイアウトのテストの画面にバッジのパネル・札・NEW が出ないためのセーブ（openApp の storage に { badges: QUIET_BADGES }）。
-// テストで別のバッジが取れて画面が変わるなら、そのキーをここに足す
-export const QUIET_BADGES = { v: 1, got: { 'first-clear@1': 1, 'ta-clear@1': 1, 'dopa-on@1': 1 }, eq: '', sn: { 'first-clear': 2, 'ta-clear': 2, 'dopa-on': 2 }, sent: [], tip: 3 };
+// テストで別のバッジが取れて画面が変わるなら、そのキーをここに足す。sent にも入れておく（払い残しにすると、本物の rpg.js では
+// 読み込むたびに ●+150 を払い直して「バッジのごほうび」のトーストが出て、場面の計測に写る）
+export const QUIET_BADGES = { v: 1, got: { 'first-clear@1': 1, 'ta-clear@1': 1, 'dopa-on@1': 1 }, eq: '', sn: { 'first-clear': 2, 'ta-clear': 2, 'dopa-on': 2 },
+  sent: ['first-clear@1', 'ta-clear@1', 'dopa-on@1'], tip: 3 };
 
 // index.html が読む CDN のファイル → npm install した同じ版
 const LIBS = {
