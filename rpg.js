@@ -527,7 +527,8 @@
         go: () => open('battle', { id: nf.id, floor: nf.floor }),
       };
     }
-    return { text: `全クリア！ ${TOTAL}か国を仲間にしよう（${owned(d)}/${TOTAL}）`, go: () => open('cards') };
+    return hasCards() ? { text: `全クリア！ ${TOTAL}か国を仲間にしよう（${owned(d)}/${TOTAL}）`, go: () => open('cards') }
+      : { text: '全クリア！ クイズでコインを稼いで、レベルを上げよう', go: () => open('rpg') };
   };
   // ダンジョンの図版。開いていないものは 🔒 と押せないフロアだけ（ボスは見せない）
   const plateHTML = (d, g) => {

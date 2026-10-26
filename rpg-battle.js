@@ -514,7 +514,7 @@
   registerScreen('battle', render);
 
   window.RPG_BATTLE = {
-    start,
+    start: tryStart,   // 外から呼んでも、例外のときは片付けてから始めていない画面を出す
     // いまの問題の国コード（問題・答え合わせ・復活のあいだ。ほかは null）
     cur: () => B && B.q && B.phase !== 'intro' && B.phase !== 'end' ? B.q.a : null,
     state: () => ({ phase: B ? B.phase : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null }),

@@ -339,7 +339,7 @@
       for (const k of [1, 2, 3]) el.classList.toggle(`rpg-m${k}`, star === k);
       el.classList.toggle('rpg-fog', !star);
     }
-    svg.setAttribute('aria-label', `仲間にした国の世界地図（仲間 ${Object.keys(cards).length}/${TOTAL}）`);
+    svg.setAttribute('aria-label', `仲間にした国の世界地図（仲間 ${owned({ cards })}/${TOTAL}）`);
   };
 
   // シェア: 押した処理の中で（await の前に）navigator.share。閉じただけ（AbortError）なら何もしない。
