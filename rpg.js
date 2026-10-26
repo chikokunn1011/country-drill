@@ -514,6 +514,7 @@
     field.innerHTML = '<span class="lbl">冒険</span><label class="switch"><input type="checkbox" id="set-rpg"> 冒険（コイン・RPG）を表示する</label>';
     $('set-dopa')?.closest('.field')?.after(field);
     const sw = $('set-rpg');
+    if (sw) sw.checked = get().show !== false;   // #settings の直リンクは rpg.js より前に設定を開く（その drill:screen は聞きのがす）
     if (sw) sw.onchange = () => {
       const v = sw.checked;
       tx(d => { d.show = v; });
@@ -560,4 +561,6 @@
   emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: Object.keys(base.cards).length });
   // 直リンク（index.html の起動処理は #rpg を知らないので、画面を登録したあとでここから開く）
   if (location.hash === '#rpg') show('rpg');
+  // そのときはまだ後ろのスクリプト（badges.js の称号など）が無いので、読み込みが終わったらもう1回描く
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { if (document.body.dataset.screen === 'rpg') renderHome(); }, { once: true });
 })();

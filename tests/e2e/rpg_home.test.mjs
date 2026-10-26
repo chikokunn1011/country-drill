@@ -147,6 +147,31 @@ t('hash_link', async page => {
   assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
 });
 
+// #rpg の直リンクでは rpg.js の読み込み中に旅人カードを描く。あとから読み込まれる badges.js の称号も出る
+// （badges.js の代わりに、rpg.js より後の rpg-battle.js の末尾で window.BADGES を作る）
+t('hash_link_title', async page => {
+  await writeSave(page, saveWith({}));
+  await page.route('**/rpg-battle.js*', async r => {
+    const res = await r.fetch();
+    await r.fulfill({ response: res, body: (await res.text()) + "\nwindow.BADGES = { title: () => 'アジア博士' };" });
+  });
+  await page.goto('about:blank');
+  await page.goto(server.url + '#rpg');
+  await page.waitForFunction(() => document.readyState === 'complete');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
+  assert.equal(await text(page, '#rpg-title'), '〈アジア博士〉');
+});
+
+// #settings の直リンクでは rpg.js より前に設定が開く（drill:screen を聞きのがす）。2回目の読み込みはセーブを書き直さないので refresh も走らない
+t('settings_hash_switch_on', async page => {
+  await writeSave(page, saveWith({}));
+  await page.goto('about:blank');
+  await page.goto(server.url + '#settings');
+  await page.waitForFunction(() => document.readyState === 'complete');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'settings');
+  assert.equal(await page.isChecked('#set-rpg'), true);
+});
+
 t('levelup_one', async page => {
   await home(page, saveWith({ coins: 1000 }));
   assert.ok((await text(page, '#rpg-lvup')).includes('100'));
