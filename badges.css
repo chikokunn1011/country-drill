@@ -152,3 +152,30 @@
   .bdg-recent { display: block; }
   .bdg-tiles { grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 11vw, 200px), 1fr)); }
 }
+
+/* ---------- 動き（§5.4）。全部 no-preference の中（reduced motion ではその場に出て、止まっている） ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* トーストとパネルはすっと出る（.toast は index.html のもの。バッジのトーストだけ） */
+  .toast:has(> .bdg-toast) { animation: bdg-drop .2s ease-out; }
+  .bdg-result { animation: bdg-rise .2s ease-out; }
+  /* ドパガキ: トーストとパネルのメダルが1回転して、きらっと光る */
+  body.dopa :is(.bdg-toast, .bdg-result) .bdg-medal { animation: bdg-spin .9s cubic-bezier(.3, .7, .4, 1) .1s; }
+  /* ドパガキ: バッジ画面の金・虹のメダルの枠の上を、光がゆっくり回る（::after の輪を回す。光るのは輪の一部だけ） */
+  body.dopa #scr-badges .bdg-medal:is(.t3, .t4):not(.off) { position: relative; }
+  body.dopa #scr-badges .bdg-medal:is(.t3, .t4):not(.off)::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(transparent 0 70%, rgb(255 255 255 / .95) 82%, transparent 94%);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+    animation: bdg-sheen 4s linear infinite;
+  }
+}
+@keyframes bdg-drop { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes bdg-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes bdg-spin {
+  from { transform: perspective(240px) rotateY(0); }
+  65% { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 0 0 transparent; }
+  80% { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 14px 5px rgb(255 214 90 / .85); }
+  to { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes bdg-sheen { to { transform: rotate(1turn); } }

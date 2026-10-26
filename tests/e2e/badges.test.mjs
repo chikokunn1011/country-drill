@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC, QUIET_BADGES } from './helpers.mjs';
 import { measureFit, settleLayout, rectOf } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -821,3 +821,97 @@ t('title_without_brackets', async (page, app) => {
   await playPractice(page);
   assert.equal(await page.evaluate(() => BADGES.title()), 'ドリルの新人');
 });
+
+/* ---------- ドパガキと reduced motion（設計書 §5.4） ---------- */
+// FX の4つを、呼ばれた引数を window.__fx に [名前, ...引数] で積んでから元を呼ぶものに置きかえる（badges.js は呼ぶときに FX から読む）
+const spyFx = page => page.evaluate(() => {
+  window.__fx = [];
+  for (const k of ['sfx', 'confetti', 'pop', 'flash']) {
+    const orig = FX[k];
+    FX[k] = function (...a) { window.__fx.push([k, ...a]); return orig.apply(this, a); };
+  }
+});
+const fxCalls = page => page.evaluate(() => window.__fx);
+const fxReset = page => page.evaluate(() => { window.__fx = []; });
+// バッジの部分で動いているアニメの数（index.html のドパガキのボタンのアニメは数えない）
+const badgeAnims = page => page.evaluate(() => document.getAnimations().filter(a => a.effect?.target?.closest?.('[class*="bdg-"], #toasts, #r-badges')).length);
+const DOPA = { region: 'all', dopa: true, sound: false };
+
+t('reduced_motion_static', async page => {
+  await spyFx(page);
+  await playPractice(page);
+  await fxReset(page);                         // index.html の結果の演出はここまでで終わっている
+  assert.equal(await count(page, '#r-badges'), 1);
+  await page.waitForTimeout(800);
+  assert.equal(await badgeAnims(page), 0);
+  const fx = await fxCalls(page);
+  assert.deepEqual(fx.filter(c => ['confetti', 'pop', 'flash'].includes(c[0])), [], json(fx));
+  assert.ok(fx.some(c => json(c) === json(['sfx', 'correct', 10])), json(fx));
+  await page.evaluate(() => show('home'));
+  await page.evaluate(() => BADGES.debug.set('right', 1000));
+  await toastWith(page, 'こつこつ正解').first().waitFor();
+  assert.equal(await badgeAnims(page), 0);
+  await page.evaluate(() => { BADGES.debug.grant('answers@3'); show('badges'); });   // 金のメダルも止まっている
+  assert.equal(await badgeAnims(page), 0);
+  assert.deepEqual((await fxCalls(page)).filter(c => c[0] !== 'sfx'), []);
+}, { reducedMotion: 'reduce', storage: { settings: DOPA } });
+
+t('dopa_effects', async page => {
+  await spyFx(page);
+  await playPractice(page);
+  await fxReset(page);
+  await page.waitForTimeout(800);
+  let fx = await fxCalls(page);
+  assert.ok(fx.some(c => json(c) === json(['sfx', 'correct', 10])), json(fx));
+  assert.ok(fx.some(c => c[0] === 'confetti' && c[2] === 80), json(fx));
+  await page.click('#brand');
+  await fxReset(page);
+  await page.evaluate(() => BADGES.debug.set('right', 5000));   // 銅・銀・金
+  await page.waitForTimeout(1500);
+  fx = await fxCalls(page);
+  assert.ok(fx.some(c => json(c) === json(['sfx', 'correct', 8])), json(fx));
+  assert.ok(fx.some(c => c[0] === 'confetti' && c[2] === 60), json(fx));
+  await page.evaluate(() => BADGES.open('answers'));
+  await page.click('#detail [data-bdg-equip="answers@1"]');
+  assert.ok((await fxCalls(page)).some(c => json(c) === json(['pop', '称号チェンジ！', 'small'])), json(await fxCalls(page)));
+  await page.evaluate(() => { $('detail').close(); show('badges'); });
+  assert.ok(await badgeAnims(page) > 0);
+}, { viewport: PC, reducedMotion: 'no-preference', storage: { settings: DOPA } });
+
+t('dopa_off_quiet', async page => {
+  await spyFx(page);
+  await page.evaluate(() => BADGES.debug.set('right', 5000));
+  await page.waitForTimeout(1000);             // 400ms ずつずらした分も出きる
+  assert.equal(await toastN(page), 2);
+  await page.evaluate(() => BADGES.open('answers'));
+  await page.click('#detail [data-bdg-equip="answers@1"]');
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), 'answers@1');
+  assert.deepEqual(await fxCalls(page), []);
+}, { reducedMotion: 'no-preference' });
+
+// ヒントの注意だけのパネル（バッジが取れていない）では、ドパガキでも音も紙吹雪も出さない
+t('dopa_tip_only_quiet', async page => {
+  await spyFx(page);
+  await pickSetup(page, { mode: 'm2f', kind: 'practice', region: 'all', count: 5 });
+  await page.check('#nameopt');
+  await page.click('#start');
+  await clearByAnswering(page);
+  await fxReset(page);
+  assert.equal(await count(page, '#r-badges .bdg-tip'), 1);
+  assert.equal(await count(page, '#r-badges .bdg-row'), 0);
+  await page.waitForTimeout(800);
+  assert.deepEqual(await fxCalls(page), []);
+}, { reducedMotion: 'no-preference', storage: { settings: DOPA, badges: { ...QUIET_BADGES, tip: 0 } } });
+
+t('dark_dopa_layouts', async page => {
+  for (const [width, height] of [[390, 844], [1440, 900]]) {
+    const key = `${width}x${height}`;
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => show('home'));
+    assert.ok(await noHScroll(page), `home ${key}`);
+    const c = await page.evaluate(() => { const s = getComputedStyle($('home-badges')); return [s.color, s.backgroundColor]; });
+    assert.notEqual(c[0], c[1], `#home-badges ${key}`);
+    await page.evaluate(() => show('badges'));
+    assert.ok(await noHScroll(page), `badges ${key}`);
+  }
+}, { colorScheme: 'dark', storage: { settings: DOPA, badges: { v: 1, got: { 'answers@1': 1, 'answers@2': 1, 'answers@3': 1 }, eq: 'answers@3', sn: { answers: 2 } } } });

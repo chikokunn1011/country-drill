@@ -591,10 +591,20 @@
     if (wait === Infinity) return;
     if (wait > 0) { flushTimer = setTimeout(flush, wait); return; }
     const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), cap = innerWidth < 600 ? 2 : 3;
-    const html = list.filter(it => 'summary' in it).map(it => lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`));
-    if (steps.length > cap) html.push(...steps.slice(0, cap - 1).map(stepToast), lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`));
-    else html.push(...steps.map(stepToast));
-    html.forEach((h, i) => { if (i) setTimeout(() => toast(h, 4500), i * 400); else toast(h, 4500); });   // toast はいつもグローバルの名前で呼ぶ
+    // { html, key }。key があるのは個別のトースト（ドパガキの演出をする）
+    const out = list.filter(it => 'summary' in it).map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`) }));
+    const single = it => ({ html: stepToast(it), key: it.key });
+    if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`) });
+    else out.push(...steps.map(single));
+    out.forEach((o, i) => { if (i) setTimeout(() => showToast(o), i * 400); else showToast(o); });
+  }
+  // トーストを1枚出す（toast はいつもグローバルの名前で呼ぶ）。個別のトーストは、ドパガキなら音と、金・虹なら紙吹雪（§5.4）
+  function showToast({ html, key }) {
+    toast(html, 4500);
+    if (!key || !S.dopa) return;
+    FX.sfx('correct', 8);
+    const el = $('toasts')?.lastElementChild;   // toast() は何も返さないので、いま足した1枚
+    if (el && (stepInfo(CAT, key)?.color ?? 0) >= 3 && !reduced()) FX.confetti(el.getBoundingClientRect(), 60);
   }
 
   // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］
@@ -629,6 +639,16 @@
     const ext = host.querySelector(':scope > #r-ext'), btns = host.querySelector(':scope > .row.center');
     if (ext) ext.before(box); else if (btns) btns.before(box); else host.append(box);
     panelAdd(box, items);
+    if (S.dopa && items.length) setTimeout(() => panelFx(box), 700);   // 結果のファンファーレのあと（ヒントの注意だけのパネルでは鳴らさない）
+  }
+  // 結果パネルのドパガキの演出（§5.4）。結果画面を離れた・次の結果に変わったら何もしない。
+  // 紙吹雪はパネルの真ん中が画面内に見えていればそこから、見えていなければ画面の中央（null）から
+  function panelFx(box) {
+    if (!box.isConnected || $('scr-result').hidden) return;
+    FX.sfx('correct', 10);
+    if (reduced()) return;
+    const r = box.getBoundingClientRect(), cy = r.top + r.height / 2;
+    FX.confetti(r.width && cy >= 0 && cy <= innerHeight ? r : null, 80);
   }
   // パネルに行を足す。4行まで、それより多ければ「ほか◯個」の数を増やす（行は作り直さない）
   function panelAdd(box, items) {
@@ -846,10 +866,12 @@
   // 称号をつける（'' なら外す）。取っていないキーは何もしない
   function equip(key) {
     if (typeof key !== 'string' || key !== '' && !own(bs.st.got, key)) return;
+    const was = bs.st.eq;
     bs.push(['eq', key]);
     deliver(bs.commit());          // ホームの札とバッジ画面も、ここで描き直す
     emitTitle(key || null);
     redrawDialog();
+    if (key && key !== was && S.dopa && !reduced()) FX.pop('称号チェンジ！', 'small');   // つけた称号が変わった（外したときは出さない）
   }
   // 地域・モードのバッジの条件でモード選択へ（P.name は変えない。詳細の注意書きで知らせる）
   function practice(id) {
