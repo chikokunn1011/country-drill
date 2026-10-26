@@ -21,7 +21,6 @@
   const K = RPG_CORE, T = K.TUNING;
   const KEY = 'rpg', BROKEN = 'rpg-broken-';
   const KEEP_BROKEN = 3;      // 壊れたセーブの写しは新しいものから3つ（設計書 §9）
-  const CAP = 1e9;            // コインの上限（rpg-core.js の sanitize と同じ）
   const KEEP_BADGES = 500;    // badgesPaid は最新500件
   const COIN = '<i class="coin" aria-hidden="true"></i>';
   const MSG = {
@@ -34,6 +33,9 @@
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
   const missesNow = () => (misses && typeof misses === 'object') ? misses : {};
   const names = as => as.map(a => esc(byA.get(a)?.n ?? a)).join('・');
+  const JOIN_MAX = 5;   // 仲間になった国の一覧は5か国まで、あとは「ほか n か国」（結果のパネルもトーストも同じ）
+  const joinedText = as => { const j = as.slice(0, JOIN_MAX), more = as.length - j.length; return `${names(j)}${more ? `ほか${more}か国` : ''}`; };
+  const restHint = rest => `あと${rest}回正解で仲間に（1回のゲームで1回ぶん）`;
   // document のイベントを受ける。例外はクイズに伝えずコンソールに出す
   const on = (type, f) => document.addEventListener(type, e => {
     try { f(e.detail ?? {}, e); } catch (err) { console.error('[rpg]', err); }
@@ -92,7 +94,7 @@
     try {
       const raw = readRaw(), r = load(raw);
       status = !ls ? 'memory' : r.readOnly ? 'readOnly' : 'ok';
-      if (r.readOnly) return null;
+      if (r.readOnly) { wrote = false; return null; }   // 何も書いていない
       if (r.backup && raw !== backedUp) {
         backedUp = raw;
         backupRaw(raw);
@@ -187,6 +189,10 @@
     if (firstArmed && last.coin > 0) { firstArmed = false; firstDue = true; }
     queuePcoin();
   });
+  // この回で仲間になった国をのぞいたのが、始める前の仲間
+  const ownedBefore = (d, rc) => Object.keys(d.cards).filter(a => !rc.joined.includes(a));
+  // 次に冒険ホームを開いたときに出すシェア（出したら、押すか冒険ホームを離れるまで）
+  let homeShares = [], homeSharesShown = false;
   on('drill:result', det => {
     if (!run || run.sid !== det.sid) return;
     const r = run, m = missesNow(), t = todayStr();
@@ -212,7 +218,10 @@
     if (det.outcome === 'clear') drawResult(rc, d);
     else {
       if (rc.delta > 0) toast(`${COIN} +${fmt(rc.delta)} コイン`);
-      if (rc.joined.length) toast(`🤝 ${names(rc.joined)}が仲間になった！`);
+      if (rc.joined.length) toast(`🤝 ${joinedText(rc.joined)}が仲間になった！`);
+      // 失格／にげたときはトーストに［シェア］を置けないので、節目は次に冒険ホームを開いたときに出す（開く前にまた届いたら足す）
+      const sh = milestones(ownedBefore(d, rc), Object.keys(d.cards));
+      if (sh.length) homeShares = [...homeShares.filter(s => !sh.some(x => x.kind === s.kind)), ...sh];
     }
   });
   // 途中の受け取り（iOS はアプリの切りかえで pagehide が来ないことがあるので visibilitychange でも）。トーストもパネルも出さない
@@ -234,17 +243,16 @@
     const row = (label, coins) => coins > 0 ? `<li>${label} …… ${fmt(coins)}</li>` : '';
     const rows = row(`一発正解 ${rc.first.n}問`, rc.first.coins) + row(`やり直しで正解 ${rc.retry.n}問`, rc.retry.coins)
       + row(`正解 ${rc.ta.n}問`, rc.ta.coins) + row('クリアボーナス', rc.clear) + row(`はじめて正解 ${rc.fe.n}か国`, rc.fe.coins);
-    const joined = rc.joined.slice(0, 5), more = rc.joined.length - joined.length;
     const lines = [
       rc.daily > 0 && `🎁 今日はじめてのクリア +${fmt(rc.daily)} ／ 無料ガチャ1回ゲット`,
-      joined.length && `🤝 ${names(joined)}${more ? `ほか${more}か国` : ''}が仲間になった！（${T.card.frJoin}回正解した国は仲間になるよ）`,
+      rc.joined.length && `🤝 ${joinedText(rc.joined)}が仲間になった！（${T.card.frJoin}回正解した国は仲間になるよ）`,
       rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
       rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(T.overcome * rc.overcome.length)}`,
       rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(T.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(T.bountyAll)}）` : ''}`,
       rc.zeroed && 'タイムが速すぎたので、この回のコインはなし',
     ].filter(Boolean);
     // 仲間の数・地域の国を全部、に届いたらシェア（この回で仲間になった国をのぞいたのが、始める前の仲間）
-    const after = Object.keys(d.cards), shares = milestones(after.filter(a => !rc.joined.includes(a)), after);
+    const shares = milestones(ownedBefore(d, rc), Object.keys(d.cards));
     ext.innerHTML = `<div class="rpg-res" id="rpg-res">`
       + `<p class="rpg-res-head">${COIN} +<span class="rpg-res-n">${fmt(rc.sum)}</span> コイン <span class="rpg-now">いま ${fmt(get().coins)}</span></p>`
       + (rows ? `<ul class="rpg-res-rows">${rows}</ul>` : '')
@@ -274,8 +282,8 @@
       let d = null;
       const paid = tx(x => {
         if (x.badgesPaid.includes(det.id)) return 0;
-        x.coins = Math.min(CAP, x.coins + T.badge);
-        x.earned = Math.min(CAP, x.earned + T.badge);
+        x.coins = Math.min(K.BIG, x.coins + T.badge);
+        x.earned = Math.min(K.BIG, x.earned + T.badge);
         x.badgesPaid = [...x.badgesPaid, det.id].slice(-KEEP_BADGES);
         d = x;
         return T.badge;
@@ -492,8 +500,8 @@
       tx(s => {
         if (s.intro) return;   // 別のタブで先に旅に出ていたら、お祝いは二重に出さない
         s.intro = true; s.av = av;
-        s.coins = Math.min(CAP, s.coins + T.start);
-        s.earned = Math.min(CAP, s.earned + T.start);
+        s.coins = Math.min(K.BIG, s.coins + T.start);
+        s.earned = Math.min(K.BIG, s.earned + T.start);
         x = s;
       });
       if (x && wrote) emitCoins(x, T.start, 'start');
@@ -566,8 +574,18 @@
       + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
       + `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
       + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div></div>'
-      + `<div class="rpg-main"><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
-      + `<div class="rpg-aside">${bountyHTML(d)}<div class="rpg-wmapbox" id="rpg-map"></div></div>`;
+      + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
+      + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
+  };
+  // 失格／にげたときの節目の［シェア］。押した行は消える（冒険ホームを離れたら全部消える: drill:screen）
+  const drawHomeShares = () => {
+    const box = $('rpg-home-share');
+    drawShares(box, homeShares);
+    homeSharesShown = homeShares.length > 0;
+    box.querySelectorAll('.rpg-share').forEach((b, i) => {
+      const { kind } = homeShares[i];
+      b.addEventListener('click', () => { homeShares = homeShares.filter(s => s.kind !== kind); drawHomeShares(); });
+    });
   };
   const bindHome = nx => {
     $('rpg-av').onclick = () => tx(x => { x.av = (x.av + 1) % AV.length; });
@@ -600,6 +618,7 @@
       const nf = nextFloor(d), nx = nextAction(d, nf);
       sec.innerHTML = homeHTML(d, nf, nx);
       bindHome(nx);
+      drawHomeShares();
       drawHomeMap(d);
     } else {
       sec.innerHTML = introHTML(d);
@@ -637,16 +656,16 @@
 
   // 仲間のカード（<button>）: 国旗・国名・★・かさね・なかよし度。持っていない国は国旗をグレーで薄く（.is-none）、あと何回正解で仲間になるか
   // （なかよし度が5以上なのに持っていない国には出さない）。face: 'back' は裏向き（.is-back。方位磁針の模様）
-  const cardHTML = (a, d, { face = 'up', label = '' } = {}) => {
+  const cardHTML = (a, d, { face = 'up', label = '', lazy = false } = {}) => {
     const c = byA.get(a);
     if (!c) return '';
     const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = T.card.frJoin - fr, back = face === 'back';
     const mid = card
       ? `<span class="rpg-card-star">${'★'.repeat(star)}</span><span class="rpg-card-stack" title="かさね ${card[1]}/${T.card.stackMax}">${dots(card[1])}</span>`
-      : rest > 0 ? `<span class="rpg-card-hint">あと${rest}回正解で仲間に（1回のゲームで1回ぶん）</span>` : '';
+      : rest > 0 ? `<span class="rpg-card-hint">${restHint(rest)}</span>` : '';
     return `<button type="button" class="rpg-card rpg-s${star}${card ? '' : ' is-none'}${back ? ' is-back' : ''}" data-a="${a}" data-star="${star}"${back ? ' aria-label="裏向きのカード"' : ''}>`
-      + `<span class="rpg-card-face">${label ? `<span class="rpg-lab">${label}</span>` : ''}<img class="rpg-card-flag" src="${flag(a)}" alt="">`
-      + `<b class="rpg-card-name">${esc(c.n)}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
+      + `<span class="rpg-card-face">${label ? `<span class="rpg-lab">${label}</span>` : ''}<img class="rpg-card-flag" src="${flag(a)}" alt=""${lazy ? ' loading="lazy"' : ''}>`
+      + `<b class="rpg-card-name" style="--n:${c.n.length}">${esc(c.n)}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
       + '<span class="rpg-card-back" aria-hidden="true"><span>🧭</span></span></button>';
   };
   // #detail に国の情報とカードの強さ。id があればそのダンジョンでの値（地域ボーナス ×1.5 が付くか）
@@ -663,7 +682,7 @@
         + (g ? '' : `<p class="hint">${esc(c.r)}のダンジョンと地図喰いの巣では、地域ボーナスで ×${T.card.regionMul}</p>`);
     } else {
       info = `<p class="rpg-cd-pow">まだ仲間じゃない（なかよし度 ♥${fr}/${T.card.frMax}）</p>`
-        + (fr < T.card.frJoin ? `<p class="hint">あと${T.card.frJoin - fr}回正解で仲間に（1回のゲームで1回ぶん）</p>` : '');
+        + (fr < T.card.frJoin ? `<p class="hint">${restHint(T.card.frJoin - fr)}</p>` : '');
     }
     inner.innerHTML = `<button class="close">閉じる</button>${factsHTML(c)}<div class="rpg-cd-info">${info}</div>`;
     inner.querySelector('.close').onclick = () => dlg.close();
@@ -678,7 +697,7 @@
     + `<div class="chips" id="ga-regions" role="group" aria-labelledby="ga-q">${chipsHTML('全世界')}</div>`
     + `<p class="hint" id="ga-hint">選んだ地域のダンジョンでは、その地域の仲間が ×${T.card.regionMul} で強い</p>`
     + '<div class="rpg-ga-btns"><button class="btn ghost" id="ga-free"></button><button class="btn" id="ga-1"></button><button class="btn" id="ga-10"></button></div>'
-    + '<p class="rpg-ga-need" id="ga-need" hidden></p><p class="rpg-ga-pity" id="ga-pity"></p>'
+    + '<p class="rpg-ga-need" id="ga-need" hidden></p><p class="rpg-ga-msg" id="ga-msg" role="status"></p><p class="rpg-ga-pity" id="ga-pity"></p>'
     + `<div class="rpg-ga-rates" id="ga-rates"></div><p class="rpg-ga-note" id="ga-note">${GA_NOTE}</p></div>`
     + '<div class="rpg-ga-main" id="ga-main"><p class="rpg-lbl">結果</p><p class="hint" id="ga-empty">引いたカードがここに並ぶよ</p>'
     + '<div class="rpg-ga-res" id="ga-res"></div><div class="rpg-shares" id="ga-share" hidden></div><button class="btn ghost" id="ga-flipall" hidden>ぜんぶめくる</button></div>';
@@ -725,12 +744,16 @@
     el.removeAttribute('aria-label');
     if (el.classList.contains('is-gold')) fx('gold', el);
   };
-  // 残りを全部表にして、ボタンを戻し、シェアを出す（［ぜんぶめくる］もここ）
+  // 残りを全部表にして、［ぜんぶめくる］を隠し、ボタンを戻し、シェアを出す（［ぜんぶめくる］もここ）。
+  // ［ぜんぶめくる］にフォーカスがあれば（引くボタンから移してある）、消えるので最初のカードへ
   const endFlip = () => {
     clearInterval(gaTimer);
     gaTimer = null;
-    $('ga-res').querySelectorAll('.rpg-card.is-back').forEach(flipCard);
+    const box = $('ga-res'), all = $('ga-flipall');
+    box.querySelectorAll('.rpg-card.is-back').forEach(flipCard);
     gaBusy = false;
+    if (document.activeElement === all) box.firstElementChild?.focus({ preventScroll: true });
+    all.hidden = true;
     drawShares($('ga-share'), gaShares);
     drawGacha();
   };
@@ -766,7 +789,7 @@
       if (r.star === 3) { if (back) el.classList.add('is-gold'); else fx('gold', el); }
     });
     drawShares($('ga-share'), []);   // シェアは全部めくれてから
-    $('ga-flipall').hidden = false;
+    $('ga-flipall').hidden = !back;   // めくるものが無ければ出さない
     $('ga-empty').hidden = true;
     if (back) {
       if (['ga-free', 'ga-1', 'ga-10'].includes(document.activeElement?.id)) $('ga-flipall').focus({ preventScroll: true });
@@ -775,6 +798,13 @@
     // スマホは結果がボタンと確率の下なので、結果まで送る
     if (innerWidth < 900) $('ga-main').scrollIntoView({ block: 'nearest', behavior: back ? 'smooth' : 'auto' });
   };
+  // 引けなかったときの1行（#ga-msg）。引けたら消す
+  const GA_MSG = {
+    coins: 'コインが足りないので引けなかったよ（ほかのタブで使ったかも）',
+    free: '今日の無料1回はもう使っているか、まだ今日クイズをクリアしていないよ',
+    save: '保存できなかったので、引いていないよ',
+  };
+  const sayGacha = key => { const el = $('ga-msg'); if (el) el.textContent = GA_MSG[key] || ''; };
   // 1回の tx で コインを引く（無料なら day.free）→ 抽選 → gr。書けてから結果を描き、イベントは tx が返ってから
   const pullGacha = (count, free) => {
     if (gaBusy) return;
@@ -791,7 +821,9 @@
       x.gr = region;
       d = x;
     });
-    if (!d || !wrote) { gaBusy = false; drawGacha(); return; }   // 足りなかった（別のタブで使った）・保存できなかった
+    // 足りなかった（別のタブで使った）・保存できなかった（新しい版のデータもふくむ）: 黙らずに1行で知らせて、ボタンを描き直す
+    if (!d || !wrote) { gaBusy = false; sayGacha(d || status === 'readOnly' ? 'save' : free ? 'free' : 'coins'); drawGacha(); return; }
+    sayGacha('');
     gaShares = milestones(Object.keys(before), Object.keys(d.cards));
     let owned0 = Object.keys(d.cards).length - res.filter(r => r.out === 'new').length;
     emit('rpg:pull', { region, count, free, results: res.map(r => ({ ...r })), pity: d.pity, pulls: d.pulls });
@@ -808,6 +840,7 @@
   const renderGacha = () => {
     const d = get();
     gaRegion = firstRegion(d);
+    sayGacha('');
     clearResults();
     drawGacha(d);
   };
@@ -825,7 +858,14 @@
     $('ga-1').onclick = onPull(1, false);
     $('ga-10').onclick = onPull(10, false);
     $('ga-flipall').onclick = endFlip;
-    $('ga-res').onclick = e => { const b = e.target.closest('.rpg-card'); if (b) openCard(b.dataset.a); };
+    // 裏向きのカードはめくるだけ（最後の1枚なら全部めくれたことにする）。詳細は表になってから
+    $('ga-res').onclick = e => {
+      const b = e.target.closest('.rpg-card');
+      if (!b) return;
+      if (!b.classList.contains('is-back')) { openCard(b.dataset.a); return; }
+      flipCard(b);
+      if (!$('ga-res').querySelector('.rpg-card.is-back')) endFlip();
+    };
   };
 
   // ---- 仲間の一覧（★の多い順 → 国名の順で固定。地図 #cd-map の中身は Task 12） ----
@@ -840,7 +880,7 @@
     $('cd-count').textContent = `仲間 ${owned(d)} / ${TOTAL}`;
     drawChips($('cd-regions'), d, cdRegion);
     // sort は安定なので、同じ★の中は国名の順のまま
-    $('cd-grid').innerHTML = byName.filter(a => inArea(a, cdRegion)).sort((x, y) => star(y) - star(x)).map(a => cardHTML(a, d)).join('');
+    $('cd-grid').innerHTML = byName.filter(a => inArea(a, cdRegion)).sort((x, y) => star(y) - star(x)).map(a => cardHTML(a, d, { lazy: true })).join('');   // 195枚の国旗は見えてから読む
     worldMap($('cd-map'), d);   // 地図は絞りこみに関係なく全世界
   };
   const bindCards = sec => {
@@ -856,7 +896,8 @@
 
   /* ---------- 仲間の世界地図（RPG.worldMap）・シェア（RPG.shareButton）・演出（RPG.fx） ---------- */
   // 国の形のパスは最初に1回だけ文字列にしておき、どの入れ物も同じ文字列から作る。色は class の付け替えだけ（★の金属 .rpg-m1〜3 / 霧 .rpg-fog）
-  const SMALL_AR = 25000;   // これより小さい国と、地図に形の無い国は丸印（図鑑の地図と同じ）
+  // 小さい国と、地図に形の無い国は丸印（図鑑の地図と同じ判定 isSmall。無ければ同じ値で）
+  const small = typeof isSmall === 'function' ? isSmall : c => c.ar < 25000 || !featOf(c);
   const LEGEND = [['rpg-m1', '★1 ブロンズ'], ['rpg-m2', '★2 シルバー'], ['rpg-m3', '★3 ゴールド'], ['rpg-fog', 'まだ']];
   let mapCache = null;
   const mapHTML = () => {
@@ -871,7 +912,7 @@
       s += c ? `<path d="${p}" data-a="${c.a}"></path>` : `<path class="rpg-fog" d="${p}"></path>`;
     }
     for (const c of C) {
-      if (c.ar >= SMALL_AR && featOf(c)) continue;
+      if (!small(c)) continue;
       const q = proj([c.ll[1], c.ll[0]]);
       if (q) s += `<circle class="rpg-dot" data-a="${c.a}" cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="4"></circle>`;
     }
@@ -1080,18 +1121,20 @@
     if (sw) sw.onchange = () => {
       const v = sw.checked;
       tx(d => { d.show = v; });
-      document.body.classList.toggle('rpg-off', !v);
+      if (wrote) document.body.classList.toggle('rpg-off', !v);   // 書けたときだけ（新しい版のデータ・保存の失敗ではスイッチを戻す）
+      else sw.checked = get().show !== false;
     };
     drawEntrances();
   };
   on('drill:screen', ({ name }) => {
+    if (name !== 'rpg' && homeSharesShown) { homeShares = []; homeSharesShown = false; }   // 冒険ホームを離れたら、出していたシェアは消す
     if (name === 'home') drawEntrances();
     if (name === 'settings' && $('set-rpg')) $('set-rpg').checked = get().show !== false;
   });
 
   /* ---------- window.RPG ---------- */
   const RPG = window.RPG = {
-    tx, get, emitCoins, announce, coinHTML, cardHTML, openCard, worldMap, shareButton, fx,
+    tx, get, emitCoins, announce, coinHTML, cardHTML, openCard, worldMap, shareButton, milestones, drawShares, fx,
     get status() { return status; },
     refresh, open, nextFloor, unlocked, snapshot,
     opts: {},   // RPG.open で渡したもの（開いた画面が読む）
@@ -1102,7 +1145,7 @@
         let d = null;
         const delta = tx(x => {
           const before = x.coins;
-          x.coins = Math.max(0, Math.min(CAP, x.coins + Math.round(+n || 0)));
+          x.coins = Math.max(0, Math.min(K.BIG, x.coins + Math.round(+n || 0)));
           d = x;
           return x.coins - before;
         });

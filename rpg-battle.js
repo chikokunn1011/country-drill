@@ -20,7 +20,6 @@
 
   const K = RPG_CORE, T = K.TUNING, TB = T.battle, DG = K.DUNGEONS, RPG = window.RPG;
   const BOSS = 5;             // フロアは F1〜F4 とボス（5）
-  const CAP = 1e9;            // コイン・回数の上限（rpg-core.js の sanitize と同じ）
   const LOG_LINES = 3;        // ログは直近3行
   const COIN = '<i class="coin" aria-hidden="true"></i>';
   const LABEL = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？' };
@@ -155,13 +154,16 @@
     $('bt-fight')?.focus({ preventScroll: true });
     return true;
   };
-  // 画面（screenRender.battle）。RPG.open('battle', {id, floor}) のときだけ始める
+  // 画面（screenRender.battle）。RPG.open('battle', {id, floor}) のときだけ始める。
+  // 始めるのに失敗した（例外）ときはページの例外にせず console.error('[rpg]') にして、始めていない画面を出す
   const render = () => {
-    const o = RPG.opts || {};
-    if (o.id !== undefined && o.floor !== undefined) {
-      RPG.opts = {};
-      if (start(o.id, o.floor)) return;
-    }
+    try {
+      const o = RPG.opts || {};
+      if (o.id !== undefined && o.floor !== undefined) {
+        RPG.opts = {};
+        if (start(o.id, o.floor)) return;
+      }
+    } catch (e) { console.error('[rpg]', e); }
     if (!B) sec.innerHTML = '<div class="rpg-bend"><p class="hint">バトルは冒険ホームのダンジョンから始めてね</p>'
       + '<div class="row center"><button type="button" class="btn" id="bt-home">冒険ホームへ</button></div></div>';
   };
@@ -237,7 +239,11 @@
     emit('rpg:answer', { a: q.a, right, mode: q.mode, dungeon: B.id, boss: B.boss });
     if (right) hit(); else miss();
   };
-  const wait = () => { B.waiting = true; B.timer = setTimeout(advance, TB.autoNextMs); };
+  // 自動で進む（タイマーの中の例外はページの例外にせず console.error('[rpg]') にする）
+  const wait = () => {
+    B.waiting = true;
+    B.timer = setTimeout(() => { try { advance(); } catch (e) { console.error('[rpg]', e); } }, TB.autoNextMs);
+  };
   const hit = () => {
     const { q } = B;
     B.rights++;
@@ -344,20 +350,22 @@
     B.win = win;
     const b = B, t = todayStr(), key = `${b.id}:${b.floor}`, mistakes = b.mistakes.length;
     const res = RPG.tx(d => {
+      const owned0 = Object.keys(d.cards);
       const receipt = K.settleRun(d, b.run, null, t);
+      const shares = RPG.milestones(owned0, Object.keys(d.cards));   // 仲間の節目（50か国・地域の国を全部）
       const first = win && (d.floors[b.id] || 0) < b.floor;
       const coins = K.battleReward(b.en.s, { win, first, boss: b.boss, rights: b.rights });
-      d.coins = Math.min(CAP, d.coins + coins);
-      d.earned = Math.min(CAP, d.earned + coins);
+      d.coins = Math.min(K.BIG, d.coins + coins);
+      d.earned = Math.min(K.BIG, d.earned + coins);
       if (win) { d.floors[b.id] = Math.max(d.floors[b.id] || 0, b.floor); delete d.gauge[key]; }
       else d.gauge[key] = Math.min(TB.gaugeMax, (d.gauge[key] || 0) + 1);
-      const st = d.st, add = k => { st[k] = Math.min(CAP, st[k] + 1); };
+      const st = d.st, add = k => { st[k] = Math.min(K.BIG, st[k] + 1); };
       add(win ? 'win' : 'lose');
       if (b.revived) add('revive');
       if (win && b.boss) add('bossWins');
       if (win && !mistakes) add('nodmg');
       st.combo = Math.max(st.combo, b.maxCombo);
-      return { receipt, coins, first, gauge: d.gauge[key] || 0, d };
+      return { receipt, coins, first, gauge: d.gauge[key] || 0, d, shares };
     });
     if (res) {
       const { receipt: rc, d } = res;
@@ -370,17 +378,18 @@
       RPG.announce(rc, d);
     }
     if (B !== b) return;   // イベントを受けた側が画面を変えた
-    drawEnd(res || { receipt: null, coins: 0, first: false, gauge: 0, d: null });
+    drawEnd(res || { receipt: null, coins: 0, first: false, gauge: 0, d: null, shares: [] });
   };
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
     const mates = `仲間 ${Object.keys(d.cards).length}/${C.length}か国 ${T.share.tag}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
-  const drawEnd = ({ receipt: rc, coins, first, gauge, d }) => {
+  const drawEnd = ({ receipt: rc, coins, first, gauge, d, shares }) => {
     const b = B, win = b.win;
     b.next = win ? nextOf(b.id, b.floor) : null;
     $('bt-flee').hidden = true;
+    if (win) $('bt-mon')?.classList.add('rpg-dead');   // 倒した: 小さくなって消える（CSS）
     // 仲間・昇格・克服・手配書（クイズの結果のパネルと同じ文）
     const lines = rc ? [
       rc.joined.length && `🤝 ${names(rc.joined)}が仲間になった！`,
@@ -400,12 +409,14 @@
           + missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('') + '</ul>' : '');
     }
     html += lines.map(l => `<p class="rpg-bline">${l}</p>`).join('')
+      + '<div class="rpg-shares" id="bt-shares" hidden></div>'
       + '<div class="row center">'
       + (win ? '' : '<button type="button" class="btn ghost" id="bt-practice">この地域を練習する</button><button type="button" class="btn ghost" id="bt-again">もう一回</button>')
       + '<button type="button" class="btn ghost" id="bt-home">冒険ホームへ</button>'
       + (b.next ? '<button type="button" class="btn" id="bt-nextfloor">つぎのフロアへ</button>' : '')
       + '</div></div>';
     $('bt-col').innerHTML = html;
+    RPG.drawShares($('bt-shares'), shares || []);   // 仲間の節目に届いたら、その場に［シェア］（設計書 §3.7）
     // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
     if (win && b.boss && first && d) {
       const sb = RPG.shareButton(b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final
@@ -428,7 +439,7 @@
   // バトルが続いていれば st.flee を数える。それから片付ける（run は捨てる。misses はもう書いてある）
   const flee = () => {
     if (!B) return;
-    if (ONGOING.has(B.phase)) RPG.tx(d => { d.st.flee = Math.min(CAP, d.st.flee + 1); });
+    if (ONGOING.has(B.phase)) RPG.tx(d => { d.st.flee = Math.min(K.BIG, d.st.flee + 1); });
     stopTimer();
     B = null;
     sec.replaceChildren();

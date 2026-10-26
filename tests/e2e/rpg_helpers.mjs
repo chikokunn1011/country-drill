@@ -63,6 +63,12 @@ export async function playPractice(page, { mode = 'f2n', region = 'all', count =
 // 今の問題を国 a に置きかえる
 export const forceNext = (page, a) => page.evaluate(a => { G.queue.unshift(byA.get(a)); nextQuestion(); }, a);
 
+// ガチャの結果を全部表にする。［ぜんぶめくる］は全部表になると隠れる（押すのが間に合わないことがある）ので、onclick を直接呼んでから表になるのを待つ
+export async function flipAll(page) {
+  await page.evaluate(() => $('ga-flipall').click());
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+}
+
 // ---- バトル（rpg-battle.js） ----
 // 出題から TUNING.battle.guardMs たつまで待つ（その間の選択肢のクリックは無視される）
 export const battleGuard = page => page.waitForFunction(() => performance.now() - RPG_BATTLE.state().shownAt >= RPG_CORE.TUNING.battle.guardMs);

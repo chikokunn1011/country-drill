@@ -146,6 +146,34 @@ t('settings_switch', async page => {
   assert.equal(await visible(page, '#rpg-chip'), true);
 });
 
+// 設定のスイッチは、tx が書けたときだけ body.rpg-off を切りかえる（新しい版のデータ・保存の失敗では、スイッチを戻して何も変えない）
+t('settings_switch_needs_write', async page => {
+  await writeSave(page, { v: 99, intro: true, show: true });
+  await page.evaluate(() => show('settings'));
+  assert.equal(await page.isChecked('#set-rpg'), true);
+  await page.click('#set-rpg');   // uncheck() は押したあとの状態を確かめるので、戻すこのテストでは click
+  assert.equal(await page.evaluate(() => document.body.classList.contains('rpg-off')), false);
+  assert.equal(await page.isChecked('#set-rpg'), true);   // 書けなかったので戻す
+  await page.evaluate(() => show('setup'));
+  assert.equal(await visible(page, '#rpg-chip'), true);
+  // 保存の失敗（setItem が例外）でも同じ。トースト「保存できなかった…」は tx が出す
+  const q = await openRpg(browser, { init: () => {
+    const { setItem } = Storage.prototype;
+    Storage.prototype.setItem = function (k, v) { if (k === 'rpg' && window.__fail) throw new DOMException('full', 'QuotaExceededError'); return setItem.call(this, k, v); };
+  } });
+  try {
+    const p = q.page;
+    await writeSave(p, saveWith({}));
+    await p.evaluate(() => { window.__fail = true; show('settings'); });
+    await p.click('#set-rpg');
+    assert.equal(await p.evaluate(() => document.body.classList.contains('rpg-off')), false);
+    assert.equal(await p.isChecked('#set-rpg'), true);
+    assert.ok((await toastTexts(p)).includes('保存できなかった…'), JSON.stringify(await toastTexts(p)));
+    assert.equal((await readSave(p)).show, true);
+    assert.deepEqual(q.errors.map(String), []);
+  } finally { await q.close(); }
+});
+
 t('rpg_off_on_startup', async page => {
   await writeSave(page, saveWith({ show: false }));
   assert.equal(await page.evaluate(() => document.body.classList.contains('rpg-off')), true);
@@ -415,6 +443,20 @@ t('code_keep_misses', async page => {
   assert.deepEqual(await page.evaluate(() => [misses, JSON.parse(localStorage.getItem('misses'))]), [{ br: 1 }, { br: 1 }]);
 });
 
+// 引き継ぎコードのメッセージ（role=status）は空でも display:none にしない（読み上げが止まらないように）。空のときの余白は前と同じ
+t('code_msg_rendered_when_empty', async page => {
+  await home(page, saveWith({}));
+  await page.click('#rpg-data summary');
+  const m = () => page.evaluate(() => {
+    const r = id => $(id).getBoundingClientRect();
+    return { display: getComputedStyle($('rpg-code-msg')).display, gap: +(r('rpg-wipe').top - r('rpg-code-load').bottom).toFixed(1), h: +r('rpg-code-msg').height.toFixed(1) };
+  });
+  assert.deepEqual(await m(), { display: 'block', gap: 16, h: 0 });
+  await page.evaluate(() => { $('rpg-code-msg').textContent = 'コードが正しくないみたい'; });
+  const f = await m();
+  assert.ok(f.h > 0 && f.gap >= 16 + f.h, JSON.stringify(f));
+});
+
 t('code_invalid', async page => {
   await home(page, saveWith({ lv: 5, coins: 777 }));
   const before = await raw(page), b0 = await brokenKeys(page);
@@ -669,8 +711,9 @@ t('snapshot_shape', async page => {
 
 t('two_tabs_sync', async (page, app) => {
   await writeSave(page, saveWith({ coins: 1000 }));
-  const p2 = await app.context.newPage(), errs2 = [];
+  const p2 = await app.context.newPage(), errs2 = [], cerrs2 = [];
   p2.on('pageerror', e => errs2.push(String(e)));
+  p2.on('console', m => { if (m.type() === 'error') cerrs2.push(m.text()); });
   await p2.goto(server.url);
   await p2.waitForFunction(() => document.readyState === 'complete');
   for (const p of [page, p2]) await p.evaluate(() => show('setup'));
@@ -685,4 +728,5 @@ t('two_tabs_sync', async (page, app) => {
   // ページ2の冒険ホームも描き直す
   await p2.waitForFunction(() => $('rpg-stats').textContent.includes('Lv 3'));
   assert.deepEqual(errs2, []);
+  assert.deepEqual(cerrs2.filter(s => s.startsWith('[rpg]')), []);   // 2枚目のページでも [rpg] の console.error は無い
 });

@@ -416,6 +416,31 @@ t('auto_advance', async page => {
   assert.equal((await events(page, 'rpg:answer')).length, n3 + 1);
 });
 
+// 画面（render）と自動で進む setTimeout の中で例外が出ても、ページの例外にせず console.error('[rpg]', e) にする
+t('battle_errors_are_caught', async (page, app) => {
+  await writeSave(page, saveWith({}));
+  // render（RPG.open → show('battle') → start）の中で落ちる → 画面は「冒険ホームのダンジョンから始めてね」のまま
+  await page.evaluate(() => {
+    const f = RPG_CORE.battleStats;
+    RPG_CORE.battleStats = () => { throw new Error('boom-render'); };
+    try { RPG.open('battle', { id: 'samerica', floor: 1 }); } finally { RPG_CORE.battleStats = f; }   // 冒険ホームも battleStats を使うので開かない
+  });
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'battle');
+  assert.equal(await phase(page), null);
+  assert.ok((await text(page, '#scr-battle')).includes('冒険ホームのダンジョンから始めてね'));
+  // 自動送りのタイマーの中（nextQ → showQ → makeQuestion）で落ちる
+  await startBattle(page, 'samerica', 1);
+  await battleGuard(page);
+  const a = await cur(page);
+  await page.evaluate(() => { window.makeQuestion = () => { throw new Error('boom-timer'); }; });
+  await page.click(`#scr-battle .choice[data-a="${a}"]`);
+  await page.waitForTimeout(await page.evaluate(() => RPG_CORE.TUNING.battle.autoNextMs) + 300);
+  const errs = app.consoleErrors.filter(s => s.startsWith('[rpg]'));
+  assert.equal(errs.length, 2, JSON.stringify(app.consoleErrors));
+  assert.ok(errs[0].includes('boom-render') && errs[1].includes('boom-timer'), JSON.stringify(errs));
+  assert.deepEqual(app.errors.map(String), []);
+}, { rpgErrorOk: true });
+
 t('party_on_intro', async page => {
   await writeSave(page, saveWith({ cards: { br: [2, 0], cl: [1, 0], jp: [3, 0] } }));
   await page.evaluate(() => RPG_BATTLE.start('samerica', 1));

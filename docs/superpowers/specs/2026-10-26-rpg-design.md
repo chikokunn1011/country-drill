@@ -273,13 +273,13 @@ rpg.js / rpg-battle.js が `<section id="scr-…" class="wrap" hidden>` を作�
 
 **はじめての人向け:**
 - 地域のチップは、次に挑むダンジョンの地域を最初から選んでおく（全部クリアしたあとは前回の地域）。チップの下に「選んだ地域のダンジョンでは、その地域の仲間が ×1.5 で強い」と1行
-- コインが足りないボタンは押せない状態にして「あと●340」と出す
+- コインが足りないボタンは押せない状態にして「あと●340」と出す。押せたのに引けなかったとき（ほかのタブでコインを使っていた・保存に失敗した）は、黙らずにボタンの下の1行（`#ga-msg`、`role="status"`）で知らせる
 - 無料ボタンは、まだもらっていない日は「今日クイズを1回クリアすると無料1回」と出して押せない状態、使ったあとは「また明日」
 
 **決まりごと:**
 - 提供割合は**ボタンのすぐ下に常に表示する**（折りたたまない、リンクの先に隠さない）。表示する表と抽選する表は、`TUNING.gacha` の同じ値から作る。
 - **コインを引いて結果を決め、セーブしてから演出する。** 演出中に再読み込みしても、引き直しはできない。
-- カードは裏向きで並び、120ms ずつ順にめくれる。★3は裏のうちから金色に光る。［ぜんぶめくる］で飛ばせる。reduced motion のときは最初から表向きで並べる。
+- カードは裏向きで並び、120ms ずつ順にめくれる。★3は裏のうちから金色に光る。［ぜんぶめくる］で飛ばせる（全部表になったら隠す）。裏向きのカードを押すとめくれるだけ（詳細は表になってから）。reduced motion のときは最初から表向きで並べる。
 - ラベル: `NEW` / `ランクアップ` / `かさね+1` / `おかえし ●30`。押すと `#detail` に国の情報（`factsHTML`）とカードの強さを出す。
 - 言葉は「引く」「出会う」でそろえる。「当たり」「大当たり」「爆死」は使わない。
 
@@ -303,6 +303,7 @@ rpg.js / rpg-battle.js が `<section id="scr-…" class="wrap" hidden>` を作�
   - 地域の国を全部仲間にした
   - 仲間が 50 / 100 / 195 か国になった
   - 地図喰いを倒した
+- 届いた場所ごとに: クイズのクリアは結果のパネル（`#rpg-res`）の中、ガチャは結果の下（全部めくれてから）、バトルは終わりの画面（`#bt-end`）の中。クイズの失格／にげたときはトーストに置けないので、次に冒険ホームを開いたときに出す（押すか、冒険ホームを離れるまで）。
 - やり方: `navigator.share?.({ text, url })`。使えなければ `https://twitter.com/intent/tweet?text=…&url=…`（`encodeURIComponent`）を新しいタブで開く。ライブラリは足さない。
   - `navigator.share` はボタンを押した処理の中で直接呼ぶ（`await` の後ろに置かない。iOS で失敗する）
   - 共有シートを閉じただけ（`AbortError`）のときは何もしない。X の画面を代わりに開くのは、`share` がないか、`AbortError` 以外のエラーのときだけ
@@ -702,7 +703,12 @@ function pull(st, region, count, rng, C) {
     if (!Number.isInteger(raw.v) || raw.v < 1) return { d: fresh(), readOnly: false, backup: true };
     if (raw.v > VERSION) return { d: sanitize(raw), readOnly: true };   // 新しい版のデータ → 上書きしない
     let d = raw;
-    while (d.v < VERSION) { const f = MIGRATE[d.v]; if (!f) return { d: fresh(), readOnly: false, backup: true }; d = f(d); }
+    while (d.v < VERSION) {
+      const f = MIGRATE[d.v]; if (!f) return { d: fresh(), readOnly: false, backup: true };
+      let next; try { next = f(d); } catch { break; }   // 移行が例外を出したら、その版で止めて sanitize に任せる（新しく始めない。次に読むときにもう一度試す）
+      if (!next || !Number.isInteger(next.v) || next.v <= d.v) return { d: fresh(), readOnly: false, backup: true };   // v を進めない移行は止まらない
+      d = next;
+    }
     return { d: sanitize(d), readOnly: false };
   }
   ```
@@ -721,7 +727,7 @@ function pull(st, region, count, rng, C) {
 - **localStorage が使えない・満杯:** `localStorage` に触るだけで例外が出る環境（Cookie を止めた設定など）では、メモリだけで動かし、冒険ホームに「この端末では保存できないみたい。閉じると消えるよ」と出す。`setItem` が `QuotaExceededError` などで失敗したら、トースト「保存できなかった…」を1回だけ出す（クイズは止めない）。
 - **既存の `misses` が壊れていても:** RPG が読むときは `const m = (misses && typeof misses === 'object') ? misses : {}` と `Math.max(0, +m[a] || 0)` を通す。
 - **タブを2つ開いたとき:** `storage` イベントで `rpg` が変わったら、表示中の画面を描き直す。
-- **消えにくくする:** 最初に保存するときに `navigator.storage?.persist?.()` を1回だけ呼ぶ。
+- **消えにくくする:** 稼いだコイン（`earned`）が増えた書きこみがはじめて届いたときに `navigator.storage?.persist?.()` を呼ぶ（ページを開くごとに1回まで）。Firefox は確認のダイアログを出すので、起動時の書き直し・日付の書き直し・ゲームの開始・冒険の表示が OFF のときは呼ばない。
 - **引き継ぎコード（段階2から入れる）:**
   - 形式は `'CQ1.' + base64url(UTF-8 の JSON)`。中身は `{ rpg: セーブ, m: misses }`（`misses` も一緒に運ぶ。ボスの旗や手配書が苦手の記録を使うため）
   - 復元するときは、前後の空白と改行を消し、`CQ1.` で始まり、長さが 100KB 以下で、base64url と JSON として読めることを確かめる。だめなら「コードが正しくないみたい」と出して何も変えない
@@ -739,7 +745,7 @@ function pull(st, region, count, rng, C) {
 | ファイル | 中身 | 目安 |
 |---|---|---|
 | `rpg-core.js` | `TUNING`、`DUNGEONS`、`MONSTERS`、`AVATARS`、DOM を触らない関数（`answerCoins` `clearBonus` `levelCost` `heroStats` `recLv` `enemy` `floorsOf` `battleBag` `bossFlags` `cardAtk` `party` `hitsNeeded` `pull` `addCard` `battleReward` `bountyFor` `isWeak` `overcomeOf` `capOK` `missesAllowed` `judge`（余裕/ちょうど/きびしい） `settleDelta`（差額払い） `fresh` `migrate` `sanitize` `encodeCode` `decodeCode` `today` `dayNum`）。`globalThis.RPG_CORE` に置く。node の `vm` で読める | 約280行 |
-| `rpg.js` | 即時関数で包む。`RPG.tx`、イベントの受け取り、`run` の計算と受け取り、トップバーのチップ、結果のパネル、設定のスイッチ、冒険ホーム、ガチャ、仲間、はじめての画面、シェア、引き継ぎ、デバッグ → `window.RPG`（`snapshot()` `tx` `debug`） | 約480行 |
+| `rpg.js` | 即時関数で包む。`RPG.tx`、イベントの受け取り、`run` の計算と受け取り、トップバーのチップ、結果のパネル、設定のスイッチ、冒険ホーム、ガチャ、仲間、はじめての画面、シェア、引き継ぎ、デバッグ → `window.RPG`（`tx` `get` `emitCoins` `announce` `coinHTML` `cardHTML` `openCard` `worldMap` `shareButton` `milestones` `drawShares` `fx` `status` `refresh` `open` `nextFloor` `unlocked` `snapshot` `opts` `debug`） | 約480行 |
 | `rpg-battle.js` | 即時関数で包む。バトル画面と進行、keydown、復活 → `window.RPG_BATTLE`（`start(dungeonId, floor)`） | 約320行 |
 | `rpg.css` | `.rpg-` で始まるクラスと `.bq`。色は既存のトークン（`--accent` `--surface` `--line` `--ok` `--ng` `--hl`）を使う。新しいトークン（★の枠の色・地域の色）は `:root`、`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`、`:root[data-theme="dark"]` の3か所に書く。PC 用は `@media (min-width: 900px)` の中に書き、pc.css の変数は `var(--col-gap, 16px)` のように予備の値を付ける | 約260行 |
 | `tests/unit/rpg-core.test.mjs`、`tests/unit/rpg-balance.test.mjs`、`tests/e2e/rpg.test.mjs` | §15 | |

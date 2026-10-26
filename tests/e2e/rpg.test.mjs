@@ -48,6 +48,10 @@ const MEMORY_INIT = () => { Object.defineProperty(window, 'localStorage', { get(
 t('rpg_loaded', async page => {
   assert.deepEqual(await page.evaluate(() => [typeof RPG_CORE, typeof RPG.tx, RPG.status]), ['object', 'function', 'ok']);
   assert.deepEqual(await page.evaluate(() => window.__ready), { intro: false, lv: 1, coins: 0, owned: 0 });
+  // rpg:ready は読み込み時に1回だけ（画面を開き直しても描き直しても出ない）
+  assert.equal((await events(page, 'rpg:ready')).length, 1);
+  await page.evaluate(() => { show('rpg'); RPG.refresh(); show('home'); });
+  assert.equal((await events(page, 'rpg:ready')).length, 1);
 }, { init: () => { document.addEventListener('rpg:ready', e => { window.__ready = e.detail; }); } });
 
 t('practice_receipt', async page => {
@@ -153,6 +157,53 @@ t('quit_pays', async page => {
   await page.click('#quit');
   await waitToast(page, '+60 コイン');
   assert.equal(await coins(page), 60);
+});
+
+// 失格／にげたときの「仲間になった」トーストも、結果のパネルと同じく5か国までと「ほか n か国」
+t('quit_toast_caps_joined', async page => {
+  const as = ['br', 'ar', 'cl', 'pe', 'co', 've', 'ec'];
+  await writeSave(page, saveWith({ fr: Object.fromEntries(as.map(a => [a, 4])) }));
+  await startPractice(page, 10);
+  for (const a of as) { await forceNext(page, a); await answerCorrect(page); await page.click('#next'); }
+  await page.click('#quit');
+  await waitToast(page, '仲間になった');
+  const names = await page.evaluate(as => as.map(a => byA.get(a).n), as.slice(0, 5));
+  assert.deepEqual((await toastTexts(page)).filter(s => s.includes('仲間になった')), [`🤝 ${names.join('・')}ほか2か国が仲間になった！`]);
+  assert.equal(Object.keys((await readSave(page)).cards).length, 7);
+});
+
+// 1回の受け取りで rpg:coins は理由ごとに分けて出す（R7）: drill → daily → overcome → bounty。coins・earned は出した時点のセーブの額
+t('coins_split_by_reason', async page => {
+  await writeSave(page, saveWith({ wk: { cl: 1 }, bounty: { d: localToday(), a: ['cl', 'br', 'jp'], done: [] } }));
+  await startPractice(page);
+  await forceNext(page, 'cl');
+  await answerCorrect(page);
+  await page.click('#next');
+  await clearByAnswering(page);
+  const evs = await events(page, 'rpg:coins'), s = await readSave(page);
+  assert.deepEqual(evs.map(e => e.reason), ['drill', 'daily', 'overcome', 'bounty']);
+  assert.deepEqual(evs.slice(1).map(e => e.delta), [100, 30, 30]);
+  assert.ok(evs[0].delta > 0, JSON.stringify(evs[0]));
+  assert.equal(evs.reduce((n, e) => n + e.delta, 0), s.coins);
+  for (const e of evs) assert.deepEqual([e.coins, e.earned], [s.coins, s.earned]);
+  assert.equal(headNum(await resLines(page)), s.coins);
+});
+
+// 受け取りの通知（announce）の payload: rpg:join {a, via:'learn', owned}・rpg:promote {a, star:2, via:'learn'}・rpg:overcome {a, total}・rpg:bounty {a, doneAll, totalDays}
+t('announce_payloads', async page => {
+  // cl: あと1回で仲間。br: ★1・なかよし10・f2n だけ残して3モードで正解ずみ → f2n で正解するとシルバー。jp: 苦手の印だけ → 一発正解で克服。pe: 手配書の最後の1件
+  await writeSave(page, saveWith({ cards: { br: [1, 0] }, fr: { cl: 4, br: 10 }, mb: { br: 14 }, wk: { jp: 1 },
+    bounty: { d: localToday(), a: ['pe', 'ar', 'uy'], done: ['ar', 'uy'] } }));
+  await startPractice(page);
+  for (const a of ['cl', 'br', 'jp', 'pe']) { await forceNext(page, a); await answerCorrect(page); await page.click('#next'); }
+  await clearByAnswering(page);
+  const evs = async type => (await events(page, type)).map(({ type: _, ...e }) => e);
+  assert.deepEqual(await evs('rpg:join'), [{ a: 'cl', via: 'learn', owned: 2 }]);
+  assert.deepEqual(await evs('rpg:promote'), [{ a: 'br', star: 2, via: 'learn' }]);
+  assert.deepEqual(await evs('rpg:overcome'), [{ a: 'jp', total: 1 }]);
+  assert.deepEqual(await evs('rpg:bounty'), [{ a: 'pe', doneAll: true, totalDays: 1 }]);
+  const s = await readSave(page);
+  assert.deepEqual([s.cards.cl, s.cards.br, s.ov.jp, s.st.bountyDays], [[1, 0], [2, 0], 1, 1]);
 });
 
 t('visibility_then_result', async page => {

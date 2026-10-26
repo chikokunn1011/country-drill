@@ -5,7 +5,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, events, pickSetup, answerCorrect, clearByAnswering } from './helpers.mjs';
-import { openRpg, readSave, writeSave, saveWith, localToday, forceNext } from './rpg_helpers.mjs';
+import { openRpg, readSave, writeSave, saveWith, localToday, forceNext, flipAll } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -134,7 +134,7 @@ t('intro_ten_pull_cards', async page => {
   const order = await page.evaluate(() => window.__ev.filter(e => /^rpg:(pull|join|promote|coins)$/.test(e.type)).map(e => e.type).slice(1));
   assert.equal(order[0], 'rpg:pull');
   assert.equal(order[order.length - 1], 'rpg:coins');
-  await page.click('#ga-flipall');
+  await flipAll(page);
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
   await page.evaluate(() => RPG.open('cards'));
   assert.equal(await text(page, '#cd-count'), `仲間 ${Object.keys(s.cards).length} / 195`);
@@ -155,9 +155,84 @@ t('flip_in_order', async page => {
   }
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
   assert.ok(seen.size >= 3, [...seen].join());   // 一度に全部ではない
-  // めくり終わったらボタンがまた押せる（1,000 は使ったので 1回も押せない）
+  // めくり終わったらボタンがまた押せる（1,000 は使ったので 1回も押せない）。全部表になったら［ぜんぶめくる］は隠れる
   assert.equal(await page.isDisabled('#ga-1'), true);
-  assert.equal(await page.isVisible('#ga-flipall'), true);
+  assert.equal(await page.isVisible('#ga-flipall'), false);
+});
+
+// 裏向きのカードを押すとめくれるだけ（詳細は表になってから）。最後の1枚を押してめくったら、その場で［ぜんぶめくる］が隠れてボタンが戻る
+t('back_card_tap_flips_only', async page => {
+  await gacha(page, saveWith({ coins: 1000 }));
+  // 引く → 10枚目（まだ裏）を押す、を1つの evaluate で（めくる interval が割りこまない）
+  const r = await page.evaluate(() => {
+    $('ga-10').click();
+    const b = document.querySelector('#ga-res .rpg-card:nth-child(10)'), back = b.classList.contains('is-back');
+    b.click();
+    return { back, nowBack: b.classList.contains('is-back'), open: $('detail').open, flipall: $('ga-flipall').hidden };
+  });
+  assert.deepEqual(r, { back: true, nowBack: false, open: false, flipall: false });
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  assert.equal(await page.isVisible('#ga-flipall'), false);
+  await page.click('#ga-res .rpg-card:nth-child(10)');   // 表になったら詳細
+  assert.equal(await page.isVisible('#detail[open]'), true);
+  await page.click('#detail .close');
+  await gacha(page, saveWith({ coins: 100 }));
+  const r2 = await page.evaluate(() => {
+    $('ga-1').click();
+    const b = document.querySelector('#ga-res .rpg-card');
+    b.click();
+    return { nowBack: b.classList.contains('is-back'), open: $('detail').open, flipall: $('ga-flipall').hidden, one: $('ga-1').disabled };
+  });
+  assert.deepEqual(r2, { nowBack: false, open: false, flipall: true, one: true });   // コインは 0 になったので 1回は押せない
+});
+
+// 保存に失敗したときと、ほかのタブでコインを使っていたときは、黙らずに1行（#ga-msg、role=status）で知らせる
+t('gacha_failure_message', async page => {
+  await gacha(page, saveWith({ coins: 100 }));
+  assert.equal(await page.getAttribute('#ga-msg', 'role'), 'status');
+  assert.equal(await text(page, '#ga-msg'), '');
+  // ほかのタブでコインを使った（storage イベントは自分のタブには来ないので、ボタンは押せるまま）
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('rpg')); d.coins = 0; localStorage.setItem('rpg', JSON.stringify(d)); });
+  assert.equal(await page.isEnabled('#ga-1'), true);
+  await page.click('#ga-1');
+  assert.ok((await text(page, '#ga-msg')).includes('コインが足りない'), await text(page, '#ga-msg'));
+  assert.equal(await page.locator('#ga-res .rpg-card').count(), 0);
+  assert.deepEqual(await events(page, 'rpg:pull'), []);
+  assert.equal(await page.isDisabled('#ga-1'), true);   // 描き直した
+  // 引けたら消える
+  await page.evaluate(() => RPG.debug.give(100));
+  await page.waitForFunction(() => !$('ga-1').disabled);
+  await page.click('#ga-1');
+  assert.equal(await text(page, '#ga-msg'), '');
+  assert.equal(await page.locator('#ga-res .rpg-card').count(), 1);
+  // 別のタブが新しい版のデータを書いていた: 保存できないので引かない。コインのせいにせず「保存できなかった」（上の警告の行も出る）
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  await page.evaluate(() => RPG.debug.give(100));
+  await page.waitForFunction(() => !$('ga-1').disabled);
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('rpg')); d.v = 99; localStorage.setItem('rpg', JSON.stringify(d)); });
+  await page.click('#ga-1');
+  assert.ok((await text(page, '#ga-msg')).includes('保存できなかった'), await text(page, '#ga-msg'));
+  assert.equal(await page.isVisible('#ga-warn'), true);
+  assert.equal(await page.locator('#ga-res .rpg-card').count(), 1);   // 前の結果のまま
+  assert.equal((await events(page, 'rpg:pull')).length, 1);
+  assert.equal(await page.isDisabled('#ga-1'), true);
+  // 保存に失敗（setItem が例外）: 引かなかったことになり、1行で知らせる
+  const q = await openRpg(browser, { seed: 1, init: () => {
+    const { setItem } = Storage.prototype;
+    Storage.prototype.setItem = function (k, v) { if (k === 'rpg' && window.__fail) throw new DOMException('full', 'QuotaExceededError'); return setItem.call(this, k, v); };
+  } });
+  try {
+    const p = q.page;
+    await gacha(p, saveWith({ coins: 100 }));
+    await p.evaluate(() => { window.__fail = true; });
+    await p.click('#ga-1');
+    assert.ok((await text(p, '#ga-msg')).includes('保存できなかった'), await text(p, '#ga-msg'));
+    assert.equal(await p.locator('#ga-res .rpg-card').count(), 0);
+    assert.deepEqual(await events(p, 'rpg:pull'), []);
+    assert.equal((await readSave(p)).coins, 100);
+    assert.equal(await p.isEnabled('#ga-1'), true);
+    assert.deepEqual(q.errors.map(String), []);
+  } finally { await q.close(); }
 });
 
 t('saved_before_animation', async page => {
@@ -176,10 +251,9 @@ t('reduced_motion_face_up', async page => {
   await page.click('#ga-10');
   assert.equal(await page.locator('#ga-res .rpg-card').count(), 10);
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
-  // めくるのを待たないので、すぐ押せる
+  // めくるのを待たないので、すぐ押せる。めくるものが無いので［ぜんぶめくる］は出ない
   assert.equal(await page.isEnabled('#ga-1'), true);
-  await page.click('#ga-flipall');   // 押しても何も変わらない
-  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
+  assert.equal(await page.isVisible('#ga-flipall'), false);
 }, { reducedMotion: 'reduce' });
 
 t('labels', async page => {
@@ -246,7 +320,7 @@ t('free_pull', async page => {
   assert.deepEqual(await evs(page, 'rpg:pull', { count: 0, free: 0 }), [{ count: 1, free: true }]);
   assert.deepEqual(await evs(page, 'rpg:coins', { reason: 0 }), []);
   // めくり終わっても「また明日」のまま
-  await page.click('#ga-flipall');
+  await flipAll(page);
   assert.equal(await page.isDisabled('#ga-free'), true);
   // 昨日の無料は今日は使えない（日付が変わったら day は空になる）
   await gacha(page, saveWith({ coins: 0, day: { d: '2000-01-01', n: {}, first: true, free: false } }));
@@ -338,6 +412,8 @@ t('cards_list', async page => {
   assert.equal(await page.isVisible('#scr-cards'), true);
   assert.equal(await text(page, '#cd-count'), '仲間 2 / 195');
   assert.equal(await page.locator('#cd-grid .rpg-card').count(), 195);
+  // 195枚の国旗は見えてから読む（図鑑の一覧と同じ loading="lazy"）
+  assert.ok(await page.$$eval('#cd-grid .rpg-card-flag', is => is.length === 195 && is.every(i => i.getAttribute('loading') === 'lazy')), '国旗の <img> に loading="lazy" が無い');
   const as = await page.$$eval('#cd-grid .rpg-card', bs => bs.map(b => b.dataset.a));
   assert.deepEqual(as.slice(0, 2), ['jp', 'cl']);
   // 持っていない国は国名の順
@@ -387,7 +463,7 @@ t('learn_join_in_result', async page => {
 t('back_and_refresh', async page => {
   await gacha(page, saveWith({ coins: 1000 }));
   await page.click('#ga-10');
-  await page.click('#ga-flipall');
+  await flipAll(page);
   // 別のタブで書かれても（RPG.refresh）結果は残り、ボタンと地域の数だけ描き直す
   await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('rpg')); d.coins = 150; localStorage.setItem('rpg', JSON.stringify(d)); RPG.refresh(); });
   assert.equal(await page.locator('#ga-res .rpg-card').count(), 10);

@@ -196,7 +196,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 #rpg-code-out { color: var(--muted); }
 .rpg-data-in .btn { padding: 8px 18px; font-size: .95rem; }
 .rpg-code-msg { margin: 0; font-size: .85rem; font-weight: 700; }
-.rpg-code-msg:empty { display: none; }
+.rpg-code-msg:empty { margin-top: -8px; }   /* 空でも display:none にしない（role=status の読み上げが止まらないように）。余白（gap 8px）だけ消す */
 .rpg-data-in .rpg-danger { margin-top: 8px; color: var(--ng); border-color: var(--ng); }
 
 /* 開発用パネル（?rpgdebug=1 のときだけ） */
@@ -319,13 +319,13 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
     grid-template-areas: "head head head head head flags flags" "mon ebar enum av hbar hnum left";
   }
   .rpg-bhead { grid-area: head; min-width: 0; justify-content: flex-start; gap: 10px; }
-  #bt-flee { padding-block: 0; font-size: .8rem; white-space: nowrap; }
+  #bt-flee { min-height: 24px; margin-block: -3.5px; padding-block: 0; font-size: .8rem; white-space: nowrap; }   /* 押せる高さは 24px。上下 3.5px は余白に重ねて、行の高さ（17px）と帯（約56px）は変えない */
   .rpg-bwhere { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; }
   #bt-mon { grid-area: mon; }
   .rpg-mon-e { font-size: 24px; }
   .rpg-mon.rpg-boss { margin: 0; padding: 1px; border-width: 2px; outline: 0; box-shadow: 0 0 6px 1px color-mix(in srgb, var(--rpg-c, var(--hl)) 40%, transparent); }
   .rpg-mon.rpg-boss .rpg-mon-e { font-size: 18px; }
-  .rpg-bosstag { bottom: -6px; padding: 0 2px; border-radius: 2px; font-size: .45rem; letter-spacing: .04em; }
+  .rpg-bosstag { bottom: -6px; padding: 0 2px; border-radius: 2px; font-size: .55rem; letter-spacing: .04em; }
   .rpg-hpl { display: contents; }
   .rpg-hpname { max-width: none; }
   .rpg-hpl:has(#bt-ehp) > .rpg-hpname { display: none; }   /* 敵の名前は絵文字で（HP バーの aria-label に名前がある） */
@@ -408,8 +408,13 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
     #scr-battle .rpg-stage[data-phase="reveal"] .bq > .mapbox { width: min(100%, max(128px, calc((var(--rpg-free) - 274px) * 16 / 9))); }
   }
 }
-/* 動き（当たるとモンスターが横に揺れて白く光る・ダメージの数字が浮かぶ・HP バーが縮む）。reduced motion では止める */
+/* 倒したモンスターは小さくなって消える（reduced motion ではその場で消える） */
+.rpg-mon.rpg-dead { opacity: 0; scale: .2; }
+/* 動き（モンスターがゆらゆら・当たると横に揺れて白く光る・倒すと小さくなって消える・ダメージの数字が浮かぶ・HP バーが縮む）。
+   reduced motion では止める。ゆらゆらは CSS だけ（ドパガキの ON/OFF には関係ない）。揺れ（.rpg-hit）は中の絵文字なので、ゆらゆらとは別に動く */
 @media (prefers-reduced-motion: no-preference) {
+  .rpg-mon { animation: rpg-sway 2.6s ease-in-out infinite; transition: scale .6s ease-in, opacity .6s ease-in; }
+  @keyframes rpg-sway { 0%, 100% { translate: 0 0; rotate: -2deg; } 50% { translate: 0 -3px; rotate: 2deg; } }
   .rpg-hp > i { transition: width .3s; }
   .rpg-mon.rpg-hit .rpg-mon-e { animation: rpg-hit .4s; }
   .rpg-dmg { animation: rpg-dmg .9s ease-out forwards; }
@@ -441,10 +446,11 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-card.rpg-s2 { --rpg-b: var(--rpg-b2); }
 .rpg-card.rpg-s3 { --rpg-b: var(--rpg-b3); }
 .rpg-card.is-none { border-style: dashed; }
-.rpg-card-face { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; }
+.rpg-card-face { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; container-type: inline-size; }
 .rpg-card-flag { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 3px; background: var(--bg); }
 .rpg-card.is-none .rpg-card-flag { filter: grayscale(1); opacity: .4; }
-.rpg-card-name { max-width: 100%; margin-top: 2px; font: 700 .82rem/1.3 var(--font-display); overflow-wrap: anywhere; }
+/* 国名はカタカナの途中で折らない: 字数（--n）に合わせて1行に入る大きさまで小さくする（.6rem まで）。長い名前は文節で折る（それでも入らなければ字の途中） */
+.rpg-card-name { max-width: 100%; margin-top: 2px; font: 700 .82rem/1.3 var(--font-display); font-size: clamp(.6rem, calc(95cqw / var(--n, 6)), .82rem); word-break: auto-phrase; overflow-wrap: break-word; }
 .rpg-card-star { font-size: .9rem; line-height: 1.2; letter-spacing: .04em; color: color-mix(in srgb, var(--rpg-b) 70%, var(--ink)); }
 .rpg-card-stack, .rpg-card-fr { font: 500 .72rem/1.35 var(--font-mono); color: var(--muted); }
 .rpg-card-hint { font-size: .68rem; line-height: 1.35; color: var(--muted); word-break: auto-phrase; }
@@ -472,6 +478,9 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 :is(.rpg-ga-side, .rpg-ga-main) p { margin: 0; }
 .rpg-ga-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .rpg-ga-btns .btn { padding: 12px 10px; white-space: nowrap; }
+/* 引けなかったときの1行（role=status。空でも display:none にしない。空のときは余白（gap 10px）だけ消す） */
+.rpg-ga-msg { margin: 0; font-size: .85rem; font-weight: 700; color: var(--ng); }
+.rpg-ga-msg:empty { margin-top: -10px; }
 #ga-free { grid-column: 1 / -1; padding: 9px 12px; font-size: .95rem; white-space: normal; }
 #ga-need { margin-top: -4px; text-align: right; font: 700 .85rem var(--font-mono); color: var(--muted); }
 #ga-pity { font: 700 1rem var(--font-display); }
@@ -529,7 +538,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 @media (min-width: 1400px) {
   .rpg-ga-res { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
   .rpg-ga-res .rpg-card-face { padding-inline: 4px; }
-  .rpg-ga-res .rpg-card-name { font-size: .74rem; }
+  .rpg-ga-res .rpg-card-name { font-size: clamp(.56rem, calc(97cqw / var(--n, 6)), .74rem); letter-spacing: -.02em; }   /* 10列は狭いので字間も少し詰める */
   .rpg-ga-res .rpg-lab { padding-inline: 2px; font-size: .6rem; letter-spacing: -.02em; }
 }
 
@@ -553,8 +562,10 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   #rpg-map { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
 }
 
-/* シェア（「🎉 仲間が50か国になった！［シェア］」。ガチャの結果の下と、クイズの結果のパネルの中。ボスの［シェア］は終わりの画面のまん中） */
+/* シェア（「🎉 仲間が50か国になった！［シェア］」。ガチャの結果の下・クイズの結果のパネルの中・バトルの終わりの画面・
+   失格／にげたあとの冒険ホーム（.rpg-home-share）。ボスの［シェア］は終わりの画面のまん中） */
 .rpg-shares { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.rpg-home-share { padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
 .rpg-shares[hidden] { display: none; }
 .rpg-share-row { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 700 .95rem/1.45 var(--font-display); word-break: auto-phrase; }
 .rpg-share-row .rpg-share, #bt-share { align-self: center; margin: 0; padding: 6px 18px; font-size: .92rem; }

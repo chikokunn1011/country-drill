@@ -95,7 +95,7 @@ const RPG_SCENES = {
     await rpgLoad(page, { ...RPG_SAVE, coins: 1000 });
     await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
     await page.click('#ga-10');
-    await page.click('#ga-flipall');
+    await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));   // reduced motion なので最初から表（［ぜんぶめくる］は出ない）
   },
   cards: async page => { await rpgLoad(page, RPG_SAVE); await page.evaluate(() => RPG.open('cards')); },
 };

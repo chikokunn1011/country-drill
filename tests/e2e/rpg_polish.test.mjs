@@ -182,6 +182,83 @@ t('share_region_in_result', async page => {
   assert.deepEqual(await shareKinds(page), ['region-samerica']);
 }, { init: SHARE_STUB });
 
+// バトルで仲間の節目（50か国）に届いたら、終わりの画面（#bt-end）にも［シェア］（設計書 §3.7「その場の結果ダイアログの中に」）
+t('share_cards_50_in_battle', async page => {
+  const codes = await page.evaluate(() => C.filter(c => c.r !== '南アメリカ').map(c => c.a).sort().slice(0, 49));
+  await writeSave(page, saveWith({ lv: 20, fr: { br: 4 }, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  await startBattle(page, 'samerica', 1);
+  await page.evaluate(() => RPG_BATTLE.force('br', 'f2n'));
+  await battleAnswer(page, true);
+  await winBattle(page);
+  assert.ok((await page.locator('#bt-end').innerText()).includes('ブラジルが仲間になった！'));
+  assert.equal(await count(page, '#bt-end .rpg-share'), 1);
+  assert.equal(await count(page, '#bt-share'), 0);   // ボスではないので、ボスの［シェア］は無い
+  await page.click('#bt-end .rpg-share');
+  assert.deepEqual(await shared(page), { text: `国旗クエストで仲間が50か国になった！ ${TAG}`, url: SHARE_URL });
+  assert.deepEqual(await shareKinds(page), ['cards-50']);
+}, { init: SHARE_STUB });
+
+// クイズの失格／にげたときの節目は、トーストには［シェア］を出せないので、次に冒険ホームを開いたときに出す（押すか、冒険ホームを離れるまで）
+t('share_after_quit_on_home', async page => {
+  // n か国目が仲間になるように n−1 か国を持たせ、練習を1問（br が仲間になる）で にげる
+  const reach = async n => {
+    const codes = await page.evaluate(n => C.filter(c => c.r !== '南アメリカ').map(c => c.a).sort().slice(0, n - 1), n);
+    await writeSave(page, saveWith({ fr: { br: 4 }, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+    await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+    await page.click('#start');
+    await forceNext(page, 'br');
+    await answerCorrect(page);
+    await page.click('#next');
+    await page.click('#quit');
+    await page.waitForFunction(() => window.__ev.some(e => e.type === 'rpg:join'));
+    assert.equal(await count(page, '.rpg-share'), 0);
+    await page.evaluate(() => show('rpg'));
+    await page.locator('#rpg-home-share .rpg-share').waitFor();
+    assert.ok((await page.locator('#rpg-home-share').innerText()).includes(`仲間が${n}か国になった！`));
+  };
+  await reach(50);
+  await page.evaluate(() => RPG.refresh());   // 描き直しても残る
+  assert.equal(await count(page, '#rpg-home-share .rpg-share'), 1);
+  await page.click('#rpg-home-share .rpg-share');
+  assert.deepEqual(await shared(page), { text: `国旗クエストで仲間が50か国になった！ ${TAG}`, url: SHARE_URL });
+  assert.deepEqual(await shareKinds(page), ['cards-50']);
+  assert.equal(await count(page, '#rpg-home-share .rpg-share'), 0);   // 押したら消える
+  // 押さずに冒険ホームを離れても消える
+  await reach(100);
+  await page.evaluate(() => show('setup'));
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await count(page, '#rpg-home-share .rpg-share'), 0);
+}, { init: SHARE_STUB });
+
+// 冒険ホームを開く前に、失格／にげたで2つの節目に届いたら両方出す。押した行だけ消える
+t('share_after_two_quits_on_home', async page => {
+  // 49か国（オセアニアは tv のほか全部）を持たせ、1回目は br で50か国、2回目は tv でオセアニアを全部
+  const codes = await page.evaluate(() => [
+    ...C.filter(c => c.r === 'オセアニア' && c.a !== 'tv'),
+    ...C.filter(c => c.r !== '南アメリカ' && c.r !== 'オセアニア').sort((x, y) => x.a.localeCompare(y.a)),
+  ].map(c => c.a).slice(0, 49));
+  await writeSave(page, saveWith({ fr: { br: 4, tv: 4 }, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  for (const a of ['br', 'tv']) {
+    await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+    await page.click('#start');
+    await forceNext(page, a);
+    await answerCorrect(page);
+    await page.click('#next');
+    await page.click('#quit');
+    await page.waitForFunction(a => window.__ev.some(e => e.type === 'rpg:join' && e.a === a), a);
+  }
+  await page.evaluate(() => show('rpg'));
+  await page.locator('#rpg-home-share .rpg-share').first().waitFor();
+  const rows = () => page.locator('#rpg-home-share .rpg-share-row').allInnerTexts();
+  assert.deepEqual((await rows()).map(s => s.replace(/\s*シェア$/, '')), ['🎉 仲間が50か国になった！', '🎉 オセアニアの国を全部仲間にした！']);
+  await page.click('#rpg-home-share .rpg-share-row:nth-child(2) .rpg-share');
+  assert.deepEqual(await shareKinds(page), ['region-oceania']);
+  assert.deepEqual((await rows()).map(s => s.replace(/\s*シェア$/, '')), ['🎉 仲間が50か国になった！']);   // 押した行だけ消える
+  await page.click('#rpg-home-share .rpg-share');
+  assert.deepEqual(await shareKinds(page), ['region-oceania', 'cards-50']);
+  assert.equal(await page.isVisible('#rpg-home-share'), false);
+}, { init: SHARE_STUB });
+
 /* ---------- 演出（RPG.fx） ---------- */
 // ボス（Lv1 なので旗1枚に2回かかる）で5回続けて正解して1回まちがえ、呼ばれた FX の名前を返す
 const bossFx = async page => {
@@ -230,6 +307,26 @@ t('gold_fx', async page => {
     else for (const k of ['flash', 'confetti']) assert.ok(calls.includes(k), `${rm}: ${k} が無い: ${calls}`);
   }
 }, { storage: DOPA });
+
+// モンスターは CSS だけでゆらゆら（ドパガキに関係なく）、倒すと小さくなって消える。reduced motion では動かない（倒したらその場で消える）
+t('monster_sway_and_defeat', async page => {
+  const style = () => page.evaluate(() => {
+    const s = getComputedStyle($('bt-mon'));
+    return { anim: s.animationName, tr: s.transitionDuration, opacity: s.opacity, dead: $('bt-mon').classList.contains('rpg-dead') };
+  });
+  for (const rm of ['no-preference', 'reduce']) {
+    await page.emulateMedia({ reducedMotion: rm });
+    await writeSave(page, saveWith({ lv: 20 }));
+    assert.equal(await page.evaluate(() => S.dopa), false);
+    await startBattle(page, 'samerica', 1);
+    assert.deepEqual(await style(), { anim: rm === 'reduce' ? 'none' : 'rpg-sway', tr: rm === 'reduce' ? '0s' : '0.6s, 0.6s', opacity: '1', dead: false }, rm);   // scale と opacity
+    await winBattle(page);
+    assert.equal((await style()).dead, true, rm);
+    if (rm === 'reduce') assert.equal((await style()).opacity, '0', rm);
+    else await page.waitForFunction(() => getComputedStyle($('bt-mon')).opacity === '0');
+    assert.ok(await page.isVisible('#bt-end'));
+  }
+});
 
 t('reduced_motion_auto_next', async page => {
   await writeSave(page, saveWith({}));

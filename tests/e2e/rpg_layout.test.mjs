@@ -6,7 +6,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, pickSetup } from './helpers.mjs';
-import { openRpg, writeSave, saveWith, startBattle, battleAnswer, battleGuard, winBattle } from './rpg_helpers.mjs';
+import { openRpg, writeSave, saveWith, startBattle, battleAnswer, battleGuard, winBattle, flipAll } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -14,13 +14,13 @@ before(async () => { server = await startServer(); browser = await chromium.laun
 after(async () => { await browser?.close(); await server?.close(); });
 
 // 毎回まっさらなブラウザで開いて fn を実行する。最後にページの例外と、[rpg] で始まる console.error が無いことを見る
-// （opts.rpgErrorOk で console.error の確認だけ外せる。opts.timeout は node:test の timeout。ほかの opts は openRpg にそのまま渡す）
-const t = (name, fn, { rpgErrorOk = false, timeout = 60_000, ...opts } = {}) => test(name, { timeout }, async () => {
+// （opts.timeout は node:test の timeout。ほかの opts は openRpg にそのまま渡す）
+const t = (name, fn, { timeout = 60_000, ...opts } = {}) => test(name, { timeout }, async () => {
   const app = await openRpg(browser, { seed: 1, ...opts });
   try {
     await fn(app.page, app);
     assert.deepEqual(app.errors.map(String), []);
-    if (!rpgErrorOk) assert.deepEqual(app.consoleErrors.filter(s => s.startsWith('[rpg]')), []);
+    assert.deepEqual(app.consoleErrors.filter(s => s.startsWith('[rpg]')), []);
   } finally { await app.close(); }
 });
 
@@ -143,7 +143,8 @@ t('short_phone_one_line', async page => {
   await writeSave(page, PARTY);
   await startBattle(page, 'samerica', 1);
   const top = await rect(page, '.rpg-btop');
-  assert.ok(top.height <= 64, `上の列の高さ ${top.height}`);
+  assert.ok(top.height <= 58, `上の列の高さ ${top.height}`);   // 約56px
+  assert.ok((await rect(page, '#bt-flee')).height >= 24, `［にげる］の高さ ${(await rect(page, '#bt-flee')).height} が 24px より低い（押しにくい）`);
   assert.equal(await page.isVisible('.rpg-flagtext'), true);
   assert.match(await page.innerText('.rpg-flagtext'), /旗/);
   assert.equal(await page.locator('#bt-flags .rpg-cloth:visible').count(), 0);   // 旗の列は「旗 n/N」の文字だけ
@@ -163,9 +164,42 @@ t('short_phone_one_line', async page => {
   // ボス（丸いスタンプの枠と BOSS の札）でも1行のまま
   await startBattle(page, 'samerica', 5);
   const boss = await rect(page, '.rpg-btop');
-  assert.ok(boss.height <= 64, `ボスの上の列の高さ ${boss.height}`);
+  assert.ok(boss.height <= 58, `ボスの上の列の高さ ${boss.height}`);
   assert.equal(await page.isVisible('#bt-mon .rpg-bosstag'), true);
+  const tag = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.rpg-bosstag')).fontSize));
+  assert.ok(tag >= 8.8, `BOSS の札の文字 ${tag}px が小さすぎる`);   // .55rem
+  assert.ok((await rect(page, '.rpg-bosstag')).bottom <= boss.bottom, 'BOSS の札が上の列からはみ出る');
 }, { viewport: SHORT });
+
+// カードの国名はカタカナの途中で折らない: アルゼンチン・アゼルバイジャンは 1行（字数に合わせて小さくする。9px 未満にはしない）
+t('card_names_one_line', async page => {
+  await writeSave(page, saveWith({ coins: 1000, cards: { ar: [1, 0], az: [2, 0] } }));
+  const lines = (page, sel) => page.evaluate(sel => {
+    const el = document.querySelector(sel), r = document.createRange();
+    r.selectNodeContents(el);
+    const ys = new Set([...r.getClientRects()].map(b => Math.round(b.top)));
+    return { lines: ys.size, fs: parseFloat(getComputedStyle(el).fontSize), over: el.scrollWidth > el.clientWidth + 1 };
+  }, sel);
+  for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 640 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(vp);
+    await page.evaluate(() => RPG.open('cards'));
+    for (const a of ['ar', 'az']) {
+      const r = await lines(page, `#cd-grid .rpg-card[data-a="${a}"] .rpg-card-name`);
+      assert.deepEqual([r.lines, r.over, r.fs >= 9], [1, false, true], `仲間 ${vp.width} ${a}: ${JSON.stringify(r)}`);
+    }
+    // ガチャの結果（1400px 以上は10列で狭い）
+    await page.evaluate(() => RPG.open('gacha'));
+    await page.evaluate(() => { const d = RPG.get(); $('ga-res').innerHTML = ['ar', 'az', 'br', 'cl', 'jp', 'us', 'fr', 'de', 'it', 'es'].map(a => RPG.cardHTML(a, d, { label: 'NEW' })).join(''); });
+    for (const a of ['ar', 'az']) {
+      const r = await lines(page, `#ga-res .rpg-card[data-a="${a}"] .rpg-card-name`);
+      assert.deepEqual([r.lines, r.over, r.fs >= 9], [1, false, true], `ガチャ ${vp.width} ${a}: ${JSON.stringify(r)}`);
+    }
+  }
+  // 短い名前は小さくしない（.82rem のまま）
+  await page.evaluate(() => RPG.open('cards'));
+  const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
+  assert.equal((await lines(page, '#cd-grid .rpg-card[data-a="jp"] .rpg-card-name')).fs, +(rem * .82).toFixed(3));
+});
 
 t('pc_stage_fits', async page => {
   await writeSave(page, PARTY);
@@ -283,7 +317,7 @@ t('gacha_layout', async page => {
   await writeSave(page, saveWith({ coins: 1000, cards: { jp: [3, 4], cf: [2, 2], vc: [1, 1] }, fr: { cf: 10, vc: 7 } }));
   await page.evaluate(() => RPG.open('gacha', { region: '北・中央アメリカ' }));
   await page.click('#ga-10');
-  await page.click('#ga-flipall');
+  await flipAll(page);
   for (const v of VIEWPORTS) {
     await page.setViewportSize(v);
     assert.ok(await noHScroll(page), `gacha ${size(v)}`);
@@ -348,7 +382,7 @@ t('dark_mode', async page => {
   await page.setViewportSize(PHONE);
   await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
   await page.click('#ga-10');
-  await page.click('#ga-flipall');
+  await flipAll(page);
   await noHScrollAt(page, 'ダークのガチャ');
   await page.evaluate(() => RPG.open('cards'));
   await noHScrollAt(page, 'ダークの仲間');
