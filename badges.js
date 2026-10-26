@@ -540,7 +540,7 @@
   const TOAST_GAP = 400;                               // 続けて出すトーストのずらし（§5.3）
   const GACHA_HOLD = 3000, GACHA_HOLD_REDUCED = 1000;  // 最後の rpg:pull から、ガチャの演出中としてお知らせを待つ時間。reduced motion なら短く（§5.1）
   const PANEL_FX_DELAY = 700;                          // 結果のファンファーレから、パネルの音と紙吹雪まで（§5.4）
-  const COPIED_MS = 2000;                              // シェアの「コピーしたよ」を出しておく時間（§6.3）
+  const COPIED_MS = 2000;                              // シェアの「コピー済み」を出しておく時間（§6.3）
   let run = null;           // クイズ中なら { sid }。drill:start で作り、drill:result で捨てる（保留の判定に使う）
   let battle = false;       // バトル画面にいる
   let screen = document.body.dataset.screen || 'home';   // 最初の drill:screen は badges.js を読む前に出るので、body から読む
@@ -858,7 +858,8 @@
       return `<li class="bdg-tier" data-key="${key}"><span class="bdg-tl t${t.color}">${tierLabel(t.color)}</span><div class="bdg-tbody">`
         + `<p class="bdg-cond">${esc(t.desc)}</p>${state}<div class="bdg-trow"><p class="bdg-ttl">称号〈${esc(t.title)}〉</p>${act}</div></div></li>`;
     }).join('');
-    const acts = (topOf(b, d) >= 0 ? `<button class="btn ghost bdg-btn" data-bdg-share="${b.id}">シェア</button>` : '')
+    // ［シェア］は「シェア」と「コピー済み」を重ねて置き、幅を初めから長いほうに合わせる（コピーしたときに幅が変わって行が折り返さない）
+    const acts = (topOf(b, d) >= 0 ? `<button class="btn ghost bdg-btn bdg-share" data-bdg-share="${b.id}"><span>シェア</span><span>コピー済み</span></button>` : '')
       + (b.cat === 'region' || b.cat === 'mode' ? `<button class="btn ghost bdg-btn" data-bdg-practice="${b.id}">練習する →</button>` : '');
     return `<div class="bdg-detail" data-id="${b.id}">${head}<ol class="bdg-tiers">${tiers}</ol>`
       + `${b.skill ? '<p class="bdg-note">※ 国名ヒントありの正解は数えないよ</p>' : ''}${acts ? `<div class="row bdg-acts">${acts}</div>` : ''}</div>`;
@@ -946,13 +947,13 @@
       else navigator.clipboard?.writeText(text).then(() => copied(btn), () => {});
     } catch { /* 共有もコピーもできなければ何もしない */ }
   }
-  // コピーできた。トーストはモーダルの #detail の下に隠れるので、開いている間は押したボタンの文字をしばらく「コピーしたよ」にする
+  // コピーできた。トーストはモーダルの #detail の下に隠れるので、開いている間は押したボタンの文字をしばらく「コピー済み」にする（data-copied。badges.css）
   let copiedTimer = 0;
   function copied(btn) {
     if (!$('detail').open || !btn?.isConnected) { toast('コピーしたよ', COPIED_MS); return; }   // コピーが終わる前に閉じた
     clearTimeout(copiedTimer);
-    btn.textContent = 'コピーしたよ';
-    copiedTimer = setTimeout(() => { btn.textContent = 'シェア'; }, COPIED_MS);
+    btn.dataset.copied = '';
+    copiedTimer = setTimeout(() => { delete btn.dataset.copied; }, COPIED_MS);
   }
 
   // バッジのボタンは document でまとめて受ける（ホーム・バッジ画面・ダイアログ・トースト・結果画面のパネル）

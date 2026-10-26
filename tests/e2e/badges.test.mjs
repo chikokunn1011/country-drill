@@ -381,7 +381,7 @@ t('practice_button_count', async page => {
   assert.deepEqual(await go('mode-f2m', 5), [5, 5, '5']);
 });
 
-// navigator.share が無ければコピー。トーストはモーダルの #detail の下に隠れるので、開いている間は［シェア］の文字を2秒だけ「コピーしたよ」にする。
+// navigator.share が無ければコピー。トーストはモーダルの #detail の下に隠れるので、開いている間は［シェア］の文字を2秒だけ「コピー済み」にする。
 // コピーが終わる前にダイアログを閉じていたらトースト
 t('share_copies', async (page, app) => {
   await app.context.addInitScript(() => {
@@ -390,13 +390,13 @@ t('share_copies', async (page, app) => {
   });
   await page.reload();
   await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
-  const shown = await page.evaluate(() => new Promise(ok => {   // 「コピーしたよ」になってから「シェア」に戻るまで（ms）
+  const shown = await page.evaluate(() => new Promise(ok => {   // 見えている文字が「コピー済み」になってから「シェア」に戻るまで（ms）
     const b = document.querySelector('#detail-inner [data-bdg-share]');
     let t0 = 0;
     new MutationObserver(() => {
-      if (b.textContent === 'コピーしたよ') t0 = performance.now();
-      else if (t0) ok({ ms: performance.now() - t0, back: b.textContent, toasts: document.querySelectorAll('#toasts .toast').length });
-    }).observe(b, { childList: true, characterData: true, subtree: true });
+      if (b.innerText === 'コピー済み') t0 ||= performance.now();
+      else if (t0) ok({ ms: performance.now() - t0, back: b.innerText, toasts: document.querySelectorAll('#toasts .toast').length });
+    }).observe(b, { attributes: true, childList: true, characterData: true, subtree: true });
     b.click();
   }));
   assert.ok(shown.ms >= 1900 && shown.ms < 2600, json(shown));
@@ -410,6 +410,30 @@ t('share_copies', async (page, app) => {
   assert.equal(await count(page, '#detail-inner .bdg-detail'), 1);
   assert.equal(await count(page, '#detail-inner [data-bdg-share]'), 0);
 });
+
+// 320px でも、［シェア］が「コピー済み」になっている間に［練習する →］が次の行に落ちない（［シェア］の幅は初めから長いほうの文字に合わせてある）。
+// 読み上げの名前も見えている文字と同じ
+t('share_copied_no_wrap_320', async (page, app) => {
+  await app.context.addInitScript(() => {
+    delete Navigator.prototype.share;
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() } });
+  });
+  await page.reload();
+  await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
+  const geo = () => page.evaluate(() => {
+    const r = sel => { const b = document.querySelector(`#detail-inner ${sel}`).getBoundingClientRect(); return [b.left, b.top, b.width, b.height].map(Math.round); };
+    return { share: r('[data-bdg-share]'), prac: r('[data-bdg-practice]'), acts: r('.bdg-acts'), sh: $('detail').scrollHeight };
+  });
+  const share = page.getByRole('button', { name: 'シェア', exact: true });
+  await share.scrollIntoViewIfNeeded();
+  const before = await geo();
+  assert.equal(before.share[1], before.prac[1], `初めから2行になっている: ${json(before)}`);
+  await share.click();
+  await page.getByRole('button', { name: 'コピー済み', exact: true }).waitFor();
+  assert.deepEqual(await geo(), before);
+  await share.waitFor({ timeout: 4000 });   // 2秒で「シェア」に戻る
+  assert.deepEqual(await geo(), before);
+}, { viewport: { width: 320, height: 640 } });
 
 // ひみつのバッジは、取るまで条件と称号をどこにも出さない（タイルと詳細）
 t('secret_detail_hint_only', async page => {
@@ -726,23 +750,62 @@ for (const viewport of [{ width: 1366, height: 657 }, { width: 1280, height: 577
     assert.ok(r.bottom <= win.h && r.right <= win.w, json({ r, win }));
   }, { viewport });
 
-  // まちがえた国の一覧（10問ぜんぶの10か国）とパネル（4行と「ほか」）が #r-side に並んでも、［もう一回］はスクロールなしで押せる
-  t(`result_panel_pc_fits_misses_${viewport.width}x${viewport.height}`, async page => {
-    await page.evaluate(() => { BADGES.debug.set('right', 95); BADGES.debug.set('days', 2); BADGES.debug.set('last', '2000-01-01'); });
-    await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 10 });
-    await page.click('#start');
-    for (let i = 0; i < 10; i++) { await answerWrong(page); await page.click('#next'); }   // まちがえた国は後ろに回る
-    await clearByAnswering(page);   // first-clear answers streak reg-world days comeback
-    await settleLayout(page);
-    assert.equal(await count(page, '#r-side .misslist li'), 10);
-    assert.equal(await count(page, '#r-badges .bdg-row'), 4);
-    assert.match(await text(page, '#r-badges .bdg-more'), /ほか2個/);
-    assert.ok(await noHScroll(page));
-    const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
-    assert.ok(r.top >= 0 && r.bottom <= win.h && r.right <= win.w, json({ r, win }));
+}
+
+// 練習10問で、はじめの misses 問をまちがえてからクリアする（まちがえた国は後ろに回る）。
+// パネルは first-clear answers streak reg-world days comeback の6個で、4行と「ほか2個」
+async function playMisses(page, misses) {
+  await page.evaluate(() => { BADGES.debug.set('right', 95); BADGES.debug.set('days', 2); BADGES.debug.set('last', '2000-01-01'); });
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 10 });
+  await page.click('#start');
+  for (let i = 0; i < misses; i++) { await answerWrong(page); await page.click('#next'); }
+  await clearByAnswering(page);
+  await settleLayout(page);
+  assert.equal(await count(page, '#r-side .misslist li'), misses);
+  assert.equal(await count(page, '#r-badges .bdg-row'), 4);
+  assert.match(await text(page, '#r-badges .bdg-more'), /ほか2個/);
+  assert.ok(await noHScroll(page));
+}
+// ［もう一回］がスクロールしないで全部見えている
+async function againInView(page) {
+  const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, y: scrollY }));
+  assert.ok(win.y === 0 && r.top >= 0 && r.bottom <= win.h && r.right <= win.w, json({ r, win }));
+}
+
+// ≥1280 の背の低い PC: まちがえた国の一覧とパネル（4行と「ほか」）が #r-side に並んでも、［もう一回］はスクロールなしで押せる。
+// 一覧が5か国以上なら左の列（点数と［もう一回］）も上にそろえる。4か国までは pc.css のまま上下まん中（上にそろえない）
+for (const [viewport, misses] of [[{ width: 1366, height: 657 }, 10], [{ width: 1366, height: 657 }, 4],
+  [{ width: 1280, height: 577 }, 10], [{ width: 1280, height: 577 }, 4], [{ width: 1536, height: 730 }, 1]]) {
+  t(`result_panel_pc_fits_misses_${misses}_${viewport.width}x${viewport.height}`, async page => {
+    await playMisses(page, misses);
+    await againInView(page);
+    const top = await page.evaluate(() => ({ result: $('rcard').querySelector(':scope > .result').getBoundingClientRect().top, side: $('r-side').getBoundingClientRect().top }));
+    if (misses >= 5) assert.ok(Math.abs(top.result - top.side) < 1, `上にそろっていない: ${json(top)}`);
+    else assert.ok(top.result - top.side > 20, `上にそろえている: ${json(top)}`);
     // 詰めても行の［つける］は 44px 以上
     const btn = await page.locator('#r-badges .bdg-row [data-bdg-equip]').first().evaluate(e => e.getBoundingClientRect().height);
     assert.ok(btn >= 44, `［つける］の高さ ${btn}`);
+  }, { viewport });
+}
+
+// 900〜1279 の PC は #rcard が縦1列。パネルがあると、ボタンの行を点数のすぐ下（まちがえた国とパネルの上）に出し、［もう一回］をスクロールなしで押せるようにする。
+// Tab の順も見た目の順（［もう一回］の次はまちがえた国・パネル、前は［モード選択へ］）
+for (const [viewport, misses] of [[{ width: 1024, height: 600 }, 1], [{ width: 1024, height: 600 }, 10], [{ width: 1279, height: 700 }, 1],
+  [{ width: 1279, height: 700 }, 10], [{ width: 1024, height: 768 }, 1], [{ width: 1024, height: 768 }, 10]]) {
+  t(`result_panel_mid_pc_buttons_first_${misses}_${viewport.width}x${viewport.height}`, async page => {
+    await playMisses(page, misses);
+    await againInView(page);
+    const g = await page.evaluate(() => {
+      const b = e => e.getBoundingClientRect();
+      return { result: b($('rcard').querySelector(':scope > .result')).bottom, btns: b($('r-again').parentElement), side: b($('r-side')).top };
+    });
+    assert.ok(g.result <= g.btns.top && g.btns.bottom <= g.side, `点数 → ボタン → まちがえた国とパネル の順でない: ${json(g)}`);
+    await page.focus('#r-again');
+    await page.keyboard.press('Tab');
+    assert.ok(await page.evaluate(() => !!document.activeElement.closest('#r-badges')), 'Tab で［もう一回］の次がパネルでない');
+    await page.focus('#r-again');
+    await page.keyboard.press('Shift+Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'r-setup');
   }, { viewport });
 }
 

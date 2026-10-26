@@ -49,8 +49,11 @@ test('events_doc_covers_badges', () => {
 });
 
 test('events_doc_rpg_answer_timing', () => {
-  // 10章: クイズの外で積んだ rpg:answer をいつ判定するか（次に判定するイベント＝ふつうは rpg:battle、または pagehide のあとの次の起動）
+  // 10章: クイズの外で積んだ rpg:answer をいつ判定するか（次に判定するイベント＝ふつうは rpg:battle）。
+  // ページを閉じた・隠れたときは保存だけして、そのあとの判定で判定する。visibilitychange ではページが残るので、次の起動とは限らない
   const sec = doc().split(/^## /m).find(s => s.startsWith('10.')) ?? '';
   const line = sec.split('\n').find(l => l.startsWith('- ') && l.includes('`rpg:answer`')) ?? '';
-  for (const s of ['`rpg:battle`', '`pagehide`', '次の起動']) assert.ok(line.includes(s), `10章の rpg:answer の行に ${s} がない: ${line}`);
+  for (const s of ['`rpg:battle`', '`pagehide`', '`visibilitychange`', '次の起動', 'そのあとの判定（次に判定するイベントか、次の起動時）'])
+    assert.ok(line.includes(s), `10章の rpg:answer の行に ${s} がない: ${line}`);
+  assert.ok(!line.includes('次の起動時の判定で判定する'), `visibilitychange のあとも次の起動で判定すると書いてある: ${line}`);
 });
