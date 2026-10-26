@@ -382,8 +382,9 @@ t('double_click_one_answer', async page => {
 });
 
 t('auto_advance', async page => {
-  await writeSave(page, saveWith({}));
-  await startBattle(page, 'samerica', 1);
+  // 4回続けて正解しても倒しきらないように F4（HP 80。atk 10 で会心が4回続いても 70）
+  await writeSave(page, saveWith({ floors: { samerica: 3 } }));
+  await startBattle(page, 'samerica', 4);
   const ms = await page.evaluate(() => RPG_CORE.TUNING.battle.autoNextMs);
   const right = async () => { await battleGuard(page); await page.click(`#scr-battle .choice[data-a="${await cur(page)}"]`); };
   // 正解 → 300ms 後はまだ同じ問題、autoNextMs + 300ms 後は次の問題
@@ -405,6 +406,14 @@ t('auto_advance', async page => {
   await right();
   await page.click('#scr-battle .rpg-bwhere');
   await page.waitForFunction(t0 => RPG_BATTLE.state().shownAt !== t0, s2.shownAt, { timeout: 300 });
+  // 正解の直後に、押した選択肢（disabled）をもう一度タップ → 下の .choices に落ちて、すぐ次の問題。答えは増えない
+  // page.click は enabled になるのを待つので、座標で押す
+  const s3 = await state(page), a3 = await cur(page), n3 = (await events(page, 'rpg:answer')).length;
+  await right();
+  const bb = await page.locator(`#scr-battle .choice[data-a="${a3}"]`).boundingBox();
+  await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2);
+  await page.waitForFunction(t0 => RPG_BATTLE.state().shownAt !== t0, s3.shownAt, { timeout: 300 });
+  assert.equal((await events(page, 'rpg:answer')).length, n3 + 1);
 });
 
 t('party_on_intro', async page => {
