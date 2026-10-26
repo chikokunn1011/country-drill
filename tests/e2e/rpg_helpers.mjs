@@ -1,4 +1,5 @@
 // 国旗クエスト（RPG）の e2e の共通部品。開くときは openRpg（badges.js を止めて、RPG のイベントとトーストを積む）。バトルは startBattle・battleAnswer・winBattle
+import assert from 'node:assert/strict';
 import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './helpers.mjs';
 
 // RPG のファイル。既存のテストが「RPG がある」ことだけで落ちるときは、開くときに blockScripts: RPG_FILES を渡す
@@ -63,10 +64,11 @@ export async function playPractice(page, { mode = 'f2n', region = 'all', count =
 // 今の問題を国 a に置きかえる
 export const forceNext = (page, a) => page.evaluate(a => { G.queue.unshift(byA.get(a)); nextQuestion(); }, a);
 
-// ガチャの結果を全部表にする。［ぜんぶめくる］は全部表になると隠れる（押すのが間に合わないことがある）ので、onclick を直接呼んでから表になるのを待つ
+// ガチャの結果を全部表にする。［ぜんぶめくる］は全部表になると隠れる（押すのが間に合わないことがある）ので、onclick を直接呼ぶ。
+// めくる interval だけでも全部表になるので待たずに、押したその場で裏が0枚になったことを見る
 export async function flipAll(page) {
-  await page.evaluate(() => $('ga-flipall').click());
-  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  const n = await page.evaluate(() => { $('ga-flipall').click(); return document.querySelectorAll('#ga-res .rpg-card.is-back').length; });
+  assert.equal(n, 0, '［ぜんぶめくる］を押しても裏のカードが残っている');
 }
 
 // ---- バトル（rpg-battle.js） ----

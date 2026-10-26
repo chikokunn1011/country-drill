@@ -160,6 +160,22 @@ t('flip_in_order', async page => {
   assert.equal(await page.isVisible('#ga-flipall'), false);
 });
 
+// ［ぜんぶめくる］で飛ばせる: 押したその場で全部表になり、［ぜんぶめくる］が隠れて、引くボタンがまた押せる。
+// 引く → 押す を1つの evaluate で（めくる interval が割りこまないので、interval が全部めくったのと区別できる）
+t('flipall_skips', async page => {
+  await gacha(page, saveWith({ coins: 1100 }));   // 10回のあとも 100 残るので 1回が押せるようになる
+  const r = await page.evaluate(() => {
+    $('ga-10').click();
+    const back = () => document.querySelectorAll('#ga-res .rpg-card.is-back').length;
+    const before = { back: back(), shown: !$('ga-flipall').hidden, one: $('ga-1').disabled };
+    $('ga-flipall').click();
+    return { before, after: { back: back(), shown: !$('ga-flipall').hidden, one: $('ga-1').disabled } };
+  });
+  assert.deepEqual(r, { before: { back: 10, shown: true, one: true }, after: { back: 0, shown: false, one: false } });
+  assert.equal(await page.isVisible('#ga-flipall'), false);
+  assert.equal(await page.isEnabled('#ga-1'), true);
+});
+
 // 裏向きのカードを押すとめくれるだけ（詳細は表になってから）。最後の1枚を押してめくったら、その場で［ぜんぶめくる］が隠れてボタンが戻る
 t('back_card_tap_flips_only', async page => {
   await gacha(page, saveWith({ coins: 1000 }));
