@@ -745,6 +745,25 @@ t('rpg_battle_holds', async (page, app) => {
   await toastWith(page, '初勝利').waitFor();
 });
 
+// バトルの終わりに同じタスクで続けて来たもの（rpg:battle → rpg:clear → コイン → 仲間・克服）は、まとめて1回のお知らせ（スマホは2枚まで）
+t('rpg_battle_end_one_notice', async (page, app) => {
+  await withRpg(app, {});
+  await page.evaluate(() => {
+    const go = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
+    go('rpg:battle', { dungeon: 'oceania', floor: 5, boss: true, win: true, first: true, mistakes: 0, revived: false, gauge: 0, maxCombo: 3, lv: 3, recLv: 9 });
+    go('rpg:clear', { dungeon: 'oceania' });
+    go('rpg:coins', { delta: 100, reason: 'battle', coins: 100, earned: 100 });
+    go('rpg:join', { a: 'jp', via: 'learn', owned: 1 });
+    go('rpg:overcome', { a: 'fr', total: 1 });
+  });
+  await page.waitForTimeout(1000);   // 400ms ずつずらした分も出きる
+  assert.equal(await toastN(page), 2);
+  assert.equal(await toastWith(page, 'ほか').count(), 1);
+  const ids = (await earned(page)).map(e => e.id);
+  for (const k of ['rpg-first-win@1', 'rpg-boss@1', 'rpg-friend@1', 'overcome@1']) assert.ok(ids.includes(k), `${k} が無い: ${json(ids)}`);
+  assert.deepEqual([...(await saved(page)).sent].sort(), [...ids].sort());
+});
+
 // ガチャの演出中（reduced motion なら最後の rpg:pull から1秒）は保留し、過ぎたら出す。ガチャで仲間になっても「覚えて仲間に」は取れない
 t('rpg_gacha_holds', async (page, app) => {
   await withRpg(app, {});

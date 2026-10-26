@@ -575,8 +575,16 @@
     const left = screen === 'gacha' ? lastPull + (reduced() ? 1000 : 3000) - Date.now() : 0;
     return left > 0 ? left : 0;
   }
-  // 保留していたお知らせを出す。まとめは1枚ずつ、ステップは上限まで（超えたら上限−1枚と「ほか◯個」）。400ms ずつずらす
+  // 保留していたお知らせを出す。同じタスクで続けて来た分（バトルの終わりの rpg:battle → rpg:clear → 仲間など）は
+  // マイクロタスクを1つ待ってまとめて1回で出す（上限はそのまとめに効く）。判定と払いはイベントごとに同期のまま
+  let flushQueued = false;
   function flush() {
+    if (flushQueued) return;
+    flushQueued = true;
+    queueMicrotask(() => { flushQueued = false; flushNow(); });
+  }
+  // まとめは1枚ずつ、ステップは上限まで（超えたら上限−1枚と「ほか◯個」）。400ms ずつずらす
+  function flushNow() {
     clearTimeout(flushTimer);
     if (!pending.length) return;
     const wait = blockedFor();
