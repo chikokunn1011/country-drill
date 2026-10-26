@@ -112,7 +112,7 @@ t('share_after_boss', async page => {
   await winBattle(page);
   await page.click('#bt-share');
   assert.deepEqual(await shared(page), { text: `国旗クエストで地図喰いをたおして、世界を取りもどした！ 仲間 1/195か国 ${TAG}`, url: SHARE_URL });
-  assert.deepEqual(await shareKinds(page), ['boss-world']);
+  assert.deepEqual(await shareKinds(page), ['final']);
 }, { init: SHARE_STUB, timeout: 120_000 });
 
 t('share_fallbacks', async page => {
@@ -237,7 +237,12 @@ t('reduced_motion_auto_next', async page => {
   await battleGuard(page);
   const { a, shownAt } = await page.evaluate(() => ({ a: RPG_BATTLE.cur(), ...RPG_BATTLE.state() }));
   await page.click(`#scr-battle .choice[data-a="${a}"]`);
-  // ダメージの数字は浮かばない
+  // モンスターは揺れずに白く光る。ダメージの数字は浮かばない
+  assert.deepEqual(await page.evaluate(() => ({
+    glow: document.getElementById('bt-mon').classList.contains('rpg-hitglow'),
+    shake: document.getElementById('bt-mon').classList.contains('rpg-hit'),
+    filter: getComputedStyle(document.querySelector('#bt-mon .rpg-mon-e')).filter,
+  })), { glow: true, shake: false, filter: 'brightness(1.8)' });
   assert.equal(await count(page, '#bt-mon .rpg-dmg'), 0);
   await page.waitForTimeout(await page.evaluate(() => RPG_CORE.TUNING.battle.autoNextMs) + 300);
   const s = await page.evaluate(() => RPG_BATTLE.state());

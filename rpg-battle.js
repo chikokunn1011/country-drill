@@ -408,7 +408,7 @@
     $('bt-col').innerHTML = html;
     // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
     if (win && b.boss && first && d) {
-      const sb = RPG.shareButton(`boss-${b.id}`, bossShareText(b.dg, d));
+      const sb = RPG.shareButton(b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final
       sb.id = 'bt-share';
       $('bt-end').querySelector('.rpg-bend-x').after(sb);
     }

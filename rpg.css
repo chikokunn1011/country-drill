@@ -546,9 +546,10 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-share-row { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 700 .95rem/1.45 var(--font-display); word-break: auto-phrase; }
 .rpg-share-row .rpg-share, #bt-share { align-self: center; margin: 0; padding: 6px 18px; font-size: .92rem; }
 
-/* 演出（RPG.fx）。まちがえると旅人の HP が赤く光る（reduced motion では光るだけ）。★3 のカードは表になっても金色に光る。
-   結果のコインの数は桁の幅をそろえる（カウントアップで横にゆれない） */
+/* 演出（RPG.fx）。まちがえると旅人の HP が赤く光る（reduced motion では光るだけ）。reduced motion で当たるとモンスターは揺れずに白く光るだけ。
+   ★3 のカードは表になっても金色に光る。結果のコインの数は桁の幅をそろえる（カウントアップで横にゆれない） */
 .rpg-hp.rpg-ouch { box-shadow: 0 0 0 2px var(--ng), 0 0 12px 3px color-mix(in srgb, var(--ng) 60%, transparent); }
+.rpg-mon.rpg-hitglow .rpg-mon-e { filter: brightness(1.8); }
 .rpg-card.is-gold:not(.is-back) { box-shadow: 0 0 0 2px var(--rpg-b3), 0 0 14px 2px var(--rpg-b3); }
 .rpg-res-n { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: no-preference) {

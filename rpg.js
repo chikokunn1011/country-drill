@@ -944,12 +944,12 @@
 
   // 演出。ドパガキ（S.dopa は毎回読む）と reduced motion を見て決める。FX の効果音・振動はドパガキ ON のときだけ、
   // 紙吹雪・フラッシュ・ポップ・浮かぶ数字は reduced motion では呼ばない（FX は自分では確かめないため）
-  //   hit:   el（モンスター）が揺れて白く光り、n（ダメージ）が浮かぶ。combo はこの正解をふくむ連続正解の数
+  //   hit:   el（モンスター）が揺れて白く光り、n（ダメージ）が浮かぶ（reduced motion では白く光るだけ）。combo はこの正解をふくむ連続正解の数
   //   miss:  el（旅人の HP バー）が赤く光る
   //   win:   勝利の表示（画面は呼ぶ側が出す）
   //   gold:  el（★3 のカード）が金色に光る
   //   count: el の数を n にする（ドパガキ ON ならカウントアップ）
-  const OUCH_MS = 900, COUNT_MS = 800, ouchTimer = new WeakMap();
+  const OUCH_MS = 900, GLOW_MS = 400, COUNT_MS = 800, ouchTimer = new WeakMap(), glowTimer = new WeakMap();
   // 0 から n まで数え上げ、+n を浮かべる（結果のパネルは画面を出す前に描くので、場所は次のフレームで測る）
   const countUp = (el, n) => {
     let t0 = 0;
@@ -980,6 +980,10 @@
           num.onanimationend = () => num.remove();
           setTimeout(() => num.remove(), 2000);   // CSS が読めなかったときも残さない
           el.append(num);
+        } else if (el) {   // reduced motion: 揺らさず数字も出さず、白く光るだけ
+          el.classList.add('rpg-hitglow');
+          clearTimeout(glowTimer.get(el));
+          glowTimer.set(el, setTimeout(() => el.classList.remove('rpg-hitglow'), GLOW_MS));
         }
         if (dopa) {
           FX.sfx('correct', combo);
