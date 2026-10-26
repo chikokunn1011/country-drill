@@ -281,6 +281,215 @@
     return { ok: true, rpg: r.d, m: hasM ? sanitizeMisses(o.m) : {}, hasM };
   };
 
+  // ---- クイズのコインと学習の記録（設計書 §5.1・§6.2・§8） ----
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const QUIZ_KINDS = new Set(['practice', 'challenge', 'ta']);
+  const QUIZ_BITS = MODE_BIT.f2n | MODE_BIT.n2f | MODE_BIT.m2f | MODE_BIT.f2m;   // マスター昇格に要る4モード
+  const BOUNTY_N = 3, REVIEW_DAYS = 7;   // 手配書の数、復習の手配書に選ぶまでの日数
+  // 苦手: misses が1以上か、wk の印がある
+  const isWeak = (d, m, a) => Math.max(0, +(m || {})[a] || 0) > 0 || !!(d.wk || {})[a];
+
+  // 1問ぶんのコイン。nth は今日その国でコインをもらうのが何回目か（1から）。不正解・知らない kind / mode は全部0
+  const answerCoins = ({ kind, mode, right, first, hint, weak, nth, retryUsed, feDone }) => {
+    const Q = TUNING.quiz, decay = (Q.decay.find(([max]) => nth <= max) || Q.decay[Q.decay.length - 1])[1];
+    if (!right || !QUIZ_KINDS.has(kind) || !has(Q.modeMul, mode)) return { coin: 0, base: 0, decay, firstEver: 0 };
+    const base = kind === 'ta' ? Q.ta : first ? Q.base : kind === 'practice' && !retryUsed ? Q.retry : 0;
+    const coin = base > 0
+      ? Math.max(1, Math.round(base * Q.modeMul[mode] * (hint ? Q.hintMul : 1) * (weak && first && !hint ? Q.weakMul : 1) * decay))
+      : 0;
+    const firstEver = !hint && !feDone ? Q.firstEver : 0;   // 倍率も目減りもかけずに足す
+    return { coin: coin + firstEver, base, decay, firstEver };
+  };
+  // クリアボーナス（クリアのときだけ呼ぶ）。decayAvg はその回の国の目減りの平均
+  const clearBonus = ({ kind, mode, hint, n, firstTry, wrongs, attempts, decayAvg = 1 }) => {
+    const K = TUNING.clear, Q = TUNING.quiz;
+    if (!has(Q.modeMul, mode)) return 0;
+    const x = kind === 'practice' ? (firstTry * 2 >= n ? K.practiceHalf * n + (wrongs === 0 ? K.practicePerfect * n : 0) : 0)
+      : kind === 'challenge' ? K.challenge * n + (attempts === 1 ? K.challengeNoMiss * n : 0)
+      : kind === 'ta' ? K.ta * n : 0;
+    return Math.round(x * Q.modeMul[mode] * (hint ? Q.hintMul : 1) * decayAvg) || 0;
+  };
+
+  // 仲間カードを足す（設計書 §6.3「同じ国が出たとき」）。refund は引いた★の額を coins と earned に足す
+  const addCard = (d, a, star) => {
+    const c = d.cards[a];
+    if (!c) { d.cards[a] = [star, 0]; return 'new'; }
+    if (star > c[0]) { d.cards[a] = [star, c[1]]; return 'up'; }
+    if (c[1] < TUNING.card.stackMax) { d.cards[a] = [c[0], c[1] + 1]; return 'stack'; }
+    const r = TUNING.gacha.refund[star];
+    d.coins = Math.min(BIG, d.coins + r);
+    d.earned = Math.min(BIG, d.earned + r);
+    return 'refund';
+  };
+
+  // 差額だけ払う。paid は [[sid, 払った額], …]。払った額は減らさない。新しい配列で、その sid を最後に移して最新20件（sanitize と同じ）
+  const settleDelta = (paid, sid, total) => {
+    const ps = list(paid), hit = ps.filter(p => p[0] === sid).pop(), so = hit ? hit[1] : 0;
+    const next = ps.filter(p => p[0] !== sid).map(p => [p[0], p[1]]);
+    next.push([sid, Math.max(so, total)]);
+    return { delta: Math.max(0, total - so), paid: next.slice(-20) };
+  };
+
+  // ---- 1回のゲーム（run）。JSON にできる値だけ ----
+  // base: 開始時の写し（以後変えない）／game: そのゲーム全体の数（消さない）／pend: まだ d に書いていない記録（受け取りのたびに空にする）
+  const row0 = () => ({ n: 0, coins: 0 });
+  const pend0 = () => ({ fr: {}, mb: {}, fe: {}, wk: {}, lc: {}, n: {}, ov: {}, bounty: {} });   // n は day.n の足し分
+  const newRun = ({ sid, kind, mode, region, n, hint }, d) => ({
+    sid, kind, mode, region, n, hint: !!hint,
+    base: {
+      day: { n: { ...d.day.n } }, fe: { ...d.fe }, ov: { ...d.ov }, wk: { ...d.wk },
+      bounty: { d: d.bounty.d, a: [...d.bounty.a], done: [...d.bounty.done] }, earned: d.earned,
+    },
+    // fr re fe ov bounty: 1か国1回の印（re はやり直しの +3）、wk: このゲームで付けた(1)/外した(0)印、
+    // cnt: 国ごとのコインをもらった回数、dec: 国ごとの最初の正解の decay、coins: クイズのコインの合計、rc: レシートの内訳
+    game: {
+      fr: {}, re: {}, fe: {}, ov: {}, bounty: {}, wk: {}, cnt: {}, dec: {}, coins: 0,
+      rc: { first: row0(), retry: row0(), ta: row0(), fe: row0(), clear: 0, daily: 0, free: false, zeroed: false,
+            overcome: [], bounty: [], bountyAll: false, joined: [], promoted: [] },
+    },
+    pend: pend0(),
+  });
+
+  // 1問ぶんの記録。run.game と run.pend だけを書きかえる。kind:'battle' はコイン0で記録だけ
+  const runAnswer = (run, { a, right, first, hint, mode, missesBefore, missesAfter }) => {
+    const { base: b, game: g, pend: p } = run, rc = g.rc, bit = has(MODE_BIT, mode) ? MODE_BIT[mode] : 0;
+    // 答える前の苦手（開始時の印に、このゲームで付けた/外した印を重ねる）
+    const weak = Math.max(0, +missesBefore || 0) > 0 || !!(has(g.wk, a) ? g.wk[a] : b.wk[a]);
+    const r = answerCoins({
+      kind: run.kind, mode, right, first, hint, weak,
+      nth: (b.day.n[a] || 0) + (g.cnt[a] || 0) + 1,
+      retryUsed: !!g.re[a], feDone: !!((b.fe[a] | g.fe[a]) & bit),
+    });
+    if (r.base > 0) {
+      g.cnt[a] = (g.cnt[a] || 0) + 1;
+      p.n[a] = (p.n[a] || 0) + 1;
+      const row = run.kind === 'ta' ? rc.ta : first ? rc.first : rc.retry;
+      row.n++;
+      row.coins += r.coin - r.firstEver;
+      if (run.kind === 'practice' && !first) g.re[a] = 1;
+    }
+    if (r.firstEver > 0) {
+      g.fe[a] = (g.fe[a] | 0) | bit;
+      p.fe[a] = (p.fe[a] | 0) | bit;
+      rc.fe.n++;
+      rc.fe.coins += r.firstEver;
+    }
+    g.coins += r.coin;
+    if (right) {
+      p.lc[a] = 1;
+      if (!has(g.dec, a)) g.dec[a] = r.decay;
+      if (!hint) {
+        if (!g.fr[a]) g.fr[a] = p.fr[a] = 1;
+        if (bit) p.mb[a] = (p.mb[a] | 0) | bit;
+      }
+    } else g.wk[a] = p.wk[a] = 1;
+    if (right && first && !hint) {
+      g.wk[a] = p.wk[a] = 0;
+      // 克服: 答える前は苦手で、misses が0になった。1か国一生に1回
+      if (weak && Math.max(0, +missesAfter || 0) === 0 && !b.ov[a] && !g.ov[a]) g.ov[a] = p.ov[a] = 1;
+      if (b.bounty.a.includes(a) && !b.bounty.done.includes(a) && !g.bounty[a]) g.bounty[a] = p.bounty[a] = 1;
+    }
+    return { coin: r.coin, decay: r.decay, firstEver: r.firstEver };
+  };
+
+  // レシート。内訳と sum はそのゲーム全体（途中の受け取りの分もふくむ）、delta は今回 d.coins に足した額
+  const receiptOf = (rc, delta) => {
+    const T = TUNING, row = r => ({ n: r.n, coins: rc.zeroed ? 0 : r.coins });
+    const rows = { first: row(rc.first), retry: row(rc.retry), ta: row(rc.ta), fe: row(rc.fe) };
+    const sum = Object.values(rows).reduce((s, r) => s + r.coins, 0) + rc.clear + rc.daily
+      + rc.overcome.length * T.overcome + rc.bounty.length * T.bounty + (rc.bountyAll ? T.bountyAll : 0);
+    return {
+      sum, delta, ...rows, clear: rc.clear, daily: rc.daily, free: rc.free, zeroed: rc.zeroed,
+      overcome: [...rc.overcome], bounty: [...rc.bounty], bountyAll: rc.bountyAll, joined: [...rc.joined], promoted: [...rc.promoted],
+    };
+  };
+
+  // run.pend を d に書いて空にし、レシートを返す。res は drill:result の detail か null（途中の受け取り・バトル）。
+  // 何回呼んでも同じ記録・同じコインが二重にならない
+  const settleRun = (d, run, res, todayStr) => {
+    const T = TUNING, g = run.game, p = run.pend, rc = g.rc, quiz = run.kind !== 'battle';
+    const clear = quiz && !!res && res.outcome === 'clear';
+    // タイムアタックのクリアが速すぎたら、その回のコインは全部0（一度0になったら、あとの受け取りでも0）
+    rc.zeroed = rc.zeroed || (clear && run.kind === 'ta' && !(+res.timeMs >= res.n * T.quiz.taMinMsPerQ));
+    const zeroed = rc.zeroed;
+    // 学習の記録（0になった回も書く）
+    for (const a of Object.keys(p.fr)) d.fr[a] = Math.min(T.card.frMax, (d.fr[a] || 0) + 1);
+    for (const [a, bits] of Object.entries(p.mb)) d.mb[a] = (d.mb[a] | 0) | bits;
+    for (const [a, on] of Object.entries(p.wk)) if (on) d.wk[a] = 1; else delete d.wk[a];
+    for (const a of Object.keys(p.lc)) d.lc[a] = dayNum(todayStr);
+    // なかよし度が frJoin になった国は★1で仲間に。★1 でなかよし度 frMax・4モード全部で正解したら★2に
+    const joined = [], promoted = [];
+    for (const a of Object.keys(p.fr)) if (!d.cards[a] && d.fr[a] >= T.card.frJoin) { addCard(d, a, 1); joined.push(a); }
+    for (const a of uniq([...Object.keys(p.fr), ...Object.keys(p.mb)])) {
+      if (d.cards[a]?.[0] === 1 && d.fr[a] >= T.card.frMax && (d.mb[a] & QUIZ_BITS) === QUIZ_BITS) { addCard(d, a, 2); promoted.push(a); }
+    }
+    // 払った印とコイン（0になった回は書かない・払わない）
+    let delta = 0, daily = 0, all = false;
+    const ov = [], bo = [];
+    if (!zeroed) {
+      for (const [a, bits] of Object.entries(p.fe)) d.fe[a] = (d.fe[a] | 0) | bits;
+      for (const [a, k] of Object.entries(p.n)) d.day.n[a] = (d.day.n[a] || 0) + k;
+    }
+    if (quiz) {
+      const dec = Object.values(g.dec), decayAvg = dec.length ? dec.reduce((s, x) => s + x, 0) / dec.length : 1;
+      if (clear && !zeroed) rc.clear = clearBonus({ ...res, kind: run.kind, mode: run.mode, hint: run.hint, decayAvg });
+      const s = settleDelta(d.paid, run.sid, zeroed ? 0 : g.coins + (clear ? rc.clear : 0));
+      d.paid = s.paid;
+      delta += s.delta;
+      if (clear && !zeroed && res.n >= T.clear.dailyMinN && !d.day.first) { daily = T.daily; d.day.first = true; }
+    }
+    if (!zeroed) {
+      for (const a of Object.keys(p.ov)) if (!d.ov[a]) { d.ov[a] = 1; d.st.overcome = Math.min(BIG, d.st.overcome + 1); ov.push(a); }
+      // 手配書は今の d.bounty にあってまだ達成していない国だけ（ゲームの途中で日付が変わって選び直されても二重にならない）
+      const B = d.bounty;
+      for (const a of Object.keys(p.bounty)) if (B.a.includes(a) && !B.done.includes(a)) { B.done.push(a); bo.push(a); }
+      all = bo.length > 0 && B.a.length === BOUNTY_N && B.a.every(a => B.done.includes(a));
+      if (all) d.st.bountyDays = Math.min(BIG, d.st.bountyDays + 1);
+    }
+    delta += daily + ov.length * T.overcome + bo.length * T.bounty + (all ? T.bountyAll : 0);
+    d.coins = Math.min(BIG, d.coins + delta);
+    d.earned = Math.min(BIG, d.earned + delta);
+    run.pend = pend0();
+    rc.daily += daily;
+    rc.free = rc.free || daily > 0;
+    rc.overcome.push(...ov);
+    rc.bounty.push(...bo);
+    rc.bountyAll = rc.bountyAll || all;
+    rc.joined.push(...joined);
+    rc.promoted.push(...promoted);
+    return receiptOf(rc, delta);
+  };
+
+  // ---- 今日の分と手配書 ----
+  // 今日の手配書: 1. 苦手で misses がいちばん多い国 2. なかよし1以上で、最後の正解から7日以上たった国のうちいちばん前の国
+  // 3. まだ一度も正解していない国。足りなければなかよし度の低い国で埋める。同点はどれも rng で選ぶ。全部ちがう国
+  const bountyFor = (d, m, todayStr, rng) => {
+    const out = [], now = dayNum(todayStr), codes = C.map(c => c.a), miss = a => Math.max(0, +(m || {})[a] || 0);
+    const pick = (ok, score) => {
+      const xs = codes.filter(a => !out.includes(a) && ok(a));
+      if (!xs.length) return;
+      const best = Math.max(...xs.map(score)), ties = xs.filter(a => score(a) === best);
+      out.push(ties[Math.floor(rng() * ties.length)]);
+    };
+    pick(a => isWeak(d, m, a), miss);
+    pick(a => d.fr[a] >= 1 && now - d.lc[a] >= REVIEW_DAYS, a => -d.lc[a]);
+    pick(a => !d.fr[a] && !d.mb[a] && !d.lc[a], () => 0);
+    if (out.length < BOUNTY_N) {
+      codes.filter(a => !out.includes(a)).map(a => [d.fr[a] || 0, rng(), a])
+        .sort((x, y) => x[0] - y[0] || x[1] - y[1]).slice(0, BOUNTY_N - out.length).forEach(x => out.push(x[2]));
+    }
+    return out;
+  };
+  // 日付が変わったら day を空にし、手配書が今日のものでなければ選び直す。変えたら true
+  const ensureDay = (d, m, todayStr, rng) => {
+    let changed = false;
+    if (d.day.d !== todayStr) { d.day = fresh(todayStr).day; changed = true; }
+    if (d.bounty.d !== todayStr) { d.bounty = { d: todayStr, a: bountyFor(d, m, todayStr, rng), done: [] }; changed = true; }
+    return changed;
+  };
+  // 設定の「記録を消す」（drill:misses-reset）で苦手の印も全部消す
+  const resetWeak = d => { d.wk = {}; };
+
   globalThis.RPG_CORE = {
     TUNING, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
     levelCost, maxLevelUp, heroStats,
@@ -292,5 +501,8 @@
     today, dayNum, shortCoins,
     VERSION, MIGRATE, fresh, sanitize, migrate,
     encodeCode, decodeCode, sanitizeMisses,
+    isWeak, answerCoins, clearBonus, addCard, settleDelta,
+    newRun, runAnswer, settleRun,
+    ensureDay, bountyFor, resetWeak,
   };
 })();

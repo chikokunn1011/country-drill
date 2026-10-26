@@ -1,7 +1,7 @@
 // rpg-core.js（国旗クエストの計算部品）の単体テスト。countries.js と一緒に vm で読み込み、globalThis.RPG_CORE を使う
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { T0, read, plain, loadCtx, loadCore, dWith } from './rpg_load.mjs';
+import { T0, read, plain, loadCtx, loadCore, dWith, mulberry32 } from './rpg_load.mjs';
 
 const IDS = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];
 const REGIONS = ['南アメリカ', 'オセアニア', '北・中央アメリカ', 'ヨーロッパ', 'アジア', 'アフリカ'];
@@ -452,4 +452,469 @@ test('sanitize_misses', () => {
   assert.deepEqual(plain(K.sanitizeMisses({ fr: 5000, de: 0, us: NaN, it: 'x', es: 1 })), { fr: 999, es: 1 });
   assert.deepEqual(plain(K.sanitizeMisses(JSON.parse('{"__proto__":{"cl":1},"br":1}'))), { br: 1 });
   for (const x of [null, [], 'x', 5, undefined]) assert.deepEqual(plain(K.sanitizeMisses(x)), {}, String(x));
+});
+
+// ---- クイズのコインと学習の記録（run と受け取り） ----
+// countries.js の国コード全部と RPG_CORE
+const setup = () => { const { ctx } = loadCtx(); return { K: ctx.RPG_CORE, codes: plain(ctx.COUNTRIES.map(c => c.a)) }; };
+const all15 = codes => Object.fromEntries(codes.map(a => [a, 15]));
+let SID = 0;
+// 1回のゲームを流す。first はそのゲームで初めて出た国か（練習はまちがえた国を後でもう一度答える）。
+// misses は m をクイズと同じく ±1 して書きかえる。最後に settleRun のレシートを返す
+const play = (K, d, m, { kind = 'practice', mode = 'f2n', hint = false, n = 10 } = {}, answers = [], res = null) => {
+  const run = K.newRun({ sid: `g${++SID}`, kind, mode, region: 'all', n, hint }, d), seen = new Set();
+  for (const [a, right] of answers) {
+    const missesBefore = Math.max(0, +m[a] || 0), missesAfter = right ? Math.max(0, missesBefore - 1) : missesBefore + 1;
+    if (missesAfter) m[a] = missesAfter; else delete m[a];
+    K.runAnswer(run, { a, right, first: !seen.has(a), hint, mode, missesBefore, missesAfter });
+    seen.add(a);
+  }
+  return K.settleRun(d, run, res, T0);
+};
+// drill:result のクリアの detail（既定はパーフェクト・1回目でクリア）
+const clearRes = (kind, n, o = {}) => ({ outcome: 'clear', kind, mode: 'f2n', n, firstTry: n, wrongs: 0, attempts: 1, timeMs: kind === 'ta' ? n * 1000 : null, ...o });
+const right = as => as.map(a => [a, true]);
+const pendEmpty = run => Object.values(plain(run.pend)).every(v => Object.keys(v).length === 0);
+
+// 練習・f2n・一発正解・ヒントなし・苦手なし・今日1回目・はじめて正解は払い済み
+const AC = { kind: 'practice', mode: 'f2n', right: true, first: true, hint: false, weak: false, nth: 1, retryUsed: false, feDone: true };
+
+test('answer_coins_table', () => {
+  const K = loadCore(), c = o => K.answerCoins({ ...AC, ...o }).coin;
+  assert.equal(c({}), 10);
+  assert.equal(c({ mode: 'n2f' }), 10);
+  assert.equal(c({ mode: 'm2f' }), 12);
+  assert.equal(c({ hint: true }), 6);
+  assert.equal(c({ mode: 'f2m', hint: true }), 7);
+  assert.equal(c({ weak: true }), 20);
+  assert.equal(c({ weak: true, hint: true }), 6);
+  assert.equal(c({ weak: true, first: false }), 3);           // 苦手の ×2 は一発正解だけ
+  assert.equal(c({ first: false }), 3);                       // 練習のやり直し
+  assert.equal(c({ first: false, retryUsed: true }), 0);
+  assert.equal(c({ kind: 'challenge' }), 10);
+  assert.equal(c({ kind: 'challenge', first: false }), 0);
+  assert.equal(c({ kind: 'ta' }), 5);
+  assert.equal(c({ kind: 'ta', mode: 'm2f' }), 6);
+  assert.equal(c({ nth: 3 }), 10);
+  assert.equal(c({ nth: 4 }), 5);
+  assert.equal(c({ nth: 6 }), 5);
+  assert.equal(c({ nth: 7 }), 2);
+  assert.equal(c({ nth: 40 }), 2);
+  assert.equal(c({ first: false, nth: 7 }), 1);               // base が1以上なら最低1
+  assert.equal(c({ right: false }), 0);
+  for (const kind of ['zzz', 'battle', 'constructor']) assert.equal(c({ kind }), 0, kind);
+  for (const mode of ['cap', 'zzz', 'toString']) assert.equal(c({ mode }), 0, mode);
+  assert.deepEqual(plain(K.answerCoins({ ...AC, nth: 4 })), { coin: 5, base: 10, decay: 0.5, firstEver: 0 });
+  assert.deepEqual(plain(K.answerCoins({ ...AC, first: false, retryUsed: true })), { coin: 0, base: 0, decay: 1, firstEver: 0 });
+  // はじめて正解: 倍率も目減りもかけずに足す。ヒントありでは無し
+  assert.deepEqual(plain(K.answerCoins({ ...AC, feDone: false })), { coin: 30, base: 10, decay: 1, firstEver: 20 });
+  assert.equal(c({ feDone: false, nth: 7 }), 22);
+  assert.equal(c({ feDone: false, mode: 'm2f', weak: true }), 44);
+  assert.equal(c({ feDone: false, hint: true }), 6);
+  assert.equal(c({ feDone: false, right: false }), 0);
+  assert.equal(c({ feDone: false, kind: 'battle' }), 0);
+  assert.equal(c({ feDone: false, mode: 'cap' }), 0);
+  // 挑戦のやり直しの正解は base 0 でも、そのモードで生まれてはじめての正解なら +20
+  assert.equal(c({ feDone: false, kind: 'challenge', first: false }), 20);
+});
+
+const CB = { kind: 'practice', mode: 'f2n', hint: false, n: 10, firstTry: 10, wrongs: 0, attempts: 1, decayAvg: 1 };
+
+test('clear_bonus_table', () => {
+  const K = loadCore(), b = o => K.clearBonus({ ...CB, ...o });
+  assert.equal(b({ firstTry: 8, wrongs: 2 }), 20);
+  assert.equal(b({ firstTry: 5, wrongs: 5 }), 20);           // ちょうど半分
+  assert.equal(b({ firstTry: 4, wrongs: 6 }), 0);
+  assert.equal(b({}), 50);                                    // パーフェクト
+  assert.equal(b({ kind: 'challenge' }), 100);
+  assert.equal(b({ kind: 'challenge', attempts: 3, firstTry: 6, wrongs: 4 }), 50);
+  assert.equal(b({ kind: 'ta' }), 30);
+  assert.equal(b({ mode: 'm2f' }), 60);
+  assert.equal(b({ hint: true }), 30);
+  assert.equal(b({ firstTry: 8, wrongs: 2, hint: true }), 12);
+  assert.equal(b({ decayAvg: .5 }), 25);
+  assert.equal(b({ kind: 'zzz' }), 0);
+  assert.equal(b({ kind: 'battle' }), 0);
+  assert.equal(b({ mode: 'cap' }), 0);
+});
+
+test('example_table', () => {
+  const { K, codes } = setup(), T = codes.slice(0, 10), save = () => dWith(K, { fe: all15(codes) });
+  const net = r => r.sum - r.daily;
+  // 設計書 §5.1 の例（はじめて正解ボーナスを除く）
+  assert.equal(net(play(K, save(), {}, { n: 10 }, [[T[0], false], [T[1], false], ...right(T.slice(2)), [T[0], true], [T[1], true]],
+    clearRes('practice', 10, { firstTry: 8, wrongs: 2 }))), 106);
+  assert.equal(net(play(K, save(), {}, { n: 10 }, right(T), clearRes('practice', 10))), 150);
+  assert.equal(net(play(K, save(), {}, { kind: 'challenge', n: 10 }, right(T), clearRes('challenge', 10))), 200);
+  assert.equal(net(play(K, save(), {}, { kind: 'ta', n: 10 }, right(T), clearRes('ta', 10, { timeMs: 20000 }))), 80);
+  const fail = clearRes('ta', 10, { outcome: 'fail', timeMs: 9000 });
+  let r = play(K, save(), {}, { kind: 'ta', n: 10 }, [...right(T.slice(0, 6)), [T[6], false]], fail);
+  assert.deepEqual([r.sum, r.daily, r.clear], [30, 0, 0]);
+  r = play(K, save(), {}, { kind: 'ta', n: 10 }, [...right(T.slice(0, 5)), [T[5], false]], fail);
+  assert.deepEqual([r.sum, r.daily, r.clear], [25, 0, 0]);
+  assert.deepEqual(plain(r.ta), { n: 5, coins: 25 });
+});
+
+test('practice_8_2_receipt', () => {
+  const { K, codes } = setup(), T = codes.slice(0, 10), [A, B] = T, d = dWith(K), m = {};
+  const r = plain(play(K, d, m, { n: 10 }, [[A, false], [B, false], ...right(T.slice(2)), [A, true], [B, true]],
+    { outcome: 'clear', kind: 'practice', mode: 'f2n', n: 10, firstTry: 8, wrongs: 2, attempts: 1, timeMs: null, sid: 'x' }));
+  assert.deepEqual(r, {
+    sum: 406, delta: 406,
+    first: { n: 8, coins: 80 }, retry: { n: 2, coins: 6 }, ta: { n: 0, coins: 0 }, fe: { n: 10, coins: 200 },
+    clear: 20, daily: 100, free: true, zeroed: false,
+    overcome: [], bounty: [], bountyAll: false, joined: [], promoted: [],
+  });
+  assert.equal(d.coins, 406);
+  assert.equal(d.earned, 406);
+  assert.equal(d.day.first, true);
+  assert.equal(d.day.free, false);   // 無料ガチャはまだ使っていない
+  assert.equal(d.fr[A], 1);
+  assert.equal(d.wk[A], 1);          // やり直しの正解では外れない
+  assert.equal(d.wk[T[2]], undefined);
+  assert.equal(d.fe[A], 1);
+  assert.equal(d.mb[A], 1);
+  assert.equal(d.lc[A], K.dayNum(T0));
+  assert.equal(d.day.n[A], 1);       // まちがえた答えはコインの回数に数えない
+  assert.equal(d.day.n[T[2]], 1);
+  assert.deepEqual(m, {});
+  assert.equal(plain(d.paid).length, 1);
+  assert.equal(plain(d.paid)[0][1], 306);   // クイズの合計（今日はじめてのクリアは別）
+});
+
+test('daily_rules', () => {
+  const { K, codes } = setup(), T = codes.slice(0, 5);
+  const d = dWith(K);
+  let r = play(K, d, {}, { n: 5 }, right(T), clearRes('practice', 5));
+  assert.deepEqual([r.daily, r.free], [100, true]);
+  r = play(K, d, {}, { n: 5 }, right(T), clearRes('practice', 5));   // 同じ日の2回目
+  assert.deepEqual([r.daily, r.free], [0, false]);
+  // 失格・やめた・4問では今日のクリアにならない
+  for (const [o, n] of [[{ outcome: 'fail' }, 5], [{ outcome: 'quit' }, 5], [{}, 4]]) {
+    const d2 = dWith(K);
+    r = play(K, d2, {}, { n }, right(T.slice(0, n)), clearRes('practice', n, o));
+    assert.deepEqual([r.daily, r.free, d2.day.first], [0, false, false], JSON.stringify([o, n]));
+  }
+  // タイムアタックが速すぎる（5問 × 400ms = 2000 未満）→ その回のコインは全部0。でも学習の記録は残る
+  const dt = dWith(K);
+  r = plain(play(K, dt, {}, { kind: 'ta', n: 5 }, right(T), clearRes('ta', 5, { timeMs: 1000 })));
+  assert.equal(r.zeroed, true);
+  assert.deepEqual([r.delta, r.daily, r.free, r.sum, r.clear], [0, 0, false, 0, 0]);
+  assert.deepEqual([r.ta, r.fe], [{ n: 5, coins: 0 }, { n: 5, coins: 0 }]);
+  assert.deepEqual([dt.coins, dt.earned, dt.day.first], [0, 0, false]);
+  assert.deepEqual(plain(dt.fr), Object.fromEntries(T.map(a => [a, 1])));
+  // ちょうど n × 400ms なら払う
+  const dk = dWith(K);
+  r = play(K, dk, {}, { kind: 'ta', n: 5 }, right(T), clearRes('ta', 5, { timeMs: 2000 }));
+  assert.deepEqual([r.zeroed, r.ta.coins, r.clear, r.daily], [false, 25, 15, 100]);
+});
+
+test('zeroed_pays_nothing', () => {
+  const { K, codes } = setup(), T = codes.slice(0, 5), [A, B] = T;
+  const d = dWith(K, { wk: { [A]: 1 }, bounty: { d: T0, a: [B, 'jp', 'cl'], done: [] } });
+  const run = K.newRun({ sid: 'z', kind: 'ta', mode: 'f2n', region: 'all', n: 5, hint: false }, d);
+  for (const a of T) K.runAnswer(run, { a, right: true, first: true, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+  const r = plain(K.settleRun(d, run, clearRes('ta', 5, { timeMs: 100 }), T0));
+  // 克服も手配書も払わず、払った印（fe・day.n・ov・bounty.done）も書かない
+  assert.deepEqual([r.zeroed, r.delta, r.sum, r.overcome, r.bounty, r.bountyAll], [true, 0, 0, [], [], false]);
+  assert.deepEqual([d.coins, d.earned, d.st.overcome], [0, 0, 0]);
+  assert.deepEqual([plain(d.fe), plain(d.day.n), plain(d.ov), plain(d.bounty.done)], [{}, {}, {}, []]);
+  // 学習の記録は書く（fr・mb・lc・wk）
+  assert.deepEqual(plain(d.fr), Object.fromEntries(T.map(a => [a, 1])));
+  assert.deepEqual(plain(d.mb), Object.fromEntries(T.map(a => [a, 1])));
+  assert.equal(d.lc[A], K.dayNum(T0));
+  assert.equal(d.wk[A], undefined);
+  assert.ok(pendEmpty(run));
+  // 0 になった回は、あとで結果なしの受け取りが来ても払わない
+  const again = plain(K.settleRun(d, run, null, T0));
+  assert.deepEqual([again.zeroed, again.delta, d.coins], [true, 0, 0]);
+});
+
+test('diff_pay', () => {
+  const { K, codes } = setup(), T = codes.slice(0, 5), d = dWith(K);
+  const run = K.newRun({ sid: 'dp', kind: 'practice', mode: 'f2n', region: 'all', n: 5, hint: false }, d);
+  const ans = a => K.runAnswer(run, { a, right: true, first: true, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+  assert.deepEqual(plain(ans(T[0])), { coin: 30, decay: 1, firstEver: 20 });
+  T.slice(1, 3).forEach(ans);
+  let r = K.settleRun(d, run, null, T0);                       // 途中の受け取り（pagehide）
+  assert.deepEqual([r.delta, r.sum, d.coins], [90, 90, 90]);   // 10×3 + はじめて 20×3
+  assert.deepEqual(plain(d.paid), [['dp', 90]]);
+  assert.ok(pendEmpty(run));
+  T.slice(3).forEach(ans);
+  const res = clearRes('practice', 5);
+  r = K.settleRun(d, run, res, T0);
+  assert.deepEqual([r.delta, r.sum, r.clear, r.daily, d.coins, d.earned], [185, 275, 25, 100, 275, 275]);   // 60 + クリア 25 + 今日 100
+  r = K.settleRun(d, run, res, T0);                            // 同じ結果をもう一度
+  assert.deepEqual([r.delta, r.sum, r.daily, d.coins], [0, 275, 100, 275]);
+  r = K.settleRun(d, run, null, T0);                           // 結果のあとの pagehide（クリアボーナスの無い合計 150 < 払った 175）
+  assert.deepEqual([r.delta, r.sum, d.coins], [0, 275, 275]);
+  assert.deepEqual(plain(d.paid).at(-1), ['dp', 175]);
+  // settleDelta
+  assert.deepEqual(plain(K.settleDelta([['s', 175]], 's', 150)), { delta: 0, paid: [['s', 175]] });
+  assert.deepEqual(plain(K.settleDelta([['s', 100], ['t', 5]], 's', 150)), { delta: 50, paid: [['t', 5], ['s', 150]] });
+  assert.deepEqual(plain(K.settleDelta([], 'n', 7)), { delta: 7, paid: [['n', 7]] });
+  const p0 = [['s', 1]];
+  assert.notEqual(K.settleDelta(p0, 's', 5).paid, p0);         // 新しい配列
+  assert.deepEqual(p0, [['s', 1]]);
+  let paid = [];
+  for (let i = 0; i < 21; i++) paid = K.settleDelta(paid, `x${i}`, 10).paid;
+  assert.equal(paid.length, 20);
+  assert.deepEqual(plain(paid[0]), ['x1', 10]);
+});
+
+test('mid_settle_no_double_count', () => {
+  const K = loadCore(), d1 = dWith(K), d2 = dWith(K);
+  const res = clearRes('practice', 3, { firstTry: 3 });
+  const evs = [['cl', true], ['cl', false], ['br', true], ['jp', true]];   // [国, first]
+  const go = (d, mid) => {
+    const run = K.newRun({ sid: 'mid', kind: 'practice', mode: 'f2n', region: 'all', n: 3, hint: false }, d);
+    const base = plain(run.base);
+    evs.forEach(([a, first], i) => {
+      K.runAnswer(run, { a, right: true, first, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+      if (mid && i === 0) {
+        K.settleRun(d, run, null, T0);
+        assert.ok(pendEmpty(run), '受け取りのあと pend は空');
+        assert.equal(d.fr.cl, 1);
+      }
+      if (mid && i === 1) assert.equal(d.fr.cl, 1, '途中の受け取りのあとの2回目で増えない');
+    });
+    const r = plain(K.settleRun(d, run, res, T0));
+    assert.deepEqual(plain(run.base), base, 'run.base は変えない');
+    return r;
+  };
+  const r1 = go(d1, true), r2 = go(d2, false);
+  for (const d of [d1, d2]) assert.deepEqual(plain(d.fr), { cl: 1, br: 1, jp: 1 });
+  assert.deepEqual(plain(d1.day.n), plain(d2.day.n));
+  assert.equal(d1.day.n.cl, 2);
+  assert.equal(d1.coins, d2.coins);
+  assert.equal(d1.coins, 30 + 3 + 30 + 30 + 15);   // 3問なので今日のクリアにはならない
+  const { delta: x1, ...rest1 } = r1, { delta: x2, ...rest2 } = r2;
+  assert.deepEqual(rest1, rest2);
+  assert.notEqual(x1, x2);
+  assert.equal(x1 + 30, x2);
+});
+
+test('run_is_plain_data', () => {
+  const K = loadCore(), d = dWith(K, { wk: { cl: 1 }, fe: { cl: 1 }, day: { d: T0, n: { cl: 2 }, first: false, free: false } });
+  const run = K.newRun({ sid: 'p', kind: 'practice', mode: 'f2n', region: 'アジア', n: 5, hint: false }, d);
+  assert.deepEqual(plain(Object.keys(run)).sort(), ['base', 'game', 'hint', 'kind', 'mode', 'n', 'pend', 'region', 'sid']);
+  assert.deepEqual(plain(run.base), { day: { n: { cl: 2 } }, fe: { cl: 1 }, ov: {}, wk: { cl: 1 }, bounty: { d: '', a: [], done: [] }, earned: 0 });
+  // 開始時の写し: あとで d を書きかえても変わらない
+  d.wk.br = 1; d.day.n.cl = 9; d.fe.br = 3;
+  assert.deepEqual(plain(run.base.wk), { cl: 1 });
+  assert.equal(run.base.day.n.cl, 2);
+  // JSON にして戻しても同じように動く
+  K.runAnswer(run, { a: 'br', right: true, first: true, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+  const copy = JSON.parse(JSON.stringify(run));
+  assert.deepEqual(copy, plain(run));
+  K.runAnswer(copy, { a: 'cl', right: true, first: true, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+  // cl: 苦手で一発正解 → ×2、今日3回目 → ×1、はじめて正解は払い済み
+  assert.equal(K.settleRun(dWith(K), copy, null, T0).first.coins, 10 + 20);
+});
+
+test('decay_across_games', () => {
+  const { K, codes } = setup(), d = dWith(K, { fe: all15(codes) });
+  const one = () => play(K, d, {}, { n: 1 }, [['cl', true]]).first.coins;
+  assert.deepEqual([one(), one(), one(), one()], [10, 10, 10, 5]);
+  assert.equal(d.day.n.cl, 4);
+  assert.equal(K.ensureDay(d, {}, '2026-10-27', mulberry32(1)), true);
+  assert.deepEqual(plain(d.day.n), {});
+  assert.equal(one(), 10);
+  // 同じゲームの中でもらった回数も数える（今日2回 + このゲームの一発正解で3回目 → やり直しの正解は4回目で ×0.5）
+  const d1 = dWith(K, { fe: all15(codes), day: { d: T0, n: { cl: 2 }, first: true, free: false } });
+  const r1 = play(K, d1, {}, { n: 1 }, [['cl', true], ['cl', true]]);
+  assert.deepEqual([r1.first.coins, r1.retry.coins, d1.day.n.cl], [10, 2, 4]);
+  // クリアボーナスにはその回の国の目減りの平均をかける（4回目の国 ×0.5 と新しい国 ×1 → ×0.75）
+  const d2 = dWith(K, { fe: all15(codes), day: { d: T0, n: { cl: 3 }, first: true, free: false } });
+  const r = play(K, d2, {}, { n: 2 }, right(['cl', 'br']), clearRes('practice', 2));
+  assert.deepEqual([r.first.coins, r.clear], [15, Math.round(10 * 0.75)]);
+});
+
+test('fr_once_per_game', () => {
+  const K = loadCore(), d = dWith(K), m = {};
+  play(K, d, m, {}, [['cl', false], ['cl', true], ['cl', true]]);   // 同じ国にやり直しで2回正解
+  assert.equal(d.fr.cl, 1);
+  play(K, d, m, { mode: 'm2f', hint: true }, [['cl', true]]);         // ヒントありは数えない
+  assert.equal(d.fr.cl, 1);
+  assert.equal(d.mb.cl, 1);                                           // ヒントありの正解は mb にも入れない
+  play(K, d, m, { kind: 'battle', mode: 'cap', n: 0 }, [['cl', true], ['cl', true]]);
+  assert.equal(d.fr.cl, 2);
+  assert.equal(d.mb.cl, 1 | 16);
+  // バトル: なかよし度は1回、コインは0、paid は使わない
+  const db = dWith(K);
+  const r = plain(play(K, db, {}, { kind: 'battle', mode: 'cap', n: 0 }, [['cl', true], ['cl', true]]));
+  assert.deepEqual([db.fr.cl, db.mb.cl, r.sum, r.delta, db.coins, db.earned], [1, 16, 0, 0, 0, 0]);
+  assert.deepEqual([plain(db.paid), plain(db.fe), plain(db.day.n)], [[], {}, {}]);
+  // fr は 10 まで
+  const d10 = dWith(K, { fr: { cl: 10 }, cards: { cl: [3, 0] } });
+  play(K, d10, {}, {}, [['cl', true]]);
+  assert.equal(d10.fr.cl, 10);
+});
+
+test('join_and_promote', () => {
+  const K = loadCore();
+  let d = dWith(K, { fr: { cl: 4 } }), r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.joined, r.promoted], [['cl'], []]);
+  assert.deepEqual(plain(d.cards.cl), [1, 0]);
+  d = dWith(K, { fr: { cl: 3 } });
+  r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.joined, d.cards.cl], [[], undefined]);
+  d = dWith(K, { cards: { cl: [1, 2] }, fr: { cl: 9 }, mb: { cl: 15 } });
+  r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.joined, r.promoted], [[], ['cl']]);
+  assert.deepEqual(plain(d.cards.cl), [2, 2]);                         // かさねはそのまま
+  d = dWith(K, { cards: { cl: [1, 0] }, fr: { cl: 9 }, mb: { cl: 7 } });
+  r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.promoted, plain(d.cards.cl), d.fr.cl], [[], [1, 0], 10]);
+  // 最後のモード（f2m）で 15 がそろったら上がる
+  d = dWith(K, { cards: { cl: [1, 0] }, fr: { cl: 9 }, mb: { cl: 7 } });
+  r = plain(play(K, d, {}, { mode: 'f2m' }, [['cl', true]]));
+  assert.deepEqual([r.promoted, plain(d.cards.cl)], [['cl'], [2, 0]]);
+  // ★2 以上は上がらない
+  d = dWith(K, { cards: { cl: [3, 0] }, fr: { cl: 9 }, mb: { cl: 15 } });
+  r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.promoted, plain(d.cards.cl)], [[], [3, 0]]);
+});
+
+test('overcome_rules', () => {
+  const K = loadCore(), d = dWith(K), m = {};
+  let r = plain(play(K, d, m, {}, [['cl', false], ['cl', true]]));   // 1ゲーム目: まちがえ → やり直しで正解
+  assert.deepEqual(r.overcome, []);
+  assert.deepEqual([d.wk.cl, m.cl], [1, undefined]);
+  r = plain(play(K, d, m, {}, [['cl', true]]));                       // 2ゲーム目: 一発正解（misses 0・wk あり）
+  assert.deepEqual(r.overcome, ['cl']);
+  assert.equal(r.first.coins, 20);                                    // 苦手の ×2
+  assert.equal(r.delta, 20 + 30);
+  assert.deepEqual([d.ov.cl, d.wk.cl, d.st.overcome], [1, undefined, 1]);
+  play(K, d, m, {}, [['cl', false]]);                                 // 3ゲーム目でまちがえ
+  r = plain(play(K, d, m, {}, [['cl', true]]));                       // 次のゲームで一発正解 → もう払わない
+  assert.deepEqual([r.overcome, d.st.overcome, d.wk.cl], [[], 1, undefined]);
+  // misses 2 → 1 では克服しない（wk は外れる）。次のゲームで 1 → 0 → 克服
+  m.br = 2;
+  r = plain(play(K, d, m, {}, [['br', true]]));
+  assert.deepEqual([r.overcome, m.br, d.wk.br, d.ov.br], [[], 1, undefined, undefined]);
+  r = plain(play(K, d, m, {}, [['br', true]]));
+  assert.deepEqual([r.overcome, m.br, d.ov.br, d.st.overcome], [['br'], undefined, 1, 2]);
+  // ヒントありの一発正解では克服しない（wk も外れない）
+  m.jp = 1; d.wk.jp = 1;
+  r = plain(play(K, d, m, { mode: 'm2f', hint: true }, [['jp', true]]));
+  assert.deepEqual([r.overcome, d.ov.jp, d.wk.jp], [[], undefined, 1]);
+  // バトルでも克服する（コインは克服の分だけ）
+  const db = dWith(K, { wk: { pe: 1 } });
+  r = plain(play(K, db, {}, { kind: 'battle', mode: 'n2f', n: 0 }, [['pe', true], ['pe', true]]));
+  assert.deepEqual([r.overcome, r.delta, db.coins, db.ov.pe], [['pe'], 30, 30, 1]);
+});
+
+test('fe_independent_of_battle', () => {
+  const K = loadCore();
+  const d = dWith(K, { mb: { cl: 1 }, fe: {} });
+  const r = plain(play(K, d, {}, {}, [['cl', true]]));
+  assert.deepEqual(r.fe, { n: 1, coins: 20 });
+  assert.equal(d.fe.cl, 1);
+  // バトルの正解は fe を立てない
+  const db = dWith(K);
+  play(K, db, {}, { kind: 'battle', mode: 'f2n', n: 0 }, [['cl', true]]);
+  assert.deepEqual([plain(db.fe), db.mb.cl], [{}, 1]);
+  // 同じゲームで同じ国・同じモードは1回だけ
+  const d2 = dWith(K);
+  const r2 = plain(play(K, d2, {}, {}, [['cl', true], ['cl', true]]));
+  assert.deepEqual(r2.fe, { n: 1, coins: 20 });
+});
+
+test('bounty_progress', () => {
+  const { K, codes } = setup(), m = {};
+  const d = dWith(K, { fe: all15(codes), bounty: { d: T0, a: ['cl', 'br', 'jp'], done: [] } });
+  let r = plain(play(K, d, m, {}, [['cl', true]]));
+  assert.deepEqual([r.bounty, r.bountyAll, r.delta], [['cl'], false, 10 + 30]);
+  assert.deepEqual(plain(d.bounty.done), ['cl']);
+  r = plain(play(K, d, m, { mode: 'm2f', hint: true }, [['br', true]]));   // ヒントありは数えない
+  assert.deepEqual([r.bounty, plain(d.bounty.done)], [[], ['cl']]);
+  r = plain(play(K, d, m, {}, [['cl', true]]));                             // 達成済みはもう数えない
+  assert.deepEqual([r.bounty, r.delta], [[], 10]);
+  r = plain(play(K, d, m, {}, right(['br', 'jp'])));
+  assert.deepEqual([r.bounty, r.bountyAll, r.delta], [['br', 'jp'], true, 20 + 60 + 100]);
+  assert.equal(d.st.bountyDays, 1);
+  r = plain(play(K, d, m, {}, right(['br', 'jp'])));                        // 全部そろったあとはもう払わない
+  assert.deepEqual([r.bounty, r.bountyAll, d.st.bountyDays], [[], false, 1]);
+  // やり直しの正解（first でない）では数えない
+  const d2 = dWith(K, { fe: all15(codes), bounty: { d: T0, a: ['cl', 'br', 'jp'], done: [] } });
+  r = plain(play(K, d2, {}, {}, [['cl', false], ['cl', true]]));
+  assert.deepEqual([r.bounty, plain(d2.bounty.done)], [[], []]);
+  // ゲームの途中で日付が変わり手配書が選び直された → 今の手配書に無い国は払わない
+  const d3 = dWith(K, { fe: all15(codes), bounty: { d: T0, a: ['cl', 'br', 'jp'], done: [] } });
+  const run = K.newRun({ sid: 'b3', kind: 'practice', mode: 'f2n', region: 'all', n: 5, hint: false }, d3);
+  K.runAnswer(run, { a: 'cl', right: true, first: true, hint: false, mode: 'f2n', missesBefore: 0, missesAfter: 0 });
+  d3.bounty = { d: '2026-10-27', a: ['us', 'ca', 'mx'], done: [] };
+  r = plain(K.settleRun(d3, run, null, T0));
+  assert.deepEqual([r.bounty, r.delta, plain(d3.bounty.done)], [[], 10, []]);
+  // 3件そろっていない手配書では全部の +100 は出ない
+  const d4 = dWith(K, { fe: all15(codes), bounty: { d: T0, a: ['cl'], done: [] } });
+  r = plain(play(K, d4, {}, {}, [['cl', true]]));
+  assert.deepEqual([r.bounty, r.bountyAll, d4.st.bountyDays], [['cl'], false, 0]);
+});
+
+test('ensure_day_and_bounty', () => {
+  const { K, codes } = setup(), T1 = '2026-10-27';
+  const mk = () => dWith(K, { day: { d: T0, n: { cl: 3 }, first: true, free: true }, fr: { cl: 2 }, lc: { cl: K.dayNum(T0) - 10 }, bounty: { d: T0, a: ['us'], done: ['us'] } });
+  const m = { br: 3, jp: 1 };
+  const d = mk();
+  assert.equal(K.ensureDay(d, m, T0, mulberry32(1)), false);          // 同じ日は何もしない
+  assert.deepEqual(plain(d.bounty), { d: T0, a: ['us'], done: ['us'] });
+  assert.equal(K.ensureDay(d, m, T1, mulberry32(1)), true);
+  assert.deepEqual(plain(d.day), { d: T1, n: {}, first: false, free: false });
+  const a = plain(d.bounty.a);
+  assert.equal(d.bounty.d, T1);
+  assert.deepEqual(plain(d.bounty.done), []);
+  assert.equal(a.length, 3);
+  assert.equal(new Set(a).size, 3);
+  assert.ok(a.every(x => codes.includes(x)));
+  assert.equal(a[0], 'br');                                           // 苦手のうち misses がいちばん多い
+  assert.equal(a[1], 'cl');                                           // なかよし1以上で7日以上前
+  assert.ok(!d.fr[a[2]] && !d.mb[a[2]] && !d.lc[a[2]]);              // まだ一度も正解していない
+  const snap = plain(d);
+  assert.equal(K.ensureDay(d, m, T1, mulberry32(9)), false);
+  assert.deepEqual(plain(d), snap);
+  // 同じ乱数なら同じ結果
+  const e = mk();
+  K.ensureDay(e, m, T1, mulberry32(1));
+  assert.deepEqual(plain(e.bounty), plain(d.bounty));
+  // 日付は同じでも手配書がまだなら選ぶ
+  const f = dWith(K);
+  assert.equal(K.ensureDay(f, {}, T0, mulberry32(2)), true);
+  assert.equal(f.bounty.d, T0);
+  assert.equal(plain(f.bounty.a).length, 3);
+});
+
+test('bounty_fill', () => {
+  const { K, codes } = setup(), now = K.dayNum(T0);
+  // 苦手なし・最近正解した国ばかり・全部の国を正解済み → なかよし度の低い3か国で埋める
+  const low = ['cl', 'br', 'jp'];
+  const d = dWith(K, {
+    fr: Object.fromEntries(codes.map(a => [a, low.includes(a) ? 1 : 5])),
+    lc: Object.fromEntries(codes.map(a => [a, now])),
+  });
+  assert.deepEqual(plain(K.bountyFor(d, {}, T0, mulberry32(3))).sort(), [...low].sort());
+  // 苦手な国が7日以上前の国でもある → 2つ目は別の国。足りない分は埋める
+  const d2 = dWith(K, {
+    fr: Object.fromEntries(codes.map(a => [a, 5])), lc: Object.fromEntries(codes.map(a => [a, now])), wk: { cl: 1 },
+  });
+  d2.lc.cl = now - 30;
+  const b = plain(K.bountyFor(d2, {}, T0, mulberry32(4)));
+  assert.equal(b[0], 'cl');
+  assert.equal(new Set(b).size, 3);
+  // 苦手の同点は乱数で決まる（乱数が同じなら同じ）
+  const d3 = dWith(K, { wk: { cl: 1, br: 1, jp: 1 } });
+  assert.deepEqual(plain(K.bountyFor(d3, {}, T0, mulberry32(5))), plain(K.bountyFor(d3, {}, T0, mulberry32(5))));
+  assert.ok(['cl', 'br', 'jp'].includes(K.bountyFor(d3, {}, T0, mulberry32(5))[0]));
+});
+
+test('is_weak_and_reset_weak', () => {
+  const K = loadCore(), d = dWith(K, { wk: { cl: 1, br: 1 } });
+  assert.equal(K.isWeak(d, {}, 'cl'), true);
+  assert.equal(K.isWeak(d, { jp: 1 }, 'jp'), true);
+  assert.equal(K.isWeak(d, { jp: '2' }, 'jp'), true);
+  for (const v of [0, -3, 'x', null, NaN]) assert.equal(K.isWeak(d, { jp: v }, 'jp'), false, String(v));
+  K.resetWeak(d);
+  assert.deepEqual(plain(d.wk), {});
+  assert.equal(K.isWeak(d, {}, 'cl'), false);
 });
