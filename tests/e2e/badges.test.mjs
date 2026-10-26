@@ -396,10 +396,10 @@ t('home_menu_pc', async page => {
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bdg-titlerow')).justifyContent), 'flex-start');
 }, { viewport: { width: 900, height: 700 } });
 
-// 背の低い PC（150% 表示のノートなど）で、ボタン5つと札があってもホームが縦にスクロールしない
+// 背の低い PC（150% 表示のノートなど）と、高さ 760 を少し超える PC で、ボタン5つと札があってもホームが縦にスクロールしない
 t('home_short_pc_fits', async page => {
   await addAdvButton(page);
-  for (const [i, viewport] of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }].entries()) {
+  for (const [i, viewport] of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }, { width: 1366, height: 768 }, { width: 1920, height: 800 }].entries()) {
     const key = `${viewport.width}x${viewport.height}`;
     if (i) await page.setViewportSize(viewport);
     await settleLayout(page);

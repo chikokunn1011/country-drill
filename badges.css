@@ -15,12 +15,18 @@
 /* 横に並ぶメニュー（900〜1279）でボタンが増えても横にはみ出さない。札は幅100%なので自分の行になる */
 @media (min-width: 900px) { .home .menu { flex-wrap: wrap; justify-content: center; max-width: 100%; } }
 @media (min-width: 1280px) { body[data-screen] .bdg-titlerow { justify-content: flex-start; } }
-/* 背の低い PC（150% 表示のノートなど）: ボタンを2列にして縦に収める。プレイと札の行だけ全幅。
-   札とボタン4行は、2列にしても 1280×577 で約20px はみ出すので、ボタンと札の上下の余白も詰める */
-@media (min-width: 1280px) and (max-height: 760px) {
+/* 高さ 1000px までの PC: ボタンを2列にして縦に収める。プレイと札の行だけ全幅。
+   1列のままだと、ボタンが4〜5つと札で高さ 760 を少し超える PC（1366×768、1600×900 のブラウザなど）でもホームがスクロールする */
+@media (min-width: 1280px) and (max-height: 1000px) {
   .home .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .home .menu > #home-play, .home .menu > .bdg-titlerow { grid-column: 1 / -1; }
-  .home .menu .btn { padding-block: 7px; }
+}
+/* 背の低い PC（150% 表示のノートなど）: 2列にしても 1280×577 ではみ出すので、ボタンと札・ホームの上下の余白も詰める。
+   .btn の font は line-height を normal に戻し、高さが字体で変わる（Zen Maru Gothic は約1.46、代わりの字体は約1.35）ので、行の高さを決めておく */
+@media (min-width: 1280px) and (max-height: 760px) {
+  .home { padding-block: clamp(12px, 3vh, 64px); }
+  .home .menu .btn { padding-block: 9px; }
+  .home .menu .btn, #home-book { line-height: 1.3; }
   .bdg-titlechip { padding-block: 3px; }
 }
 
