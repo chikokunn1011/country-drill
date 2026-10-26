@@ -918,3 +918,296 @@ test('is_weak_and_reset_weak', () => {
   assert.deepEqual(plain(d.wk), {});
   assert.equal(K.isWeak(d, {}, 'cl'), false);
 });
+
+// ---- ガチャとバトルの出題 ----
+// RPG_CORE と countries.js の国（vm 側のまま。pull に渡す）、南アメリカの国コード
+const gsetup = () => {
+  const { ctx } = loadCtx(), C = ctx.COUNTRIES;
+  return { K: ctx.RPG_CORE, C, sa: plain(C.filter(c => c.r === '南アメリカ').map(c => c.a)) };
+};
+const pctNear = (n, N, want, tol, label) => assert.ok(Math.abs(n / N * 100 - want) <= tol, `${label}: ${(n / N * 100).toFixed(3)}% ≈ ${want}%±${tol}`);
+const SA_F1 = ['br', 'ar', 'pe'];
+
+test('add_card_cases', () => {
+  const K = loadCore(), d = dWith(K, { coins: 5, earned: 7, cards: { br: [2, 1], ar: [1, 4], pe: [3, 4], cl: [2, 4] } });
+  // 無い国 → その★、かさね0
+  assert.equal(K.addCard(d, 'jp', 2), 'new');
+  assert.deepEqual(plain(d.cards.jp), [2, 0]);
+  // ★を上回る → ★だけ上がる（かさねはそのまま）
+  assert.equal(K.addCard(d, 'br', 3), 'up');
+  assert.deepEqual(plain(d.cards.br), [3, 1]);
+  // 同じか低い・かさね<4 → かさね+1
+  assert.equal(K.addCard(d, 'br', 3), 'stack');
+  assert.deepEqual(plain(d.cards.br), [3, 2]);
+  assert.equal(K.addCard(d, 'br', 1), 'stack');
+  assert.deepEqual(plain(d.cards.br), [3, 3]);
+  assert.equal(K.addCard(d, 'br', 2), 'stack');
+  assert.equal(K.addCard(d, 'br', 2), 'refund');   // かさね4になったあとはおかえし
+  assert.deepEqual(plain(d.cards.br), [3, 4]);
+  assert.equal(d.coins, 5 + 30);
+  // かさね4 → 引いた★の額をおかえし（★1 10 / ★2 30 / ★3 100）。カードは変わらない
+  const before = { coins: d.coins, earned: d.earned };
+  assert.equal(K.addCard(d, 'pe', 1), 'refund');     // [3,4] に★1 → 10
+  assert.equal(K.addCard(d, 'pe', 3), 'refund');     // 100
+  assert.equal(K.addCard(d, 'cl', 2), 'refund');     // 30
+  assert.equal(K.addCard(d, 'cl', 1), 'refund');     // 10
+  assert.equal(K.addCard(d, 'ar', 1), 'refund');     // 10
+  assert.deepEqual(plain(d.cards.pe), [3, 4]);
+  assert.deepEqual(plain(d.cards.cl), [2, 4]);
+  assert.equal(d.coins, before.coins + 160);
+  assert.equal(d.earned, before.earned + 160);
+  // かさね4でも★が上回れば up（かさね4のまま）
+  assert.equal(K.addCard(d, 'ar', 2), 'up');
+  assert.deepEqual(plain(d.cards.ar), [2, 4]);
+  assert.equal(d.coins, before.coins + 160);
+});
+
+test('pull_rates', () => {
+  const { K, C } = gsetup(), d = dWith(K), rng = mulberry32(42), N = 200000, n = [0, 0, 0, 0];
+  // 1回ずつ。毎回天井を0に戻して、素の確率だけを見る
+  for (let i = 0; i < N; i++) { d.pity = 0; n[K.pull(d, 'all', 1, rng, C)[0].star]++; }
+  pctNear(n[3], N, 3, 0.3, '★3');
+  pctNear(n[2], N, 17, 0.3, '★2');
+  pctNear(n[1], N, 80, 0.3, '★1');
+  assert.equal(d.pulls, N);
+  // 10連の10枚目（引く前に天井を0に戻す。戻さないと天井の★3が混ざる）
+  const M = 20000, t = [0, 0, 0, 0];
+  for (let i = 0; i < M; i++) {
+    d.pity = 0;
+    const r = K.pull(d, 'all', 10, rng, C);
+    assert.equal(r.length, 10);
+    t[r[9].star]++;
+  }
+  pctNear(t[3], M, 3, 0.5, '10枚目 ★3');
+  pctNear(t[2], M, 97, 0.5, '10枚目 ★2');
+  assert.equal(t[1], 0);
+  assert.equal(d.pulls, N + 10 * M);
+});
+
+test('pull_pity', () => {
+  const { K, C } = gsetup(), d = dWith(K), rng = () => 0.99;   // いつも★1
+  const regions = ['南アメリカ', 'オセアニア', 'all', 'アフリカ'];   // 天井は地域をまたいで続く
+  for (let i = 1; i <= 49; i++) {
+    const r = K.pull(d, regions[i % regions.length], 1, rng, C);
+    assert.equal(r.length, 1);
+    assert.equal(r[0].star, 1, `${i}回目`);
+    assert.equal(d.pity, i);
+    assert.equal(d.pulls, i);
+  }
+  const [x] = K.pull(d, 'アジア', 1, rng, C);
+  assert.equal(x.star, 3, '50回目は★3');
+  assert.equal(d.pity, 0);
+  assert.equal(d.pulls, 50);
+  // 10連の途中で天井 → その1枚が★3、10枚目は★2以上
+  d.pity = 45;
+  const ten = K.pull(d, '南アメリカ', 10, rng, C);
+  assert.deepEqual(plain(ten.map(r => r.star)), [1, 1, 1, 1, 3, 1, 1, 1, 1, 2]);
+  assert.equal(d.pity, 5);
+  assert.equal(d.pulls, 60);
+  // 結果の形: 国・★・addCard の結果
+  const d2 = dWith(K), [y] = K.pull(d2, '南アメリカ', 1, () => 0, C);
+  assert.deepEqual(plain(y), { a: plain(C.filter(c => c.r === '南アメリカ')[0].a), star: 3, out: 'new' });
+  assert.deepEqual(plain(d2.cards[y.a]), [3, 0]);
+  assert.equal(d2.coins, 0, 'コインは引かない（呼ぶ側が引く）');
+});
+
+test('pull_region_uniform', () => {
+  const { K, C, sa } = gsetup(), d = dWith(K), rng = mulberry32(7), N = 24000, cnt = {};
+  for (let i = 0; i < N; i++) for (const x of K.pull(d, '南アメリカ', 1, rng, C)) cnt[x.a] = (cnt[x.a] || 0) + 1;
+  assert.deepEqual(Object.keys(cnt).sort(), [...sa].sort());
+  for (const a of sa) assert.ok(Math.abs(cnt[a] / (N / sa.length) - 1) <= 0.15, `${a}: ${cnt[a]}`);
+  // オセアニアを選ぶとオセアニアの国だけ
+  const oc = new Set(plain(C.filter(c => c.r === 'オセアニア').map(c => c.a)));
+  for (let i = 0; i < 50; i++) for (const x of K.pull(d, 'オセアニア', 10, rng, C)) assert.ok(oc.has(x.a), x.a);
+});
+
+test('pull_bad_args', () => {
+  const { K, C } = gsetup(), d = dWith(K, { pity: 7, pulls: 3 }), rng = mulberry32(1);
+  for (const count of [3, 0, 2, '1', '10', 11, -1, undefined]) {
+    assert.deepEqual(plain(K.pull(d, 'all', count, rng, C)), [], String(count));
+  }
+  for (const region of ['火星', '', undefined, 'samerica']) {
+    assert.deepEqual(plain(K.pull(d, region, 1, rng, C)), [], String(region));
+    assert.deepEqual(plain(K.pull(d, region, 10, rng, C)), [], String(region));
+  }
+  assert.equal(d.pulls, 3);
+  assert.equal(d.pity, 7);
+  assert.deepEqual(plain(d.cards), {});
+});
+
+test('gacha_rates', () => {
+  const K = loadCore(), r = plain(K.gachaRates());
+  const { eff3, ...rest } = r;
+  assert.deepEqual(rest, { r3: 3, r2: 17, r1: 80, tenR3: 3, tenR2: 97, pity: 50 });
+  assert.equal(eff3.toFixed(1), '3.8');
+  // 天井込みの率は、天井を戻さずに引き続けたときの★3の率と合う
+  const { ctx } = loadCtx(), d = dWith(ctx.RPG_CORE), rng = mulberry32(9), N = 200000;
+  let n3 = 0;
+  for (let i = 0; i < N; i++) if (ctx.RPG_CORE.pull(d, 'all', 1, rng, ctx.COUNTRIES)[0].star === 3) n3++;
+  pctNear(n3, N, eff3, 0.3, '天井込みの★3');
+});
+
+test('mode_cycle', () => {
+  const K = loadCore();
+  for (const f of [1, 2]) assert.deepEqual(plain(K.modeCycle(f)), ['f2n', 'n2f'], `F${f}`);
+  for (const f of [3, 4, 5]) assert.deepEqual(plain(K.modeCycle(f)), ['f2n', 'n2f', 'm2f'], `F${f}`);
+  assert.equal(K.nextMode('f2n', 1), 'n2f');
+  assert.equal(K.nextMode('n2f', 2), 'f2n');
+  assert.equal(K.nextMode('n2f', 3), 'm2f');
+  assert.equal(K.nextMode('m2f', 3), 'f2n');
+  assert.equal(K.nextMode('f2n', 5), 'n2f');
+  assert.equal(K.nextMode('cap', 5), 'f2n');
+  assert.equal(K.nextMode('m2f', 1), 'f2n');   // その階に無い形式の次は先頭
+  // どの階でも、次はちがう形式でその階の形式
+  for (const f of [1, 2, 3, 4, 5]) for (const m of ['f2n', 'n2f', 'm2f', 'cap']) {
+    const nx = K.nextMode(m, f);
+    assert.notEqual(nx, m, `${m} F${f}`);
+    assert.ok(plain(K.modeCycle(f)).includes(nx), `${m} F${f} → ${nx}`);
+  }
+  // 返した配列を書きかえても次に影響しない
+  K.modeCycle(1).push('cap');
+  assert.deepEqual(plain(K.modeCycle(1)), ['f2n', 'n2f']);
+});
+
+test('battle_bag', () => {
+  const { K, C, sa } = gsetup(), as = b => b.map(x => x.a);
+  // 新しいセーブ: F1 の3か国を1回ずつ ＋ 苦手が無いので F1 以外の国を2つ。形式は f2n と n2f の交互
+  const b = plain(K.battleBag(dWith(K), {}, 'samerica', 1, mulberry32(1)));
+  assert.equal(b.length, 5);
+  assert.deepEqual(as(b.slice(0, 3)).sort(), [...SA_F1].sort());
+  const extra = as(b.slice(3));
+  assert.equal(new Set(extra).size, 2);
+  for (const a of extra) assert.ok(sa.includes(a) && !SA_F1.includes(a), a);
+  assert.deepEqual(b.map(x => x.mode), ['f2n', 'n2f', 'f2n', 'n2f', 'f2n']);
+  assert.ok(b.every(x => x.tag === null));
+  // 苦手が無いときは、なかよし度の低い順
+  const fr = Object.fromEntries(sa.map(a => [a, 5]));
+  Object.assign(fr, { gy: 0, co: 1, br: 0 });
+  assert.deepEqual(as(plain(K.battleBag(dWith(K, { fr }), {}, 'samerica', 1, mulberry32(2))).slice(3)), ['gy', 'co']);
+  // その階の国はシャッフルされる（乱数が同じなら同じ）
+  const firsts = new Set();
+  for (let s = 1; s <= 30; s++) firsts.add(plain(K.battleBag(dWith(K), {}, 'samerica', 1, mulberry32(s)))[0].a);
+  assert.deepEqual([...firsts].sort(), [...SA_F1].sort());
+  assert.deepEqual(plain(K.battleBag(dWith(K), {}, 'samerica', 1, mulberry32(5))), plain(K.battleBag(dWith(K), {}, 'samerica', 1, mulberry32(5))));
+
+  // 苦手: misses の多い順
+  assert.deepEqual(as(plain(K.battleBag(dWith(K), { sr: 2, uy: 1 }, 'samerica', 1, mulberry32(3))).slice(3)), ['sr', 'uy']);
+  // misses が同じなら wk がある順。3つ目以降（weakMax をこえる分）は入らない
+  const b2 = plain(K.battleBag(dWith(K, { wk: { uy: 1, cl: 1 } }), { sr: 1, uy: 1, ve: 1 }, 'samerica', 1, mulberry32(4)));
+  assert.deepEqual(as(b2.slice(3)), ['uy', b2[4].a]);
+  assert.ok(['sr', 've'].includes(b2[4].a));
+  assert.equal(b2.length, 5);
+  // その階の苦手な国は足さない（もう袋にある）。その階の外に苦手が無ければ、なかよし度の低い国
+  const b3 = plain(K.battleBag(dWith(K, { fr }), { br: 3 }, 'samerica', 1, mulberry32(5)));
+  assert.deepEqual(as(b3.slice(3)), ['gy', 'co']);
+  // 苦手が1つだけなら1つだけ足す
+  const b4 = plain(K.battleBag(dWith(K), { br: 3, sr: 1 }, 'samerica', 1, mulberry32(6)));
+  assert.deepEqual(as(b4.slice(3)), ['sr']);
+  assert.equal(b4.length, 4);
+  // 地域の外の苦手は入らない
+  assert.deepEqual(as(plain(K.battleBag(dWith(K), { jp: 5, sr: 1 }, 'samerica', 1, mulberry32(7))).slice(3)), ['sr']);
+
+  // 手配書: 地域の国でまだ達成していないもの。袋に無ければ足して、tag:'wanted'
+  const bounty = { d: T0, a: ['cl', 'jp', 'fr'], done: [] };
+  const b5 = plain(K.battleBag(dWith(K, { bounty }), { sr: 2, uy: 1 }, 'samerica', 1, mulberry32(8)));
+  assert.deepEqual(as(b5.slice(3)), ['sr', 'uy', 'cl']);
+  assert.deepEqual(b5.map(x => x.tag), [null, null, null, null, null, 'wanted']);
+  assert.deepEqual(b5.map(x => x.mode), ['f2n', 'n2f', 'f2n', 'n2f', 'f2n', 'n2f']);
+  assert.ok(!as(b5).includes('jp') && !as(b5).includes('fr'));
+  // 袋にもうあれば足さずに札だけ付ける
+  const b6 = plain(K.battleBag(dWith(K, { bounty: { d: T0, a: ['br', 'sr'], done: [] } }), { sr: 2 }, 'samerica', 1, mulberry32(9)));
+  assert.equal(b6.length, 4);
+  assert.deepEqual(b6.filter(x => x.tag === 'wanted').map(x => x.a).sort(), ['br', 'sr']);
+  assert.equal(as(b6).filter(a => a === 'br').length, 1);
+  // 達成した国には付けない
+  const b7 = plain(K.battleBag(dWith(K, { bounty: { d: T0, a: ['br', 'cl'], done: ['br', 'cl'] } }), { sr: 2 }, 'samerica', 1, mulberry32(10)));
+  assert.ok(b7.every(x => x.tag === null));
+  assert.equal(b7.length, 4);
+
+  // F3 は f2n → n2f → m2f のくり返し
+  const b8 = plain(K.battleBag(dWith(K, { bounty }), { sr: 2, uy: 1 }, 'samerica', 3, mulberry32(11)));
+  assert.deepEqual(as(b8.slice(0, 3)).sort(), ['cl', 'ec', 'py']);
+  assert.deepEqual(b8.map(x => x.mode), ['f2n', 'n2f', 'm2f', 'f2n', 'n2f']);
+  assert.equal(b8.find(x => x.a === 'cl').tag, 'wanted');
+
+  // 全世界: F1 は floorsOf('all')[0] の国。手配書はどの地域の国でも入る
+  const w1 = plain(K.floorsOf('all')[0]);
+  const bw = plain(K.battleBag(dWith(K, { bounty: { d: T0, a: ['jp'], done: [] } }), {}, 'world', 1, mulberry32(12)));
+  assert.deepEqual(as(bw.slice(0, w1.length)).sort(), [...w1].sort());
+  const wx = as(bw.slice(w1.length));
+  assert.equal(new Set(as(bw)).size, bw.length);
+  assert.ok(wx.length >= 2 && wx.length <= 3 && wx.slice(0, 2).every(a => !w1.includes(a)));
+  assert.equal(bw.find(x => x.a === 'jp').tag, 'wanted');
+  assert.ok(bw.every((x, i) => x.mode === ['f2n', 'n2f'][i % 2]));
+  assert.ok(as(bw).every(a => plain(C.map(c => c.a)).includes(a)));
+});
+
+test('refill_bag', () => {
+  const K = loadCore(), byA = b => Object.fromEntries(plain(b).map(x => [x.a, x]));
+  const r = byA(K.refillBag('samerica', 1, { br: 'f2n', ar: 'n2f' }, mulberry32(3)));
+  assert.deepEqual(Object.keys(r).sort(), [...SA_F1].sort());
+  assert.deepEqual([r.br.mode, r.ar.mode, r.pe.mode], ['n2f', 'f2n', 'n2f']);   // 前の形式が無ければ f2n の次
+  assert.ok(Object.values(r).every(x => x.tag === null));
+  const r3 = byA(K.refillBag('samerica', 3, { cl: 'm2f', py: 'f2n', ec: 'n2f' }, mulberry32(4)));
+  assert.deepEqual([r3.cl.mode, r3.py.mode, r3.ec.mode], ['f2n', 'n2f', 'm2f']);
+  // シャッフルされる
+  const firsts = new Set();
+  for (let s = 1; s <= 30; s++) firsts.add(plain(K.refillBag('samerica', 1, {}, mulberry32(s)))[0].a);
+  assert.equal(firsts.size, 3);
+  // 全世界の F2
+  assert.deepEqual(plain(K.refillBag('world', 2, {}, mulberry32(1))).map(x => x.a).sort(), plain(K.floorsOf('all')[1]).sort());
+});
+
+test('boss_flags', () => {
+  const { K, C, sa } = gsetup();
+  // 7か国に misses 1〜7、残り5か国は苦手なし → 6枚のうち苦手は floor(6×0.7) = 4 枚（misses の多い4か国）
+  const m = { ar: 7, bo: 6, br: 5, cl: 4, co: 3, ec: 2, gy: 1 }, rest = new Set();
+  for (let s = 1; s <= 20; s++) {
+    const f = plain(K.bossFlags(dWith(K), m, 'samerica', mulberry32(s)));
+    assert.equal(f.length, 6);
+    assert.equal(new Set(f).size, 6);
+    assert.ok(f.every(a => sa.includes(a)));
+    assert.deepEqual(f.slice(0, 4), ['ar', 'bo', 'br', 'cl']);
+    assert.equal(f.filter(a => m[a]).length, 4);
+    f.slice(4).forEach(a => rest.add(a));
+  }
+  assert.ok(rest.size >= 4, '苦手でない国は乱数で選ぶ');
+  // 12か国全部に misses → 苦手でない国が無いので、苦手で埋める（misses の多い順）
+  const all = Object.fromEntries(sa.map((a, i) => [a, i + 1])), top = [...sa].reverse().slice(0, 6);
+  const fa = plain(K.bossFlags(dWith(K), all, 'samerica', mulberry32(1)));
+  assert.deepEqual(fa, top);
+  // 並べる順: misses の多い順 → wk あり → なかよし度の低い順
+  const d = dWith(K, { wk: { uy: 1, cl: 1, sr: 1 }, fr: { cl: 3, uy: 0, sr: 1 } });
+  const fw = plain(K.bossFlags(d, { ve: 1, sr: 1 }, 'samerica', mulberry32(2)));
+  assert.deepEqual(fw.slice(0, 4), ['sr', 've', 'uy', 'cl']);
+  assert.ok(fw.slice(4).every(a => !['sr', 've', 'uy', 'cl'].includes(a)));
+  // 苦手が無ければ全部乱数（乱数が同じなら同じ）
+  assert.deepEqual(plain(K.bossFlags(dWith(K), {}, 'samerica', mulberry32(3))), plain(K.bossFlags(dWith(K), {}, 'samerica', mulberry32(3))));
+  // 全世界は12枚、どの地域の国からでも
+  const fwld = plain(K.bossFlags(dWith(K), { jp: 2 }, 'world', mulberry32(4)));
+  assert.equal(fwld.length, 12);
+  assert.equal(new Set(fwld).size, 12);
+  assert.equal(fwld[0], 'jp');
+  assert.ok(fwld.every(a => plain(C.map(c => c.a)).includes(a)));
+});
+
+test('boss_mode', () => {
+  const K = loadCore();
+  assert.equal(K.bossMode(0, 6, 6, 'cl'), 'f2n');
+  assert.equal(K.bossMode(1, 6, 6, 'cl'), 'n2f');
+  assert.equal(K.bossMode(2, 3, 6, 'cl'), 'm2f');   // 半分を切っていない
+  assert.equal(K.bossMode(5, 2, 6, 'cl'), 'cap');
+  assert.equal(K.bossMode(5, 2, 6, 'br'), 'm2f');   // ブラジルは首都がヒントになる
+  assert.equal(K.bossMode(4, 2, 6, 'cl'), 'n2f');
+  assert.equal(K.bossMode(8, 1, 6, 'ws'), 'cap');
+  assert.equal(K.bossMode(5, 1, 6, 'zz'), 'm2f');   // 知らない国には cap を出さない
+});
+
+test('revive_set', () => {
+  const K = loadCore();
+  const ms = [{ a: 'br', mode: 'f2n' }, { a: 'ar', mode: 'm2f' }, { a: 'br', mode: 'n2f' }, { a: 'pe', mode: 'f2n' }, { a: 'cl', mode: 'f2n' }];
+  assert.deepEqual(plain(K.reviveSet(ms)), [{ a: 'cl', mode: 'n2f' }, { a: 'pe', mode: 'n2f' }, { a: 'br', mode: 'm2f' }]);
+  assert.deepEqual(plain(ms[0]), { a: 'br', mode: 'f2n' }, '渡した配列は変えない');
+  assert.deepEqual(plain(K.reviveSet([{ a: 'uy', mode: 'cap' }, { a: 'uy', mode: 'm2f' }])), [{ a: 'uy', mode: 'f2n' }]);
+  assert.deepEqual(plain(K.reviveSet([])), []);
+});

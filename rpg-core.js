@@ -490,6 +490,102 @@
   // 設定の「記録を消す」（drill:misses-reset）で苦手の印も全部消す
   const resetWeak = d => { d.wk = {}; };
 
+  // ---- 国旗ガチャ（設計書 §6.3） ----
+  // region は 'all' か地域名、count は 1 か 10 だけ（それ以外と空の地域は []）。d.pity d.pulls を書きかえ、addCard を呼ぶ。
+  // コインは引かない（呼ぶ側が引く）。Cs は国の一覧（index.html の C）
+  const pull = (d, region, count, rng, Cs) => {
+    const T = TUNING.gacha, pool = list(Cs).filter(c => region === 'all' || c.r === region), out = [];
+    if (!pool.length || (count !== 1 && count !== 10)) return out;
+    for (let i = 0; i < count; i++) {
+      const r = rng();
+      const star = d.pity >= T.pity - 1 ? 3
+        : count === 10 && i === 9 ? (r < T.r3 ? 3 : 2)
+        : r < T.r3 ? 3 : r < T.r3 + T.r2 ? 2 : 1;
+      d.pity = star === 3 ? 0 : d.pity + 1;
+      d.pulls = Math.min(BIG, d.pulls + 1);
+      const c = pool[Math.floor(rng() * pool.length)];
+      out.push({ a: c.a, star, out: addCard(d, c.a, star) });   // 'new' | 'up' | 'stack' | 'refund'
+    }
+    return out;
+  };
+  // 画面に出す確率（%の数）。eff3 は天井込みの★3の率 = 100 / ★3 1枚あたりの平均回数（Σ_{k<天井} (1−r3)^k）
+  const pct = x => Math.round(x * 1e4) / 100;
+  const gachaRates = () => {
+    const T = TUNING.gacha;
+    let per = 0;
+    for (let k = 0; k < T.pity; k++) per += (1 - T.r3) ** k;
+    return { r3: pct(T.r3), r2: pct(T.r2), r1: pct(1 - T.r3 - T.r2), tenR3: pct(T.r3), tenR2: pct(1 - T.r3), pity: T.pity, eff3: 100 / per };
+  };
+
+  // ---- バトルの出題（設計書 §7.3・§7.4） ----
+  const BY_A = new Map(C.map(c => [c.a, c]));
+  const codesOf = region => C.filter(c => region === 'all' || c.r === region).map(c => c.a);
+  const missOf = (m, a) => Math.max(0, +(m || {})[a] || 0);
+  // rng でシャッフルした新しい配列
+  const shuffled = (xs, rng) => {
+    const a = [...xs];
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  // その階の形式の順。F1〜F2 は f2n と n2f の交互、F3〜F4 とボス（5）は f2n → n2f → m2f
+  const modeCycle = floor => floor <= 2 ? ['f2n', 'n2f'] : ['f2n', 'n2f', 'm2f'];
+  // その階の順で次の、ちがう形式。その階に無い形式（cap など）の次は先頭の f2n
+  const nextMode = (mode, floor) => { const cy = modeCycle(floor); return cy[(cy.indexOf(mode) + 1) % cy.length]; };
+
+  // 通常フロアの国の袋: その階の国（シャッフル）→ 階の外の苦手な国を misses の多い順 → wk がある順に最大 weakMax 個
+  // （苦手が無ければなかよし度の低い順。同点は乱数）→ 今日の手配書でまだ達成していない地域の国（袋に無ければ足す）。
+  // 形式は袋の位置で modeCycle の順。手配書の国には tag:'wanted'
+  const battleBag = (d, m, id, floor, rng) => {
+    const dg = dungeonOf(id);
+    if (!dg) return [];
+    const here = floorsOf(dg.r)[floor - 1] || [], codes = codesOf(dg.r), fr = d.fr || {}, wk = d.wk || {};
+    const bag = shuffled(here, rng), away = shuffled(codes.filter(a => !here.includes(a)), rng);
+    const weak = away.filter(a => isWeak(d, m, a)).sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x]);
+    const pick = weak.length ? weak : [...away].sort((x, y) => (fr[x] || 0) - (fr[y] || 0));
+    bag.push(...pick.slice(0, TUNING.battle.weakMax));
+    const b = d.bounty || {}, done = list(b.done), wanted = list(b.a).filter(a => !done.includes(a) && codes.includes(a));
+    for (const a of wanted) if (!bag.includes(a)) bag.push(a);
+    const cy = modeCycle(floor);
+    return bag.map((a, i) => ({ a, mode: cy[i % cy.length], tag: wanted.includes(a) ? 'wanted' : null }));
+  };
+  // 袋が空になったら、その階の国をもう一度（シャッフル）、前と別の形式で。lastMode は {国コード: 前に出した形式}
+  const refillBag = (id, floor, lastMode, rng) => {
+    const dg = dungeonOf(id), last = lastMode || {};
+    if (!dg) return [];
+    return shuffled(floorsOf(dg.r)[floor - 1] || [], rng).map(a => ({ a, mode: nextMode(last[a] ?? 'f2n', floor), tag: null }));
+  };
+  // ボスの旗（flags 枚）: 地域の国を misses の多い順 → wk あり → なかよし度の低い順 → 乱数で並べ、苦手な国を上から
+  // floor(枚数 × bossWeakPct) 個まで。残りは苦手でない国から乱数で選び、足りなければ苦手な国の続きで埋める
+  const bossFlags = (d, m, id, rng) => {
+    const dg = dungeonOf(id);
+    if (!dg) return [];
+    const fr = d.fr || {}, wk = d.wk || {}, n = dg.flags, cap = Math.floor(n * TUNING.battle.bossWeakPct);
+    const mixed = shuffled(codesOf(dg.r), rng);
+    const weak = mixed.filter(a => isWeak(d, m, a))
+      .sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x] || (fr[x] || 0) - (fr[y] || 0));
+    const out = weak.slice(0, cap);
+    out.push(...mixed.filter(a => !isWeak(d, m, a)).slice(0, n - out.length));
+    out.push(...weak.slice(cap, cap + n - out.length));
+    return out;
+  };
+  // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。旗の残り left が total の半分を切ったら、3問に1問を cap にする
+  // （首都がヒントになる国には出さない）
+  const bossMode = (k, left, total, a) => {
+    const cy = modeCycle(5), i = k % cy.length, c = BY_A.get(a);
+    return i === cy.length - 1 && left * 2 < total && c && capOK(c) ? 'cap' : cy[i];
+  };
+  // 思い出して復活の問題: 新しいまちがいから順に、重なりを除いて最大 reviveMax か国。形式はまちがえた形式の次（F3 の順）
+  const reviveSet = mistakes => {
+    const out = [], seen = new Set();
+    for (const { a, mode } of [...list(mistakes)].reverse()) {
+      if (seen.has(a)) continue;
+      seen.add(a);
+      out.push({ a, mode: nextMode(mode, 3) });
+      if (out.length >= TUNING.battle.reviveMax) break;
+    }
+    return out;
+  };
+
   globalThis.RPG_CORE = {
     TUNING, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
     levelCost, maxLevelUp, heroStats,
@@ -504,5 +600,7 @@
     isWeak, answerCoins, clearBonus, addCard, settleDelta,
     newRun, runAnswer, settleRun,
     ensureDay, bountyFor, resetWeak,
+    pull, gachaRates,
+    modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, reviveSet,
   };
 })();
