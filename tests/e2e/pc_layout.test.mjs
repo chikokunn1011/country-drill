@@ -469,6 +469,22 @@ test('menus_do_not_jump', { timeout: 120_000 }, async () => {
   assert.deepEqual(problems, []);
 });
 
+// キーボードの無いタッチ端末（横向きの iPad。900px 以上なので pc.css が効く）では、答えの場所にキーの案内を出さない
+test('rslot_keys_hidden_on_touch', async () => {
+  const IPAD = { width: 1366, height: 1024 };
+  for (const hasTouch of [false, true]) {
+    const app = await openApp(browser, { viewport: IPAD, hasTouch, seed: 1, reducedMotion: 'reduce' });
+    try {
+      const { page } = app;
+      assert.equal(await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches), hasTouch);
+      await startF2n(page, 'practice');
+      assert.equal(await page.isVisible('#qcard > .rslot .rslot-hint'), true, `hasTouch=${hasTouch}`);
+      assert.equal(await page.isVisible('#qcard > .rslot .rslot-keys'), !hasTouch, `hasTouch=${hasTouch}`);
+      noErrors(app);
+    } finally { await app.close(); }
+  }
+});
+
 // PC でも 1〜4 キーと Enter が動き、答えたら「次の問題 →」にフォーカスの枠が出る（設計書 9章 10）
 test('keys_and_focus_pc', async () => {
   await checkKeysAndFocus(W1366, { focusVisible: true });

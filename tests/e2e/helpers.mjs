@@ -94,12 +94,12 @@ async function supabaseRoute(route, db) {
 }
 
 // 新しいブラウザコンテキストでサイトを開く。supabase: 'fake'（偽DB）か 'down'（つながらない）
-// seed: Math.random を決まった列にする（mulberry32）。reducedMotion・colorScheme は newContext にそのまま渡す
+// seed: Math.random を決まった列にする（mulberry32）。reducedMotion・colorScheme・hasTouch は newContext にそのまま渡す（hasTouch: true で (hover: none) and (pointer: coarse) になる）
 // storage: ページのスクリプトより前に localStorage へ入れておく値（キー → JSON にする値）
 // 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, storage } = {}) {
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, hasTouch, storage } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
-  const context = await browser.newContext({ viewport, reducedMotion, colorScheme });
+  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
   if (seed !== undefined) await context.addInitScript(seed => {
     let t = seed;
