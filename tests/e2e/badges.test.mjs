@@ -485,6 +485,28 @@ t('later_steps_join_panel', async page => {
   await toastWith(page, 'れんぞく正解').waitFor();
 });
 
+// パネルの［つける］（ドパガキ OFF）: 押した行は「つけてる中」、自動でつけた行は「をつけたよ」をやめて［つける］。払ったコインはそのまま
+t('panel_equip_feedback', async (page, app) => {
+  await withRpg(app, {});   // ●+50 が描き直しても残るか見るため
+  await playPractice(page, { count: 10 });
+  const rows = page.locator('#r-badges .bdg-row'), n = await rows.count();
+  assert.ok(n >= 2, `行が ${n}`);
+  const coins = await rows.locator('.bdg-paid').allInnerTexts();
+  assert.ok(coins.every(s => s === '●+50'), coins.join(' | '));
+  assert.match(await rows.nth(0).innerText(), /をつけたよ/);
+  const key = await rows.nth(1).getAttribute('data-key');
+  await rows.nth(1).locator('[data-bdg-equip]').click();
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), key);
+  assert.match(await rows.nth(1).innerText(), /つけてる中/);
+  assert.equal(await rows.nth(1).locator('[data-bdg-equip]').count(), 0);
+  const first = await rows.nth(0).innerText();
+  assert.doesNotMatch(first, /をつけたよ/);
+  assert.equal(await rows.nth(0).locator('[data-bdg-equip]').count(), 1, first);
+  assert.equal(await rows.count(), n);
+  assert.deepEqual(await rows.locator('.bdg-paid').allInnerTexts(), coins);
+  assert.ok(await noHScroll(page));
+});
+
 // 図鑑の詳細（ダイアログ）を開いている間はトーストを出さず、閉じたら出す
 t('book_toast_after_dialog', async page => {
   await page.click('#home-book');
@@ -522,6 +544,23 @@ t('ta_fail_toast_no_overlap', async page => {
   for (const p of m.toasts) for (const q of m.btns) assert.ok(!hit(p, q), `重なっている: ${json({ p, q })}`);
 });
 
+// 失格のトーストが出ているうちに［もう一回］: 次のタイムアタックの間はバッジのトーストを出さない（タイマーと問題に重ねない）
+t('ta_retry_hides_toasts', async page => {
+  await page.evaluate(() => BADGES.debug.set('right', 99));
+  await pickSetup(page, { mode: 'f2n', kind: 'ta', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  await answerWrong(page);
+  await toastWith(page, 'こつこつ正解').waitFor();
+  await page.click('#next');
+  await page.waitForFunction(() => G.kind === 'ta' && !G.ended);
+  for (let ms = 0; ms <= 1200; ms += 300) {
+    assert.equal(await count(page, '#toasts [data-bdg-toast]'), 0, `始めて ${ms}ms`);
+    await page.waitForTimeout(300);
+  }
+  assert.equal(await page.evaluate(() => G.kind === 'ta' && !G.ended), true);   // ずっとタイムアタックの途中だった
+});
+
 // 一度に出す枚数: スマホは2枚（多ければ「ほか◯個」）、PC は3枚。400ms ずつずらす
 t('toast_limits', async page => {
   await watchToasts(page);
@@ -540,6 +579,33 @@ t('toast_limits', async page => {
   assert.equal(tt.length, 3);
   assert.ok(tt[2] - tt[0] >= 700, `1枚目と3枚目の差 ${tt[2] - tt[0]}ms`);
 });
+
+// 3枚を 400ms ずつ出している途中でクイズを始めた（PC）: 出ていた1枚は消し、残りの2枚はクイズの間は出さずに結果のあとで出す
+t('quiz_start_holds_toasts', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  const at = await page.evaluate(() => new Promise(ok => {
+    const t0 = performance.now();
+    BADGES.debug.set('right', 5000);   // こつこつ正解の金（自動でつけたので先頭）・銅・銀。1枚目はすぐ、2・3枚目は 400・800ms あと
+    setTimeout(() => {
+      const shown = document.querySelectorAll('#toasts [data-bdg-toast]').length;
+      $('start').click();
+      ok({ shown, ms: performance.now() - t0 });
+    }, 150);
+  }));
+  assert.equal(at.shown, 1, json(at));
+  assert.ok(at.ms < 300, json(at));
+  await page.waitForSelector('#qcard .choice');
+  assert.equal(await count(page, '#toasts [data-bdg-toast]'), 0, '始めたとき');
+  await page.waitForTimeout(1000);
+  assert.equal(await count(page, '#toasts [data-bdg-toast]'), 0, '始めて1秒');
+  assert.equal(await page.evaluate(() => G.ended), undefined);   // まだクイズの途中
+  await clearByAnswering(page);
+  await toastWith(page, 'こつこつ正解 銀').waitFor();
+  const texts = await page.locator('#toasts [data-bdg-toast]').allInnerTexts();
+  assert.equal(texts.length, 2, texts.join(' | '));
+  assert.ok(texts.some(s => s.includes('こつこつ正解 銅')), texts.join(' | '));
+  assert.ok(texts.every(s => !s.includes('こつこつ正解 金')), texts.join(' | '));   // 始める前に出ていた1枚は出し直さない
+}, { viewport: PC });
 
 // トーストの文字を押すとすぐ消える。［つける］［見る］を押してもそのトーストは消える
 t('toast_click', async page => {

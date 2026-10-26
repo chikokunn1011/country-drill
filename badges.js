@@ -545,6 +545,7 @@
 
   let lastSid = null;       // いちばん新しいクリアの sid（結果画面のパネルにあとから足すかを決める）
   let flushTimer = 0;       // ガチャの演出が終わったら flush する（タイマーは1つだけ）
+  const toastTimers = [];   // 400ms ずらしてまだ出していないトースト { id, src }（src は元のお知らせ。出す前に止めたら pending に戻す）
 
   // 取れたステップを知らせる（§5.1〜§5.3）。auto（自動でつけた称号）は、ほかの commit が lastAuto を消す前に読む。
   // opts.result: drill:result の detail（clear なら結果画面のパネル）、opts.startup: 起動時の判定（まとめて1枚）
@@ -591,12 +592,30 @@
     if (wait === Infinity) return;
     if (wait > 0) { flushTimer = setTimeout(flush, wait); return; }
     const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), cap = innerWidth < 600 ? 2 : 3;
-    // { html, key }。key があるのは個別のトースト（ドパガキの演出をする）
-    const out = list.filter(it => 'summary' in it).map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`) }));
-    const single = it => ({ html: stepToast(it), key: it.key });
-    if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`) });
+    // { html, key, src }。key があるのは個別のトースト（ドパガキの演出をする）。src はそのトーストにしたお知らせ
+    const out = list.filter(it => 'summary' in it).map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`), src: [it] }));
+    const single = it => ({ html: stepToast(it), key: it.key, src: [it] });
+    if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`), src: steps.slice(cap - 1) });
     else out.push(...steps.map(single));
-    out.forEach((o, i) => { if (i) setTimeout(() => showToast(o), i * 400); else showToast(o); });
+    showToast(out[0]);
+    out.slice(1).forEach((o, i) => {
+      const tm = { src: o.src };
+      tm.id = setTimeout(() => {               // 待つ間にクイズ・バトル・ダイアログなどが始まったら、これと残りは出さずに pending に戻す
+        if (blockedFor()) { requeue(); flush(); return; }
+        toastTimers.splice(toastTimers.indexOf(tm), 1);
+        showToast(o);
+      }, (i + 1) * 400);
+      toastTimers.push(tm);
+    });
+  }
+  // ずらして出す途中のトーストを止めて、元のお知らせを pending に戻す（順番はそのまま。出せるようになったら flush で出す）
+  function requeue() {
+    for (const tm of toastTimers.splice(0)) { clearTimeout(tm.id); pending.push(...tm.src); }
+  }
+  // クイズ・バトルが始まった: 出ているバッジのトーストは問題やタイマーに重なるので消し（ほかのトーストは残す）、まだの分は終わってから出す
+  function hideToasts() {
+    requeue();
+    document.querySelectorAll('#toasts > .toast').forEach(el => el.querySelector(':scope > [data-bdg-toast]') && el.remove());
   }
   // トーストを1枚出す（toast はいつもグローバルの名前で呼ぶ）。個別のトーストは、ドパガキなら音と、金・虹なら紙吹雪（§5.4）
   function showToast({ html, key }) {
@@ -607,16 +626,17 @@
     if (el && (stepInfo(CAT, key)?.color ?? 0) >= 3 && !reduced()) FX.confetti(el.getBoundingClientRect(), 60);
   }
 
-  // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］
+  // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］（つけている称号なら「つけてる中」）
+  // data-key・data-paid は、称号をつけかえたときにパネルの行を描き直すため（redrawPanel）
   function stepHTML({ key, paid, auto }) {
     const si = stepInfo(CAT, key);
     if (!si) return '';
-    const coin = typeof paid === 'number' && Number.isFinite(paid) && paid > 0 ? `●+${paid}` : '';   // 0 は「もう払ってある」（docs/events.md）
+    const coin = typeof paid === 'number' && Number.isFinite(paid) && paid > 0 ? paid : 0;   // 0 は「もう払ってある」（docs/events.md）
     const title = `称号〈${esc(si.t.title)}〉`;
     const l2 = auto ? `<p class="bdg-l2">${title}をつけたよ</p>`
-      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? '' : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
-    return `<div class="bdg-row"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${si.b.name} ${tierLabel(si.color)}`)}</p>`
-      + `<span class="bdg-paid">${coin}</span>${l2}</div>`;
+      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? '<span class="bdg-on">つけてる中</span>' : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
+    return `<div class="bdg-row" data-key="${key}" data-paid="${coin}"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${si.b.name} ${tierLabel(si.color)}`)}</p>`
+      + `<span class="bdg-paid">${coin ? `●+${coin}` : ''}</span>${l2}</div>`;
   }
   // トーストの中身。<div data-bdg-toast> の中を押したら消す（document の click）
   const stepToast = item => `<div data-bdg-toast class="bdg-toast"><p class="bdg-h">バッジゲット！</p>${stepHTML(item)}</div>`;
@@ -669,6 +689,10 @@
     more.dataset.n = (Number(more.dataset.n) || 0) + extra;
     more.firstElementChild.textContent = `ほか${more.dataset.n}個`;
   }
+  // パネルの行を、いまつけている称号に合わせて描き直す（押した行は「つけてる中」、自動でつけた行も「をつけたよ」をやめて［つける］）
+  function redrawPanel() {
+    for (const row of $('r-badges')?.querySelectorAll(':scope > .bdg-row') ?? []) row.outerHTML = stepHTML({ key: row.dataset.key, paid: +row.dataset.paid, auto: false });
+  }
   // つける称号が変わった（key が null なら外した）。badge:title を出すのはここだけ
   function emitTitle(key) {
     emit('badge:title', key ? { key, title: stepInfo(CAT, key)?.t.title ?? '' } : { key: null, title: '' });
@@ -676,7 +700,7 @@
 
   // ---------- イベントの受け取り（設計書 §3.3） ----------
   const on = (type, fn) => document.addEventListener(type, e => fn(e.detail ?? {}));
-  on('drill:start', d => { run = { sid: d.sid }; });
+  on('drill:start', d => { run = { sid: d.sid }; hideToasts(); });
   on('drill:answer', d => {                    // 軽く！ op を1つ積むだけ。保存・判定・DOM はしない
     try { bs.push(['ans', d.a, !!d.right, !!d.first, !!d.hint, d.mode, d.missesBefore | 0, d.missesAfter | 0]); }
     catch (e) { console.error('[badges]', e); }
@@ -696,7 +720,7 @@
   on('drill:misses-reset', () => { bs.push(['wk-reset']); deliver(bs.commit()); });   // 苦手の印だけ消す。克服・バッジは消さない
   on('drill:screen', d => {
     const was = screen; screen = d.name;
-    if (d.name === 'battle') battle = true; else if (was === 'battle') battle = false;
+    if (d.name === 'battle') { battle = true; hideToasts(); } else if (was === 'battle') battle = false;
     if (d.name === 'home') renderHome();
     flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
   });
@@ -871,6 +895,7 @@
     deliver(bs.commit());          // ホームの札とバッジ画面も、ここで描き直す
     emitTitle(key || null);
     redrawDialog();
+    redrawPanel();                 // 結果画面のパネル（ドパガキ OFF だと、ほかに押した手ごたえが出ない）
     if (key && key !== was && S.dopa && !reduced()) {   // つけた称号が変わった（外したときは出さない）
       FX.pop('称号チェンジ！', 'small');
       // FX.pop は body に足すが、showModal の #detail は top layer で z-index に関係なく上に来る。開いたままなら中へ移す
