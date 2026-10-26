@@ -203,8 +203,9 @@
       x.gr = region;
       d = x;
     });
-    // 足りなかった（別のタブで使った）・保存できなかった（新しい版のデータもふくむ）: 黙らずに1行で知らせて、ボタンを描き直す
-    if (!d || !RPG.wrote) { gaBusy = false; sayGacha(d || RPG.status === 'readOnly' ? 'save' : free ? 'free' : 'coins'); drawGacha(); return; }
+    // 保存できなかった（新しい版のデータ・書けなかった・tx の中の例外。どれも RPG.wrote が false）・足りなかった（別のタブで使った。
+    // fn が途中で返るだけなので RPG.wrote は true のまま）: 黙らずに1行で知らせて、ボタンを描き直す
+    if (!d || !RPG.wrote) { gaBusy = false; sayGacha(!RPG.wrote ? 'save' : free ? 'free' : 'coins'); drawGacha(); return; }
     sayGacha('');
     gaShares = milestones(Object.keys(before), Object.keys(d.cards));
     let owned0 = Object.keys(d.cards).length - res.filter(r => r.out === 'new').length;

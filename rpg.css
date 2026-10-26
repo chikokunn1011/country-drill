@@ -319,7 +319,9 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
     grid-template-areas: "head head head head head flags flags" "mon ebar enum av hbar hnum left";
   }
   .rpg-bhead { grid-area: head; min-width: 0; justify-content: flex-start; gap: 10px; }
-  #bt-flee { min-height: 24px; margin-block: -3.5px; padding-block: 0; font-size: .8rem; white-space: nowrap; }   /* 押せる高さは 24px。上下 3.5px は余白に重ねて、行の高さ（17px）と帯（約56px）は変えない */
+  /* 押せる高さは 24px。上下 3.5px は余白に重ねて、行の高さ（17px）と帯（約56px）は変えない。
+     重ねたぶんにすぐ下のモンスターがゆらゆら（translate・rotate）で入ってくるので、［にげる］を上に重ねる（押すとモンスターに当たらない） */
+  #bt-flee { position: relative; z-index: 1; min-height: 24px; margin-block: -3.5px; padding-block: 0; font-size: .8rem; white-space: nowrap; }
   .rpg-bwhere { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .75rem; }
   #bt-mon { grid-area: mon; }
   .rpg-mon-e { font-size: 24px; }

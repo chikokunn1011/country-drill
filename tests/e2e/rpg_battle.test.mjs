@@ -441,6 +441,36 @@ t('battle_errors_are_caught', async (page, app) => {
   assert.deepEqual(app.errors.map(String), []);
 }, { rpgErrorOk: true });
 
+// 始める途中（B を作ったあと。上の列の「のこりミス」を描くところ）で落ちても、途中まで描いたバトルを画面に残さない。
+// タイマーと B を片付けて「冒険ホームのダンジョンから始めてね」と［冒険ホームへ］を出す（RPG.open からも、終わりの画面の［つぎのフロアへ］からも）
+t('battle_start_throw_cleans_up', async (page, app) => {
+  await writeSave(page, saveWith({ lv: 20 }));
+  const boom = () => page.evaluate(() => { window.__ma = RPG_CORE.missesAllowed; RPG_CORE.missesAllowed = () => { throw new Error('boom-start'); }; });
+  const unboom = () => page.evaluate(() => { RPG_CORE.missesAllowed = window.__ma; });
+  const idle = async () => {
+    assert.equal(await page.evaluate(() => document.body.dataset.screen), 'battle');
+    assert.equal(await phase(page), null);
+    assert.equal(await page.locator('#scr-battle .rpg-stage, #bt-intro, #bt-end').count(), 0);
+    assert.ok((await text(page, '#scr-battle')).includes('冒険ホームのダンジョンから始めてね'));
+  };
+  await boom();
+  await page.evaluate(() => RPG.open('battle', { id: 'samerica', floor: 1 }));
+  await unboom();
+  await idle();
+  await startBattle(page, 'samerica', 1);
+  await winBattle(page);
+  await boom();
+  await page.click('#bt-nextfloor');
+  await unboom();
+  await idle();
+  await page.click('#bt-home');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
+  for (let i = 0; i < 100 && app.consoleErrors.filter(s => s.startsWith('[rpg]')).length < 2; i++) await new Promise(ok => setTimeout(ok, 20));
+  const errs = app.consoleErrors.filter(s => s.startsWith('[rpg]'));
+  assert.equal(errs.length, 2, JSON.stringify(app.consoleErrors));
+  assert.ok(errs.every(s => s.includes('boom-start')), JSON.stringify(errs));
+}, { rpgErrorOk: true });
+
 t('party_on_intro', async page => {
   await writeSave(page, saveWith({ cards: { br: [2, 0], cl: [1, 0], jp: [3, 0] } }));
   await page.evaluate(() => RPG_BATTLE.start('samerica', 1));

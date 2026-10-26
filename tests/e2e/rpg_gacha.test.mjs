@@ -251,6 +251,21 @@ t('gacha_failure_message', async page => {
   } finally { await q.close(); }
 });
 
+// 引く処理（tx の中）が例外を出したとき（d は null・書けていない・status は ok のまま）も、コインのせいにせず「保存できなかった」。
+// 引いていないのでコインはそのまま、ボタンも押せる（例外は [rpg] の console.error に1回）
+t('gacha_throw_message', async (page, app) => {
+  await gacha(page, saveWith({ coins: 100 }));
+  await page.evaluate(() => { RPG_CORE.pull = () => { throw new Error('boom'); }; });
+  await page.click('#ga-1');
+  assert.ok((await text(page, '#ga-msg')).includes('保存できなかった'), await text(page, '#ga-msg'));
+  assert.equal(await page.locator('#ga-res .rpg-card').count(), 0);
+  assert.deepEqual(await events(page, 'rpg:pull'), []);
+  assert.equal((await readSave(page)).coins, 100);
+  assert.equal(await page.isEnabled('#ga-1'), true);
+  for (let i = 0; i < 100 && !app.consoleErrors.some(s => s.startsWith('[rpg]')); i++) await new Promise(ok => setTimeout(ok, 20));
+  assert.equal(app.consoleErrors.filter(s => s.startsWith('[rpg]')).length, 1, JSON.stringify(app.consoleErrors));
+}, { rpgErrorOk: true });
+
 t('saved_before_animation', async page => {
   await gacha(page, saveWith({ coins: 1000 }));
   await page.click('#ga-10');

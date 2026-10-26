@@ -171,6 +171,27 @@ t('short_phone_one_line', async page => {
   assert.ok((await rect(page, '.rpg-bosstag')).bottom <= boss.bottom, 'BOSS の札が上の列からはみ出る');
 }, { viewport: SHORT });
 
+// 短いスマホの［にげる］（押せる高さ 24px のうち上下 3.5px は余白に重ねている）は、すぐ下でゆらゆらするモンスターの下にもぐらない。
+// ゆれ（rpg-sway）を途中の4か所で止め、まん中とボタンの中の5×5の点の elementFromPoint がどれも［にげる］（ボスの丸い枠でも）
+t('short_phone_flee_on_top', async page => {
+  await writeSave(page, PARTY);
+  for (const floor of [1, 5]) {
+    await startBattle(page, 'samerica', floor);
+    for (const k of [0, .25, .5, .75]) {
+      const miss = await page.evaluate(k => {
+        const mon = $('bt-mon'), a = mon.getAnimations().find(x => x.animationName === 'rpg-sway');
+        if (a) { a.pause(); a.currentTime = a.effect.getComputedTiming().duration * k; }
+        const b = $('bt-flee'), r = b.getBoundingClientRect(), out = [];
+        const at = (x, y) => { const el = document.elementFromPoint(x, y); if (!b.contains(el)) out.push({ x, y, hit: el?.id || el?.className || null }); };
+        at(r.left + r.width / 2, r.top + r.height / 2);
+        for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) at(r.left + 1 + (r.width - 2) * i / 4, r.top + 1 + (r.height - 2) * j / 4);
+        return out;
+      }, k);
+      assert.deepEqual(miss, [], `F${floor} ゆれ ${k}: ［にげる］の上に別のもの ${JSON.stringify(miss)}`);
+    }
+  }
+}, { viewport: SHORT });
+
 // カードの国名はカタカナの途中で折らない: アルゼンチン・アゼルバイジャンは 1行（字数に合わせて小さくする。9px 未満にはしない）
 t('card_names_one_line', async page => {
   await writeSave(page, saveWith({ coins: 1000, cards: { ar: [1, 0], az: [2, 0] } }));

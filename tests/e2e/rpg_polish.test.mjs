@@ -251,12 +251,20 @@ t('share_after_two_quits_on_home', async page => {
   await page.locator('#rpg-home-share .rpg-share').first().waitFor();
   const rows = () => page.locator('#rpg-home-share .rpg-share-row').allInnerTexts();
   assert.deepEqual((await rows()).map(s => s.replace(/\s*シェア$/, '')), ['🎉 仲間が50か国になった！', '🎉 オセアニアの国を全部仲間にした！']);
-  await page.click('#rpg-home-share .rpg-share-row:nth-child(2) .rpg-share');
+  // キーボードで押す。押した行は消えるので、フォーカスは残った行の［シェア］へ、最後の1つなら「つぎにやること」へ（body に落とさない）
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return el?.id || (el?.matches('#rpg-home-share .rpg-share') ? `share:${el.closest('.rpg-share-row').textContent.replace(/\s*シェア$/, '')}` : el?.tagName);
+  });
+  await page.focus('#rpg-home-share .rpg-share-row:nth-child(2) .rpg-share');
+  await page.keyboard.press('Enter');
   assert.deepEqual(await shareKinds(page), ['region-oceania']);
   assert.deepEqual((await rows()).map(s => s.replace(/\s*シェア$/, '')), ['🎉 仲間が50か国になった！']);   // 押した行だけ消える
-  await page.click('#rpg-home-share .rpg-share');
+  assert.equal(await focused(), 'share:🎉 仲間が50か国になった！');
+  await page.keyboard.press('Enter');
   assert.deepEqual(await shareKinds(page), ['region-oceania', 'cards-50']);
   assert.equal(await page.isVisible('#rpg-home-share'), false);
+  assert.equal(await focused(), 'rpg-next');
 }, { init: SHARE_STUB });
 
 /* ---------- 演出（RPG.fx） ---------- */

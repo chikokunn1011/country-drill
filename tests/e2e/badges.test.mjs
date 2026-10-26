@@ -146,6 +146,8 @@ test('storage_unavailable', { timeout: 60_000 }, async () => {
     assert.equal(await app.page.isVisible('#scr-result'), true);
     assert.equal(await app.page.evaluate(() => BADGES.count().got), 1);
     assert.deepEqual(app.errors.map(String), []);
+    // どちらも保存できないことを知っていて、例外を [rpg] / [badges] の console.error にもしない
+    assert.deepEqual(app.consoleErrors.filter(s => /^\[(rpg|badges)\]/.test(s)), []);
   } finally { await app.close(); }
 });
 

@@ -580,14 +580,22 @@
       + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
   };
-  // 失格／にげたときの節目の［シェア］。押した行は消える（冒険ホームを離れたら全部消える: drill:screen）
+  // 失格／にげたときの節目の［シェア］。押した行は消える（冒険ホームを離れたら全部消える: drill:screen）。
+  // 押したボタンにフォーカスがあれば（キーボード）、消えたあとは同じ場所に来た行（最後の行なら1つ前）の［シェア］へ、もう無ければ「つぎにやること」へ
   const drawHomeShares = () => {
     const box = $('rpg-home-share');
     RPG.drawShares(box, homeShares);
     homeSharesShown = homeShares.length > 0;
     box.querySelectorAll('.rpg-share').forEach((b, i) => {
       const { kind } = homeShares[i];
-      b.addEventListener('click', () => { homeShares = homeShares.filter(s => s.kind !== kind); drawHomeShares(); });
+      b.addEventListener('click', () => {
+        const had = document.activeElement === b;
+        homeShares = homeShares.filter(s => s.kind !== kind);
+        drawHomeShares();
+        if (!had) return;
+        const bs = $('rpg-home-share')?.querySelectorAll('.rpg-share') ?? [];
+        (bs[Math.min(i, bs.length - 1)] ?? $('rpg-next'))?.focus({ preventScroll: true });
+      });
     });
   };
   const bindHome = nx => {

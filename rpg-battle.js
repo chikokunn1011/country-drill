@@ -154,18 +154,31 @@
     $('bt-fight')?.focus({ preventScroll: true });
     return true;
   };
-  // 画面（screenRender.battle）。RPG.open('battle', {id, floor}) のときだけ始める。
-  // 始めるのに失敗した（例外）ときはページの例外にせず console.error('[rpg]') にして、始めていない画面を出す
-  const render = () => {
-    try {
-      const o = RPG.opts || {};
-      if (o.id !== undefined && o.floor !== undefined) {
-        RPG.opts = {};
-        if (start(o.id, o.floor)) return;
-      }
-    } catch (e) { console.error('[rpg]', e); }
-    if (!B) sec.innerHTML = '<div class="rpg-bend"><p class="hint">バトルは冒険ホームのダンジョンから始めてね</p>'
+  // 始めていない画面（RPG.open を通らずに開いた・始めるのに失敗した）
+  const idle = () => {
+    sec.innerHTML = '<div class="rpg-bend"><p class="hint">バトルは冒険ホームのダンジョンから始めてね</p>'
       + '<div class="row center"><button type="button" class="btn" id="bt-home">冒険ホームへ</button></div></div>';
+  };
+  // バトルを片付ける（タイマー・B・画面）。にげたときと、始めるのに失敗したとき
+  const drop = () => { stopTimer(); B = null; sec.replaceChildren(); };
+  // start を呼ぶ（画面と、終わりの画面の［つぎのフロアへ］［もう一回］）。例外はページの例外にせず console.error('[rpg]') にし、
+  // 途中まで描いたバトル（B を作ったあとの上の列・登場画面）を片付けてから、始めていない画面を出す
+  const tryStart = (id, floor) => {
+    try { return start(id, floor); } catch (e) {
+      console.error('[rpg]', e);
+      drop();
+      idle();
+      return false;
+    }
+  };
+  // 画面（screenRender.battle）。RPG.open('battle', {id, floor}) のときだけ始める
+  const render = () => {
+    const o = RPG.opts || {};
+    if (o.id !== undefined && o.floor !== undefined) {
+      RPG.opts = {};
+      if (tryStart(o.id, o.floor)) return;
+    }
+    if (!B) idle();
   };
 
   // ---- 出題 ----
@@ -440,9 +453,7 @@
   const flee = () => {
     if (!B) return;
     if (ONGOING.has(B.phase)) RPG.tx(d => { d.st.flee = Math.min(K.BIG, d.st.flee + 1); });
-    stopTimer();
-    B = null;
-    sec.replaceChildren();
+    drop();
   };
   // ［← にげる］と Esc。先に片付けてから冒険ホームへ（show が出す drill:screen では、もう数えない）
   const askFlee = () => {
@@ -470,8 +481,8 @@
         const b = B;
         ({
           'bt-flee': askFlee, 'bt-fight': fight, 'bt-next': next, 'bt-practice': practice,
-          'bt-nextfloor': () => b.next && start(b.next.id, b.next.floor),
-          'bt-again': () => start(b.id, b.floor),
+          'bt-nextfloor': () => b.next && tryStart(b.next.id, b.next.floor),
+          'bt-again': () => tryStart(b.id, b.floor),
           'bt-home': () => show('rpg'),
         })[btn.id]?.();
         return;
