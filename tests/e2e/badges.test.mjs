@@ -726,15 +726,15 @@ for (const viewport of [{ width: 1366, height: 657 }, { width: 1280, height: 577
     assert.ok(r.bottom <= win.h && r.right <= win.w, json({ r, win }));
   }, { viewport });
 
-  // まちがえた国の一覧（7か国）とパネル（4行と「ほか」）が #r-side に並んでも、［もう一回］はスクロールなしで押せる
+  // まちがえた国の一覧（10問ぜんぶの10か国）とパネル（4行と「ほか」）が #r-side に並んでも、［もう一回］はスクロールなしで押せる
   t(`result_panel_pc_fits_misses_${viewport.width}x${viewport.height}`, async page => {
     await page.evaluate(() => { BADGES.debug.set('right', 95); BADGES.debug.set('days', 2); BADGES.debug.set('last', '2000-01-01'); });
     await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 10 });
     await page.click('#start');
-    for (let i = 0; i < 7; i++) { await answerWrong(page); await page.click('#next'); }   // まちがえた国は後ろに回る
+    for (let i = 0; i < 10; i++) { await answerWrong(page); await page.click('#next'); }   // まちがえた国は後ろに回る
     await clearByAnswering(page);   // first-clear answers streak reg-world days comeback
     await settleLayout(page);
-    assert.equal(await count(page, '#r-side .misslist li'), 7);
+    assert.equal(await count(page, '#r-side .misslist li'), 10);
     assert.equal(await count(page, '#r-badges .bdg-row'), 4);
     assert.match(await text(page, '#r-badges .bdg-more'), /ほか2個/);
     assert.ok(await noHScroll(page));
