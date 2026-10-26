@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, pickSetup, answerCorrect, answerWrong, settle, settleResult, clearTimeAttack, clearByAnswering, recordEvents, events, PHONE, PC, QUIET_BADGES } from './helpers.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -378,7 +379,7 @@ t('r_ext_slot', async page => {
     const x = $('r-ext');
     return { parent: x.parentElement.id, last: x === $('r-side').lastChild, nodes: x.childNodes.length, display: getComputedStyle(x).display };
   }), { parent: 'r-side', last: true, nodes: 0, display: 'none' });
-}, { storage: { badges: QUIET_BADGES } });
+}, { storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
 // drill:result（clear）のリスナーが走るときには #r-ext がもうあり、入れた中身が結果画面に出る
 t('r_ext_ready_on_clear', async page => {
@@ -410,7 +411,7 @@ t('r_ext_layout_pc', async page => {
   assert.equal(await page.evaluate(() => G.wrongs), 0); // ノーミスでも
   assert.equal((await layout()).card, 'grid');
   assert.equal(await page.isVisible('#r-side'), true); // 右列も出ている
-}, { viewport: PC, storage: { badges: QUIET_BADGES } });
+}, { viewport: PC, storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
 // トップバーの差し込み口 #topbar-extra は #brand の次。空なら見えず、ほかのボタンの位置もトップバーの高さも変えない
 t('topbar_extra', async page => {
@@ -437,4 +438,4 @@ t('topbar_extra', async page => {
     assert.deepEqual(r.zero, [], at);
     assert.deepEqual(r.after, r.before, at);
   }
-});
+}, { blockScripts: RPG_FILES });

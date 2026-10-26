@@ -62,6 +62,43 @@ async function taStart(page, mode) {
   await page.click('#start');
   await waitChoices(page);
 }
+// 国旗クエスト（RPG）の場面のセーブ: Lv12・仲間4枚・南アメリカは F4 まで・オセアニアは F1 まで
+const RPG_SAVE = { v: 1, intro: true, lv: 12, coins: 12345, cards: { br: [2, 1], cl: [1, 0], jp: [3, 4], fr: [1, 2] }, fr: { pe: 3 }, floors: { samerica: 4, oceania: 1 } };
+// セーブを入れて読み込み直し、window.RPG ができるまで待つ
+async function rpgLoad(page, save) {
+  await page.evaluate(s => localStorage.setItem('rpg', s), JSON.stringify(save));
+  await page.reload();
+  await page.waitForFunction(() => window.RPG);
+}
+// 最後に #toasts を空にする（バッジのさかのぼりのトーストが写らないように）
+const noToasts = page => page.evaluate(() => document.getElementById('toasts')?.replaceChildren());
+// 南アメリカの floor で［たたかう］まで。mode があれば、いまの問題をチリ（cl）のその形式にする
+async function rpgBattle(page, floor, mode) {
+  await rpgLoad(page, RPG_SAVE);
+  await page.evaluate(f => RPG_BATTLE.start('samerica', f), floor);
+  await page.click('#bt-fight');
+  if (mode) await page.evaluate(m => RPG_BATTLE.force('cl', m), mode);
+}
+const RPG_SCENES = {
+  rpg_intro: async page => { await rpgLoad(page, { v: 1, intro: false }); await page.evaluate(() => show('rpg')); },
+  rpg_home: async page => { await rpgLoad(page, RPG_SAVE); await page.evaluate(() => show('rpg')); },
+  ...Object.fromEntries(['f2n', 'n2f', 'm2f'].map(m => [`battle_${m}`, page => rpgBattle(page, 3, m)])),
+  // 出題から guardMs たってから、まちがいの選択肢を押す
+  battle_reveal: async page => {
+    await rpgBattle(page, 3, 'f2n');
+    await page.waitForFunction(() => performance.now() - RPG_BATTLE.state().shownAt >= RPG_CORE.TUNING.battle.guardMs);
+    await page.locator('#scr-battle .choice:not([data-a="cl"])').first().click();
+    await page.locator('#bt-reveal').waitFor();
+  },
+  battle_boss: page => rpgBattle(page, 5),
+  gacha_result: async page => {
+    await rpgLoad(page, { ...RPG_SAVE, coins: 1000 });
+    await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
+    await page.click('#ga-10');
+    await page.click('#ga-flipall');
+  },
+  cards: async page => { await rpgLoad(page, RPG_SAVE); await page.evaluate(() => RPG.open('cards')); },
+};
 
 export const SCENES = {
   home: async () => {},
@@ -115,15 +152,16 @@ export const SCENES = {
     await page.click('#grid .card[data-a="jp"]');
     await page.waitForSelector('#detail[open]');
   },
+  ...Object.fromEntries(Object.entries(RPG_SCENES).map(([name, go]) => [name, async page => { await go(page); await noToasts(page); }])),
 };
 
-// 場面を開いて落ち着くまで待つ。戻り値は openApp と同じ（閉じるのは呼んだ側）
+// 場面を開いて落ち着くまで待つ。戻り値は openApp と同じ（閉じるのは呼んだ側）。blockScripts は openApp にそのまま渡す
 // badges はバッジのセーブ（既定はバッジが出ない QUIET_BADGES。null なら入れない）
-export async function openScene(browser, { scene, viewport, url, dopa, colorScheme, badges = QUIET_BADGES } = {}) {
+export async function openScene(browser, { scene, viewport, url, dopa, colorScheme, badges = QUIET_BADGES, blockScripts = [] } = {}) {
   if (!SCENES[scene]) throw new Error(`そんな場面はない: ${scene}`);
   const storage = dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {};
   if (badges) storage.badges = badges;
-  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, storage });
+  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, blockScripts, storage });
   try {
     await SCENES[scene](app.page);
     await settleLayout(app.page);

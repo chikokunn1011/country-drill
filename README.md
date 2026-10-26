@@ -17,6 +17,14 @@
 - PC レイアウトのテスト: `node --test tests/e2e/pc_layout.test.mjs` で PC の大きさ（1024×768・1366×657・1366×768・1920×1080）の収まりを見る。`GEOM_BASE=auto` を付けると、スマホ幅の全要素の位置を PC レイアウトを入れる前のコミットと比べる（スマホの見た目をわざと変えたあとは使わない）
 - PC の確認用スクショ: `node tests/e2e/pc_shots.mjs --out <フォルダ>` でスクショと測定の表を出す（`--viewport 1280x577,2560x1300` `--scenes home,result` `--dopa` `--dark` `--no-shot` も使える）
 
+## 冒険（国旗クエスト）
+
+クイズでコインを稼いで、旅人のレベルアップ・国旗ガチャ（仲間のカード）・ダンジョンのバトルに使う RPG（`rpg-core.js` `rpg.js` `rpg-battle.js` `rpg.css`。設定の「冒険（コイン・RPG）を表示する」で隠せる）。
+
+- データはこの端末の localStorage（キー `rpg`）にだけ保存する。別の端末へは冒険ホームの「データ（引き継ぎコード）」のコードで移す
+- 開発用パネル（コインを足す・Lv を変える・フロアを開く）は URL に `?rpgdebug=1` を付けると冒険ホームに出る
+- 値段・確率・強さなどの数値は全部 `rpg-core.js` の `TUNING` にある（ペースは `tests/unit/rpg-balance.test.mjs` で確かめる）
+
 ## クレジット
 
 - 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）

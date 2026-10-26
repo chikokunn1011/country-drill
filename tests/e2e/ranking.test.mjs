@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, pickSetup, clearTimeAttack, warned, PC, QUIET_BADGES } from './helpers.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -43,7 +44,7 @@ t('home_button_order', async page => {
   assert.equal(await page.isVisible('#scr-ranking'), true);
   assert.equal(await page.isHidden('#scr-home'), true);
   assert.equal(await page.isVisible('#topbar'), true);
-}, { storage: { badges: QUIET_BADGES } });
+}, { storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
 t('home_button_hidden_when_disabled', async page => {
   // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じやり方）

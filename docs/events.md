@@ -102,7 +102,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | イベント | detail | メモ |
 |---|---|---|
 | `rpg:ready` | `{intro, lv, coins, owned}` | 読み込み時に1回。バッジのさかのぼり判定は `RPG.snapshot()` で |
-| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty', coins, earned}` | |
+| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty'｜'levelup'｜'gacha'｜'debug', coins, earned}` | コインが変わったとき。`levelup`（レベルアップ）と `gacha`（ガチャを引いた）は使った分なので `delta` が負。`debug` は開発用（`RPG.debug.give`・`?rpgdebug=1` のパネル）。`coins` `earned` は出した時点の額 |
 | `rpg:levelup` | `{lv, from}` | 「上げられるだけ上げる」でも1回。バッジは `from < 10 <= lv` のように、またいだかで判定する |
 | `rpg:join` | `{a, via:'learn'｜'gacha', owned}` | 新しく仲間になった |
 | `rpg:promote` | `{a, star, via:'learn'｜'gacha'}` | マスター昇格・ガチャでのランクアップ |
@@ -119,7 +119,9 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - `rpg:promote` の `via` は、覚えて昇格した（`'learn'`）か、ガチャでランクアップした（`'gacha'`）か。バッジの判定に使うので必ず入れる。
 - `rpg:battle` の `maxCombo` は「そのバトルで続けて正解した数の最大」。ダメージの式で使う「この問題の前の数」ではない。
 - `rpg:ready` は rpg.js を読み込んだときに1回だけ出る。あとから読むファイル（badges.js）には届かないので、起動時は `RPG.snapshot()` を同期で読む。
-- `RPG.snapshot()`（`window.RPG.snapshot()`）は `{intro, lv, owned, ownedByStar, ownedByRegion, floors, cleared, earned, st, overcome, bountyDays}` を返す。読む側は try/catch の中で、どのキーも無いかもしれない前提で `?.` と `?? 0` で読む。ボスを倒したかは `floors[id] >= 5` で判定する（`cleared` の形に頼らない）。
+- `RPG.snapshot()`（`window.RPG.snapshot()`）は `{intro, lv, coins, owned, ownedByStar, ownedByRegion, floors, cleared, earned, st, overcome, bountyDays}` を返す（読んだときのセーブの写し。書きかえてもセーブは変わらない）。
+  - `ownedByStar` は `{1, 2, 3}`（★ごとの仲間の数）、`ownedByRegion` は `{samerica, oceania, namerica, europe, asia, africa}`（地域ごとの仲間の数）、`floors` は `{ダンジョン id: クリアした最高フロア 0..5}`、`cleared` はボスを倒したダンジョンの id の配列（`floors[id] >= 5`）、`overcome` は `st.overcome`、`bountyDays` は `st.bountyDays`。
+  - 読む側は try/catch の中で、どのキーも無いかもしれない前提で `?.` と `?? 0` で読む。ボスを倒したかは `floors[id] >= 5` で判定する（`cleared` の形に頼らない）。
 - rpg.js は `drill:answer` の処理の中（クイズ中）に `rpg:overcome` などを出してよい。バッジはクイズ中は積むだけにし、`drill:result` でまとめて判定する。
 
 ## 8. badges.js → rpg.js
@@ -129,6 +131,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `badge:earned` | `{id, badge, tier, title, color, retro}`。rpg.js が同期で `paid` を書き足す | バッジのステップを取ったとき。`window.RPG` があるときだけ出す |
 | `badge:title` | `{key, title}`（外したときは `{key: null, title: ''}`） | つける称号が変わったとき |
 
+- rpg.js の受け取り（RPG 計画 Task 8 で決めたこと）: `paid` は「新しく払った `50`／すでに払った `0`／払えなかった `false`」（`false` は保存できないとき: 新しい版のデータ `RPG.status === 'readOnly'`・メモリだけ `'memory'`・書きこみの失敗）。新しく払ったときだけ、そのあとに `rpg:coins {delta: 50, reason: 'badge'}` を出す。`retro: true` で新しく払った（`paid === 50`）分は、同じタスクの中のもの（`setTimeout(…, 0)` まで）をまとめてトースト1つ「バッジのごほうび ●+合計」（冒険の表示が OFF なら出さない）。`retro: false` ではトーストを出さない。`badge:title` を受けたら、その場で（同期で）旅人カードの称号を `window.BADGES.title()` から描き直す。
 - `badge:earned` の `id` はステップのキー（`'reg-asia@2'`）。`badge`（`'reg-asia'`）・`tier`（`2`）・`color`（`1`〜`4`）・`title`（称号）は足したキー。rpg.js は `id` で二重払いを防ぐ。
 - RPG 設計 §10.3 の `badge:earned {id, tier?, title?}` は、この detail の一部（キーを足しただけ）。ずれはバッジ設計 §8.4 で決めたとおり。
 - `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。どちらも起動時にまとめて出す: 起動時の判定で取れたステップ（`RPG.snapshot()` からのさかのぼりなど）と、払い残し（`got` にあって `sent` に無い、見えているステップ全部。前に `false` だったものもふくむ）。冒険のイベントやクイズで取ったときの `retro` は `false`。
