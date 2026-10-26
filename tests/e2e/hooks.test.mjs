@@ -247,6 +247,8 @@ t('start_detail', async page => {
   assert.ok(st.sid.length > 0);
   await page.click('#quit');
   await pickSetup(page, { kind: 'ta' });
+  // 国名表示の設定は ON のまま。それでもタイムアタックでは hint が false になる
+  assert.equal(await page.evaluate(() => P.name), true);
   await page.click('#start');
   const st2 = (await starts(page))[1];
   assert.deepEqual(pick(st2, START_KEYS.slice(1)), { mode: 'm2f', kind: 'ta', region: 'ヨーロッパ', n: 5, hint: false });
@@ -279,15 +281,17 @@ t('register_screen', async page => {
 });
 
 t('toast_basic', async page => {
-  // 200ms で消えるので、出した直後に1回の evaluate でまとめて調べる
+  // 600ms で消える。出した直後に1回の evaluate でまとめて調べる
   const r = await page.evaluate(() => {
-    toast('<b>hi</b>', 200); toast('<b>hi</b>', 200);
+    toast('<b>hi</b>', 600); toast('<b>hi</b>', 600);
     return { boxes: document.querySelectorAll('#toasts').length, live: $('toasts').getAttribute('aria-live'),
       toasts: document.querySelectorAll('#toasts > .toast').length, bold: document.querySelectorAll('#toasts > .toast > b').length };
   });
   assert.deepEqual(r, { boxes: 1, live: 'polite', toasts: 2, bold: 2 });
-  await page.waitForTimeout(400);
-  assert.equal(await page.locator('#toasts .toast').count(), 0);
+  // 200ms ではまだ出ていて（出してすぐ消えるのではない）、そのあと消える
+  await page.waitForTimeout(200);
+  assert.equal(await page.locator('#toasts .toast').count(), 2);
+  await page.waitForFunction(() => !document.querySelector('#toasts .toast'));
 });
 
 t('book_open_events', async page => {
@@ -301,10 +305,10 @@ t('book_open_events', async page => {
   await page.waitForSelector('#bmapbox svg path');
   await page.locator('#bmapbox path[data-a="br"]').first().dispatchEvent('click');
   assert.deepEqual(await opened(), ['jp', 'br']);
-  // 検索で1件にしぼったときの自動選択では出さない
-  await page.fill('#q', 'ブラジル');
+  // 検索で1件にしぼったときの自動選択では出さない（いま選んでいるブラジルとは別の国でしぼって、選択が移ったのを確かめる）
+  await page.fill('#q', '日本');
   await page.waitForFunction(() => $('bcount').textContent === '1か国');
-  assert.equal(await page.evaluate(() => bsel), 'br');
+  assert.equal(await page.evaluate(() => bsel), 'jp');
   assert.deepEqual(await opened(), ['jp', 'br']);
 });
 
@@ -405,6 +409,7 @@ t('r_ext_layout_pc', async page => {
   assert.equal(await page.innerText('#r-ext'), 'EXT');
   assert.equal(await page.evaluate(() => G.wrongs), 0); // ノーミスでも
   assert.equal((await layout()).card, 'grid');
+  assert.equal(await page.isVisible('#r-side'), true); // 右列も出ている
 }, { viewport: PC });
 
 // トップバーの差し込み口 #topbar-extra は #brand の次。空なら見えず、ほかのボタンの位置もトップバーの高さも変えない
@@ -427,6 +432,7 @@ t('topbar_extra', async page => {
       return { display, before, after, zero: ids.filter(id => !before[id].width) };
     });
     const at = `${vp.width}×${vp.height}`;
+    // 本当の守りはこの display: none の確認。display: none の要素は外しても何も動かないので、下の before/after の比較はそれを念のため確かめているだけ
     assert.equal(r.display, 'none', at);
     assert.deepEqual(r.zero, [], at);
     assert.deepEqual(r.after, r.before, at);

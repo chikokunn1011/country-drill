@@ -288,6 +288,9 @@ test('answer_does_not_move', { timeout: 300_000 }, async () => {
       await page.waitForSelector('#next');
       await settleLayout(page);
       const after = await parts();
+      // rectOf は要素が無いと null を返し、[null, null] どうしも等しくなってしまうので、先に有無を見る
+      if (before.some(r => !r)) problems.push(`${key}: 答える前に .qmain/.choices が無い`);
+      if (after.some(r => !r)) problems.push(`${key}: 答えたあとに .qmain/.choices が無い`);
       if (!isDeepStrictEqual(before, after)) problems.push(`${key}: ${json(before)} → ${json(after)}`);
       if (app.errors.length) problems.push(`${key}: ページで例外 ${app.errors.map(String).join(' | ')}`);
     } catch (e) { problems.push(`${key}: ${e.message.split('\n')[0]}`); }
