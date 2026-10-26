@@ -16,6 +16,8 @@ export function loadCtx() {
   return { ctx, before };
 }
 export const loadCore = () => loadCtx().ctx.RPG_CORE;
+// RPG_CORE と、同じ vm の国の一覧（globalThis.COUNTRIES。pull に渡す C）
+export const loadAll = () => { const { ctx } = loadCtx(); return { core: ctx.RPG_CORE, C: ctx.COUNTRIES }; };
 
 // 計画 A の helpers（openApp の seed）と同じ式の乱数
 export function mulberry32(seed) {
