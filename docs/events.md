@@ -1,6 +1,6 @@
 # イベントの約束（index.html ⇄ 機能ファイル）
 
-index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `rpg-battle.js` `badges.js`）は、主に `document` に出す CustomEvent と6章の共通の部品でつながる（ほかに、9章の起動時チェックに挙げる index.html のグローバルを読む）。機能ファイルどうしは CustomEvent と `window.RPG` `window.BADGES` でつながる。RPG とバッジの実装はこの文書に従う。
+index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `rpg-cards.js` `rpg-battle.js` `badges.js`）は、主に `document` に出す CustomEvent と6章の共通の部品でつながる（ほかに、9章の起動時チェックに挙げる index.html のグローバルを読む）。機能ファイルどうしは CustomEvent と `window.RPG` `window.BADGES` でつながる。RPG とバッジの実装はこの文書に従う。
 
 - 元にした設計書: RPG 設計（`docs/superpowers/specs/2026-10-26-rpg-design.md`）§10.2・§10.3、バッジ設計（`docs/superpowers/specs/2026-10-26-badges-design.md`）§5.3・§8・§9.2
 - 2つが食い違う所は、共通フック＋豆知識の設計書（`docs/superpowers/specs/2026-10-26-platform-hooks-trivia-design.md`）§2 の決め方に合わせてある
@@ -97,7 +97,9 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 `#r-ext` の中身は rpg.js のもの（`innerHTML` で書きかえる）。バッジなどほかの機能は `#r-ext` の中に入れず、`#r-side` の中で `#r-ext` の直前に自分の要素を差し込む（同じく `outcome === 'clear'` のときだけ）。
 
-## 7. rpg.js / rpg-battle.js → ほかの機能（バッジなど）
+## 7. rpg.js / rpg-cards.js / rpg-battle.js → ほかの機能（バッジなど）
+
+`rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` など）は rpg-battle.js、ほかは rpg.js。
 
 | イベント | detail | メモ |
 |---|---|---|
@@ -142,16 +144,17 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 ## 9. 読み込みの順番
 
-- 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-battle.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
+- 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
 - CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
 - 起動時に使うグローバルを `typeof` で確かめ、足りなければ `console.error('[rpg] …')` のように出して何もしない（ボタンも画面も作らない）。クイズはそのまま動く。
+  - `rpg-cards.js` は rpg.js の作った `window.RPG` に足すだけなので、`window.RPG` が無ければ（rpg.js が読めない・起動しなかった）黙って何もしない（知らせるのは rpg.js と rpg-battle.js）。`rpg-cards.js` だけが読めなかったときは、rpg.js の `window.RPG` にある代わり（地図・シェア・演出なし）で冒険ホーム・クイズのコイン・バトルが動き、ガチャと仲間の画面と入口は無い。
 - 機能ファイルと、それを読みこむ index.html の行は同じコミットで公開し、`?v=` を上げる（キャッシュの食い違いを防ぐ）。
 
 ## 10. badges.js が読むもの・出すもの
 
-badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-battle.js から読むもの。出すもの（`badge:earned` `badge:title`）の約束は8章。
+badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-cards.js / rpg-battle.js から読むもの。出すもの（`badge:earned` `badge:title`）の約束は8章。
 
 | イベント | 使うキー | badges.js がすること |
 |---|---|---|

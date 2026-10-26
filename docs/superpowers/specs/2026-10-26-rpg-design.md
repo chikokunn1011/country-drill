@@ -24,7 +24,7 @@
   - 苦手な国は戦闘にまぜて出す
   - 力尽きても、まちがえた国を思い出せれば復活できる
   - 毎日「手配書」で3か国を出す（間をあけた復習になる）
-- 新しいファイルは4つ: `rpg-core.js`（計算だけ。テストできる）、`rpg.js`（セーブ・イベント・冒険ホーム・ガチャ・仲間）、`rpg-battle.js`（戦闘）、`rpg.css`。**index.html の変更はフックだけで約40行**。
+- 新しいファイルは5つ: `rpg-core.js`（計算だけ。テストできる）、`rpg.js`（セーブ・イベント・冒険ホーム）、`rpg-cards.js`（ガチャ・仲間・シェア・演出）、`rpg-battle.js`（戦闘）、`rpg.css`。**index.html の変更はフックだけで約40行**。
 - 画像ファイルは使わない。国旗は今ある `flag(a)` の SVG、モンスターとアバターは絵文字（Unicode 11 まで）、そのほかは CSS で描く。
 
 **3つの約束（実装でも守る）**
@@ -87,7 +87,7 @@
 
 ## 3. 画面と導線
 
-rpg.js / rpg-battle.js が `<section id="scr-…" class="wrap" hidden>` を作り、`registerScreen` で登録する。
+rpg.js（冒険ホーム）・rpg-cards.js（ガチャ・仲間）・rpg-battle.js（バトル）が `<section id="scr-…" class="wrap" hidden>` を作り、`registerScreen` で登録する。
 
 | 画面 | id | 中身 | PCでの種類（pc_layout 5.10） |
 |---|---|---|---|
@@ -745,7 +745,8 @@ function pull(st, region, count, rng, C) {
 | ファイル | 中身 | 目安 |
 |---|---|---|
 | `rpg-core.js` | `TUNING`、`DUNGEONS`、`MONSTERS`、`AVATARS`、DOM を触らない関数（`answerCoins` `clearBonus` `levelCost` `heroStats` `recLv` `enemy` `floorsOf` `battleBag` `bossFlags` `cardAtk` `party` `hitsNeeded` `pull` `addCard` `battleReward` `bountyFor` `isWeak` `overcomeOf` `capOK` `missesAllowed` `judge`（余裕/ちょうど/きびしい） `settleDelta`（差額払い） `fresh` `migrate` `sanitize` `encodeCode` `decodeCode` `today` `dayNum`）。`globalThis.RPG_CORE` に置く。node の `vm` で読める | 約280行 |
-| `rpg.js` | 即時関数で包む。`RPG.tx`、イベントの受け取り、`run` の計算と受け取り、トップバーのチップ、結果のパネル、設定のスイッチ、冒険ホーム、ガチャ、仲間、はじめての画面、シェア、引き継ぎ、デバッグ → `window.RPG`（`tx` `get` `emitCoins` `announce` `coinHTML` `cardHTML` `openCard` `worldMap` `shareButton` `milestones` `drawShares` `fx` `status` `refresh` `open` `nextFloor` `unlocked` `snapshot` `opts` `debug`） | 約480行 |
+| `rpg.js` | 即時関数で包む。`RPG.tx`、イベントの受け取り、`run` の計算と受け取り、トップバーのチップ、結果のパネル、設定のスイッチ、冒険ホーム、はじめての画面、引き継ぎ、バッジのコインの支払い、デバッグ → `window.RPG`（`tx` `get` `emitCoins` `announce` `coinHTML` `status` `wrote`（最後の `tx` が書けたか） `warn`（保存の注意の文。無ければ `''`） `refresh` `open` `nextFloor` `unlocked` `snapshot` `opts` `debug`）。rpg-cards.js が入れかえる `worldMap` `milestones` `drawShares` `shareButton` `fx` `redraw` は、何もしない代わりを置く（rpg-cards.js が読めなくても、冒険ホーム・クイズのコイン・バトルは動く。ガチャと仲間の入口は出さない） | 約770行 |
+| `rpg-cards.js` | 即時関数で包む。rpg.js の後に読み、`window.RPG` が無ければ何もしない。仲間のカード、国旗ガチャ（`#scr-gacha`）、仲間の一覧（`#scr-cards`）、仲間の世界地図、シェア、演出 → `window.RPG` に足す（`cardHTML` `openCard` `worldMap` `shareButton` `milestones` `drawShares` `fx` `redraw`（`refresh` が呼ぶ。いまの画面がガチャ・仲間なら描き直す））。セーブ・コインは `window.RPG` を通して使う | 約450行 |
 | `rpg-battle.js` | 即時関数で包む。バトル画面と進行、keydown、復活 → `window.RPG_BATTLE`（`start(dungeonId, floor)`） | 約320行 |
 | `rpg.css` | `.rpg-` で始まるクラスと `.bq`。色は既存のトークン（`--accent` `--surface` `--line` `--ok` `--ng` `--hl`）を使う。新しいトークン（★の枠の色・地域の色）は `:root`、`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`、`:root[data-theme="dark"]` の3か所に書く。PC 用は `@media (min-width: 900px)` の中に書き、pc.css の変数は `var(--col-gap, 16px)` のように予備の値を付ける | 約260行 |
 | `tests/unit/rpg-core.test.mjs`、`tests/unit/rpg-balance.test.mjs`、`tests/e2e/rpg.test.mjs` | §15 | |
@@ -766,6 +767,7 @@ function pull(st, region, count, rng, C) {
 <!-- 本体のインライン script の「後ろ」（index.html のグローバルを使うため） -->
 <script src="rpg-core.js?v=1"></script>
 <script src="rpg.js?v=1"></script>
+<script src="rpg-cards.js?v=1"></script>
 <script src="rpg-battle.js?v=1"></script>
 <!-- badges.js の位置はバッジの設計に従う。rpg.js はロード時に BADGES を使わない -->
 ```

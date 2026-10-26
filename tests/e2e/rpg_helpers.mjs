@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './helpers.mjs';
 
 // RPG のファイル。既存のテストが「RPG がある」ことだけで落ちるときは、開くときに blockScripts: RPG_FILES を渡す
-export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-battle.js'];
+export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js'];
 // window.__ev に積むイベント（helpers の events(page, type?) で読める）
 export const RPG_EVENTS = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer', 'rpg:battle', 'rpg:clear',
   'rpg:overcome', 'rpg:bounty', 'rpg:share', 'badge:earned', 'badge:title',

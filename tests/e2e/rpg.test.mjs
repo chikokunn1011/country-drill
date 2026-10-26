@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, events } from './helpers.mjs';
-import { RPG_FILES, openRpg, toastTexts, readSave, writeSave, saveWith, localToday, playPractice, forceNext } from './rpg_helpers.mjs';
+import { RPG_FILES, openRpg, toastTexts, readSave, writeSave, saveWith, localToday, playPractice, forceNext, startBattle, winBattle } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -406,6 +406,30 @@ t('works_without_rpg', async (page, app) => {
     assert.deepEqual(noRpg.errors.map(String), []);
   } finally { await noRpg.close(); }
 }, { blockScripts: ['rpg-core.js'], rpgErrorOk: true });
+
+// rpg-cards.js だけが無い → rpg.js と rpg-battle.js はそのまま動く（[rpg] の console.error も出ない）。
+// ガチャ・仲間の画面と入口は無く、演出・シェアもない。クイズのコインもバトルの保存も止まらない
+t('works_without_cards', async page => {
+  assert.deepEqual(await page.evaluate(() => [typeof RPG.tx, !!$('scr-gacha'), !!$('scr-cards'), SCREENS.includes('gacha'), SCREENS.includes('cards'), SCREENS.includes('battle')]),
+    ['function', false, false, false, false, true]);
+  // 冒険ホーム: ［国旗ガチャ］［仲間］が無く、つぎにやることもガチャをすすめない（10連が引けるコインがあっても）
+  await writeSave(page, saveWith({ coins: 1000 }));
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await page.locator('#rpg-to-gacha, #rpg-to-cards').count(), 0);
+  const next = await page.textContent('#rpg-next');
+  assert.ok(!next.includes('ガチャ') && next.includes('F1'), next);
+  // クイズのコインと結果のパネル
+  await writeSave(page, saveWith({ intro: false }));
+  await playPractice(page);
+  assert.ok(headNum(await resLines(page)) > 0);
+  // ボスに勝つと保存される（シェアのボタンは出ない）
+  await writeSave(page, saveWith({ lv: 20, floors: { samerica: 4 } }));
+  await startBattle(page, 'samerica', 5);
+  await winBattle(page);
+  assert.equal((await readSave(page)).floors.samerica, 5);
+  assert.ok((await page.textContent('#bt-end')).includes('南アメリカを取りもどした！'));
+  assert.equal(await page.locator('#bt-end button').filter({ hasText: 'シェア' }).count(), 0);
+}, { blockScripts: ['badges.js', 'rpg-cards.js'] });
 
 t('rpg_off_hides', async page => {
   await writeSave(page, saveWith({ show: false }));
