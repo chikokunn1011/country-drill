@@ -67,7 +67,7 @@
   // #scr-battle > .rpg-stage: 1つ目の子が上の列（.rpg-btop）、2つ目の子が問題の列（登場画面・問題・答え合わせ・終わりが入れかわる）
   const stageHTML = () => {
     const { dg, floor, mon, boss, d } = B;
-    return `<div class="rpg-stage" data-phase="${B.phase}" style="--rpg-c: ${dg.color}"><div class="rpg-btop">`
+    return `<div class="rpg-stage" data-phase="${B.phase}" style="--rpg-c: var(--rpg-r-${dg.id}, ${dg.color})"><div class="rpg-btop">`
       + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${esc(dg.name)} ${boss ? 'ボス' : `F${floor}`}</span></div>`
       + `<div class="rpg-mon${boss ? ' rpg-boss' : ''}" id="bt-mon"><span class="rpg-mon-e" aria-hidden="true">${mon.e}</span>${boss ? '<span class="rpg-bosstag">BOSS</span>' : ''}</div>`
       + `<div class="rpg-hpl"><b class="rpg-hpname">${esc(mon.n)}</b>${barHTML('bt-ehp', `${mon.n}のHP`)}</div>`
@@ -108,20 +108,6 @@
     p.textContent = line;
     log.append(p);
     while (log.children.length > LOG_LINES) log.firstElementChild.remove();
-  };
-  // 当たったらモンスターが揺れて、ダメージの数字が浮かぶ（動きは rpg.css の prefers-reduced-motion: no-preference の中。reduce なら数字は出さない）
-  const hitFx = dmg => {
-    const mon = $('bt-mon');
-    if (!mon) return;
-    mon.classList.remove('rpg-hit');
-    void mon.offsetWidth;   // 続けて当たっても揺れ直す
-    mon.classList.add('rpg-hit');
-    if (reduced()) return;
-    const n = document.createElement('span');
-    n.className = 'rpg-dmg'; n.textContent = `-${dmg}`; n.setAttribute('aria-hidden', 'true');
-    n.onanimationend = () => n.remove();
-    setTimeout(() => n.remove(), 2000);   // CSS が読めなかったときも残さない
-    mon.append(n);
   };
 
   // ---- 登場画面 ----
@@ -280,7 +266,7 @@
       say(`${head}${B.mon.n}に${dmg}ダメージ`);
     }
     drawTop();
-    hitFx(dmg);
+    RPG.fx('hit', $('bt-mon'), dmg, B.combo);   // モンスターが揺れてダメージの数字が浮かぶ（ドパガキ ON なら効果音・紙吹雪・COMBO）
     if (B.boss ? !B.order.length : B.ehp === 0) return finish(true);
     wait();
   };
@@ -311,6 +297,7 @@
       drawTop();
       say(`${B.mon.n}の反撃！ ${B.en.atk}ダメージ`);
     }
+    RPG.fx('miss', $('bt-hhp'));   // 旅人の HP が赤く光る（ドパガキ ON なら効果音・振動・赤いフラッシュ）
     setPhase('reveal');
     // 答え合わせは選択肢の場所と入れかえて出し、［つぎへ］を押すまで待つ。m2f は地図をもう1枚出さない
     const c = byA.get(q.a), rv = document.createElement('div');
@@ -383,9 +370,14 @@
       RPG.announce(rc, d);
     }
     if (B !== b) return;   // イベントを受けた側が画面を変えた
-    drawEnd(res || { receipt: null, coins: 0, first: false, gauge: 0 });
+    drawEnd(res || { receipt: null, coins: 0, first: false, gauge: 0, d: null });
   };
-  const drawEnd = ({ receipt: rc, coins, first, gauge }) => {
+  // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
+  const bossShareText = (dg, d) => {
+    const mates = `仲間 ${Object.keys(d.cards).length}/${C.length}か国 ${T.share.tag}`;
+    return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
+  };
+  const drawEnd = ({ receipt: rc, coins, first, gauge, d }) => {
     const b = B, win = b.win;
     b.next = win ? nextOf(b.id, b.floor) : null;
     $('bt-flee').hidden = true;
@@ -399,8 +391,7 @@
     let html = '<div class="rpg-bend" id="bt-end">';
     if (win) {
       html += `<p class="rpg-bend-h">勝利！ ${COIN}+${fmt(coins)}${first ? `<small>（はじめてのクリア ×${TB.firstMul}）</small>` : ''}</p>`;
-      // シェアの中身は Task 12。それまでは隠しておく
-      if (b.boss && first) html += `<p class="rpg-bend-x">${esc(b.dg.land)}を取りもどした！</p><button type="button" class="btn ghost" id="bt-share" hidden>シェア</button>`;
+      if (b.boss && first) html += `<p class="rpg-bend-x">${esc(b.dg.land)}を取りもどした！</p>`;
     } else {
       const missed = [...new Set(b.mistakes.map(x => x.a))].map(a => byA.get(a)).filter(Boolean);
       html += '<p class="rpg-bend-h">やられた…！ でも、まちがえた国はもう覚えたはず</p>'
@@ -415,6 +406,13 @@
       + (b.next ? '<button type="button" class="btn" id="bt-nextfloor">つぎのフロアへ</button>' : '')
       + '</div></div>';
     $('bt-col').innerHTML = html;
+    // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
+    if (win && b.boss && first && d) {
+      const sb = RPG.shareButton(`boss-${b.id}`, bossShareText(b.dg, d));
+      sb.id = 'bt-share';
+      $('bt-end').querySelector('.rpg-bend-x').after(sb);
+    }
+    if (win) RPG.fx('win', $('bt-end'));
     clearTop($('bt-end'));
     $('bt-end').scrollIntoView({ block: 'nearest' });
     ($('bt-nextfloor') || $('bt-again') || $('bt-home')).focus({ preventScroll: true });

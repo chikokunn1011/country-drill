@@ -20,6 +20,7 @@ const SCREEN_OF = [
   [/^home$/, 'home'], [/^settings$/, 'settings'], [/^setup/, 'setup'],
   [/^(quiz|reveal|wrong|named|long)_|^ta_quiz$|^ta_fail/, 'quiz'],
   [/^result|^ta_result$/, 'result'], [/^ranking$/, 'ranking'], [/^book_/, 'book'],
+  [/^rpg_/, 'rpg'], [/^battle_/, 'battle'], [/^gacha_/, 'gacha'], [/^cards$/, 'cards'],
 ];
 const screenOf = scene => SCREEN_OF.find(([re]) => re.test(scene))?.[1];
 

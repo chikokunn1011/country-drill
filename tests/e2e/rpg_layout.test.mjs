@@ -327,3 +327,29 @@ t('walk_all_screens', async page => {
   await page.evaluate(() => show('home'));
   assert.equal(await page.isVisible('#scr-home'), true);
 }, { timeout: 180_000 });
+
+// ダークモード: 地域の色のトークンがライトとちがう値になり、冒険ホーム・バトル・ガチャ（結果あり）・仲間が4つの大きさで横にはみ出さない
+t('dark_mode', async page => {
+  const token = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--rpg-r-samerica').trim());
+  const dark = await token();
+  assert.ok(dark, '--rpg-r-samerica が空');
+  await page.emulateMedia({ colorScheme: 'light' });
+  const light = await token();
+  assert.ok(light, 'ライトの --rpg-r-samerica が空');
+  assert.notEqual(dark, light);
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await writeSave(page, PARTY);
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await page.isVisible('#rpg-hero'), true);
+  await noHScrollAt(page, 'ダークの冒険ホーム');
+  await page.setViewportSize(PHONE);
+  await startBattle(page, 'samerica', 3);
+  await noHScrollAt(page, 'ダークのバトル');
+  await page.setViewportSize(PHONE);
+  await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
+  await page.click('#ga-10');
+  await page.click('#ga-flipall');
+  await noHScrollAt(page, 'ダークのガチャ');
+  await page.evaluate(() => RPG.open('cards'));
+  await noHScrollAt(page, 'ダークの仲間');
+}, { colorScheme: 'dark', timeout: 180_000 });

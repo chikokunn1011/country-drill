@@ -5,6 +5,29 @@
   :root:not([data-theme="light"]) { --rpg-coin: #e8ae2e; --rpg-coin-hi: #ffe7a0; --rpg-coin-lo: #b07612; --rpg-coin-rim: #f0c75a; }
 }
 :root[data-theme="dark"] { --rpg-coin: #e8ae2e; --rpg-coin-hi: #ffe7a0; --rpg-coin-lo: #b07612; --rpg-coin-rim: #f0c75a; }
+/* 地域の色（図版の帯・フロアのチップ・バトルの背景。rpg-core.js の DUNGEONS の color と同じ色）と、仲間の世界地図の霧の色（まだ仲間でない国）。
+   ダークの地域の色は白を3割まぜて明るくする。霧の色は --land と --ocean から作るので、ダークでも同じ式 */
+:root {
+  --rpg-r-samerica: #6fa86a; --rpg-r-oceania: #4fa3c7; --rpg-r-namerica: #d29a4a; --rpg-r-europe: #a77bab;
+  --rpg-r-asia: #d0705a; --rpg-r-africa: #c4a02a; --rpg-r-world: #5b6b73;
+  --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --rpg-r-samerica: color-mix(in srgb, #6fa86a 70%, #fff); --rpg-r-oceania: color-mix(in srgb, #4fa3c7 70%, #fff);
+    --rpg-r-namerica: color-mix(in srgb, #d29a4a 70%, #fff); --rpg-r-europe: color-mix(in srgb, #a77bab 70%, #fff);
+    --rpg-r-asia: color-mix(in srgb, #d0705a 70%, #fff); --rpg-r-africa: color-mix(in srgb, #c4a02a 70%, #fff);
+    --rpg-r-world: color-mix(in srgb, #5b6b73 70%, #fff);
+    --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
+  }
+}
+:root[data-theme="dark"] {
+  --rpg-r-samerica: color-mix(in srgb, #6fa86a 70%, #fff); --rpg-r-oceania: color-mix(in srgb, #4fa3c7 70%, #fff);
+  --rpg-r-namerica: color-mix(in srgb, #d29a4a 70%, #fff); --rpg-r-europe: color-mix(in srgb, #a77bab 70%, #fff);
+  --rpg-r-asia: color-mix(in srgb, #d0705a 70%, #fff); --rpg-r-africa: color-mix(in srgb, #c4a02a 70%, #fff);
+  --rpg-r-world: color-mix(in srgb, #5b6b73 70%, #fff);
+  --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
+}
 
 /* コイン: 金色の丸（文字の大きさに合わせる）。🪙 は使わない */
 .coin {
@@ -379,6 +402,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   .rpg-dmg { animation: rpg-dmg .9s ease-out forwards; }
   @keyframes rpg-hit { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); filter: brightness(1.8); } 50% { transform: translateX(7px); } 80% { transform: translateX(-3px); } }
   @keyframes rpg-dmg { 0% { opacity: 0; transform: translate(-50%, 0) scale(.7); } 20% { opacity: 1; transform: translate(-50%, -8px) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -48px); } }
+}
 
 /* ---- ガチャ・仲間（Task 11） ---- */
 /* カードの枠の金属（★1 ブロンズ・★2 シルバー・★3 ゴールド）。ダークモードでも同じ色。★の記号も書くので、色だけで見分けなくてよい */
@@ -448,7 +472,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-ga-res:empty { display: none; }
 #ga-flipall { align-self: center; padding: 8px 22px; font-size: .95rem; }
 
-/* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は Task 12。空のあいだは出さない） */
+/* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は rpg.js の RPG.worldMap。空のあいだは出さない） */
 .rpg-cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 #cd-map:empty { display: none; }
 
@@ -494,4 +518,40 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   .rpg-ga-res .rpg-card-face { padding-inline: 4px; }
   .rpg-ga-res .rpg-card-name { font-size: .74rem; }
   .rpg-ga-res .rpg-lab { padding-inline: 2px; font-size: .6rem; letter-spacing: -.02em; }
+}
+
+/* ---- 仕上げ（Task 12）: 仲間の世界地図・シェア・演出 ---- */
+/* 仲間の世界地図（RPG.worldMap。仲間の一覧の #cd-map と、冒険ホームの 1400px 以上の右の列の #rpg-map）。
+   仲間の国は★の金属の色、まだの国は霧の色。小さい国は丸印。凡例の四角も同じ色 */
+.rpg-wmap .rpg-fog { fill: var(--rpg-fog); }
+.rpg-wmap .rpg-m1 { fill: var(--rpg-b1); }
+.rpg-wmap .rpg-m2 { fill: var(--rpg-b2); }
+.rpg-wmap .rpg-m3 { fill: var(--rpg-b3); }
+.rpg-wmap .rpg-dot { stroke: var(--border-land); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rpg-legend { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: .78rem; color: var(--muted); }
+.rpg-legend li { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.rpg-key { width: .9em; height: .9em; border-radius: 3px; box-shadow: inset 0 0 0 1px var(--border-land); }
+.rpg-key.rpg-m1 { background: var(--rpg-b1); }
+.rpg-key.rpg-m2 { background: var(--rpg-b2); }
+.rpg-key.rpg-m3 { background: var(--rpg-b3); }
+.rpg-key.rpg-fog { background: var(--rpg-fog); }
+#rpg-map { display: none; }
+@media (min-width: 1400px) {
+  #rpg-map { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+}
+
+/* シェア（「🎉 仲間が50か国になった！［シェア］」。ガチャの結果の下と、クイズの結果のパネルの中。ボスの［シェア］は終わりの画面のまん中） */
+.rpg-shares { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.rpg-shares[hidden] { display: none; }
+.rpg-share-row { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font: 700 .95rem/1.45 var(--font-display); word-break: auto-phrase; }
+.rpg-share-row .rpg-share, #bt-share { align-self: center; margin: 0; padding: 6px 18px; font-size: .92rem; }
+
+/* 演出（RPG.fx）。まちがえると旅人の HP が赤く光る（reduced motion では光るだけ）。★3 のカードは表になっても金色に光る。
+   結果のコインの数は桁の幅をそろえる（カウントアップで横にゆれない） */
+.rpg-hp.rpg-ouch { box-shadow: 0 0 0 2px var(--ng), 0 0 12px 3px color-mix(in srgb, var(--ng) 60%, transparent); }
+.rpg-card.is-gold:not(.is-back) { box-shadow: 0 0 0 2px var(--rpg-b3), 0 0 14px 2px var(--rpg-b3); }
+.rpg-res-n { font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) {
+  .rpg-hp.rpg-ouch { animation: rpg-ouch .9s ease-out forwards; }
+  @keyframes rpg-ouch { 0%, 35% { box-shadow: 0 0 0 2px var(--ng), 0 0 14px 4px color-mix(in srgb, var(--ng) 70%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 }
