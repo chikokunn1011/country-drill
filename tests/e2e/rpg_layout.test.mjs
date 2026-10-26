@@ -222,6 +222,38 @@ t('card_names_one_line', async page => {
   assert.equal((await lines(page, '#cd-grid .rpg-card[data-a="jp"] .rpg-card-name')).fs, +(rem * .82).toFixed(3));
 });
 
+// 長い国名（9字以上のカタカナ・「・」「及び」で長い名前）が折れても、1字だけの行（「リヒテンシュタイ/ン」）を作らない。
+// 折るのは rpg-cards.js が <wbr> を入れたところだけ（リヒテン/シュタイン・パプア/ニューギニア・サントメ・/プリンシペ）。仲間の一覧とガチャの結果（1400px 以上は10列）
+t('card_names_no_orphan', async page => {
+  const LONGS = ['li', 'pg', 'kn', 'vc', 'st', 'tt', 'ag', 'ba', 'az', 'nz'];
+  await writeSave(page, saveWith({ coins: 1000, cards: Object.fromEntries(LONGS.map(a => [a, [3, 0]])) }));
+  // 国名の行（字の top でまとめる）
+  const lines = sel => page.$$eval(sel, els => els.map(el => {
+    const rows = new Map(), w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t; (t = w.nextNode());) for (let i = 0; i < t.length; i++) {
+      const r = document.createRange();
+      r.setStart(t, i); r.setEnd(t, i + 1);
+      const y = Math.round(r.getClientRects()[0].top);
+      rows.set(y, (rows.get(y) ?? '') + t.data[i]);
+    }
+    return { a: el.closest('.rpg-card').dataset.a, rows: [...rows.values()] };
+  }));
+  const check = (where, list) => {
+    for (const { a, rows } of list) assert.ok(rows.every(s => [...s].length > 1) || rows.length === 1, `${where} ${a}: ${rows.join(' / ')}`);
+  };
+  for (const vp of [{ width: 360, height: 640 }, { width: 390, height: 844 }, { width: 900, height: 700 }, { width: 1280, height: 720 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(vp);
+    await page.evaluate(() => RPG.open('cards'));
+    check(`仲間 ${size(vp)}`, (await lines('#cd-grid .rpg-card-name')).filter(x => LONGS.includes(x.a)));
+    await page.evaluate(() => RPG.open('gacha'));
+    await page.evaluate(as => { const d = RPG.get(); $('ga-res').innerHTML = as.map(a => RPG.cardHTML(a, d, { label: 'NEW' })).join(''); }, LONGS);
+    check(`ガチャ ${size(vp)}`, await lines('#ga-res .rpg-card-name'));
+  }
+  // 折るところ（<wbr>）と、1行に入るなら折らないこと
+  assert.deepEqual(await page.evaluate(() => ['li', 'pg', 'st', 'mk', 'jp'].map(a => RPG.cardHTML(a, RPG.get()).match(/<b class="rpg-card-name"[^>]*>(.*?)<\/b>/)[1])),
+    ['リヒテン<wbr>シュタイン', 'パプア<wbr>ニューギニア', 'サントメ・<wbr>プリンシペ', '北マケドニア', '日本']);
+});
+
 t('pc_stage_fits', async page => {
   await writeSave(page, PARTY);
   // 縦にも横にもスクロールしない。ステージの高さは 400 より大きく、.bq と（出ていれば）4つの選択肢・答え合わせがステージの中。右の列もスクロールしない

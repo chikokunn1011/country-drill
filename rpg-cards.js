@@ -36,18 +36,47 @@
     }
   };
 
+  // カードの国名を折ってよいところで分ける（rpg.css の word-break: keep-all で、ここに入れる <wbr> でだけ折る）。
+  // 「・」のあと、カタカナとそれ以外（漢字・ひらがな。「及び」は1つ）の変わり目、「セント」のあと、まだ8字以上（うしろの「・」は数えない）のカタカナの語はまん中あたり
+  // （小さい字・ー・ン・ア行で始まらないところ）。1字だけのかたまりは隣につなぐ（「北マケドニア」「ドミニカ国」は折らない）。国名ごとに1回だけ。
+  // KANA はカタカナ（ァ〜ー。「・」もふくむ）
+  const KANA = /[ァ-ー]/, NOSTART = /[ァィゥェォャュョッヮヵヶーンアイウエオ・]/, FOLD_MAX = 7, folds = new Map();
+  const foldName = n => {
+    if (folds.has(n)) return folds.get(n);
+    const parts = [];
+    for (const ch of n) {
+      const last = parts.at(-1), prev = last?.at(-1);
+      if (!last || prev === '・' || KANA.test(prev) !== KANA.test(ch)) parts.push(ch); else parts[parts.length - 1] += ch;
+    }
+    // 長いカタカナの語を、まん中にいちばん近い折れるところで2つに（まだ長ければくり返す）
+    const split = w => {
+      const s = [...w];
+      if (s.length - (w.endsWith('・') ? 1 : 0) <= FOLD_MAX || !KANA.test(s[0])) return [w];
+      if (w.startsWith('セント')) return ['セント', ...split(w.slice(3))];
+      let at = -1;
+      for (let i = 2; i <= s.length - 2; i++) if (!NOSTART.test(s[i]) && (at < 0 || Math.abs(i - s.length / 2) < Math.abs(at - s.length / 2))) at = i;
+      return at < 0 ? [w] : [...split(s.slice(0, at).join('')), ...split(s.slice(at).join(''))];
+    };
+    const out = [];
+    for (const p of parts.flatMap(split)) {
+      if (out.length && ([...p].length === 1 || [...out.at(-1)].length === 1)) out[out.length - 1] += p; else out.push(p);
+    }
+    const r = { html: out.map(esc).join('<wbr>'), n: [...n].length, l: Math.max(...out.map(p => [...p].length)) };
+    folds.set(n, r);
+    return r;
+  };
   // 仲間のカード（<button>）: 国旗・国名・★・かさね・なかよし度。持っていない国は国旗をグレーで薄く（.is-none）、あと何回正解で仲間になるか
   // （なかよし度が5以上なのに持っていない国には出さない）。face: 'back' は裏向き（.is-back。方位磁針の模様）
   const cardHTML = (a, d, { face = 'up', label = '', lazy = false } = {}) => {
     const c = byA.get(a);
     if (!c) return '';
-    const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = T.card.frJoin - fr, back = face === 'back';
+    const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = T.card.frJoin - fr, back = face === 'back', nm = foldName(c.n);
     const mid = card
       ? `<span class="rpg-card-star">${'★'.repeat(star)}</span><span class="rpg-card-stack" title="かさね ${card[1]}/${T.card.stackMax}">${dots(card[1])}</span>`
       : rest > 0 ? `<span class="rpg-card-hint">${restHint(rest)}</span>` : '';
     return `<button type="button" class="rpg-card rpg-s${star}${card ? '' : ' is-none'}${back ? ' is-back' : ''}" data-a="${a}" data-star="${star}"${back ? ' aria-label="裏向きのカード"' : ''}>`
       + `<span class="rpg-card-face">${label ? `<span class="rpg-lab">${label}</span>` : ''}<img class="rpg-card-flag" src="${flag(a)}" alt=""${lazy ? ' loading="lazy"' : ''}>`
-      + `<b class="rpg-card-name" style="--n:${c.n.length}">${esc(c.n)}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
+      + `<b class="rpg-card-name" style="--n:${nm.n};--l:${nm.l}">${nm.html}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
       + '<span class="rpg-card-back" aria-hidden="true"><span>🧭</span></span></button>';
   };
   // #detail に国の情報とカードの強さ。id があればそのダンジョンでの値（地域ボーナス ×1.5 が付くか）

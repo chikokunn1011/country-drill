@@ -451,8 +451,14 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-card-face { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 6px 8px; container-type: inline-size; }
 .rpg-card-flag { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: 3px; background: var(--bg); }
 .rpg-card.is-none .rpg-card-flag { filter: grayscale(1); opacity: .4; }
-/* 国名はカタカナの途中で折らない: 字数（--n）に合わせて1行に入る大きさまで小さくする（.6rem まで）。長い名前は文節で折る（それでも入らなければ字の途中） */
-.rpg-card-name { max-width: 100%; margin-top: 2px; font: 700 .82rem/1.3 var(--font-display); font-size: clamp(.6rem, calc(95cqw / var(--n, 6)), .82rem); word-break: auto-phrase; overflow-wrap: break-word; }
+/* 国名は rpg-cards.js が <wbr> を入れたところ（「・」のあと・カタカナと漢字の変わり目・長いカタカナの語のまん中あたり）でだけ折る（keep-all）。
+   大きさ: 全部の字数（--n）が1行に入るなら、その大きさ（.82rem まで）。.6rem でも1行に入らなければ .6rem で折る。
+   いちばん長いかたまりの字数（--l）が .6rem で入らなければ、それが入るまで小さくする（1字だけ次の行に落ちる「リヒテンシュタイ/ン」にならない） */
+.rpg-card-name {
+  max-width: 100%; margin-top: 2px; font: 700 .82rem/1.3 var(--font-display);
+  font-size: min(.82rem, max(calc(95cqw / var(--n, 6)), min(.6rem, calc(95cqw / var(--l, 6)))));
+  word-break: keep-all; overflow-wrap: break-word; text-wrap: balance;
+}
 .rpg-card-star { font-size: .9rem; line-height: 1.2; letter-spacing: .04em; color: color-mix(in srgb, var(--rpg-b) 70%, var(--ink)); }
 .rpg-card-stack, .rpg-card-fr { font: 500 .72rem/1.35 var(--font-mono); color: var(--muted); }
 .rpg-card-hint { font-size: .68rem; line-height: 1.35; color: var(--muted); word-break: auto-phrase; }
@@ -540,7 +546,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 @media (min-width: 1400px) {
   .rpg-ga-res { grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; }
   .rpg-ga-res .rpg-card-face { padding-inline: 4px; }
-  .rpg-ga-res .rpg-card-name { font-size: clamp(.56rem, calc(97cqw / var(--n, 6)), .74rem); letter-spacing: -.02em; }   /* 10列は狭いので字間も少し詰める */
+  .rpg-ga-res .rpg-card-name { font-size: min(.74rem, max(calc(97cqw / var(--n, 6)), min(.56rem, calc(97cqw / var(--l, 6))))); letter-spacing: -.02em; }   /* 10列は狭いので字間も少し詰める */
   .rpg-ga-res .rpg-lab { padding-inline: 2px; font-size: .6rem; letter-spacing: -.02em; }
 }
 
