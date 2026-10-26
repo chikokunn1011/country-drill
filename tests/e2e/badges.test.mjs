@@ -606,3 +606,199 @@ t('dialog_blocks_toast', async page => {
   await page.locator('#toasts .toast').first().waitFor();
   assert.equal(await toastN(page), 1);
 });
+
+/* ---------- 冒険（rpg.js）との連携（設計書 §2.7、§3.3、§3.4、§8.2〜§8.4） ---------- */
+// 偽の rpg.js（window.RPG.snapshot() と、badge:earned で払う）を入れて読み直す。
+// 払う額は sessionStorage の pay があればそちら（reload しても残るので、途中で払える／払えないを切りかえられる）
+async function withRpg(app, snap = {}, paid = 50) {
+  await app.context.addInitScript(([snap, paid]) => {
+    window.__snap = snap; window.__earned = [];
+    window.RPG = { snapshot: () => window.__snap };
+    document.addEventListener('badge:earned', e => {
+      window.__earned.push({ ...e.detail });
+      const o = sessionStorage.getItem('pay'), p = o !== null ? JSON.parse(o) : paid;
+      if (p !== undefined) e.detail.paid = p;
+    });
+  }, [snap, paid]);
+  await app.page.reload();
+}
+// 偽の rpg.js が受け取った badge:earned の detail（paid を書く前）
+const earned = page => page.evaluate(() => window.__earned);
+const BATTLE_WIN = { dungeon: 'samerica', floor: 1, boss: false, win: true, first: true, mistakes: 0, revived: false, gauge: 0, maxCombo: 3, lv: 10, recLv: 1 };
+
+// rpg.js が無いときは冒険のバッジを出さず、badge:earned も出さない
+t('rpg_hidden_without_rpg', async page => {
+  await page.evaluate(() => { window.__n = 0; document.addEventListener('badge:earned', () => window.__n++); });
+  assert.equal(await page.evaluate(() => BADGES.count().total), 26);
+  await page.evaluate(() => BADGES.open());
+  await page.locator('#bdg-cats [data-cat="all"]').waitFor();
+  assert.equal(await count(page, '#bdg-cats [data-cat="rpg"]'), 0);
+  await playPractice(page);
+  const d = await saved(page);
+  assert.equal(typeof d.got['first-clear@1'], 'number');
+  assert.equal(await page.evaluate(() => window.__n), 0);
+  assert.deepEqual(d.sent, []);
+});
+
+// 起動時に snapshot からさかのぼる。払いは retro: true で1つずつ1回、トーストはまとめて1枚。読み直しても二度払いしない
+t('rpg_retro_on_startup', async (page, app) => {
+  await withRpg(app, { intro: true, lv: 12, owned: 60, floors: { samerica: 5 }, st: { win: 3 }, bountyDays: 2, overcome: { jp: 1 } });
+  assert.equal(await page.evaluate(() => BADGES.count().total), 38);
+  const want = ['rpg-start@1', 'rpg-first-win@1', 'rpg-lv@1', 'rpg-boss@1', 'rpg-cards@1', 'rpg-bounty@1', 'overcome@1'].sort();
+  const ev = await earned(page);
+  assert.deepEqual(ev.map(e => e.id).sort(), want);
+  assert.ok(ev.every(e => e.retro === true), json(ev));
+  assert.deepEqual([...(await saved(page)).sent].sort(), want);
+  const ts = page.locator('#toasts .toast');
+  await ts.first().waitFor();
+  await page.waitForTimeout(500);   // 400ms ずつずらした2枚目が来ないこと
+  assert.equal(await ts.count(), 1);
+  assert.match(await ts.innerText(), /これまでの記録から バッジを7個もらったよ！/);
+  await page.reload();
+  assert.deepEqual(await earned(page), []);
+});
+
+// 冒険のイベントで取ったら、すぐ払ってトーストに ●+50
+t('rpg_event_awards', async (page, app) => {
+  await withRpg(app, {});
+  await emitIn(page, 'rpg:levelup', { lv: 10, from: 9 });
+  assert.deepEqual(await earned(page), [{ id: 'rpg-lv@1', badge: 'rpg-lv', tier: 1, title: '一人前の旅人', color: 1, retro: false }]);
+  const toast = toastWith(page, '旅人のレベル');
+  await toast.waitFor();
+  assert.match(await toast.innerText(), /●\+50/);
+});
+
+// rpg.js が 0（もう払ってある）を書いたら、払ったとみなす（sent に入れる）。●+ は出さない
+t('rpg_paid_zero_counts_as_paid', async (page, app) => {
+  await withRpg(app, {}, 0);
+  await emitIn(page, 'rpg:levelup', { lv: 10, from: 9 });
+  assert.ok((await saved(page)).sent.includes('rpg-lv@1'));
+  const toast = toastWith(page, '旅人のレベル');
+  await toast.waitFor();
+  const s = await toast.innerText();
+  assert.ok(!s.includes('●+'), s);
+});
+
+// 払えなかった（false）ステップは sent に入れず、次の起動で retro: true で送り直す
+t('rpg_paid_false_resend', async (page, app) => {
+  await withRpg(app, {}, false);
+  await emitIn(page, 'rpg:coins', { delta: 0, reason: 'start', coins: 0, earned: 0 });
+  const d = await saved(page);
+  assert.equal(typeof d.got['rpg-start@1'], 'number');
+  assert.ok(!d.sent.includes('rpg-start@1'), json(d.sent));
+  const toast = toastWith(page, '旅立ち');
+  await toast.waitFor();
+  const s = await toast.innerText();
+  assert.ok(!s.includes('●+'), s);
+  await page.evaluate(() => sessionStorage.setItem('pay', '50'));
+  await page.reload();
+  assert.deepEqual(await earned(page), [{ id: 'rpg-start@1', badge: 'rpg-start', tier: 1, title: '見習い旅人', color: 1, retro: true }]);
+  assert.ok((await saved(page)).sent.includes('rpg-start@1'));
+  await page.reload();
+  assert.deepEqual(await earned(page), []);
+});
+
+// rpg.js があとから入ったら、前に取ったステップを起動時に retro: true で払う
+t('rpg_late_install', async (page, app) => {
+  await playPractice(page);
+  assert.deepEqual((await saved(page)).sent, []);
+  await withRpg(app, {});
+  assert.deepEqual(await earned(page), [{ id: 'first-clear@1', badge: 'first-clear', tier: 1, title: 'ドリルの新人', color: 1, retro: true }]);
+  await page.reload();
+  assert.deepEqual(await earned(page), []);
+});
+
+// クイズ中に来た冒険のイベントは積むだけ（保存も判定もしない）。結果でまとめて判定する
+t('rpg_quiz_defers', async (page, app) => {
+  await withRpg(app, {});
+  const before = await page.evaluate(() => localStorage.getItem('badges'));
+  await startPractice(page);
+  await answerCorrect(page);
+  await emitIn(page, 'rpg:overcome', { a: 'jp', total: 1 });
+  assert.equal(await page.evaluate(() => localStorage.getItem('badges')), before);
+  assert.equal(await toastN(page), 0);
+  await page.click('#next');
+  await clearByAnswering(page);
+  assert.match(await text(page, '#r-badges'), /苦手克服/);
+});
+
+// バトルの1問ごと（rpg:answer）も積むだけ。次の判定（rpg:battle など）でまとめて判定する
+t('rpg_answer_defers', async (page, app) => {
+  await withRpg(app, {});
+  await page.evaluate(() => BADGES.debug.set('right', 99));
+  const before = await page.evaluate(() => localStorage.getItem('badges'));
+  await emitIn(page, 'rpg:answer', { a: 'jp', right: true, mode: 'f2n', dungeon: 'asia', boss: false });
+  assert.equal(await page.evaluate(() => localStorage.getItem('badges')), before);
+  assert.equal((await dump(page)).got['answers@1'], undefined);
+  await emitIn(page, 'rpg:battle', BATTLE_WIN);
+  assert.equal(typeof (await saved(page)).got['answers@1'], 'number');
+});
+
+// バトル中は保留し、rpg:battle が来たら出す
+t('rpg_battle_holds', async (page, app) => {
+  await withRpg(app, {});
+  await emitIn(page, 'drill:screen', { name: 'battle' });
+  await emitIn(page, 'rpg:levelup', { lv: 10, from: 9 });
+  assert.equal(await toastN(page), 0);
+  await emitIn(page, 'rpg:battle', BATTLE_WIN);
+  await toastWith(page, '旅人のレベル').waitFor();
+  await toastWith(page, '初勝利').waitFor();
+});
+
+// ガチャの演出中（reduced motion なら最後の rpg:pull から1秒）は保留し、過ぎたら出す。ガチャで仲間になっても「覚えて仲間に」は取れない
+t('rpg_gacha_holds', async (page, app) => {
+  await withRpg(app, {});
+  await emitIn(page, 'drill:screen', { name: 'gacha' });
+  await emitIn(page, 'rpg:pull', {});
+  await emitIn(page, 'rpg:join', { a: 'jp', via: 'gacha', owned: 50 });
+  await page.waitForTimeout(500);
+  assert.equal(await toastN(page), 0);
+  await page.waitForTimeout(1000);
+  assert.equal(await toastWith(page, '仲間あつめ').count(), 1);
+  assert.equal((await dump(page)).got['rpg-friend@1'], undefined);
+}, { reducedMotion: 'reduce' });
+
+// via の無い古い rpg.js の promote: ★2 で、いまの画面がガチャでなければ覚えて昇格したとみなす
+t('rpg_promote_without_via', async (page, app) => {
+  await withRpg(app, {});
+  await emitIn(page, 'rpg:promote', { a: 'jp', star: 2 });
+  assert.equal(typeof (await dump(page)).got['rpg-master@1'], 'number');
+  await page.evaluate(() => BADGES.debug.reset());
+  await emitIn(page, 'drill:screen', { name: 'gacha' });
+  await emitIn(page, 'rpg:promote', { a: 'jp', star: 2 });
+  assert.equal((await dump(page)).got['rpg-master@1'], undefined);
+});
+
+// badge:earned のリスナーの中で rpg.js がイベントを出しても（入れ子）、1つのステップは1回だけ払い、sent も重ならない
+t('rpg_nested_events', async (page, app) => {
+  await withRpg(app, {});
+  await app.context.addInitScript(() => document.addEventListener('badge:earned', e => {
+    if (e.detail.id !== 'answers@1') return;
+    document.dispatchEvent(new CustomEvent('rpg:coins', { detail: { delta: 50, reason: 'badge' } }));
+    document.dispatchEvent(new CustomEvent('rpg:levelup', { detail: { lv: 10, from: 9 } }));
+  }));
+  await page.reload();
+  await page.evaluate(() => BADGES.debug.set('right', 100));
+  const ids = (await earned(page)).map(e => e.id);
+  assert.deepEqual([...ids].sort(), ['answers@1', 'rpg-lv@1'], json(ids));
+  const { sent } = await saved(page);
+  assert.equal(new Set(sent).size, sent.length, json(sent));
+  assert.deepEqual([...sent].sort(), ['answers@1', 'rpg-lv@1']);
+});
+
+// 自動でつけたことは、払いの commit のあとでもパネルと badge:title に伝わる
+t('rpg_auto_title_kept', async (page, app) => {
+  await withRpg(app, {});
+  await listenTitle(page);
+  await playPractice(page);
+  const s = await text(page, '#r-badges');
+  for (const w of ['称号〈ドリルの新人〉をつけたよ', '●+50']) assert.ok(s.includes(w), `${w} が無い: ${s}`);
+  assert.deepEqual(await page.evaluate(() => window.__bt), [{ key: 'first-clear@1', title: 'ドリルの新人' }]);
+});
+
+// BADGES.title() はかっこなし（〈〉は表示する側が付ける）
+t('title_without_brackets', async (page, app) => {
+  await withRpg(app, {});
+  await playPractice(page);
+  assert.equal(await page.evaluate(() => BADGES.title()), 'ドリルの新人');
+});

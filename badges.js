@@ -564,7 +564,10 @@
     renderHome();
     if (screen === 'badges') renderBadges();
   }
-  function pay(keys, retro = false) { return {}; }   // 冒険への支払い（Task 7）
+  // 冒険への支払い（§8.3）。badge:earned を出して rpg.js が書いた paid を読み返す。window.RPG が無ければ何もしない
+  function pay(keys, retro = false) {
+    return payout(bs, CAT, keys, { rpg: !!window.RPG, retro, dispatch: detail => { const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev); return ev.detail.paid; } });
+  }
 
   // お知らせを出せるまでの ms。Infinity はイベント（drill:result・drill:screen・rpg:battle・ダイアログの close）を待つ
   function blockedFor() {
@@ -669,6 +672,15 @@
     if (d.name === 'home') renderHome();
     flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
   });
+  // 冒険（rpg.js / rpg-battle.js。§8.2）。バトルの1問ごと・クイズ中は積むだけ（drill:result でまとめて判定）
+  for (const t of ['coins', 'levelup', 'join', 'promote', 'answer', 'battle', 'clear', 'overcome', 'bounty']) on('rpg:' + t, d => {
+    if (t === 'coins' && d.reason !== 'start') return;   // バッジのごほうび（'badge'）などでは判定しない
+    bs.push(['rpg', t, pickRpg(t, d, screen), today()]);   // promote の learn は via が無ければ「★2 で、いまの画面がガチャでない」
+    if (t === 'battle') battle = false;                  // バトルが終わった（保留していたお知らせを出せる）
+    if (t === 'answer' || run) return;
+    deliver(bs.commit());
+  });
+  on('rpg:pull', () => { lastPull = Date.now(); flush(); });   // ガチャの演出中は保留（§5.1）。保留の時間を決め直す
   $('detail').addEventListener('close', flush);   // ダイアログの下に隠れるので、開いている間は保留していた
   // 閉じる・隠れるときは、残っている op を保存だけする（判定は次の起動か次の結果で）
   const save = () => { if (bs.pending()) bs.commit({ judge: false }); };
@@ -890,6 +902,8 @@
 
   // ---------- 起動時の判定（§3.4）。bootAuto はほかの commit より先に読む ----------
   const boot = bs.commit(), bootAuto = bs.lastAuto;
+  // いま取れたステップと前の払い残し（rpg.js があとから入った・前に払えなかった）を、まとめて retro: true で払う（§8.3）
+  pay(pendingPay(bs, CAT, ctx()), true);
   deliver(boot, { startup: true, auto: bootAuto });
 
   // ---------- バッジ画面（§6.2）。<section> を #scr-book の後ろに作ってから登録する ----------

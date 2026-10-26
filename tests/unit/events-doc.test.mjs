@@ -40,3 +40,10 @@ test('events_doc_covers_keys', () => {
     assert.ok(s.some(x => re.test(x)), `docs/events.md のコードスパンに ${k} がない`);
   }
 });
+
+test('events_doc_covers_badges', () => {
+  // badges.js の節: 払いのキー・称号の読み方・rpg.js へのお願い。どれもバッククォートで囲んだ形で書いてあること
+  const d = doc();
+  for (const s of ['paid', 'retro', 'badge:earned', 'badge:title', 'BADGES.title()', 'maxCombo', 'via', 'intro', 'floors'])
+    assert.ok(d.includes('`' + s + '`'), `docs/events.md に \`${s}\` がない`);
+});

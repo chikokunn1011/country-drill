@@ -131,10 +131,12 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 - `badge:earned` の `id` はステップのキー（`'reg-asia@2'`）。`badge`（`'reg-asia'`）・`tier`（`2`）・`color`（`1`〜`4`）・`title`（称号）は足したキー。rpg.js は `id` で二重払いを防ぐ。
 - RPG 設計 §10.3 の `badge:earned {id, tier?, title?}` は、この detail の一部（キーを足しただけ）。ずれはバッジ設計 §8.4 で決めたとおり。
-- `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。
-- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）・`0`（もう払ってある）・`false`（払えなかった）のどれかを書く。`undefined`（書いていない）は古い rpg.js。badges.js は `0` を「払った」とみなし（送り直さない）、●+ は出さない（●+ を出すのは `paid` が1以上の数のときだけ）。
+- `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。どちらも起動時にまとめて出す: 起動時の判定で取れたステップ（`RPG.snapshot()` からのさかのぼりなど）と、払い残し（`got` にあって `sent` に無い、見えているステップ全部。前に `false` だったものもふくむ）。冒険のイベントやクイズで取ったときの `retro` は `false`。
+- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）・`0`（もう払ってある）・`false`（払えなかった）のどれかを書く。`undefined`（書いていない）は古い rpg.js で、badges.js は払ったとみなす（`sent` に入れる。●+ は出さない）。badges.js は `0` を「払った」とみなし（送り直さない）、●+ は出さない（●+ を出すのは `paid` が1以上の数のときだけ）。`false` のステップは `sent` に入れず、次の起動で `retro: true` で送り直す。
 - rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。ただし `retro: true` で新しく払った分は、まとめて1回だけ「バッジのごほうび ●+合計」のトーストを出してよい（バッジ設計 §8.4 #1）。
 - 称号は `window.BADGES?.title?.()`（かっこなしの文字列。なければ `''`）があれば、旅人カードに〈〉を付けて出す。`badge:title` が来たら描き直す。
+  - `BADGES.title()` が返すのは、かっこ〈〉の無い称号の文字列。つけていない（またはいまのカタログに無いキーをつけている）ときは `''`。badges.js が無いこともあるので、呼ぶ側は `window.BADGES?.title?.()` と書く（badges.js が無ければ `undefined` になるので `''` と同じに扱う）。〈〉は表示する側が付ける。
+  - `badge:title {key, title}` は、自分でつけかえたときも、はじめてバッジを取って自動でつけたときも出る。外したときは `{key: null, title: ''}`。
 
 ## 9. 読み込みの順番
 
@@ -144,3 +146,37 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
 - 起動時に使うグローバルを `typeof` で確かめ、足りなければ `console.error('[rpg] …')` のように出して何もしない（ボタンも画面も作らない）。クイズはそのまま動く。
 - 機能ファイルと、それを読みこむ index.html の行は同じコミットで公開し、`?v=` を上げる（キャッシュの食い違いを防ぐ）。
+
+## 10. badges.js が読むもの・出すもの
+
+badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-battle.js から読むもの。出すもの（`badge:earned` `badge:title`）の約束は8章。
+
+| イベント | 使うキー | badges.js がすること |
+|---|---|---|
+| `rpg:coins` | `reason` | `reason === 'start'` のときだけ、冒険をはじめたとみなす（旅立ち）。`'badge'`（バッジのごほうび）などでは判定しない |
+| `rpg:levelup` | `lv` | 旅人のレベル |
+| `rpg:join` | `via` `owned` | `via === 'learn'` なら覚えて仲間に。`owned` は仲間あつめ |
+| `rpg:promote` | `star` `via` | `via === 'learn'` ならマスター昇格。`via` が無ければ下の表の #2 |
+| `rpg:answer` | `a` `right` `mode` | クイズの回答と同じに数える（バトルはヒントなし）。積むだけで判定しない |
+| `rpg:battle` | `boss` `win` `mistakes` `revived` `maxCombo` `lv` `recLv` | 遊んだ日・れんぞく正解・初勝利・無傷の勝利・知識こそ力・不死鳥。バトル中の保留を終える |
+| `rpg:clear` | `dungeon` | 倒したボス（旗を取りもどせ・世界を取りもどした） |
+| `rpg:overcome` | `a` | 苦手克服 |
+| `rpg:bounty` | `totalDays` | 手配書ハンター |
+| `rpg:pull` | （時刻だけ） | ガチャの演出中の保留を決め直す |
+| `rpg:ready` `rpg:share` | | 使わない |
+
+- クイズ中（`drill:start` から `drill:result` まで）に来たものと `rpg:answer` は積むだけで、判定も保存もしない（クイズ中のものは `drill:result` でまとめて判定する）。ほかはすぐ判定して保存し、取れたステップは `badge:earned` で払う。
+- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から3秒。reduced motion なら1秒）は出さずに待つ。
+- 起動時と判定のたびに `RPG.snapshot()` を同期で読む（7章）。使うキーは `intro` `lv` `owned` `floors` `st`（`st.win` `st.lose` `st.flee`）`overcome` `bountyDays`。ボスを倒したかは `floors` を見て、`floors[id] >= 5` なら倒したとみなす（`cleared` の形には頼らない）。冒険の値は、badges.js が覚えた値と snapshot の値の大きいほうで判定する。
+
+rpg.js へのお願い（バッジ設計 §8.4）と、rpg.js がやらなかったときのバッジ側の代わりの判定:
+
+| # | お願い | やらなかったとき |
+|---|---|---|
+| 1 | `badge:earned` は、`retro` でもそうでなくてもトーストを出さずに払い（コインのチップだけ更新する）、`e.detail.paid` に払った額（`50`）か、払えなかったら `false` を同期で書く（8章）。`retro` のときは、まとめて1回だけ「バッジのごほうび ●+150」のように出してよい | 結果画面でコインのトーストがパネルと重なる。`paid` を書かないと払ったとみなすので、払えなかった分が取りこぼされる |
+| 2 | `rpg:promote` に `via`（`'learn'`／`'gacha'`）を入れる | `star === 2` で、いまの画面が `'gacha'` でなければ、覚えて昇格したとみなす |
+| 3 | `RPG.snapshot()` に `intro`（冒険をはじめたか）を足す | `lv > 1` か、`st.win + st.lose + st.flee > 0` なら、はじめたとみなす |
+| 4 | `rpg:battle` の `maxCombo` は「そのバトルで続けて正解した数の最大」（ダメージの式で使う「この問題の前の数」ではない） | 1つずれる（害は小さい） |
+| 5 | RPG 設計 §12 のバッジの表を変える: `rpg-boss-{地域}`×6 → `rpg-boss`（1/3/6）。`rpg-lv10/30/50` → `rpg-lv` の3段。`rpg-cards-50/100/195` → `rpg-cards` の3段。`rpg-overcome-*` → `overcome`。`rpg-combo10` → `streak`。`rpg-silver` → `rpg-master`。`rpg-learn-join` → `rpg-friend`。`rpg-bounty-30` → `rpg-bounty` の3段。`rpg-gold` と `rpg-region-{id}` は作らない。地域ごとの「◯◯の勇者」の称号はなくなる（`rpg-boss` の3段の称号になる。冒険ホームの見本の〈南米の勇者〉も直す） | — |
+| 6 | 旅人カードの称号は `window.BADGES?.title?.()`（かっこなし）に〈〉を付けて出し、`badge:title` が来たら描き直す（8章） | — |
+| 7 | rpg.js はクイズ中（`drill:answer` の処理の中）に `rpg:overcome` などを出してもよい。バッジはクイズ中は積むだけにし、`drill:result` でまとめて判定する（取り決め） | — |
