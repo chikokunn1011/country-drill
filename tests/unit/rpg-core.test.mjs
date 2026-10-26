@@ -82,6 +82,21 @@ test('level_cost', () => {
   assert.deepEqual(plain(K.maxLevelUp(1, 99)), { to: 1, cost: 0 });
   assert.deepEqual(plain(K.maxLevelUp(50, 1e9)), { to: 50, cost: 0 });
   assert.deepEqual(plain(K.maxLevelUp(1, 1e9)), { to: 50, cost: 40180 });
+  // Infinity や数でないコインでも止まる（上限 BIG で切る）
+  assert.equal(K.BIG, 1e9);
+  assert.deepEqual(plain(K.maxLevelUp(1, Infinity)), { to: 50, cost: 40180 });
+  assert.deepEqual(plain(K.maxLevelUp(50, Infinity)), { to: 50, cost: 0 });
+  assert.deepEqual(plain(K.maxLevelUp(1, NaN)), { to: 1, cost: 0 });
+});
+
+test('region_colors_match_css', () => {
+  // rpg.css の地域の色（--rpg-r-{id}。ライトはそのまま、ダークは白を3割まぜる。ダークは2か所）は DUNGEONS の color と同じ
+  const K = loadCore(), css = read('rpg.css');
+  for (const { id, color } of K.DUNGEONS) {
+    assert.ok(css.includes(`--rpg-r-${id}: ${color};`), `rpg.css に --rpg-r-${id}: ${color} が無い`);
+    const dark = css.match(new RegExp(`--rpg-r-${id}: color-mix\\(in srgb, ${color} 70%, #fff\\);`, 'g')) || [];
+    assert.equal(dark.length, 2, `rpg.css のダークの --rpg-r-${id} が ${color} から作られていない`);
+  }
 });
 
 test('hero_stats', () => {
@@ -289,6 +304,12 @@ test('migrate_cases', () => {
   assert.deepEqual([r.d.v, r.d.y, r.d.coins, r.backup], [2, 1, 5, true]);
   // v を進めない移行は止まらないので壊れた扱い
   assert.deepEqual(m({ v: 1 }, { version: 2, steps: { 1: d => d } }), { d: FRESH, readOnly: false, backup: true });
+  // 移行が例外を出したら、その版で止めて（あとの移行はしない・新しく始めない・写しも取らない）sanitize に任せる
+  const boom = () => { throw new Error('boom'); };
+  r = m({ v: 1, coins: 9 }, { version: 3, steps: { 1: boom, 2: d => ({ ...d, v: 3, z: 1 }) } });
+  assert.deepEqual([r.d.v, r.d.coins, r.d.z, r.readOnly, r.backup], [1, 9, undefined, false, false]);
+  r = m({ v: 1, coins: 9 }, { version: 3, steps: { 1: d => ({ ...d, v: 2, x: 1 }), 2: boom } });
+  assert.deepEqual([r.d.v, r.d.x, r.d.coins, r.readOnly, r.backup], [2, 1, 9, false, false]);
 });
 
 test('sanitize_garbage', () => {
@@ -676,7 +697,11 @@ test('mid_settle_no_double_count', () => {
         assert.ok(pendEmpty(run), '受け取りのあと pend は空');
         assert.equal(d.fr.cl, 1);
       }
-      if (mid && i === 1) assert.equal(d.fr.cl, 1, '途中の受け取りのあとの2回目で増えない');
+      if (mid && i === 1) {   // 同じ国のやり直し正解のあとにもう一度受け取っても、なかよし度は1ゲーム1回
+        K.settleRun(d, run, null, T0);
+        assert.ok(pendEmpty(run), '2回目の受け取りのあと pend は空');
+        assert.equal(d.fr.cl, 1, '途中の受け取りのあとの2回目で増えない');
+      }
     });
     const r = plain(K.settleRun(d, run, res, T0));
     assert.deepEqual(plain(run.base), base, 'run.base は変えない');
@@ -691,7 +716,13 @@ test('mid_settle_no_double_count', () => {
   const { delta: x1, ...rest1 } = r1, { delta: x2, ...rest2 } = r2;
   assert.deepEqual(rest1, rest2);
   assert.notEqual(x1, x2);
-  assert.equal(x1 + 30, x2);
+  assert.equal(x1 + 30 + 3, x2);   // 途中の受け取りで払った 30（一発正解＋はじめて）と 3（やり直し）
+});
+
+test('new_run_sid_string', () => {
+  const K = loadCore(), d = dWith(K), det = { kind: 'practice', mode: 'f2n', region: 'all', n: 5, hint: false };
+  assert.equal(K.newRun({ sid: 7, ...det }, d).sid, '7');   // paid の [sid, 額] は文字列の sid だけ残るので、数で来ても文字列にする
+  assert.equal(K.newRun({ sid: 'g1', ...det }, d).sid, 'g1');
 });
 
 test('run_is_plain_data', () => {
@@ -805,6 +836,21 @@ test('overcome_rules', () => {
   assert.deepEqual([r.overcome, r.delta, db.coins, db.ov.pe], [['pe'], 30, 30, 1]);
 });
 
+// missesAfter が無い（undefined・null・数でない）ときは「ミスなし」ではなく「変化なし」（missesBefore のまま）。苦手のままなら克服しない
+test('overcome_needs_misses_after', () => {
+  const K = loadCore();
+  const go = (before, det) => {
+    const d = dWith(K, { wk: { cl: 1 } }), run = K.newRun({ sid: 'o', kind: 'practice', mode: 'f2n', region: 'all', n: 5, hint: false }, d);
+    K.runAnswer(run, { a: 'cl', right: true, first: true, hint: false, mode: 'f2n', missesBefore: before, ...det });
+    return plain(K.settleRun(d, run, null, T0).overcome);
+  };
+  assert.deepEqual(go(1, { missesAfter: 0 }), ['cl']);
+  assert.deepEqual(go(1, { missesAfter: 1 }), []);
+  for (const det of [{}, { missesAfter: undefined }, { missesAfter: null }, { missesAfter: 'x' }, { missesAfter: NaN }])
+    assert.deepEqual(go(1, det), [], `missesBefore 1 と ${JSON.stringify(det)}`);
+  assert.deepEqual(go(0, {}), ['cl']);   // 苦手の印だけ（misses 0）なら、変化なしでも 0 のままなので克服
+});
+
 test('fe_independent_of_battle', () => {
   const K = loadCore();
   const d = dWith(K, { mb: { cl: 1 }, fe: {} });
@@ -908,15 +954,20 @@ test('bounty_fill', () => {
   assert.ok(['cl', 'br', 'jp'].includes(K.bountyFor(d3, {}, T0, mulberry32(5))[0]));
 });
 
-test('is_weak_and_reset_weak', () => {
+test('is_weak', () => {
   const K = loadCore(), d = dWith(K, { wk: { cl: 1, br: 1 } });
   assert.equal(K.isWeak(d, {}, 'cl'), true);
   assert.equal(K.isWeak(d, { jp: 1 }, 'jp'), true);
   assert.equal(K.isWeak(d, { jp: '2' }, 'jp'), true);
   for (const v of [0, -3, 'x', null, NaN]) assert.equal(K.isWeak(d, { jp: v }, 'jp'), false, String(v));
+});
+
+test('reset_weak', () => {
+  const K = loadCore(), d = dWith(K, { wk: { cl: 1, br: 1 } });
   K.resetWeak(d);
   assert.deepEqual(plain(d.wk), {});
   assert.equal(K.isWeak(d, {}, 'cl'), false);
+  assert.equal(K.isWeak(d, { cl: 2 }, 'cl'), true);   // misses のほうは消さない（呼ぶ側が消す）
 });
 
 // ---- ガチャとバトルの出題 ----
@@ -1140,6 +1191,11 @@ test('battle_bag', () => {
   assert.equal(bw.find(x => x.a === 'jp').tag, 'wanted');
   assert.ok(bw.every((x, i) => x.mode === ['f2n', 'n2f'][i % 2]));
   assert.ok(as(bw).every(a => plain(C.map(c => c.a)).includes(a)));
+
+  // 範囲外の floor（ボスの 5・0・9・NaN・文字列）は最後の floor（4）として扱う（形式の順も F4 のもの）
+  const f4 = plain(K.battleBag(dWith(K), {}, 'samerica', 4, mulberry32(13)));
+  assert.equal(f4.length, 5);
+  for (const f of [5, 0, 9, NaN, '4', undefined]) assert.deepEqual(plain(K.battleBag(dWith(K), {}, 'samerica', f, mulberry32(13))), f4, String(f));
 });
 
 test('refill_bag', () => {
@@ -1156,6 +1212,10 @@ test('refill_bag', () => {
   assert.equal(firsts.size, 3);
   // 全世界の F2
   assert.deepEqual(plain(K.refillBag('world', 2, {}, mulberry32(1))).map(x => x.a).sort(), plain(K.floorsOf('all')[1]).sort());
+  // 範囲外の floor は最後の floor（4）
+  const r4 = plain(K.refillBag('samerica', 4, { cl: 'f2n' }, mulberry32(5)));
+  assert.equal(r4.length, 3);
+  for (const f of [5, 0, NaN]) assert.deepEqual(plain(K.refillBag('samerica', f, { cl: 'f2n' }, mulberry32(5))), r4, String(f));
 });
 
 test('boss_flags', () => {

@@ -20,6 +20,7 @@
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, refund: [0, 10, 30, 100], flipMs: 120 },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#195か国ドリル', cards: [50, 100, 195] },
   };
+  const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
 
   // 国の数が少ない地域から順に開く。r は S.region と同じ日本語名（全世界は 'all'）。英字 id と日本語名の変換はここだけ
   const DUNGEONS = [
@@ -49,10 +50,11 @@
   // ---- 旅人とレベル（ステータスはセーブせず、Lv から毎回計算する） ----
   // Lv L → L+1 の費用。上限の Lv から先は Infinity
   const levelCost = L => L >= TUNING.hero.maxLv ? Infinity : TUNING.levelBase + TUNING.levelStep * (L - 1);
-  // coins で上げられるところまで上げたときの Lv と、かかるコインの合計
+  // coins で上げられるところまで上げたときの Lv と、かかるコインの合計（coins が Infinity や数でなくても止まる）
   const maxLevelUp = (lv, coins) => {
+    const c = Math.min(BIG, +coins || 0);
     let to = lv, cost = 0;
-    while (cost + levelCost(to) <= coins) cost += levelCost(to++);
+    while (to < TUNING.hero.maxLv && cost + levelCost(to) <= c) cost += levelCost(to++);
     return { to, cost };
   };
   const heroStats = lv => {
@@ -153,7 +155,6 @@
   // ---- セーブの形・移行・掃除（設計書 §9） ----
   const VERSION = 1;
   const MIGRATE = { /* 1: d => ({ ...d, v: 2, … }) */ };
-  const BIG = 1e9;                                   // コイン・回数の上限
   const CODES = new Set(C.map(c => c.a));            // index.html の byA と同じ国コード
   const isCode = a => CODES.has(a);
   const IDS = new Set(DUNGEONS.map(d => d.id));
@@ -244,8 +245,10 @@
     while (d.v < version) {
       const v = d.v, step = steps[v];
       if (typeof step !== 'function') return broken();
-      d = step(d);
-      if (!isObj(d) || !Number.isInteger(d.v) || d.v <= v) return broken();   // v を進めない移行は止まらないので壊れた扱い
+      let next;
+      try { next = step(d); } catch { break; }   // 移行が例外を出したら、その版で止めて sanitize に任せる（新しく始めない・写しも取らない。次に読むときにもう一度試す）
+      if (!isObj(next) || !Number.isInteger(next.v) || next.v <= v) return broken();   // v を進めない移行は止まらないので壊れた扱い
+      d = next;
     }
     return { d: sanitize(d, todayStr), readOnly: false, backup };
   };
@@ -335,7 +338,7 @@
   const row0 = () => ({ n: 0, coins: 0 });
   const pend0 = () => ({ fr: {}, mb: {}, fe: {}, wk: {}, lc: {}, n: {}, ov: {}, bounty: {} });   // n は day.n の足し分
   const newRun = ({ sid, kind, mode, region, n, hint }, d) => ({
-    sid, kind, mode, region, n, hint: !!hint,
+    sid: String(sid), kind, mode, region, n, hint: !!hint,   // paid の [sid, 額] は文字列の sid だけ残る（sanitize）ので、文字列にそろえる
     base: {
       day: { n: { ...d.day.n } }, fe: { ...d.fe }, ov: { ...d.ov }, wk: { ...d.wk },
       bounty: { d: d.bounty.d, a: [...d.bounty.a], done: [...d.bounty.done] }, earned: d.earned,
@@ -354,7 +357,9 @@
   const runAnswer = (run, { a, right, first, hint, mode, missesBefore, missesAfter }) => {
     const { base: b, game: g, pend: p } = run, rc = g.rc, bit = has(MODE_BIT, mode) ? MODE_BIT[mode] : 0;
     // 答える前の苦手（開始時の印に、このゲームで付けた/外した印を重ねる）
-    const weak = Math.max(0, +missesBefore || 0) > 0 || !!(has(g.wk, a) ? g.wk[a] : b.wk[a]);
+    const mBefore = Math.max(0, +missesBefore || 0), weak = mBefore > 0 || !!(has(g.wk, a) ? g.wk[a] : b.wk[a]);
+    // 答えたあとの misses。無い（undefined・null・数でない）ときは「ミスなし」ではなく「変化なし」
+    const mAfter = missesAfter == null || Number.isNaN(+missesAfter) ? mBefore : Math.max(0, +missesAfter);
     const r = answerCoins({
       kind: run.kind, mode, right, first, hint, weak,
       nth: (b.day.n[a] || 0) + (g.cnt[a] || 0) + 1,
@@ -386,7 +391,7 @@
     if (right && first && !hint) {
       g.wk[a] = p.wk[a] = 0;
       // 克服: 答える前は苦手で、misses が0になった。1か国一生に1回
-      if (weak && Math.max(0, +missesAfter || 0) === 0 && !b.ov[a] && !g.ov[a]) g.ov[a] = p.ov[a] = 1;
+      if (weak && mAfter === 0 && !b.ov[a] && !g.ov[a]) g.ov[a] = p.ov[a] = 1;
       if (b.bounty.a.includes(a) && !b.bounty.done.includes(a) && !g.bounty[a]) g.bounty[a] = p.bounty[a] = 1;
     }
     return { coin: r.coin, decay: r.decay, firstEver: r.firstEver };
@@ -529,6 +534,8 @@
   };
   // その階の形式の順。F1〜F2 は f2n と n2f の交互、F3〜F4 とボス（5）は f2n → n2f → m2f
   const modeCycle = floor => floor <= 2 ? ['f2n', 'n2f'] : ['f2n', 'n2f', 'm2f'];
+  // 通常フロアの番号（1〜4）。範囲外（ボスの 5・0・数でない）は最後のフロア（4）に丸める
+  const normalFloor = floor => Number.isInteger(floor) && floor >= 1 && floor <= 4 ? floor : 4;
   // その階の順で次の、ちがう形式。その階に無い形式（cap など）の次は先頭の f2n
   const nextMode = (mode, floor) => { const cy = modeCycle(floor); return cy[(cy.indexOf(mode) + 1) % cy.length]; };
 
@@ -538,6 +545,7 @@
   const battleBag = (d, m, id, floor, rng) => {
     const dg = dungeonOf(id);
     if (!dg) return [];
+    floor = normalFloor(floor);
     const here = floorsOf(dg.r)[floor - 1] || [], codes = codesOf(dg.r), fr = d.fr || {}, wk = d.wk || {};
     const bag = shuffled(here, rng), away = shuffled(codes.filter(a => !here.includes(a)), rng);
     const weak = away.filter(a => isWeak(d, m, a)).sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x]);
@@ -552,6 +560,7 @@
   const refillBag = (id, floor, lastMode, rng) => {
     const dg = dungeonOf(id), last = lastMode || {};
     if (!dg) return [];
+    floor = normalFloor(floor);
     return shuffled(floorsOf(dg.r)[floor - 1] || [], rng).map(a => ({ a, mode: nextMode(last[a] ?? 'f2n', floor), tag: null }));
   };
   // ボスの旗（flags 枚）: 地域の国を misses の多い順 → wk あり → なかよし度の低い順 → 乱数で並べ、苦手な国を上から
@@ -587,7 +596,7 @@
   };
 
   globalThis.RPG_CORE = {
-    TUNING, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
+    TUNING, BIG, DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf,
     levelCost, maxLevelUp, heroStats,
     stageOf, recLv, enemy, firstClearTotal,
     battleReward, damage,
