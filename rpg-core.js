@@ -265,6 +265,8 @@
   // misses: 知っている国コードだけ、0..999 の整数、0 は捨てる
   const sanitizeMisses = x => keep(x, isCode, v => int(v, 0, 999) || undefined);
   const encodeCode = (d, m) => CODE_HEAD + toB64url(JSON.stringify({ rpg: d, m }));
+  // 入れ子が 16 段より深いものは断る（JSON.stringify は再帰なので深すぎると落ちる。自前のセーブは 3 段まで）
+  const shallow = (v, n = 0) => v === null || typeof v !== 'object' || (n < 16 && Object.values(v).every(x => shallow(x, n + 1)));
   // 空白と改行を全部消してから読む。壊れている（migrate が写しを取る）・新しい版のコードは受け付けない
   const decodeCode = (s, todayStr) => {
     if (typeof s !== 'string') return { ok: false };
@@ -272,7 +274,7 @@
     if (!t.startsWith(CODE_HEAD) || t.length > CODE_MAX || !/^[A-Za-z0-9_-]+$/.test(body)) return { ok: false };
     let o;
     try { o = JSON.parse(fromB64url(body)); } catch { return { ok: false }; }
-    if (!isObj(o) || !isObj(o.rpg)) return { ok: false };
+    if (!isObj(o) || !isObj(o.rpg) || !shallow(o)) return { ok: false };
     const r = migrate(o.rpg, todayStr);
     if (r.readOnly || r.backup) return { ok: false };
     const hasM = isObj(o.m);

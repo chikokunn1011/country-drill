@@ -428,6 +428,7 @@ test('code_rejects', () => {
   const badUtf8 = Buffer.concat([Buffer.from('{"rpg":{"v":1,"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}}')]);
   no('CQ1.' + badUtf8.toString('base64url'), 'UTF-8 でない');
   no('CQ1.A', 'base64 の長さがおかしい');
+  no('CQ1.' + Buffer.from('{"rpg":{"v":1,"zz":' + '['.repeat(30000) + ']'.repeat(30000) + '}}').toString('base64url'), '入れ子が深すぎる');
   no(null, 'null');
   no(5, '数');
   // 100KB 以下の大きなコードは読める
