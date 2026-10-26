@@ -432,4 +432,4 @@ t('topbar_extra', async page => {
     assert.deepEqual(r.zero, [], at);
     assert.deepEqual(r.after, r.before, at);
   }
-});
+}, { blockScripts: RPG_FILES });

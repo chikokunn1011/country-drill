@@ -38,3 +38,129 @@
   .rpg-res-rows li { break-inside: avoid; }
   .rpg-res .btn { margin-top: 0; }
 }
+
+/* ---------- 入口: ホームの［冒険］・トップバーのチップ・冒険の表示 OFF ---------- */
+.rpg-homecoin { margin-left: .35em; font: 500 .72em var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rpg-new { margin-left: .45em; padding: 1px 7px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 .6em var(--font-mono); letter-spacing: .08em; vertical-align: .2em; }
+.rpg-chip {
+  display: inline-flex; align-items: center; gap: .3em; white-space: nowrap; cursor: pointer;
+  font: 700 .9rem var(--font-display); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+}
+.rpg-chip b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rpg-chip-l { font-weight: 500; color: var(--muted); }
+/* 360px でもブランド・コイン・図鑑・設定を1行に: 「コイン」の字を足さず、チップがあるときだけトップバーのすき間を少しつめる
+   （冒険を OFF にしたときと RPG が無いときの見た目は変えない） */
+@media (max-width: 399.98px) {
+  .rpg-chip-l { display: none; }
+  .rpg-chip { gap: 2px; padding: 2px 6px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) { gap: 8px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) .row:has(> #to-book) { gap: 4px; }
+}
+/* 背の低い PC（1920×1080 を 150% など）のホームは縦1列のメニュー。［冒険］が増えても縦にスクロールしないように、ボタンを少し詰める */
+@media (min-width: 1280px) and (max-height: 760px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg) { gap: 6px; }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg) .btn { padding-block: 5px; }
+}
+/* 設定の「冒険（コイン・RPG）を表示する」が OFF: ボタン・チップ・クイズ中のコインを出さない（コインは裏で貯まる） */
+body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
+
+/* ---------- はじめての画面（#rpg-intro） ---------- */
+.rpg-intro { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.rpg-intro p { margin: 0; }
+.rpg-h1 { margin: 0; font: 900 clamp(1.9rem, 8vw, 2.6rem)/1.15 var(--font-display); text-wrap: balance; }
+.rpg-intro .rpg-sub { margin-top: -8px; font: 700 .95rem var(--font-display); color: var(--muted); }
+.rpg-story { max-width: 34em; display: flex; flex-direction: column; gap: 8px; text-align: left; font-size: .95rem; line-height: 1.75; }
+.rpg-lbl { font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.rpg-avpick { display: grid; grid-template-columns: repeat(4, 56px); gap: 10px; justify-content: center; margin-top: -6px; }
+.rpg-avpick button { width: 56px; height: 56px; padding: 0; border-radius: 16px; border: 1.5px solid var(--line); background: var(--bg); font-size: 1.9rem; line-height: 1; cursor: pointer; }
+.rpg-avpick button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+#rpg-go { min-width: 200px; }
+
+/* ---------- 冒険ホーム ---------- */
+.rpg-warn { margin: 0; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--ng); background: var(--ng-soft); color: var(--ink); font-size: .9rem; font-weight: 700; }
+.rpg-intro .rpg-warn { align-self: stretch; text-align: left; }
+/* スマホ: 入れ物は透明にして、§3.2 の順（旅人・レベルアップ・つぎ・手配書・ガチャと仲間・図版・かせぎ方）に縦に並べる */
+.rpg-side, .rpg-main, .rpg-aside { display: contents; }
+@media (max-width: 899.98px) { :is(#rpg-warn, #rpg-hero, .rpg-lv, #rpg-next, #rpg-bounty) { order: -1; } }
+
+/* 旅人カード */
+.rpg-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 14px; row-gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+.rpg-av { grid-row: 1 / span 2; width: 64px; height: 64px; padding: 0; border-radius: 18px; border: 1.5px solid var(--line); background: var(--bg); font-size: 2.2rem; line-height: 1; cursor: pointer; }
+.rpg-who { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; }
+#rpg-name { font: 900 1.15rem var(--font-display); overflow-wrap: anywhere; }
+.rpg-ttl { font: 700 .85rem var(--font-display); color: var(--accent); }
+.rpg-ttl:empty { display: none; }
+.rpg-stats { margin: 0; display: flex; flex-wrap: wrap; gap: 0 12px; font: 500 .88rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.rpg-lvnum { font-weight: 700; }
+
+/* レベルアップ・つぎにやること・ガチャと仲間 */
+.rpg-lv { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+#rpg-lvup { width: 100%; }
+.rpg-short { margin-left: .3em; font-size: .78em; font-weight: 500; white-space: nowrap; }
+#rpg-lvmax { font-size: .82rem; }
+#rpg-lvmax:disabled { color: var(--muted); opacity: .6; cursor: default; }
+.rpg-next { display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; cursor: pointer; background: var(--surface); color: var(--ink); border: 1.5px dashed var(--accent); border-radius: 12px; padding: 10px 14px; font: 700 .95rem/1.45 var(--font-display); }
+.rpg-next-k { color: var(--accent); }
+.rpg-next-w { display: block; font: 500 .8rem/1.5 var(--font-body); color: var(--ng); }
+.rpg-go { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rpg-go .btn { padding: 12px 10px; font-size: 1rem; }
+.rpg-free { display: block; font-size: .8em; }   /* 「無料1回！」はボタンの2行目に（途中で折り返さない） */
+
+/* 今日の手配書（国旗は欠けさせない: contain） */
+.rpg-bounty { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.rpg-bounty p { margin: 0; }
+.rpg-bounty-h { font: 700 .95rem var(--font-display); }
+.rpg-wanted { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px; }
+.rpg-wf { position: relative; }
+.rpg-wf img { display: block; width: 64px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.rpg-wf.is-done img { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+.rpg-check { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; background: var(--ok); color: var(--surface); font: 900 .75rem/20px var(--font-body); text-align: center; }
+
+/* ダンジョンの図版（地図帳の PLATE。上の帯が地域の色） */
+.rpg-dgs { display: flex; flex-direction: column; gap: 12px; }
+.rpg-plate { min-width: 0; display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-top: 6px solid var(--rpg-c, var(--line)); border-radius: 12px; padding: 10px 14px 12px; }
+.rpg-plate p { margin: 0; }
+.rpg-plate-no { font: 500 .7rem var(--font-mono); letter-spacing: .14em; color: var(--muted); }
+.rpg-plate-name { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; }
+.rpg-plate-name b { font: 900 1.1rem var(--font-display); }
+.rpg-plate-name small { font-size: .8rem; color: var(--muted); }
+.rpg-plate-e { font-size: 1.6rem; line-height: 1; }
+.rpg-plate-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; font-size: .85rem; color: var(--muted); }
+.rpg-judge { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--ink); }
+.rpg-judge::before { content: ""; width: .7em; height: .7em; border-radius: 50%; background: var(--rpg-j, var(--muted)); }
+.rpg-judge.is-easy { --rpg-j: var(--ok); }
+.rpg-judge.is-ok { --rpg-j: var(--hl); }
+.rpg-judge.is-hard { --rpg-j: var(--ng); }
+.rpg-fls { display: flex; flex-wrap: wrap; gap: 8px; }
+.rpg-fl { width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1.05rem/1 var(--font-body); cursor: pointer; }
+.rpg-fl.is-done { background: var(--rpg-c); border-color: var(--rpg-c); color: var(--surface); }
+.rpg-fl.is-next { border: 3px solid var(--ink); }
+.rpg-fl:disabled { opacity: .35; cursor: default; }
+.rpg-plate.rpg-locked { background: transparent; border-style: dashed; border-top-style: solid; }
+.rpg-plate.rpg-locked .rpg-plate-name b { color: var(--muted); }
+
+/* コインのかせぎ方 */
+.rpg-earn { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.rpg-earn summary { cursor: pointer; font: 700 .95rem var(--font-display); }
+.rpg-earn-t { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: .85rem; }
+.rpg-earn-t caption { text-align: left; font-size: .78rem; color: var(--muted); padding-bottom: 4px; }
+.rpg-earn-t :is(th, td) { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.rpg-earn-t :is(th, td):last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+#rpg-earn-go { margin-top: 10px; }
+
+/* PC: 左に旅人の列（上に固定）、右に図版。1400px 以上は右にもう1列（手配書。Task 12 で小さい地図も） */
+@media (min-width: 900px) {
+  #scr-rpg[data-view="home"] {
+    display: grid; align-items: start; grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-areas: "side aside" "side main"; grid-template-rows: auto 1fr; column-gap: var(--col-gap, 24px); row-gap: var(--vgap, 16px);
+  }
+  #scr-rpg .rpg-side { grid-area: side; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  #scr-rpg .rpg-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  #scr-rpg .rpg-aside { grid-area: aside; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .rpg-dgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .rpg-intro { width: 100%; max-width: 720px; margin-inline: auto; padding: var(--card-pad, 24px); }
+}
+@media (min-width: 1400px) {
+  #scr-rpg[data-view="home"] { grid-template-columns: 320px minmax(0, 1fr) 360px; grid-template-areas: "side main aside"; grid-template-rows: auto; }
+  #scr-rpg .rpg-aside { position: sticky; top: 16px; }
+}

@@ -264,12 +264,274 @@
     } catch (err) { console.error('[rpg]', err); }
   });
 
+  /* ---------- 入口（ホームの［冒険］・トップバーのチップ・設定のスイッチ）と冒険ホーム（#scr-rpg） ---------- */
+  const DG = K.DUNGEONS, AV = K.AVATARS, TOTAL = C.length;
+  const BOSS = 5;   // フロアは F1〜F4 とボス（5）
+  const STORY = [
+    '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。',
+    '旅人のきみは、クイズで集めたコインで力をつけ、国のカードの仲間といっしょに6つの地域を旅する。',
+    '国を思い出すたびに、国旗がひとつ戻ってくる。地図喰いの巣で親玉をたおして、195の旗を取りもどそう！',
+  ];
+  const FLOOR_MARK = ['①', '②', '③', '④', '👑'];
+  const JUDGE = { easy: ['余裕', 'is-easy'], ok: ['ちょうど', 'is-ok'], hard: ['きびしい', 'is-hard'] };
+  // 設計書 §5.1 の例の表（ゲームとコインの列）。表示するだけの文なので、計算には使わない
+  const EARN = [
+    ['練習・国旗→国名・10問（一発8・やり直し2）', '80+6+20 = 106'],
+    ['練習・10問・パーフェクト', '100+20+30 = 150'],
+    ['挑戦・10問・ノーミス', '100+50+50 = 200'],
+    ['挑戦・10問・3回目でクリア', '約70+50 = 120'],
+    ['タイムアタック・10問・クリア', '50+30 = 80'],
+    ['タイムアタック・10問・7問目で失格', '30'],
+    ['練習・場所→国旗・全世界・全部（195問）・85%', '約1,990+90+470 = 約2,550'],
+  ];
+  const WARN = { readOnly: MSG.readOnly, memory: 'この端末では保存できないみたい。閉じると消えるよ' };
+
+  const cleared = (d, id) => (d.floors || {})[id] || 0;
+  // 開いているダンジョン: 1つ目、前のダンジョンのボスを倒した、または自分を1フロアでも進めた（壊れたセーブでも進んだところへは行ける）
+  const unlocked = (d, id) => {
+    const i = DG.findIndex(g => g.id === id);
+    return i === 0 || (i > 0 && (cleared(d, DG[i - 1].id) >= BOSS || cleared(d, id) > 0));
+  };
+  // 次に挑むフロア: 開いているダンジョンを順に見て、最初のまだボスを倒していないもの。全部クリアなら null
+  const nextFloor = d => {
+    const g = DG.find(g => unlocked(d, g.id) && cleared(d, g.id) < BOSS);
+    return g ? { id: g.id, floor: cleared(d, g.id) + 1 } : null;
+  };
+  const judgeOf = (d, id, floor) => K.judge(K.battleStats(d, id, floor), K.enemy(id, floor));
+  const owned = d => Object.keys(d.cards).length;
+  // ガチャ・仲間・バトルへはここを通す（まだ無い画面なら opts を置くだけ）
+  const open = (name, opts = {}) => { RPG.opts = opts; if (SCREENS.includes(name)) show(name); };
+  // 称号（badges.js が無い・空なら出さない）
+  const titleOf = () => {
+    try { return String(window.BADGES?.title?.() || ''); } catch (e) { console.error('[rpg]', e); return ''; }
+  };
+
+  // ホームの［冒険］の小さいコインと NEW、トップバーのチップ
+  const drawEntrances = (d = get()) => {
+    const hb = $('home-rpg'), chip = $('rpg-chip');
+    if (hb) hb.innerHTML = `冒険 <small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}`;
+    if (chip) {
+      chip.innerHTML = `${COIN}<b>${K.shortCoins(d.coins)}</b><span class="rpg-chip-l"> コイン</span>`;
+      chip.setAttribute('aria-label', `コイン ${fmt(d.coins)}（冒険へ）`);
+    }
+  };
+
+  // ---- レベルアップ（1回の tx で上げて払う。イベントは tx が返ってから） ----
+  const levelUp = () => {
+    let d = null, from = 0, cost = 0;
+    tx(x => {
+      const c = K.levelCost(x.lv);   // 上限の Lv では Infinity
+      if (!(x.coins >= c)) return;
+      from = x.lv; cost = c;
+      x.lv++; x.coins -= c;
+      d = x;
+    });
+    if (!d || !wrote) return;
+    emit('rpg:levelup', { lv: d.lv, from });
+    emitCoins(d, -cost, 'levelup');
+  };
+  const levelMax = () => {
+    const d0 = get(), m = K.maxLevelUp(d0.lv, d0.coins);
+    if (m.to <= d0.lv || !confirm(`Lv${m.to} まで ●${fmt(m.cost)} 使う？`)) return;
+    let d = null, from = 0, spent = 0;
+    tx(x => {
+      from = x.lv;
+      // 確かめた Lv まで。そのあいだに別のタブで使っていたら、払えるところまで
+      while (x.lv < m.to && x.coins >= K.levelCost(x.lv)) { const c = K.levelCost(x.lv); x.coins -= c; spent += c; x.lv++; }
+      if (x.lv > from) d = x;
+    });
+    if (!d || !wrote) return;
+    emit('rpg:levelup', { lv: d.lv, from });
+    emitCoins(d, -spent, 'levelup');
+  };
+
+  // ---- はじめての画面 ----
+  let introAv = null;   // はじめての画面で選んでいるアバター（描き直しても残す）
+  const warnHTML = () => WARN[status] ? `<p class="rpg-warn" id="rpg-warn" role="status">${WARN[status]}</p>` : '';
+  const introHTML = d => {
+    const av = introAv ?? d.av;
+    return `<div class="rpg-intro" id="rpg-intro">${warnHTML()}`
+      + '<h2 class="rpg-h1">国旗クエスト</h2><p class="rpg-sub">地図喰いから世界を取りもどせ</p>'
+      + `<div class="rpg-story">${STORY.map(s => `<p>${s}</p>`).join('')}</div>`
+      + '<p class="rpg-lbl" id="rpg-avlbl">旅人のすがたをえらぶ</p>'
+      + `<div class="rpg-avpick" role="group" aria-labelledby="rpg-avlbl">${AV.map((e, i) => `<button type="button" data-av="${i}" aria-pressed="${i === av}">${e}</button>`).join('')}</div>`
+      + '<button class="btn" id="rpg-go">旅に出る</button></div>';
+  };
+  const bindIntro = d => {
+    const box = $('scr-rpg').querySelector('.rpg-avpick');
+    box.onclick = e => {
+      const b = e.target.closest('button[data-av]');
+      if (!b) return;
+      introAv = +b.dataset.av;
+      for (const x of box.children) x.setAttribute('aria-pressed', String(x === b));
+    };
+    $('rpg-go').onclick = () => {
+      const av = introAv ?? d.av;
+      let x = null;
+      tx(s => {
+        if (s.intro) return;   // 別のタブで先に旅に出ていたら、お祝いは二重に出さない
+        s.intro = true; s.av = av;
+        s.coins = Math.min(CAP, s.coins + T.start);
+        s.earned = Math.min(CAP, s.earned + T.start);
+        x = s;
+      });
+      if (x && wrote) emitCoins(x, T.start, 'start');
+      renderHome();
+    };
+  };
+
+  // ---- 冒険ホーム ----
+  // つぎにやること（上から最初に当てはまるもの）
+  const nextAction = (d, nf) => {
+    if (d.pulls === 0 && d.coins >= T.gacha.ten)
+      return { text: 'まずは国旗ガチャ10連で仲間をさがそう（南アメリカがおすすめ）', go: () => open('gacha', { region: DG[0].r }) };
+    if (d.day.first && !d.day.free) return { text: '今日の無料ガチャが引けるよ', go: () => open('gacha') };
+    const en = nf && K.enemy(nf.id, nf.floor);
+    if (en && d.coins >= K.levelCost(d.lv) && d.lv < en.recLv) return { text: 'レベルアップできるよ', go: () => $('rpg-lvup')?.focus() };
+    if (en) {
+      const g = K.dungeonOf(nf.id), where = en.boss ? `${g.name} ボス（${K.MONSTERS[nf.id][BOSS - 1].n}）` : `${g.name} F${nf.floor} `;
+      return {
+        text: `${where}に挑戦！（推奨Lv${en.recLv}）`,
+        warn: judgeOf(d, nf.id, nf.floor) === 'hard' ? 'ちょっときびしいかも。クイズでコインを稼ごう' : '',
+        go: () => open('battle', { id: nf.id, floor: nf.floor }),
+      };
+    }
+    return { text: `全クリア！ ${TOTAL}か国を仲間にしよう（${owned(d)}/${TOTAL}）`, go: () => open('cards') };
+  };
+  // ダンジョンの図版。開いていないものは 🔒 と押せないフロアだけ（ボスは見せない）
+  const plateHTML = (d, g) => {
+    const n = cleared(d, g.id), on = unlocked(d, g.id), boss = K.MONSTERS[g.id][BOSS - 1];
+    const fls = FLOOR_MARK.map((mark, i) => {
+      const f = i + 1, cls = !on ? '' : f <= n ? ' is-done' : f === n + 1 ? ' is-next' : '';
+      return `<button type="button" class="rpg-fl${cls}" data-d="${g.id}" data-f="${f}" aria-label="${f === BOSS ? 'ボス' : `F${f}`}${on && f <= n ? '（クリア済み）' : ''}"`
+        + `${on && f <= n + 1 ? '' : ' disabled'}>${mark}</button>`;
+    }).join('');
+    const head = `<div class="rpg-plate${on ? '' : ' rpg-locked'}" data-d="${g.id}" style="--rpg-c: ${g.color}"><p class="rpg-plate-no">${g.plate}</p>`;
+    if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="まだ開いていない">🔒</span><b>${g.name}</b></p><div class="rpg-fls">${fls}</div></div>`;
+    const rec = f => K.recLv(K.stageOf(g.id, f)), [jt, jc] = JUDGE[judgeOf(d, g.id, Math.min(n + 1, BOSS))];
+    return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" aria-hidden="true">${boss.e}</span><b>${g.name}</b><small>ボス ${boss.n}</small></p>`
+      + `<p class="rpg-plate-meta"><span>推奨Lv${rec(1)}〜${rec(BOSS)}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? '<span>ぜんぶクリア</span>' : ''}</p>`
+      + `<div class="rpg-fls">${fls}</div></div>`;
+  };
+  const bountyHTML = d => {
+    const b = d.bounty, n = b.a.filter(a => b.done.includes(a)).length;
+    const li = a => {
+      const nm = esc(byA.get(a)?.n ?? a), done = b.done.includes(a);
+      return `<li class="rpg-wf${done ? ' is-done' : ''}"><img src="${flag(a)}" alt="${nm}" title="${nm}">${done ? '<span class="rpg-check" role="img" aria-label="達成">✓</span>' : ''}</li>`;
+    };
+    return `<div class="rpg-bounty" id="rpg-bounty"${b.a.length ? '' : ' hidden'}><p class="rpg-bounty-h">今日の手配書 <b>${n}/${b.a.length}</b></p>`
+      + `<ul class="rpg-wanted">${b.a.map(li).join('')}</ul><p class="hint">ゲームでヒントなしの一発正解！</p></div>`;
+  };
+  const earnHTML = () => '<details class="rpg-earn" id="rpg-earn"><summary>コインのかせぎ方</summary>'
+    + `<table class="rpg-earn-t"><caption>クイズ1回の例（はじめて正解した国は、さらに +${T.quiz.firstEver}）</caption>`
+    + '<thead><tr><th scope="col">ゲーム</th><th scope="col">コイン</th></tr></thead>'
+    + `<tbody>${EARN.map(([g, c]) => `<tr><td>${g}</td><td>${c}</td></tr>`).join('')}</tbody></table>`
+    + '<button class="btn ghost" id="rpg-earn-go">クイズで稼ぐ</button></details>';
+  // スマホは上から 旅人・レベルアップ・つぎにやること・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
+  // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
+  const homeHTML = (d, nf, nx) => {
+    const st = nf ? K.battleStats(d, nf.id, nf.floor) : K.battleStats(d, DG[DG.length - 1].id, BOSS);   // 全部クリアなら地図喰い
+    const nick = store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
+    const max = d.lv >= T.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
+    const lvup = max ? 'MAX' : `レベルアップ ${COIN}${fmt(cost)}${can ? '' : ` <small class="rpg-short">あと${COIN}${fmt(cost - d.coins)}</small>`}`;
+    return `<div class="rpg-side">${warnHTML()}`
+      + '<div class="rpg-hero" id="rpg-hero">'
+      + `<button type="button" class="rpg-av" id="rpg-av" aria-label="旅人のすがたを変える">${AV[d.av] ?? AV[0]}</button>`
+      + `<p class="rpg-who"><b id="rpg-name">${name}</b><span class="rpg-ttl" id="rpg-title">${title ? `〈${esc(title)}〉` : ''}</span></p>`
+      + `<p class="rpg-stats" id="rpg-stats"><span class="rpg-lvnum">Lv ${d.lv}</span><span>❤️ ${fmt(st.hp)}</span><span>⚔️ ${fmt(st.atk)}</span><span>仲間 ${owned(d)}/${TOTAL}</span></p></div>`
+      + `<div class="rpg-lv"><button class="btn" id="rpg-lvup"${max || !can ? ' disabled' : ''}>${lvup}</button>`
+      + `<button class="linkbtn" id="rpg-lvmax"${upTo > d.lv ? '' : ' disabled'}>上げられるだけ上げる</button></div>`
+      + `<button type="button" class="rpg-next" id="rpg-next"><span class="rpg-next-k" aria-hidden="true">▸</span>`
+      + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
+      + `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
+      + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div></div>'
+      + `<div class="rpg-main"><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}</div>`
+      + `<div class="rpg-aside">${bountyHTML(d)}</div>`;
+  };
+  const bindHome = nx => {
+    $('rpg-av').onclick = () => tx(x => { x.av = (x.av + 1) % AV.length; });
+    $('rpg-lvup').onclick = levelUp;
+    $('rpg-lvmax').onclick = levelMax;
+    $('rpg-next').onclick = nx.go;
+    $('rpg-to-gacha').onclick = () => open('gacha');
+    $('rpg-to-cards').onclick = () => open('cards');
+    $('rpg-dgs').onclick = e => {
+      const b = e.target.closest('button.rpg-fl');
+      if (b && !b.disabled) open('battle', { id: b.dataset.d, floor: +b.dataset.f });
+    };
+    $('rpg-earn-go').onclick = () => show('setup');
+  };
+  // #scr-rpg を描く（screenRender.rpg と RPG.refresh）。日付が変わっていれば手配書を引き直す（変わらなければ tx は書かない）
+  const renderHome = () => {
+    const sec = $('scr-rpg');
+    if (!sec) return;
+    const m = missesNow(), t = todayStr();
+    let d = null;
+    tx(x => { K.ensureDay(x, m, t, Math.random); d = x; });
+    d = d || get();   // 新しい版のデータのときは読むだけ
+    // 描き直してもフォーカスと開いた <details> はそのまま
+    const focus = sec.contains(document.activeElement) ? document.activeElement.id : '';
+    const opened = [...sec.querySelectorAll('details[open]')].map(x => x.id);
+    sec.dataset.view = d.intro ? 'home' : 'intro';
+    if (d.intro) {
+      const nf = nextFloor(d), nx = nextAction(d, nf);
+      sec.innerHTML = homeHTML(d, nf, nx);
+      bindHome(nx);
+    } else {
+      sec.innerHTML = introHTML(d);
+      bindIntro(d);
+    }
+    for (const id of opened) if ($(id)) $(id).open = true;
+    if (focus) $(focus)?.focus({ preventScroll: true });
+  };
+  // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・いまの冒険ホームを描き直す
+  const refresh = () => {
+    const d = get();
+    document.body.classList.toggle('rpg-off', d.show === false);
+    drawEntrances(d);
+    if ($('set-rpg')) $('set-rpg').checked = d.show !== false;
+    if (document.body.dataset.screen === 'rpg') renderHome();
+  };
+  // 起動時に1回: 画面（<section> を作ってから登録）、ホームのボタン、トップバーのチップ、設定のスイッチ
+  const setupEntrances = () => {
+    document.body.classList.toggle('rpg-off', get().show === false);   // ボタンとチップを作る前に（OFF の人に一瞬でも見せない）
+    const wrap = document.querySelector('body > .wrap'), sec = document.createElement('section');
+    sec.id = 'scr-rpg'; sec.className = 'wrap'; sec.hidden = true;
+    const foot = wrap.querySelector(':scope > footer');
+    if (foot) foot.before(sec); else wrap.append(sec);
+    registerScreen('rpg', renderHome);
+
+    const hb = document.createElement('button');
+    hb.className = 'btn ghost'; hb.id = 'home-rpg';
+    hb.onclick = () => show('rpg');
+    $('home-play')?.after(hb);
+    const chip = document.createElement('button');
+    chip.type = 'button'; chip.className = 'rpg-chip'; chip.id = 'rpg-chip'; chip.title = 'コイン（冒険へ）';
+    chip.onclick = () => show('rpg');
+    ($('topbar-extra') || $('to-book')?.parentElement)?.prepend(chip);
+    const field = document.createElement('div');
+    field.className = 'field';
+    field.innerHTML = '<span class="lbl">冒険</span><label class="switch"><input type="checkbox" id="set-rpg"> 冒険（コイン・RPG）を表示する</label>';
+    $('set-dopa')?.closest('.field')?.after(field);
+    const sw = $('set-rpg');
+    if (sw) sw.onchange = () => {
+      const v = sw.checked;
+      tx(d => { d.show = v; });
+      document.body.classList.toggle('rpg-off', !v);
+    };
+    drawEntrances();
+  };
+  on('drill:screen', ({ name }) => {
+    if (name === 'home') drawEntrances();
+    if (name === 'settings' && $('set-rpg')) $('set-rpg').checked = get().show !== false;
+  });
+
   /* ---------- window.RPG ---------- */
   const RPG = window.RPG = {
     tx, get, emitCoins, announce, coinHTML,
     get status() { return status; },
-    // チップ・ホームのボタン・いまの RPG の画面を描き直す（冒険ホームなどを作るときに中身を足す）
-    refresh() {},
+    refresh, open, nextFloor, unlocked,
+    opts: {},   // RPG.open で渡したもの（開いた画面が読む）
     debug: {
       cur: () => window.RPG_BATTLE?.cur?.() ?? null,
       give(n) {
@@ -294,5 +556,8 @@
   if (status === 'readOnly') toast(MSG.readOnly);
   base = get();
   showCache = base.show;
+  setupEntrances();
   emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: Object.keys(base.cards).length });
+  // 直リンク（index.html の起動処理は #rpg を知らないので、画面を登録したあとでここから開く）
+  if (location.hash === '#rpg') show('rpg');
 })();

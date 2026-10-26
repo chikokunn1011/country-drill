@@ -165,7 +165,7 @@ test('rside_contents', { timeout: 120_000 }, async () => {
 });
 
 test('topbar_extra_slot', async () => {
-  const app = await openApp(browser);
+  const app = await openApp(browser, { blockScripts: RPG_FILES });
   try {
     const { page } = app;
     assert.equal(await page.locator('#topbar-extra').count(), 1);
