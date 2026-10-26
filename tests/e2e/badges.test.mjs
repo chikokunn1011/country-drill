@@ -3,6 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, pickSetup, answerCorrect, clearTimeAttack, clearByAnswering } from './helpers.mjs';
+import { measureFit, settleLayout, rectOf } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -179,3 +180,249 @@ test('missing_global_is_safe', { timeout: 60_000 }, async () => {
     assert.deepEqual(app.errors.map(String), []);
   } finally { await app.close(); }
 });
+
+/* ---------- ホームの札とボタン・バッジ画面・詳細・称号えらび（設計書 §6） ---------- */
+const text = (page, sel) => page.locator(sel).innerText();
+const count = (page, sel) => page.locator(sel).count();
+const json = o => JSON.stringify(o);
+// 計画 D の冒険ボタンの代わりに、ダミーの「冒険」ボタンを #home-rank の前に足す（ボタン5つのホームを確かめる）
+const addAdvButton = page => page.evaluate(() => {
+  const b = document.createElement('button');
+  Object.assign(b, { className: 'btn ghost', id: 'home-adv', textContent: '冒険' });
+  $('home-rank').before(b);
+});
+// 最初の .bdg-tiles の、先頭から n 個のタイルの top
+const tileTops = (page, n) => page.evaluate(n => [...document.querySelector('.bdg-tiles').children].slice(0, n).map(e => Math.round(e.getBoundingClientRect().top)), n);
+const listenTitle = page => page.evaluate(() => document.addEventListener('badge:title', e => (window.__bt ||= []).push(e.detail)));
+
+t('home_button_and_count', async page => {
+  assert.equal(await page.evaluate(() => $('home-badges').nextElementSibling.id), 'home-settings');
+  assert.match(await text(page, '#home-badges'), /バッジ\s*0\/26/);
+  assert.equal(await count(page, '#home-badges .bdg-dot'), 0);
+  await playPractice(page);
+  await page.click('#brand');
+  assert.match(await text(page, '#home-badges'), /バッジ\s*1\/26/);
+  assert.equal(await count(page, '#home-badges .bdg-dot[aria-label="新しいバッジあり"]'), 1);
+});
+
+t('home_title_chip', async page => {
+  await playPractice(page);
+  await page.click('#brand');
+  assert.equal(await page.evaluate(() => document.querySelector('#scr-home .menu').firstElementChild.className), 'bdg-titlerow');
+  assert.equal(await text(page, '#home-title'), '〈ドリルの新人〉');
+  await page.click('#home-title');
+  await page.waitForSelector('#detail[open] .bdg-picker');
+  assert.equal(await count(page, '#detail [data-bdg-pick="first-clear@1"]'), 1);
+  await listenTitle(page);
+  await page.click('#detail [data-bdg-pick=""]');
+  assert.equal(await page.evaluate(() => $('detail').open), false);
+  assert.equal(await count(page, '.bdg-titlerow'), 0);
+  assert.deepEqual(await page.evaluate(() => window.__bt), [{ key: null, title: '' }]);
+  assert.equal(await page.evaluate(() => BADGES.title()), '');
+  await page.evaluate(() => BADGES.debug.set('right', 100));   // 「つけない」を選んだら、新しいバッジでも自動でつけない
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), null);
+});
+
+t('badges_screen_phone', async page => {
+  await page.click('#home-badges');
+  assert.equal(await page.isVisible('#scr-badges'), true);
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'badges');
+  assert.equal(await text(page, '#bdg-total'), '26個中 0個');
+  assert.equal(await text(page, '#bdg-colors'), '銅 0 · 銀 0 · 金 0 · 虹 0');
+  const [a, b, c, d] = await tileTops(page, 4);
+  assert.ok(a === b && b === c && d > c, `3列でない: ${[a, b, c, d]}`);
+  assert.ok(await noHScroll(page));
+  assert.ok(await page.evaluate(() => $('bdg-cats').scrollWidth > $('bdg-cats').clientWidth), 'チップの行が横に動かない');
+  assert.equal(await count(page, '#bdg-cats [data-cat="rpg"]'), 0);
+  await page.click('#bdg-cats [data-cat="region"]');
+  assert.equal(await count(page, '.bdg-tile'), 7);
+  await page.reload();
+  await page.click('#home-badges');
+  assert.equal(await text(page, '#bdg-cats [aria-pressed="true"]'), '地域');
+  await page.setViewportSize({ width: 320, height: 640 });
+  const [p, q, r] = await tileTops(page, 3);
+  assert.ok(p === q && r > q, `2列でない: ${[p, q, r]}`);
+  assert.ok(await noHScroll(page));
+  await page.click('#bdg-home');
+  assert.equal(await page.isVisible('#scr-home'), true);
+});
+
+t('badges_screen_pc', async page => {
+  const vp = (width, height) => page.setViewportSize({ width, height });
+  await page.evaluate(() => show('badges'));
+  assert.ok(await noHScroll(page));
+  assert.equal(await page.evaluate(() => getComputedStyle($('bdg-cats')).position), 'sticky');
+  await vp(1440, 900);
+  assert.deepEqual(await page.evaluate(() => { const s = getComputedStyle($('bdg-sum')); return [s.position, s.top]; }), ['sticky', '16px']);
+  const [sum, main] = await Promise.all([rectOf(page, '#bdg-sum'), rectOf(page, '.bdg-main')]);
+  assert.ok(sum.right < main.left, `2列でない: ${json({ sum, main })}`);
+  assert.equal(await page.isVisible('.bdg-recent'), true);
+  await vp(1920, 1080);
+  const m = await page.evaluate(() => {
+    const sec = $('scr-badges'), r = sec.getBoundingClientRect(), tiles = document.querySelector('.bdg-tiles');
+    return { width: r.width, iw: innerWidth, edge: r.right - parseFloat(getComputedStyle(sec).paddingRight),
+      tiles: tiles.getBoundingClientRect().right, cols: getComputedStyle(tiles).gridTemplateColumns.split(' ').length };
+  });
+  assert.ok(m.width >= m.iw - 2 * 64 - 1, `幅に上限がある: ${json(m)}`);
+  assert.ok(Math.abs(m.tiles - m.edge) <= 1, `タイルが右端まで並ばない: ${json(m)}`);
+  assert.ok(m.cols >= 6, `列が少ない: ${json(m)}`);
+  assert.ok(await noHScroll(page));
+  await page.emulateMedia({ colorScheme: 'dark' });
+  for (const [w, h] of [[390, 844], [1440, 900]]) { await vp(w, h); assert.ok(await noHScroll(page), `dark ${w}x${h}`); }
+}, { viewport: { width: 1024, height: 768 } });
+
+t('tile_states', async page => {
+  const tile = id => `#bdg-list [data-bdg-detail="${id}"]`;
+  await page.evaluate(() => { BADGES.debug.set('right', 150); show('badges'); });
+  assert.equal(await page.getAttribute(tile('answers'), 'aria-label'), 'こつこつ正解。銅まで取った。次の銀は正解の合計が 1,000問、いま 150 / 1,000');
+  assert.equal(await count(page, `${tile('answers')} .bdg-new`), 1);
+  assert.match(await text(page, tile('chal-grit')), /？？？/);
+  assert.equal(await count(page, `${tile('chal-grit')} .bdg-bar`), 0);
+  assert.equal(await page.evaluate(() => $('bdg-soon').textContent), '');   // どれも50%未満
+  await page.evaluate(() => BADGES.debug.set('taAvg', 2430));                // バッジ画面のまま描き直される
+  assert.match(await text(page, tile('ta-speed')), /2\.43→2\.0秒/);
+  assert.deepEqual(await page.locator('#bdg-soon li').allInnerTexts(), ['⚡ スピードスター 銀 あと0.43秒']);
+  await page.evaluate(() => BADGES.debug.set('right', 600));
+  assert.deepEqual(await page.locator('#bdg-soon li').allInnerTexts(), ['⚡ スピードスター 銀 あと0.43秒', '📚 こつこつ正解 銀 あと400問']);
+});
+
+t('detail_and_new', async page => {
+  await playPractice(page);
+  assert.equal(await count(page, '#home-badges .bdg-dot'), 1);
+  await page.evaluate(() => BADGES.open('first-clear'));
+  await page.waitForSelector('#detail[open]');
+  assert.equal(await count(page, '#detail-inner .bdg-tier'), 1);
+  const tier = await text(page, '#detail-inner .bdg-tier');
+  for (const s of ['✓ ', '称号〈ドリルの新人〉', 'つけてる中']) assert.ok(tier.includes(s), `${s} が無い: ${tier}`);
+  assert.equal(typeof (await saved(page)).sn['first-clear'], 'number');
+  await page.click('#detail-inner [data-bdg-close]');
+  assert.equal(await page.evaluate(() => $('detail').open), false);
+  assert.equal(await count(page, '#bdg-list [data-bdg-detail="first-clear"]'), 1);
+  assert.equal(await count(page, '#bdg-list [data-bdg-detail="first-clear"] .bdg-new'), 0);
+  assert.equal(await count(page, '#home-badges .bdg-dot'), 0);
+});
+
+t('equip_from_detail', async page => {
+  await listenTitle(page);
+  await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
+  await page.click('.bdg-tier[data-key="reg-asia@2"] [data-bdg-equip]');
+  assert.equal(await page.evaluate(() => BADGES.title()), 'アジア通');
+  assert.deepEqual(await page.evaluate(() => window.__bt), [{ key: 'reg-asia@2', title: 'アジア通' }]);
+  assert.match(await text(page, '.bdg-tier[data-key="reg-asia@2"]'), /つけてる中/);
+  const t3 = await text(page, '.bdg-tier[data-key="reg-asia@3"]');
+  assert.ok(t3.includes('（取ると使える）') && t3.includes('0 / 184'), t3);
+  assert.equal(await text(page, '#detail-inner .bdg-note'), '※ 国名ヒントありの正解は数えないよ');
+});
+
+t('practice_button', async page => {
+  await page.evaluate(() => { P.name = true; BADGES.debug.grant('reg-asia@1'); BADGES.open('reg-asia'); });
+  await page.click('#detail-inner [data-bdg-practice]');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+  assert.deepEqual(await page.evaluate(() => [S.region, P.count, $('detail').open, JSON.parse(localStorage.getItem('settings')).region]),
+    ['アジア', 'all', false, 'アジア']);   // 次の段が銀（「全部」）なので全部にする
+  await page.evaluate(() => BADGES.open('mode-m2f'));
+  await page.click('#detail-inner [data-bdg-practice]');
+  assert.deepEqual(await page.evaluate(() => [P.mode, P.name, JSON.parse(localStorage.getItem('setup')).mode]), ['m2f', true, 'm2f']);
+});
+
+t('share_copies', async (page, app) => {
+  await app.context.addInitScript(() => {
+    delete Navigator.prototype.share;
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: s => { window.__clip = s; return Promise.resolve(); } } });
+  });
+  await page.reload();
+  await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
+  await page.click('#detail-inner [data-bdg-share]');
+  await page.locator('#toasts .toast', { hasText: 'コピーしたよ' }).waitFor();
+  assert.equal(await page.evaluate(() => window.__clip), '195か国ドリルでバッジ『アジア大陸横断（銀）』を取ったよ！ 称号〈アジア通〉 https://chikokunn1011.github.io/country-drill/');
+  await page.evaluate(() => BADGES.open('book'));
+  assert.equal(await count(page, '#detail-inner .bdg-detail'), 1);
+  assert.equal(await count(page, '#detail-inner [data-bdg-share]'), 0);
+});
+
+// ひみつのバッジは、取るまで条件と称号をどこにも出さない（タイルと詳細）
+t('secret_detail_hint_only', async page => {
+  const all = () => page.evaluate(() => $('detail-inner').textContent + $('scr-badges').innerHTML);
+  await page.evaluate(() => BADGES.open('chal-grit'));
+  const s = await all();
+  assert.ok(s.includes('挑戦でつまずいた条件に、もう一度いどむと…') && s.includes('？？？'), s);
+  for (const no of ['不屈の人', '1回目にクリア', '七転び八起き']) assert.ok(!s.includes(no), `${no} が出ている`);
+  for (const sel of ['[data-bdg-share]', '[data-bdg-practice]', '[data-bdg-equip]']) assert.equal(await count(page, `#detail-inner ${sel}`), 0, sel);
+  await page.evaluate(() => { BADGES.debug.grant('chal-grit@1'); BADGES.open('chal-grit'); });
+  const after = await text(page, '#detail-inner');
+  assert.ok(after.includes('七転び八起き') && after.includes('称号〈不屈の人〉'), after);
+});
+
+// pc.css の ≥1280 は #detail .inner を2列の grid にするので、バッジの詳細と称号えらびは全幅にする
+t('detail_full_width_pc', async page => {
+  const fill = sel => page.evaluate(sel => {
+    const inner = $('detail-inner'), cs = getComputedStyle(inner);
+    return { width: document.querySelector(sel).getBoundingClientRect().width, room: inner.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) };
+  }, sel);
+  await page.evaluate(() => BADGES.open('reg-asia'));
+  let f = await fill('#detail-inner > .bdg-detail');
+  assert.ok(f.width >= f.room - 2, `詳細: ${json(f)}`);
+  await page.click('#detail-inner [data-bdg-close]');
+  await page.evaluate(() => show('home'));
+  await page.click('#home-title');
+  f = await fill('#detail-inner > .bdg-picker');
+  assert.ok(f.width >= f.room - 2, `称号えらび: ${json(f)}`);
+}, { viewport: { width: 1440, height: 900 }, storage: { badges: { v: 1, got: { 'reg-asia@1': 1, 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'reg-asia': 2, 'first-clear': 2 } } } });
+
+t('hash_opens_badges', async page => {
+  await page.goto('about:blank');
+  await page.goto(server.url + '?bdgdebug=1#badges');
+  assert.equal(await page.isVisible('#scr-badges'), true);
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'badges');
+});
+
+// 横に並ぶホーム（900〜1279）でボタン5つと札がはみ出さず、札は自分の行に出る。≥1280 の2列ヒーローでは札を左に寄せる
+t('home_menu_pc', async page => {
+  await addAdvButton(page);
+  await page.evaluate(() => { BADGES.debug.grant('first-clear@1'); BADGES.open('first-clear'); });
+  await page.click('[data-bdg-equip="first-clear@1"]');
+  await page.evaluate(() => { $('detail').close(); show('home'); });
+  for (const [width, height] of [[900, 700], [1024, 768]]) {
+    await page.setViewportSize({ width, height });
+    const m = await page.evaluate(() => {
+      const row = document.querySelector('.bdg-titlerow').getBoundingClientRect();
+      const btns = [...document.querySelectorAll('.menu .btn')].map(b => b.getBoundingClientRect()).filter(r => r.width);
+      return { n: btns.length, inside: btns.every(r => r.right <= innerWidth), below: btns.every(r => row.bottom <= r.top) };
+    });
+    assert.deepEqual(m, { n: 5, inside: true, below: true }, `${width}x${height}`);
+    assert.ok(await noHScroll(page), `${width}x${height}`);
+  }
+  await page.setViewportSize({ width: 1366, height: 768 });
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bdg-titlerow')).justifyContent), 'flex-start');
+}, { viewport: { width: 900, height: 700 } });
+
+// 背の低い PC（150% 表示のノートなど）で、ボタン5つと札があってもホームが縦にスクロールしない
+t('home_short_pc_fits', async page => {
+  await addAdvButton(page);
+  for (const [i, viewport] of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }].entries()) {
+    const key = `${viewport.width}x${viewport.height}`;
+    if (i) await page.setViewportSize(viewport);
+    await settleLayout(page);
+    const m = await measureFit(page);
+    assert.equal(m.hscroll, false, key);
+    assert.ok(m.docH <= m.ih, `${key}: ${json(m)}`);
+    if (viewport.width === 1024) continue;
+    const bottoms = await page.$$eval('.menu .btn', bs => bs.map(b => b.getBoundingClientRect().bottom));
+    assert.ok(bottoms.every(b => b <= viewport.height), `${key}: ${bottoms}`);
+    assert.equal(await page.isVisible('#home-title'), true, key);
+  }
+}, { viewport: { width: 1280, height: 577 }, storage: { badges: { v: 1, got: { 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'first-clear': 2 } } } });
+
+// いちばん長い称号でも 320px のホームからはみ出さない。[data-bdg-equip] は document のクリックで受ける（どこに置いたボタンでも）
+t('home_long_title_320', async page => {
+  await page.evaluate(() => {
+    BADGES.debug.grant('rpg-final@1');   // 冒険なしでは一覧に出ないが、title() はカタログにあれば返す
+    const b = document.createElement('button');
+    b.dataset.bdgEquip = 'rpg-final@1'; b.textContent = 'x';
+    document.body.append(b);
+  });
+  await page.click('body > [data-bdg-equip="rpg-final@1"]');
+  assert.equal(await text(page, '#home-title'), '〈世界を取りもどした者〉');
+  assert.ok(await noHScroll(page));
+  assert.ok((await rectOf(page, '#home-title')).right <= 320);
+}, { viewport: { width: 320, height: 640 } });

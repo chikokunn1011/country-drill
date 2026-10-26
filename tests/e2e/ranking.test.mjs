@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, clearTimeAttack, warned, PC } from './helpers.mjs';
+import { startServer, openApp, pickSetup, clearTimeAttack, warned, PC, QUIET_BADGES } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -34,15 +34,16 @@ const noHScroll = page => page.evaluate(() => document.documentElement.scrollWid
 const namesFit = page => page.$$eval('#rk-list .nick', els => els.every(e => e.scrollWidth <= e.clientWidth));
 const wait = ms => new Promise(ok => setTimeout(ok, ms));
 
+// バッジのボタンは設定の前（称号の札も button なので、札が出ない QUIET_BADGES で開く）
 t('home_button_order', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-play', 'home-rank', 'home-settings']);
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-play', 'home-rank', 'home-badges', 'home-settings']);
   assert.equal(await text(page, '#home-rank'), 'ランキング');
   assert.equal(await page.getAttribute('#home-rank', 'class'), 'btn ghost');
   await page.click('#home-rank');
   assert.equal(await page.isVisible('#scr-ranking'), true);
   assert.equal(await page.isHidden('#scr-home'), true);
   assert.equal(await page.isVisible('#topbar'), true);
-});
+}, { storage: { badges: QUIET_BADGES } });
 
 t('home_button_hidden_when_disabled', async page => {
   // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じやり方）

@@ -402,12 +402,13 @@
     return best;
   }
 
+  // 段の goal への進み具合 0〜1。lower（小さいほどよい）は goal / v で、記録が無ければ 0
+  const ratioOf = (b, v, goal) => b.lower ? (v > 0 ? Math.min(1, goal / v) : 0) : Math.min(1, v / goal);
   // 次の段への進み具合。next はまだ取っていない最初の段の添字（全部取ったら -1 で、値は最後の段）
   function progressOf(b, d, x) {
     const next = b.tiers.findIndex((_, i) => !own(d.got, stepKey(b, i)));
     const t = b.tiers[next < 0 ? b.tiers.length - 1 : next], v = valOf(b, t, d.s, x), goal = t.goal;
-    const ratio = next < 0 ? 1 : b.lower ? (v > 0 ? Math.min(1, goal / v) : 0) : Math.min(1, v / goal);
-    return { next, v, goal, ratio };
+    return { next, v, goal, ratio: next < 0 ? 1 : ratioOf(b, v, goal) };
   }
   // 見えているバッジの数。1段でも取ったバッジを数え、色はそのバッジで取った一番上の段の色
   function summarize(cat, d, x) {
@@ -552,8 +553,6 @@
     if (screen === 'badges') renderBadges();
   }
   function flush() {}           // 保留していたお知らせを出す（Task 6）
-  function renderHome() {}      // ホームの札とボタン（Task 5）
-  function renderBadges() {}    // バッジ画面（Task 5）
   function pay(keys, retro = false) { return {}; }   // 冒険への支払い（Task 7）
   // つける称号が変わった（key が null なら外した）。badge:title を出すのはここだけ
   function emitTitle(key) {
@@ -597,13 +596,201 @@
     if (screen === 'badges') renderBadges();
   });
 
+  // ---------- 画面（設計書 §6）。出す文字はいつも esc() を通す ----------
+  const SITE = 'https://chikokunn1011.github.io/country-drill/';   // シェアの文の最後に付ける
+  // いまつけている称号（かっこなし）。eq がカタログに無い・取っていないなら ''
+  function titleText() { const { eq, got } = bs.st; return eq && own(got, eq) ? stepInfo(CAT, eq)?.t.title ?? '' : ''; }
+  // 取った一番上の段の添字。1段も取っていなければ -1
+  const topOf = (b, d) => { let i = b.tiers.length - 1; while (i >= 0 && !own(d.got, stepKey(b, i))) i--; return i; };
+  const masked = (b, d) => !!b.secret && topOf(b, d) < 0;   // ひみつのバッジで、まだ取っていない（条件と称号を出さない）
+  // NEW: 取った段の時刻のどれかが、詳細を最後に開いた時刻（sn）より新しい
+  const isNew = (b, d) => b.tiers.some((_, i) => { const k = stepKey(b, i); return own(d.got, k) && d.got[k] > (d.sn[b.id] || 0); });
+  // 進み具合の文。ta-speed（lower）は「2.43→2.0秒」（記録が無ければ「記録なし」）、ほかは「34 / 100」
+  const progText = (b, v, goal) => b.lower ? (v > 0 ? `${(v / 1000).toFixed(2)}→${(goal / 1000).toFixed(1)}秒` : '記録なし') : `${fmt(Math.min(v, goal))} / ${fmt(goal)}`;
+  const barHTML = r => `<div class="bdg-bar"><i style="width:${Math.round(r * 100)}%"></i></div>`;
+  const medalHTML = (b, d) => { const top = topOf(b, d); return `<span class="bdg-medal ${top < 0 ? 'off' : 't' + b.tiers[top].color}" aria-hidden="true"><i>${masked(b, d) ? '？' : esc(b.icon)}</i></span>`; };
+  const monthDay = t => { const dt = new Date(t); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
+  const catsOf = x => ['all', ...Object.keys(CAT_LABEL).filter(c => c !== 'rpg' || x.rpg)];   // 分類のチップ（冒険は rpg.js があるときだけ）
+
+  // ホーム（§6.1）: バッジのボタン（#home-settings の直前）と称号の札（.home .menu の1つ目）。何度呼んでも同じ要素を書きかえる
+  function renderHome() {
+    const menu = document.querySelector('.home .menu');
+    if (!menu) return;
+    let btn = $('home-badges');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'btn ghost'; btn.id = 'home-badges'; btn.dataset.bdgOpen = '';
+      const next = $('home-settings');
+      if (next?.parentElement === menu) next.before(btn); else menu.append(btn);
+    }
+    const d = bs.st, x = ctx(), { got, total } = summarize(CAT, d, x);
+    btn.innerHTML = `バッジ <small class="mono">${got}/${total}</small>`
+      + (visible(CAT, x).some(b => isNew(b, d)) ? '<span class="bdg-dot" role="img" aria-label="新しいバッジあり"></span>' : '');
+    const title = titleText();
+    let row = menu.querySelector(':scope > .bdg-titlerow');
+    if (!title) { row?.remove(); return; }
+    if (!row) {
+      row = document.createElement('div'); row.className = 'bdg-titlerow';
+      row.innerHTML = '<button class="bdg-titlechip" id="home-title" data-bdg-picker></button>';
+      menu.prepend(row);
+    }
+    row.firstElementChild.innerHTML = `〈${esc(title)}〉`;   // ボタンは作り直さない（フォーカスを残す）
+  }
+
+  // バッジ画面のタイル（§6.2）
+  function tileHTML(b, d, x) {
+    const top = topOf(b, d), hide = masked(b, d), p = progressOf(b, d, x), next = p.next >= 0 ? b.tiers[p.next] : null;
+    const prog = next ? progText(b, p.v, p.goal) : 'コンプリート！';
+    const label = hide ? `ひみつのバッジ。${b.hint}` : !next ? `${b.name}。コンプリート`
+      : `${b.name}。${top < 0 ? 'まだ取っていない' : tierLabel(b.tiers[top].color) + 'まで取った'}。次の${tierLabel(next.color)}は${next.desc}、いま ${prog}`;
+    const dots = b.tiers.map((t, i) => own(d.got, stepKey(b, i)) ? `<i class="t${t.color}">●</i>` : '<i>○</i>').join('');
+    return `<button class="bdg-tile" data-bdg-detail="${b.id}" aria-label="${esc(label)}">${medalHTML(b, d)}`
+      + `<b class="bdg-name">${hide ? '？？？' : esc(b.name)}</b>${b.sub && !hide ? `<small class="bdg-sub">${esc(b.sub)}</small>` : ''}`
+      + `<span class="bdg-dots">${dots}</span>${hide ? '' : `${barHTML(p.ratio)}<span class="bdg-prog">${esc(prog)}</span>`}`
+      + `${isNew(b, d) ? '<span class="bdg-new">NEW</span>' : ''}</button>`;
+  }
+  // もうすぐ取れそう: ひみつでないバッジの次の段で、進み具合が50%以上のものを、進んでいる順に3つ
+  function soonHTML(list, d, x) {
+    return list.filter(b => !b.secret).map(b => [b, progressOf(b, d, x)]).filter(([, p]) => p.next >= 0 && p.ratio >= .5 && p.ratio < 1)
+      .sort((p, q) => q[1].ratio - p[1].ratio).slice(0, 3)
+      .map(([b, p]) => {
+        const left = b.lower ? `${((p.v - p.goal) / 1000).toFixed(2)}秒` : `${fmt(p.goal - p.v)}${b.unit ?? ''}`;
+        return `<li>${esc(`${b.icon} ${b.name} ${tierLabel(b.tiers[p.next].color)} あと${left}`)}</li>`;
+      }).join('');
+  }
+  // 最近とったバッジ: 見えているバッジのステップを、取った時刻の新しい順に3つ
+  function recentHTML(list, d) {
+    const ids = new Set(list.map(b => b.id));
+    return Object.entries(d.got).map(([k, t]) => [stepInfo(CAT, k), t]).filter(([si]) => si && ids.has(si.b.id))
+      .sort((p, q) => q[1] - p[1]).slice(0, 3)
+      .map(([si, t]) => `<li>${esc(`${monthDay(t)} ${si.b.icon} ${si.b.name} ${tierLabel(si.color)}`)}</li>`).join('');
+  }
+  function renderBadges() {
+    const d = bs.st, x = ctx(), list = visible(CAT, x), sum = summarize(CAT, d, x), title = titleText();
+    $('bdg-total').textContent = `${sum.total}個中 ${sum.got}個`;
+    $('bdg-title').innerHTML = title ? `〈${esc(title)}〉` : 'まだ称号がない';
+    $('bdg-colors').textContent = [1, 2, 3, 4].map(c => `${tierLabel(c)} ${sum.byColor[c]}`).join(' · ');
+    $('bdg-soon').innerHTML = soonHTML(list, d, x);
+    $('bdg-recent').innerHTML = recentHTML(list, d);
+    // 分類のチップは、並びが変わったときだけ作り直す（押したチップのフォーカスと、行の横スクロールの位置を残す）
+    const cats = catsOf(x), saved = store.get('bdgcat', 'all'), cur = cats.includes(saved) ? saved : 'all', box = $('bdg-cats');
+    if (box.dataset.cats !== cats.join()) {
+      box.dataset.cats = cats.join();
+      box.innerHTML = cats.map(c => `<button class="chip" data-cat="${c}">${c === 'all' ? 'すべて' : esc(CAT_LABEL[c])}</button>`).join('');
+    }
+    for (const chip of box.children) chip.setAttribute('aria-pressed', chip.dataset.cat === cur);
+    $('bdg-list').innerHTML = cats.filter(c => c !== 'all' && (cur === 'all' || c === cur))
+      .map(c => `<section class="bdg-cat" data-cat="${c}"><h2 class="bdg-cat-h">${esc(CAT_LABEL[c])}</h2>`
+        + `<div class="bdg-tiles">${list.filter(b => b.cat === c).map(b => tileHTML(b, d, x)).join('')}</div></section>`).join('');
+  }
+
+  // 詳細ダイアログ（§6.3）。図鑑の #detail を使い回す（index.html の $('detail').onclick は上書きしない）
+  function detailHTML(b) {
+    const d = bs.st, x = ctx(), hide = masked(b, d);
+    const head = `<div class="bdg-dhead">${medalHTML(b, d)}<div><h2 class="bdg-dname">${hide ? '？？？' : esc(b.name)}</h2>`
+      + `<p class="bdg-dcat">${esc(CAT_LABEL[b.cat])}のバッジ</p></div></div>`;
+    if (hide) return `<div class="bdg-detail" data-id="${b.id}">${head}<p class="bdg-hint">${esc(b.hint)}</p></div>`;   // ヒントだけ
+    const tiers = b.tiers.map((t, i) => {
+      const key = stepKey(b, i), got = own(d.got, key), v = valOf(b, t, d.s, x);
+      const state = got ? `<p class="bdg-when">✓ ${monthDay(d.got[key])}</p>`
+        : `<div class="bdg-tprog">${barHTML(ratioOf(b, v, t.goal))}<span class="bdg-prog">${esc(progText(b, v, t.goal))}</span></div>`;
+      const act = got && d.eq === key ? '<span class="bdg-on">つけてる中</span>'
+        : got ? `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>` : '<span class="bdg-lock">（取ると使える）</span>';
+      return `<li class="bdg-tier" data-key="${key}"><span class="bdg-tl t${t.color}">${tierLabel(t.color)}</span><div class="bdg-tbody">`
+        + `<p class="bdg-cond">${esc(t.desc)}</p>${state}<div class="bdg-trow"><p class="bdg-ttl">称号〈${esc(t.title)}〉</p>${act}</div></div></li>`;
+    }).join('');
+    const acts = (topOf(b, d) >= 0 ? `<button class="btn ghost bdg-btn" data-bdg-share="${b.id}">シェア</button>` : '')
+      + (b.cat === 'region' || b.cat === 'mode' ? `<button class="btn ghost bdg-btn" data-bdg-practice="${b.id}">練習する →</button>` : '');
+    return `<div class="bdg-detail" data-id="${b.id}">${head}<ol class="bdg-tiers">${tiers}</ol>`
+      + `${b.skill ? '<p class="bdg-note">※ 国名ヒントありの正解は数えないよ</p>' : ''}${acts ? `<div class="row bdg-acts">${acts}</div>` : ''}</div>`;
+  }
+  // 称号えらび: 取った称号を段の色の大きい順（虹→銅）に。最後に「称号をつけない」
+  function pickerHTML() {
+    const d = bs.st, eq = d.eq || '';
+    const pick = (key, inner) => `<button class="bdg-pick" data-bdg-pick="${key}" aria-pressed="${eq === key}">${inner}</button>`;
+    const steps = visible(CAT, ctx()).flatMap(b => b.tiers.map((_, i) => stepKey(b, i))).filter(k => own(d.got, k))
+      .map(k => [k, stepInfo(CAT, k)]).sort((p, q) => q[1].color - p[1].color);
+    return `<div class="bdg-picker"><h2 class="bdg-ph">称号をえらぶ</h2><div class="bdg-picks">`
+      + steps.map(([k, si]) => pick(k, `<span class="bdg-tl t${si.color}">${tierLabel(si.color)}</span>`
+        + `<span class="bdg-pt"><b>〈${esc(si.t.title)}〉</b><small>${esc(`${si.b.icon} ${si.b.name}`)}</small></span>`)).join('')
+      + `${pick('', '称号をつけない')}</div></div>`;
+  }
+  function drawDialog(html) {
+    $('detail-inner').innerHTML = `<button class="close" data-bdg-close>閉じる</button>${html}`;
+    if (!$('detail').open) $('detail').showModal();
+  }
+  function openDetail(id) {
+    const b = visible(CAT, ctx()).find(e => e.id === id);
+    if (!b) return;
+    drawDialog(detailHTML(b));
+    bs.push(['seen', id, Date.now()]); bs.commit({ judge: false });   // NEW の印を消す
+    renderHome();
+    if (screen === 'badges') renderBadges();
+  }
+  function openPicker() { drawDialog(pickerHTML()); }
+  // ダイアログにバッジの詳細か称号えらびが出ていれば描き直す。図鑑の詳細には触らない
+  function redrawDialog() {
+    const box = $('detail').open && $('detail-inner').querySelector(':scope > .bdg-detail, :scope > .bdg-picker');
+    if (!box) return;
+    if (box.classList.contains('bdg-picker')) { drawDialog(pickerHTML()); return; }
+    const b = CAT.find(e => e.id === box.dataset.id);
+    if (b) drawDialog(detailHTML(b));
+  }
+
+  function open(id) { show('badges'); if (id) openDetail(id); }
+  // 称号をつける（'' なら外す）。取っていないキーは何もしない
+  function equip(key) {
+    if (typeof key !== 'string' || key !== '' && !own(bs.st.got, key)) return;
+    bs.push(['eq', key]);
+    deliver(bs.commit());          // ホームの札とバッジ画面も、ここで描き直す
+    emitTitle(key || null);
+    redrawDialog();
+  }
+  // 地域・モードのバッジの条件でモード選択へ（P.name は変えない。詳細の注意書きで知らせる）
+  function practice(id) {
+    const b = CAT.find(e => e.id === id);
+    if (b?.cat === 'region') {
+      S.region = X.regionOf(b.rk); store.set('settings', S);
+      if (progressOf(b, bs.st, ctx()).next === 1) P.count = 'all';   // 次の段が銀（「全部」をヒントなしでクリア）
+    } else if (b?.cat === 'mode') P.mode = b.mode;
+    else return;
+    store.set('setup', P);
+    $('detail').close();
+    show('setup');
+  }
+  // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする
+  function share(id) {
+    const b = CAT.find(e => e.id === id), top = b ? topOf(b, bs.st) : -1;
+    if (top < 0) return;
+    const t = b.tiers[top], text = `195か国ドリルでバッジ『${b.name}（${tierLabel(t.color)}）』を取ったよ！ 称号〈${t.title}〉 ${SITE}`;
+    try {
+      if (navigator.share) navigator.share({ text }).catch(() => {});
+      else navigator.clipboard?.writeText(text).then(() => toast('コピーしたよ', 2000), () => {});
+    } catch { /* 共有もコピーもできなければ何もしない */ }
+  }
+
+  // バッジのボタンは document でまとめて受ける（ホーム・バッジ画面・ダイアログ。Task 6 がトーストとパネルの分を足す）
+  document.addEventListener('click', e => {
+    const el = e.target instanceof Element && e.target.closest('[data-bdg-equip], [data-bdg-pick], [data-bdg-open], [data-bdg-detail], [data-bdg-practice], [data-bdg-share], [data-bdg-close], [data-bdg-picker]');
+    if (!el) return;
+    const v = el.dataset;
+    if ('bdgEquip' in v) equip(v.bdgEquip);
+    else if ('bdgPick' in v) { equip(v.bdgPick); $('detail').close(); }
+    else if ('bdgOpen' in v) open(v.bdgOpen || undefined);
+    else if ('bdgDetail' in v) openDetail(v.bdgDetail);
+    else if ('bdgPractice' in v) practice(v.bdgPractice);
+    else if ('bdgShare' in v) share(v.bdgShare);
+    else if ('bdgClose' in v) $('detail').close();
+    else openPicker();             // [data-bdg-picker]（ホームの札と［称号をかえる］）
+  });
+
   // ---------- window.BADGES（設計書 §9.3）。起動時の判定より先に置く（badge:title を受けた側が title() を読めるように） ----------
   window.BADGES = {
-    title() { const { eq, got } = bs.st; return eq && own(got, eq) ? stepInfo(CAT, eq)?.t.title ?? '' : ''; },   // かっこなし
+    title: titleText,              // かっこなし
     titleKey: () => bs.st.eq || null,
     count: () => summarize(CAT, bs.st, ctx()),
     list: () => listView(CAT, bs.st, ctx()),
-    open: id => show('badges'),                // Task 5 で詳細も開く
+    open,
   };
   if (new URLSearchParams(location.search).get('bdgdebug') === '1') window.BADGES.debug = {   // E2E 用
     grant(key) { bs.push(['got', key, Date.now()]); bs.commit({ judge: false }); renderHome(); },
@@ -615,4 +802,32 @@
   // ---------- 起動時の判定（§3.4）。bootAuto はほかの commit より先に読む ----------
   const boot = bs.commit(), bootAuto = bs.lastAuto;
   deliver(boot, { startup: true, auto: bootAuto });
+
+  // ---------- バッジ画面（§6.2）。<section> を #scr-book の後ろに作ってから登録する ----------
+  const sec = document.createElement('section');
+  sec.id = 'scr-badges'; sec.className = 'wrap'; sec.hidden = true;
+  sec.innerHTML = `<div class="bdg-split">
+    <div id="bdg-sum" class="bdg-sum panel">
+      <div class="bdg-head"><h2>バッジ</h2><span id="bdg-total"></span></div>
+      <div class="bdg-me"><span id="bdg-title" class="bdg-mytitle"></span><button class="btn ghost bdg-btn" id="bdg-change" data-bdg-picker>称号をかえる</button></div>
+      <p id="bdg-colors" class="bdg-colors"></p>
+      <div class="bdg-soon"><h3 class="bdg-sh">もうすぐ取れそう</h3><ul id="bdg-soon" class="bdg-lines"></ul></div>
+      <div class="bdg-recent"><h3 class="bdg-sh">最近とったバッジ</h3><ul id="bdg-recent" class="bdg-lines"></ul></div>
+    </div>
+    <div class="bdg-main"><div id="bdg-cats" class="bdg-cats" role="group" aria-label="分類"></div><div id="bdg-list"></div></div>
+  </div>
+  <div class="row end"><button class="btn" id="bdg-home">ホームへ</button></div>`;
+  $('scr-book').after(sec);
+  $('bdg-home').onclick = () => show('home');
+  $('bdg-cats').onclick = e => {
+    const chip = e.target.closest('[data-cat]');
+    if (chip) { store.set('bdgcat', chip.dataset.cat); renderBadges(); }
+  };
+  // 詳細を閉じたら、開いていたバッジのタイルにフォーカスを戻す（開いたときにタイルを描き直したので、元のタイルはもう無い）
+  $('detail').addEventListener('close', () => {
+    const id = $('detail-inner').querySelector(':scope > .bdg-detail')?.dataset.id;
+    if (id && document.activeElement === document.body) $('bdg-list').querySelector(`[data-bdg-detail="${id}"]`)?.focus();
+  });
+  registerScreen('badges', renderBadges);
+  if (location.hash === '#badges') show('badges');
 })();
