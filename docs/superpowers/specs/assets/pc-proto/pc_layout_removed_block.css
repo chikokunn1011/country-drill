@@ -1,0 +1,43 @@
+@media (min-width: 900px) {
+  body { padding-block: 28px 48px; padding-inline: 32px; }
+  .wrap { max-width: 1200px; gap: 20px; }
+  .wrap.narrow { max-width: 680px; }
+  .wrap .wrap { width: 100%; }
+  #topbar { max-width: 1200px; width: 100%; margin-inline: auto; }
+
+  .home { padding-block: 64px 32px; gap: 28px; }
+  .home h1 { font-size: 4.4rem; }
+  .home .flags { max-width: 820px; gap: 8px; }
+  .home .flags img { width: 44px; }
+  .home .flags img:nth-child(n+15) { display: block; }
+  .home .menu { flex-direction: row; width: auto; }
+  .home .menu .btn { min-width: 200px; }
+
+  .panel { padding: 28px 32px; gap: 18px; }
+  .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 32px; align-items: start; }
+  .cols > .col + .col { border-left: 1px dashed var(--line); padding-left: 32px; }
+  .modecard { padding: 16px 18px; }
+  .modecard b { font-size: 1.08rem; }
+
+  /* クイズ：左に問題、右に選択肢。答えたあとの解説は下に横長で出す */
+  .qcard { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px 36px; align-items: center; padding: 32px; }
+  .qcard.q-map { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .qcard.a-map { grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr); }
+  .qcard .reveal { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 36px; align-items: center; }
+  .qcard .reveal > .verdict, .qcard .reveal > .next { grid-column: 1 / -1; }
+  .qcard .reveal > .next { justify-self: end; }
+  .qflag { width: min(380px, 90%); }
+  .qbig { font-size: 3rem; }
+  .qlabel { font-size: 1.3rem; }
+  .choices.textc { grid-template-columns: 1fr; }
+  .choice { min-height: 60px; font-size: 1.05rem; }
+  .facts { grid-template-columns: 128px 1fr; } .facts img { width: 128px; }
+
+  #rcard { padding: 36px; display: flex; }
+  .misslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+
+  .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+  .bmap { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+  .binfo { min-height: 240px; }
+  .binfo .facts { grid-template-columns: 1fr; } .binfo .facts img { width: 100%; max-width: 220px; }
+}

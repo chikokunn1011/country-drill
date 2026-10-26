@@ -1,0 +1,214 @@
+/* バッジの画面・札・トースト。クラスは .bdg- で始める */
+/* 段の色（1 銅・2 銀・3 金・4 虹） */
+:root { --bdg-t1: #b0793f; --bdg-t2: #9aa5ad; --bdg-t3: #d9a520; --bdg-t4: conic-gradient(#ff5f6d, #ffc371, #47e891, #3fa9f5, #b06ab3, #ff5f6d); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bdg-t1: #c98d50; --bdg-t2: #b4bec5; --bdg-t3: #e8b830; }
+}
+:root[data-theme="dark"] { --bdg-t1: #c98d50; --bdg-t2: #b4bec5; --bdg-t3: #e8b830; }
+
+/* ---------- ホーム（§6.1）: 称号の札とバッジのボタン ---------- */
+.bdg-titlerow { width: 100%; display: flex; justify-content: center; }
+.bdg-titlechip { max-width: 100%; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 16px; font: 700 .95rem/1.4 var(--font-display); cursor: pointer; overflow-wrap: anywhere; }
+.bdg-titlechip:hover { border-color: var(--accent); }
+#home-badges { position: relative; }
+.bdg-dot { position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--surface); }
+/* 横に並ぶメニュー（900〜1279）でボタンが増えても横にはみ出さない。札は幅100%なので自分の行になる */
+@media (min-width: 900px) { .home .menu { flex-wrap: wrap; justify-content: center; max-width: 100%; } }
+@media (min-width: 1280px) { body[data-screen] .bdg-titlerow { justify-content: flex-start; } }
+/* 高さ 1000px までの PC: ボタンを2列にして縦に収める。プレイと札の行だけ全幅。
+   1列のままだと、ボタンが4〜5つと札で高さ 760 を少し超える PC（1366×768、1600×900 のブラウザなど）でもホームがスクロールする */
+@media (min-width: 1280px) and (max-height: 1000px) {
+  .home .menu { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .home .menu > #home-play, .home .menu > .bdg-titlerow { grid-column: 1 / -1; }
+}
+/* 背の低い PC（150% 表示のノートなど）: 2列にしても 1280×577 ではみ出すので、ボタンと札・ホームの上下の余白も詰める。
+   .btn の font は line-height を normal に戻し、高さが字体で変わる（Zen Maru Gothic は約1.46、代わりの字体は約1.35）ので、行の高さを決めておく */
+@media (min-width: 1280px) and (max-height: 760px) {
+  .home { padding-block: clamp(12px, 3vh, 64px); }
+  .home .menu .btn { padding-block: 9px; }
+  .home .menu .btn, #home-book { line-height: 1.3; }
+  .bdg-titlechip { padding-block: 3px; }
+}
+
+/* ---------- メダルと段の札（縁の色 = 段の色。色だけでなく「銅・銀・金・虹」の文字も出す） ---------- */
+.bdg-medal { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; border: 4px solid var(--line); background: var(--surface); font-size: 26px; line-height: 1; }
+.bdg-medal > i { font-style: normal; }
+.bdg-medal.off > i { filter: grayscale(1); opacity: .45; }
+.bdg-tl { flex: none; display: inline-grid; place-items: center; min-width: 2.6em; padding: 0 8px; border: 2px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink); font: 700 .8rem/1.6 var(--font-display); }
+.bdg-medal.t1, .bdg-tl.t1 { border-color: var(--bdg-t1); }
+.bdg-medal.t2, .bdg-tl.t2 { border-color: var(--bdg-t2); }
+.bdg-medal.t3, .bdg-tl.t3 { border-color: var(--bdg-t3); }
+.bdg-medal.t4, .bdg-tl.t4 { border-color: transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--bdg-t4) border-box; }
+.bdg-bar { width: 100%; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bdg-bar > i { display: block; height: 100%; background: var(--accent); }
+.bdg-prog { font: .72rem/1.3 var(--font-mono); color: var(--muted); overflow-wrap: anywhere; }
+
+/* ---------- バッジ画面（§6.2） ---------- */
+#scr-badges.wrap { width: 100%; }   /* 中身の幅に縮めない（.wrap の中の .wrap は margin: auto で縮む） */
+.bdg-split, .bdg-main, #bdg-list { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#bdg-list { gap: 22px; }
+.bdg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+#bdg-total { font-weight: 700; }
+.bdg-me { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.bdg-mytitle { min-width: 0; font: 900 1.15rem/1.4 var(--font-display); overflow-wrap: anywhere; }
+.bdg-colors { margin: 0; }
+.bdg-sh { margin: 0 0 6px; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.bdg-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: .9rem; }
+.bdg-lines:empty::before { content: "—"; color: var(--muted); }
+.bdg-recent { display: none; }   /* 最近とったバッジは ≥1280 のまとめ欄だけ */
+/* 分類のチップ: 行だけが横にスクロールする（ページは横にスクロールしない）。padding はフォーカスの枠を切らないため */
+.bdg-cats { display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; min-width: 0; padding: 6px; margin-inline: -6px; scrollbar-width: thin; }
+.bdg-cats > .chip { flex: none; }
+.bdg-cat { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bdg-cat-h { margin: 0; font: 900 1.05rem/1.3 var(--font-display); }
+/* タイル: 390px で3列、320px で2列（入れ物には padding を付けない） */
+.bdg-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.bdg-tile { position: relative; min-width: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: .85rem; line-height: 1.3; text-align: center; cursor: pointer; }
+.bdg-tile:hover { border-color: var(--accent); }
+.bdg-name { font: 700 .85rem/1.3 var(--font-display); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.bdg-sub { margin-top: -4px; font-size: .7rem; color: var(--muted); }
+.bdg-dots { margin-top: auto; display: flex; gap: 2px; font-size: .75rem; line-height: 1; color: var(--muted); }   /* 点・バー・数字はタイルの下にそろえる */
+.bdg-dots > i { font-style: normal; }
+.bdg-dots > .t1 { color: var(--bdg-t1); }
+.bdg-dots > .t2 { color: var(--bdg-t2); }
+.bdg-dots > .t3 { color: var(--bdg-t3); }
+.bdg-dots > .t4 { background: var(--bdg-t4); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.bdg-new { position: absolute; top: 6px; right: 6px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--surface); font: 700 .62rem/1.6 var(--font-mono); }
+
+/* ---------- 詳細ダイアログ・称号えらび（§6.3） ---------- */
+/* pc.css は ≥1280 で #detail .inner を2列の grid にする。図鑑と同じく .close は兄弟のまま、中身は全幅 */
+#detail .inner > .bdg-detail, #detail .inner > .bdg-picker { grid-column: 1 / -1; }
+.bdg-detail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.bdg-dhead { display: flex; align-items: center; gap: 14px; }
+.bdg-dname { margin: 0; font: 900 1.3rem/1.3 var(--font-display); }
+.bdg-dcat, .bdg-hint, .bdg-note { margin: 0; }
+.bdg-dcat, .bdg-note { font-size: .82rem; color: var(--muted); }
+.bdg-tiers { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bdg-tier { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 0; border-top: 1px dashed var(--line); }
+.bdg-tbody { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.bdg-tbody p { margin: 0; }
+.bdg-cond { font-weight: 700; }
+.bdg-when { font: .85rem var(--font-mono); color: var(--muted); }
+.bdg-tprog { display: flex; align-items: center; gap: 10px; }
+.bdg-tprog > .bdg-bar { flex: 1 1 auto; max-width: 280px; }
+.bdg-tprog > .bdg-prog { flex: none; font-size: .8rem; }
+.bdg-trow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.bdg-ttl { font-size: .9rem; }
+.bdg-on, .bdg-lock { font-size: .82rem; white-space: nowrap; }
+.bdg-on { color: var(--accent); font-weight: 700; }
+.bdg-lock { color: var(--muted); }
+.bdg-acts { justify-content: space-between; }
+.bdg-btn { min-height: 44px; padding: 8px 18px; font-size: .95rem; }
+/* ［シェア］: 「シェア」と「コピー済み」を同じマスに重ね、見えるのはどちらか1つ（visibility: hidden の文字は読み上げの名前にも入らない）。
+   幅はいつも長いほうなので、コピーしても［練習する →］が次の行に落ちない。320px でも2つが1行に入るように、左右の余白は少し詰める */
+.bdg-acts > .bdg-btn { padding-inline: 14px; }
+.bdg-share { display: inline-grid; place-items: center; }
+.bdg-share > span { grid-area: 1 / 1; }
+.bdg-share > span + span, .bdg-share[data-copied] > span:first-child { visibility: hidden; }
+.bdg-share[data-copied] > span + span { visibility: visible; }
+/* 称号えらび: 86個まで増えるのでダイアログの中でスクロールする（padding と margin はフォーカスの枠を切らないため） */
+.bdg-picker { max-height: min(60vh, 480px); overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 5px; margin-inline: -5px; }
+.bdg-ph { margin: 0; font: 900 1.2rem/1.3 var(--font-display); }
+.bdg-picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 8px; }
+.bdg-pick { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: .95rem; text-align: left; cursor: pointer; }
+.bdg-pick:hover { border-color: var(--accent); }
+.bdg-pick[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.bdg-pt { display: flex; flex-direction: column; min-width: 0; }
+.bdg-pt b { font-family: var(--font-display); overflow-wrap: anywhere; }
+.bdg-pt small { font-size: .75rem; color: var(--muted); }
+
+/* ---------- お知らせ（§5.2 結果画面のパネル・§5.3 トースト）。ボタンは .btn.ghost（ドパガキの虹色のアニメが付かない） ---------- */
+/* 取ったステップ1つ分: 2行×3列（メダル｜名前と段・称号｜コイン・［つける］） */
+.bdg-row { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; text-align: left; }
+.bdg-row > .bdg-medal { grid-row: span 2; }
+.bdg-row > p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bdg-l1 { font: 700 .95rem/1.35 var(--font-display); }
+.bdg-l2 { font-size: .85rem; line-height: 1.35; color: var(--muted); }
+.bdg-paid { justify-self: end; font: 700 .85rem/1.35 var(--font-mono); white-space: nowrap; }
+.bdg-row > .bdg-btn, .bdg-more > .bdg-btn, .bdg-line > .bdg-btn { flex: none; justify-self: end; padding-inline: 14px; white-space: nowrap; }
+.bdg-row > .bdg-on { justify-self: end; }
+.bdg-h { margin: 0; font: 900 .95rem/1.3 var(--font-display); }
+.bdg-toast { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.bdg-toast .bdg-medal { width: 40px; height: 40px; font-size: 20px; border-width: 3px; }
+.bdg-toast.bdg-line { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.bdg-msg { margin: 0; min-width: 0; font-weight: 700; line-height: 1.4; }
+.bdg-result { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.bdg-more { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; color: var(--muted); font-size: .9rem; }
+.bdg-tip { margin: 0; font-size: .82rem; line-height: 1.45; color: var(--muted); }
+/* 背の低い PC で結果画面が縦にはみ出さないように（はみ出したら pc.css ではなく、ここで詰める）。
+   #r-side が高くなるほど［もう一回］が下がる（まちがえた国の一覧と並ぶ）ので、1行を［つける］の高さ（44px）に収める:
+   名前と称号を左に2段で、コインと［つける］・「つけてる中」は右で2段ぶんを使う。列はパネルでそろえる（subgrid。コインの位置が行でずれない） */
+@media (min-width: 900px) and (max-height: 760px) {
+  .bdg-result { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 6px 8px; padding: 8px 12px; }
+  .bdg-result > :not(.bdg-row) { grid-column: 1 / -1; }
+  .bdg-result .bdg-medal { width: 32px; height: 32px; font-size: 18px; border-width: 3px; }
+  .bdg-result .bdg-row { grid-column: 1 / -1; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-columns: subgrid; gap: 0 8px; }
+  .bdg-result .bdg-row > .bdg-medal { grid-area: 1 / 1 / span 2; }
+  .bdg-result .bdg-row > .bdg-l1 { grid-area: 1 / 2; }
+  .bdg-result .bdg-row > .bdg-l2 { grid-area: 2 / 2; }
+  .bdg-result .bdg-row > .bdg-paid { grid-area: 1 / 3 / span 2; }
+  .bdg-result .bdg-row > :is(.bdg-btn, .bdg-on) { grid-area: 1 / 4 / span 2; }
+  /* まちがえた国の一覧とパネルが並ぶと #r-side が画面より高くなる。pc.css の上下まん中のままだと、#r-side が高いほど
+     左の点数と［もう一回］も下がって画面の外に出る（バッジのパネルだけなら 1280x577 で8か国から、冒険のコインのパネル（#r-ext の中身。rpg.js）
+     だけなら10か国で）ので、パネルのどちらかがあって一覧が5か国以上のときは、左も右も上にそろえる。
+     4か国までは上下まん中のままでも入る（1280x577 で［もう一回］は y 430〜480 ほど）。
+     パネルが2つとも並ぶと #r-side はさらに約 200px 高くなり、1280x577 では3か国から［もう一回］が画面の外に出る
+     （2か国は 3px しか余らない）ので、そのときは2か国から上にそろえる（badges.js はバッジのパネルを #r-ext の直前に入れる） */
+  #rcard:is(:has(> #r-side > :is(#r-badges, #r-ext:not(:empty))):has(> #r-side > .misslist > li:nth-child(5)),
+    :has(> #r-side > #r-badges + #r-ext:not(:empty)):has(> #r-side > .misslist > li:nth-child(2))) { grid-template-rows: auto 1fr; align-content: start; }
+  #rcard:is(:has(> #r-side > :is(#r-badges, #r-ext:not(:empty))):has(> #r-side > .misslist > li:nth-child(5)),
+    :has(> #r-side > #r-badges + #r-ext:not(:empty)):has(> #r-side > .misslist > li:nth-child(2))) > #r-side { align-self: start; }
+}
+/* 900〜1279 の PC: pc.css の #rcard は縦1列（点数 → まちがえた国 → ボタンの行）。パネルが入ると #r-side が高くなり、
+   ［もう一回］が画面の外に出る（1024x600 では1か国でも）ので、パネルがあるときはボタンの行を点数のすぐ下に出す。
+   Tab の順も見た目の順にする（reading-flow。効かないブラウザは HTML の順のまま）。高さは問わない（1024x768 でも外に出るため） */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  #rcard:has(> #r-side > #r-badges) { reading-flow: flex-visual; }
+  #rcard:has(> #r-side > #r-badges) > #r-side { order: 1; }
+}
+
+/* ---------- PC（900px 以上。pc.css が無くても画面いっぱいに使う） ---------- */
+@media (min-width: 900px) {
+  #scr-badges.wrap { max-width: none; width: 100%; padding-inline: clamp(16px, 3vw, 48px); }
+  .bdg-tiles { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .bdg-cats { position: sticky; top: 8px; z-index: 5; margin-inline: 0; background: color-mix(in srgb, var(--surface) 88%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+}
+/* 900〜1279: まとめ欄は上に横長（左に称号と数、右にもうすぐ取れそう） */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  #bdg-sum { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--col-gap, 24px); align-items: start; }
+  #bdg-sum > .bdg-soon { grid-column: 2; grid-row: 1 / span 3; }
+}
+/* ≥1280: 左にまとめ欄（止まる）、右にチップとタイル（行の幅に上限なし） */
+@media (min-width: 1280px) {
+  .bdg-split { display: grid; grid-template-columns: clamp(280px, 24vw, 380px) minmax(0, 1fr); gap: var(--col-gap, 16px); align-items: start; }
+  #bdg-sum { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+  .bdg-recent { display: block; }
+  .bdg-tiles { grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 11vw, 200px), 1fr)); }
+}
+
+/* ---------- 動き（§5.4）。全部 no-preference の中（reduced motion ではその場に出て、止まっている） ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* トーストとパネルはすっと出る（.toast は index.html のもの。バッジのトーストだけ） */
+  .toast:has(> .bdg-toast) { animation: bdg-drop .2s ease-out; }
+  .bdg-result { animation: bdg-rise .2s ease-out; }
+  /* ドパガキ: トーストとパネルのメダルが1回転して、きらっと光る */
+  body.dopa :is(.bdg-toast, .bdg-result) .bdg-medal { animation: bdg-spin .9s cubic-bezier(.3, .7, .4, 1) .1s; }
+  /* ドパガキ: バッジ画面の金・虹のメダルの枠の上を、光がゆっくり回る（::after の輪を回す。光るのは輪の一部だけ） */
+  body.dopa #scr-badges .bdg-medal:is(.t3, .t4):not(.off) { position: relative; }
+  body.dopa #scr-badges .bdg-medal:is(.t3, .t4):not(.off)::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(transparent 0 70%, rgb(255 255 255 / .95) 82%, transparent 94%);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 4.5px), #000 calc(100% - 4px));
+    animation: bdg-sheen 4s linear infinite;
+  }
+}
+@keyframes bdg-drop { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes bdg-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes bdg-spin {
+  from { transform: perspective(240px) rotateY(0); }
+  65% { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 0 0 transparent; }
+  80% { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 14px 5px rgb(255 214 90 / .85); }
+  to { transform: perspective(240px) rotateY(360deg); box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes bdg-sheen { to { transform: rotate(1turn); } }

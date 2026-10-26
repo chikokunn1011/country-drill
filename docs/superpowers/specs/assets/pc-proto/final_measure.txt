@@ -1,0 +1,241 @@
+900x700  quiz_f2n  ok  doc 700/700  card 688 next null over 0 FIT    16px  
+900x700  quiz_n2f  ok  doc 700/700  card 688 next null over 0 FIT    16px  
+900x700  quiz_m2f  ok  doc 700/700  card 688 next null over 0 FIT    16px  
+900x700  quiz_f2m  ok  doc 700/700  card 688 next null over 0 FIT    16px  
+900x700  reveal_f2n  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_wrong  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_wrong_n2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_n2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_m2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_f2m  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  named_m2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  named_f2m  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  home  ok  doc 700/700      16px  
+900x700  setup  ok  doc 700/700      16px  
+900x700  settings  ok  doc 700/700      16px  
+900x700  result  ok  doc 700/700      16px  
+900x700  result_miss  ok  doc 700/700      16px  
+900x700  book_grid  ok  doc 10888/700    cols 4  16px  
+900x700  book_map_sel  ok  doc 700/700      16px  
+900x700  book_detail  ok  doc 10888/700    cols 4  16px  
+1024x768  quiz_f2n  ok  doc 768/768  card 754 next null over 0 FIT    16px  
+1024x768  quiz_n2f  ok  doc 768/768  card 754 next null over 0 FIT    16px  
+1024x768  quiz_m2f  ok  doc 768/768  card 754 next null over 0 FIT    16px  
+1024x768  quiz_f2m  ok  doc 768/768  card 754 next null over 0 FIT    16px  
+1024x768  reveal_f2n  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_wrong  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_wrong_n2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_n2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_m2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_f2m  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  named_m2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  named_f2m  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  home  ok  doc 768/768      16px  
+1024x768  setup  ok  doc 768/768      16px  
+1024x768  settings  ok  doc 768/768      16px  
+1024x768  result  ok  doc 768/768      16px  
+1024x768  result_miss  ok  doc 768/768      16px  
+1024x768  book_grid  ok  doc 8148/768    cols 5  16px  
+1024x768  book_map_sel  ok  doc 768/768      16px  
+1024x768  book_detail  ok  doc 8148/768    cols 5  16px  
+1280x577  quiz_f2n  ok  doc 577/577  card 565 next null over 0 FIT    16px  
+1280x577  quiz_n2f  ok  doc 577/577  card 565 next null over 0 FIT    16px  
+1280x577  quiz_m2f  ok  doc 577/577  card 565 next null over 0 FIT    16px  
+1280x577  quiz_f2m  ok  doc 577/577  card 565 next null over 0 FIT    16px  
+1280x577  reveal_f2n  ok  doc 577/577  card 565 next 495 over 0 FIT    16px  
+1280x577  reveal_wrong  ok  doc 577/577  card 565 next 523 over 0 FIT    16px  
+1280x577  reveal_wrong_n2f  ok  doc 577/577  card 565 next 523 over 0 FIT    16px  
+1280x577  reveal_n2f  ok  doc 577/577  card 565 next 495 over 0 FIT    16px  
+1280x577  reveal_m2f  ok  doc 577/577  card 565 next 446 over 0 FIT    16px  
+1280x577  reveal_f2m  ok  doc 577/577  card 565 next 446 over 0 FIT    16px  
+1280x577  named_m2f  ok  doc 577/577  card 565 next 474 over 0 FIT    16px  
+1280x577  named_f2m  ok  doc 577/577  card 565 next 474 over 0 FIT    16px  
+1280x577  home  ok  doc 577/577      16px  
+1280x577  setup  ok  doc 585/577      16px  
+1280x577  settings  ok  doc 577/577      16px  
+1280x577  result  ok  doc 577/577      16px  
+1280x577  result_miss  ok  doc 577/577      16px  
+1280x577  book_grid  ok  doc 5570/577    cols 7  16px  
+1280x577  book_map_sel  ok  doc 577/577      16px  
+1280x577  book_detail  ok  doc 5570/577    cols 7  16px  
+1366x657  quiz_f2n  ok  doc 657/657  card 645 next null over 0 FIT    16.215px  
+1366x657  quiz_n2f  ok  doc 657/657  card 645 next null over 0 FIT    16.215px  
+1366x657  quiz_m2f  ok  doc 657/657  card 645 next null over 0 FIT    16.215px  
+1366x657  quiz_f2m  ok  doc 657/657  card 645 next null over 0 FIT    16.215px  
+1366x657  reveal_f2n  ok  doc 657/657  card 645 next 575 over 0 FIT    16.215px  
+1366x657  reveal_wrong  ok  doc 657/657  card 645 next 604 over 0 FIT    16.215px  
+1366x657  reveal_wrong_n2f  ok  doc 657/657  card 645 next 604 over 0 FIT    16.215px  
+1366x657  reveal_n2f  ok  doc 657/657  card 645 next 575 over 0 FIT    16.215px  
+1366x657  reveal_m2f  ok  doc 657/657  card 645 next 487 over 0 FIT    16.215px  
+1366x657  reveal_f2m  ok  doc 657/657  card 645 next 487 over 0 FIT    16.215px  
+1366x657  named_m2f  ok  doc 657/657  card 645 next 515 over 0 FIT    16.215px  
+1366x657  named_f2m  ok  doc 657/657  card 645 next 515 over 0 FIT    16.215px  
+1366x657  home  ok  doc 657/657      16.215px  
+1366x657  setup  ok  doc 657/657      16.215px  
+1366x657  settings  ok  doc 657/657      16.215px  
+1366x657  result  ok  doc 657/657      16.215px  
+1366x657  result_miss  ok  doc 657/657      16.215px  
+1366x657  book_grid  ok  doc 5826/657    cols 7  16.215px  
+1366x657  book_map_sel  ok  doc 657/657      16.215px  
+1366x657  book_detail  ok  doc 5826/657    cols 7  16.215px  
+1366x768  quiz_f2n  ok  doc 768/768  card 754 next null over 0 FIT    16.215px  
+1366x768  quiz_n2f  ok  doc 768/768  card 754 next null over 0 FIT    16.215px  
+1366x768  quiz_m2f  ok  doc 768/768  card 754 next null over 0 FIT    16.215px  
+1366x768  quiz_f2m  ok  doc 768/768  card 754 next null over 0 FIT    16.215px  
+1366x768  reveal_f2n  ok  doc 768/768  card 754 next 636 over 0 FIT    16.215px  
+1366x768  reveal_wrong  ok  doc 768/768  card 754 next 664 over 0 FIT    16.215px  
+1366x768  reveal_wrong_n2f  ok  doc 768/768  card 754 next 668 over 0 FIT    16.215px  
+1366x768  reveal_n2f  ok  doc 768/768  card 754 next 640 over 0 FIT    16.215px  
+1366x768  reveal_m2f  ok  doc 768/768  card 754 next 545 over 0 FIT    16.215px  
+1366x768  reveal_f2m  ok  doc 768/768  card 754 next 545 over 0 FIT    16.215px  
+1366x768  named_m2f  ok  doc 768/768  card 754 next 573 over 0 FIT    16.215px  
+1366x768  named_f2m  ok  doc 768/768  card 754 next 573 over 0 FIT    16.215px  
+1366x768  home  ok  doc 768/768      16.215px  
+1366x768  setup  ok  doc 768/768      16.215px  
+1366x768  settings  ok  doc 768/768      16.215px  
+1366x768  result  ok  doc 768/768      16.215px  
+1366x768  result_miss  ok  doc 768/768      16.215px  
+1366x768  book_grid  ok  doc 5833/768    cols 7  16.215px  
+1366x768  book_map_sel  ok  doc 768/768      16.215px  
+1366x768  book_detail  ok  doc 5833/768    cols 7  16.215px  
+1440x900  quiz_f2n  ok  doc 900/900  card 884 next null over 0 FIT    16.4px  
+1440x900  quiz_n2f  ok  doc 900/900  card 884 next null over 0 FIT    16.4px  
+1440x900  quiz_m2f  ok  doc 900/900  card 884 next null over 0 FIT    16.4px  
+1440x900  quiz_f2m  ok  doc 900/900  card 884 next null over 0 FIT    16.4px  
+1440x900  reveal_f2n  ok  doc 900/900  card 884 next 713 over 0 FIT    16.4px  
+1440x900  reveal_wrong  ok  doc 900/900  card 884 next 741 over 0 FIT    16.4px  
+1440x900  reveal_wrong_n2f  ok  doc 900/900  card 884 next 731 over 0 FIT    16.4px  
+1440x900  reveal_n2f  ok  doc 900/900  card 884 next 716 over 0 FIT    16.4px  
+1440x900  reveal_m2f  ok  doc 900/900  card 884 next 616 over 0 FIT    16.4px  
+1440x900  reveal_f2m  ok  doc 900/900  card 884 next 616 over 0 FIT    16.4px  
+1440x900  named_m2f  ok  doc 900/900  card 884 next 644 over 0 FIT    16.4px  
+1440x900  named_f2m  ok  doc 900/900  card 884 next 644 over 0 FIT    16.4px  
+1440x900  home  ok  doc 900/900      16.4px  
+1440x900  setup  ok  doc 900/900      16.4px  
+1440x900  settings  ok  doc 900/900      16.4px  
+1440x900  result  ok  doc 900/900      16.4px  
+1440x900  result_miss  ok  doc 900/900      16.4px  
+1440x900  book_grid  ok  doc 6060/900    cols 7  16.4px  
+1440x900  book_map_sel  ok  doc 900/900      16.4px  
+1440x900  book_detail  ok  doc 6060/900    cols 7  16.4px  
+1536x730  quiz_f2n  ok  doc 730/730  card 718 next null over 0 FIT    16.64px  
+1536x730  quiz_n2f  ok  doc 730/730  card 718 next null over 0 FIT    16.64px  
+1536x730  quiz_m2f  ok  doc 730/730  card 718 next null over 0 FIT    16.64px  
+1536x730  quiz_f2m  ok  doc 730/730  card 718 next null over 0 FIT    16.64px  
+1536x730  reveal_f2n  ok  doc 730/730  card 718 next 628 over 0 FIT    16.64px  
+1536x730  reveal_wrong  ok  doc 730/730  card 718 next 643 over 0 FIT    16.64px  
+1536x730  reveal_wrong_n2f  ok  doc 730/730  card 718 next 647 over 0 FIT    16.64px  
+1536x730  reveal_n2f  ok  doc 730/730  card 718 next 632 over 0 FIT    16.64px  
+1536x730  reveal_m2f  ok  doc 730/730  card 718 next 526 over 0 FIT    16.64px  
+1536x730  reveal_f2m  ok  doc 730/730  card 718 next 526 over 0 FIT    16.64px  
+1536x730  named_m2f  ok  doc 730/730  card 718 next 555 over 0 FIT    16.64px  
+1536x730  named_f2m  ok  doc 730/730  card 718 next 540 over 0 FIT    16.64px  
+1536x730  home  ok  doc 730/730      16.64px  
+1536x730  setup  ok  doc 730/730      16.64px  
+1536x730  settings  ok  doc 730/730      16.64px  
+1536x730  result  ok  doc 730/730      16.64px  
+1536x730  result_miss  ok  doc 730/730      16.64px  
+1536x730  book_grid  ok  doc 5272/730    cols 8  16.64px  
+1536x730  book_map_sel  ok  doc 730/730      16.64px  
+1536x730  book_detail  ok  doc 5272/730    cols 8  16.64px  
+1920x945  quiz_f2n  ok  doc 945/945  card 928 next null over 0 FIT    17.6px  
+1920x945  quiz_n2f  ok  doc 945/945  card 928 next null over 0 FIT    17.6px  
+1920x945  quiz_m2f  ok  doc 945/945  card 928 next null over 0 FIT    17.6px  
+1920x945  quiz_f2m  ok  doc 945/945  card 928 next null over 0 FIT    17.6px  
+1920x945  reveal_f2n  ok  doc 945/945  card 928 next 772 over 0 FIT    17.6px  
+1920x945  reveal_wrong  ok  doc 945/945  card 928 next 788 over 0 FIT    17.6px  
+1920x945  reveal_wrong_n2f  ok  doc 945/945  card 928 next 792 over 0 FIT    17.6px  
+1920x945  reveal_n2f  ok  doc 945/945  card 928 next 777 over 0 FIT    17.6px  
+1920x945  reveal_m2f  ok  doc 945/945  card 928 next 645 over 0 FIT    17.6px  
+1920x945  reveal_f2m  ok  doc 945/945  card 928 next 645 over 0 FIT    17.6px  
+1920x945  named_m2f  ok  doc 945/945  card 928 next 676 over 0 FIT    17.6px  
+1920x945  named_f2m  ok  doc 945/945  card 928 next 660 over 0 FIT    17.6px  
+1920x945  home  ok  doc 945/945      17.6px  
+1920x945  setup  ok  doc 945/945      17.6px  
+1920x945  settings  ok  doc 945/945      17.6px  
+1920x945  result  ok  doc 945/945      17.6px  
+1920x945  result_miss  ok  doc 945/945      17.6px  
+1920x945  book_grid  ok  doc 6118/945    cols 8  17.6px  
+1920x945  book_map_sel  ok  doc 945/945      17.6px  
+1920x945  book_detail  ok  doc 6118/945    cols 8  17.6px  
+1920x1080  quiz_f2n  ok  doc 1080/1080  card 1061 next null over 0 FIT    17.6px  
+1920x1080  quiz_n2f  ok  doc 1080/1080  card 1061 next null over 0 FIT    17.6px  
+1920x1080  quiz_m2f  ok  doc 1080/1080  card 1061 next null over 0 FIT    17.6px  
+1920x1080  quiz_f2m  ok  doc 1080/1080  card 1061 next null over 0 FIT    17.6px  
+1920x1080  reveal_f2n  ok  doc 1080/1080  card 1061 next 845 over 0 FIT    17.6px  
+1920x1080  reveal_wrong  ok  doc 1080/1080  card 1061 next 860 over 0 FIT    17.6px  
+1920x1080  reveal_wrong_n2f  ok  doc 1080/1080  card 1061 next 865 over 0 FIT    17.6px  
+1920x1080  reveal_n2f  ok  doc 1080/1080  card 1061 next 850 over 0 FIT    17.6px  
+1920x1080  reveal_m2f  ok  doc 1080/1080  card 1061 next 717 over 0 FIT    17.6px  
+1920x1080  reveal_f2m  ok  doc 1080/1080  card 1061 next 717 over 0 FIT    17.6px  
+1920x1080  named_m2f  ok  doc 1080/1080  card 1061 next 747 over 0 FIT    17.6px  
+1920x1080  named_f2m  ok  doc 1080/1080  card 1061 next 732 over 0 FIT    17.6px  
+1920x1080  home  ok  doc 1080/1080      17.6px  
+1920x1080  setup  ok  doc 1080/1080      17.6px  
+1920x1080  settings  ok  doc 1080/1080      17.6px  
+1920x1080  result  ok  doc 1080/1080      17.6px  
+1920x1080  result_miss  ok  doc 1080/1080      17.6px  
+1920x1080  book_grid  ok  doc 6127/1080    cols 8  17.6px  
+1920x1080  book_map_sel  ok  doc 1080/1080      17.6px  
+1920x1080  book_detail  ok  doc 6127/1080    cols 8  17.6px  
+2560x1300  quiz_f2n  ok  doc 1300/1300  card 1277 next null over 0 FIT    18px  
+2560x1300  quiz_n2f  ok  doc 1300/1300  card 1277 next null over 0 FIT    18px  
+2560x1300  quiz_m2f  ok  doc 1300/1300  card 1277 next null over 0 FIT    18px  
+2560x1300  quiz_f2m  ok  doc 1300/1300  card 1277 next null over 0 FIT    18px  
+2560x1300  reveal_f2n  ok  doc 1300/1300  card 1277 next 964 over 0 FIT    18px  
+2560x1300  reveal_wrong  ok  doc 1300/1300  card 1277 next 979 over 0 FIT    18px  
+2560x1300  reveal_wrong_n2f  ok  doc 1300/1300  card 1277 next 984 over 0 FIT    18px  
+2560x1300  reveal_n2f  ok  doc 1300/1300  card 1277 next 969 over 0 FIT    18px  
+2560x1300  reveal_m2f  ok  doc 1300/1300  card 1277 next 834 over 0 FIT    18px  
+2560x1300  reveal_f2m  ok  doc 1300/1300  card 1277 next 834 over 0 FIT    18px  
+2560x1300  named_m2f  ok  doc 1300/1300  card 1277 next 866 over 0 FIT    18px  
+2560x1300  named_f2m  ok  doc 1300/1300  card 1277 next 850 over 0 FIT    18px  
+2560x1300  home  ok  doc 1300/1300      18px  
+2560x1300  setup  ok  doc 1300/1300      18px  
+2560x1300  settings  ok  doc 1300/1300      18px  
+2560x1300  result  ok  doc 1300/1300      18px  
+2560x1300  result_miss  ok  doc 1300/1300      18px  
+2560x1300  book_grid  ok  doc 7709/1300    cols 7  18px  
+2560x1300  book_map_sel  ok  doc 1300/1300      18px  
+2560x1300  book_detail  ok  doc 7709/1300    cols 7  18px  
+1280x577  reveal_wrong  ok  doc 577/577  card 565 next 524 over 0 FIT    16px  
+1280x577  reveal_wrong_n2f  ok  doc 577/577  card 565 next 524 over 0 FIT    16px  
+1280x577  reveal_f2n  ok  doc 577/577  card 565 next 498 over 0 FIT    16px  
+1280x577  result_miss  ok  doc 577/577      16px  
+1366x657  reveal_wrong  ok  doc 657/657  card 645 next 605 over 0 FIT    16.215px  
+1366x657  reveal_wrong_n2f  ok  doc 657/657  card 645 next 605 over 0 FIT    16.215px  
+1366x657  reveal_f2n  ok  doc 657/657  card 645 next 578 over 0 FIT    16.215px  
+1366x657  result_miss  ok  doc 657/657      16.215px  
+1920x1080  reveal_wrong  ok  doc 1080/1080  card 1061 next 861 over 0 FIT    17.6px  
+1920x1080  reveal_wrong_n2f  ok  doc 1080/1080  card 1061 next 866 over 0 FIT    17.6px  
+1920x1080  reveal_f2n  ok  doc 1080/1080  card 1061 next 849 over 0 FIT    17.6px  
+1920x1080  result_miss  ok  doc 1080/1080      17.6px  
+900x700  reveal_wrong  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  reveal_wrong_n2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  quiz_n2f  ok  doc 700/700  card 688 next null over 0 FIT    16px  
+900x700  named_m2f  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+900x700  named_f2m  ok  doc 700/700  card 688 next 671 over 0 FIT    16px  
+1024x768  reveal_wrong  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  reveal_wrong_n2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  quiz_n2f  ok  doc 768/768  card 754 next null over 0 FIT    16px  
+1024x768  named_m2f  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1024x768  named_f2m  ok  doc 768/768  card 754 next 735 over 0 FIT    16px  
+1280x577  reveal_wrong  ok  doc 577/577  card 565 next 546 over 0 FIT    16px  
+1280x577  reveal_wrong_n2f  ok  doc 577/577  card 565 next 546 over 0 FIT    16px  
+1280x577  quiz_n2f  ok  doc 577/577  card 565 next null over 0 FIT    16px  
+1280x577  named_m2f  ok  doc 577/577  card 565 next 505 over 0 FIT    16px  
+1280x577  named_f2m  ok  doc 577/577  card 565 next 505 over 0 FIT    16px  
+1366x657  reveal_wrong  ok  doc 657/657  card 645 next 625 over 0 FIT    16.215px  
+1366x657  reveal_wrong_n2f  ok  doc 657/657  card 645 next 625 over 0 FIT    16.215px  
+1366x657  quiz_n2f  ok  doc 657/657  card 645 next null over 0 FIT    16.215px  
+1366x657  named_m2f  ok  doc 657/657  card 645 next 546 over 0 FIT    16.215px  
+1366x657  named_f2m  ok  doc 657/657  card 645 next 546 over 0 FIT    16.215px  
+1920x1080  reveal_wrong  ok  doc 1080/1080  card 1061 next 894 over 0 FIT    17.6px  
+1920x1080  reveal_wrong_n2f  ok  doc 1080/1080  card 1061 next 884 over 0 FIT    17.6px  
+1920x1080  quiz_n2f  ok  doc 1080/1080  card 1061 next null over 0 FIT    17.6px  
+1920x1080  named_m2f  ok  doc 1080/1080  card 1061 next 781 over 0 FIT    17.6px  
+1920x1080  named_f2m  ok  doc 1080/1080  card 1061 next 766 over 0 FIT    17.6px  
+1280x577  reveal_wrong  ok  doc 577/577  card 565 next 545 over 0 FIT    16px  
+1280x577  reveal_wrong_n2f  ok  doc 577/577  card 565 next 545 over 0 FIT    16px  
+1366x657  reveal_wrong  ok  doc 657/657  card 645 next 624 over 0 FIT    16.215px  
+1366x657  reveal_wrong_n2f  ok  doc 657/657  card 645 next 624 over 0 FIT    16.215px  

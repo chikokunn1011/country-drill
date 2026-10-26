@@ -1,0 +1,244 @@
+/* pc.css — PC layout. index.html loads it with media="(min-width: 900px)", so phones (<900px) never apply it.
+   Tiers: 900–1279 (2 columns), >=1280 (3-column quiz, 2-column hero/result), >=1600 (roomier spacing).
+   "Fill the screen": sections span the page width (up to --page-max); game screens (home, quiz, result,
+   図鑑 map) also fill the viewport height; short menus/forms are centered; lists stay top-aligned. */
+
+:root {
+  --gutter: clamp(24px, 3vw, 64px);
+  --page-max: 1840px;
+  --pad-y: clamp(12px, 1.8vh, 28px);
+  --vgap: clamp(10px, 1.5vh, 20px);
+  --card-pad: clamp(18px, 1.7vw, 36px);
+  --col-gap: clamp(24px, 2.6vw, 56px);
+  --measure: 40em;              /* Japanese prose: at most ~40 full-width characters per line */
+}
+/* rem grows 16px -> 18px between 1280px and 2080px wide (with the default 16px browser font). Below 1280 nothing changes. */
+html { font-size: clamp(100%, calc(80% + .25vw), 112.5%); }  /* % keeps the user's browser font setting */
+body {
+  padding-block: var(--pad-y);
+  padding-left: max(var(--gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--gutter), env(safe-area-inset-right, 0px));
+}
+body > .wrap { max-width: var(--page-max); gap: var(--vgap); min-height: calc(100vh - 2 * var(--pad-y)); min-height: calc(100dvh - 2 * var(--pad-y)); }
+.wrap .wrap { width: 100%; max-width: none; }
+.hint, .panel p { max-inline-size: var(--measure); }
+footer { margin-top: auto; }
+body[data-screen="quiz"] footer { display: none; }
+
+/* topbar: same edges as the content, one line */
+#topbar { width: 100%; min-height: 36px; }
+.brand { display: flex; align-items: baseline; gap: 12px; font-size: 1.15rem; }
+.brand small { order: 2; }
+.linkbtn { font-size: .95rem; }
+
+/* ---------- home ---------- */
+body[data-screen="home"] #scr-home { flex: 1 0 auto; justify-content: center; }
+.home { padding-block: clamp(16px, 5vh, 64px); gap: clamp(18px, 3vh, 30px); }
+.home h1 { font-size: clamp(4.4rem, calc(2rem + 3.4vw), 6rem); }
+.home .flags { max-width: 820px; gap: 8px; }
+.home .flags img { width: 44px; }
+.home .flags img:nth-child(n+15) { display: block; }
+.home .menu { flex-direction: row; width: auto; }
+.home .menu .btn { min-width: 200px; }
+
+/* ---------- panels / setup / settings ---------- */
+.panel { padding: var(--card-pad); gap: 18px; }
+.panel h2 { font-size: clamp(1.25rem, calc(1rem + .35vw), 1.6rem); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--col-gap); align-items: start; }
+.cols > .col + .col { border-left: 1px dashed var(--line); padding-left: var(--col-gap); }
+.modecard { padding: 16px 18px; }
+.modecard b { font-size: 1.08rem; }
+#start { min-width: 200px; padding-block: 14px; }
+#scr-settings.narrow { max-width: 720px; }
+
+/* ---------- quiz: a stage that fills the rest of the viewport ---------- */
+body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
+#scr-quiz { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 20px; row-gap: var(--vgap); }
+#scr-quiz > .progress { grid-column: 1; grid-row: 1; }
+#scr-quiz > .row.end { grid-column: 2; grid-row: 1; }
+#scr-quiz > #qcard { grid-column: 1 / -1; grid-row: 2; }
+#qcard {
+  container-type: size;           /* children size themselves with cqh = the card's free height */
+  min-height: 440px;              /* very short windows scroll instead of squashing */
+  padding: var(--card-pad);
+  display: grid; align-items: center;
+  grid-template-columns: var(--qcols);
+  grid-template-rows: minmax(0, 1fr) auto;
+  column-gap: var(--col-gap); row-gap: 14px;
+  --strip-h: 0px;
+  --mh: calc(100cqh - var(--strip-h));   /* height available to the question + choices row */
+}
+#qcard.q-flag.a-name { --qcols: minmax(0, 1.1fr) minmax(0, 1fr); }
+#qcard.q-name.a-flag { --qcols: minmax(0, .85fr) minmax(0, 1.2fr); }
+#qcard.q-map.a-flag  { --qcols: minmax(0, 1.5fr) minmax(0, 1fr); }
+#qcard.q-flag.a-map  { --qcols: minmax(0, .8fr) minmax(0, 1.4fr); }
+#qcard > .qmain { grid-column: 1; grid-row: 1; gap: clamp(10px, 2.2cqh, 22px); }
+#qcard > .choices { grid-column: 2; grid-row: 1; justify-self: center; }
+#qcard .qlabel { font-size: clamp(1.2rem, calc(.9rem + .45vw), 1.55rem); }
+#qcard .qflag { width: min(100%, 640px, calc((var(--mh) - 76px) * 4 / 3)); }
+#qcard .qmain > .mapbox { width: min(100%, calc((var(--mh) - 76px) * 16 / 9)); }
+#qcard .qbig { font-size: clamp(2.2rem, calc(1.1rem + 1.6vw), 3.6rem); text-wrap: balance; }
+#qcard .qsub { font-size: .95rem; }
+/* text choices: one column, buttons grow with the height */
+#qcard .choices.textc { grid-template-columns: 1fr; width: 100%; max-width: 620px; gap: clamp(8px, 1.6cqh, 16px); }
+#qcard .choices.textc .choice { min-height: clamp(56px, calc((var(--mh) - 48px) * .14), 96px); font-size: clamp(1.05rem, calc(.8rem + .3vw), 1.3rem); padding-inline: 18px; }
+/* flag / map choices: 2x2. Width follows the height so both rows always fit:
+   cell = 3 border + 20 padding + ~21 kbd + 6 gap + image (+27 with the country name) */
+#qcard.a-flag > .choices, #qcard.a-map > .choices { --cell-extra: 52px; width: min(100%, calc(((var(--mh) - 10px) / 2 - var(--cell-extra)) * 8 / 3 + 56px)); }
+#qcard:has(.cname) > .choices { --cell-extra: 80px; }
+
+/* answer area. Before answering .rslot holds the place, so nothing moves when .reveal replaces it */
+#qcard > .rslot, #qcard > .reveal { min-width: 0; }
+.rslot { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); text-align: center; }
+.rslot p { margin: 0; }
+.rslot-hint { font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
+.rslot-keys { font-size: .85rem; }
+.rslot kbd { font-family: var(--font-mono); font-size: .75rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: var(--surface); }
+#qcard .reveal .verdict, #qcard .qlabel, #qcard .qbig { text-wrap: balance; word-break: auto-phrase; overflow-wrap: anywhere; } /* auto-phrase: Chrome 119+ breaks Japanese at phrase boundaries; others ignore it */
+
+/* 900–1279: question | choices, answer strip below */
+@media (max-width: 1279.98px) {
+  #qcard { --strip-h: 150px; --mh: calc(100cqh - var(--strip-h) - 14px); }
+  #qcard > .rslot, #qcard > .reveal {
+    grid-column: 1 / -1; grid-row: 2; height: var(--strip-h); align-self: stretch;
+    border-top: 1px dashed var(--line); padding-top: 12px;
+  }
+  #qcard > .reveal { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto minmax(0, 1fr); column-gap: 20px; row-gap: 6px; align-items: center; }
+  #qcard > .reveal > .verdict { grid-column: 1 / 3; grid-row: 1; font-size: 1.1rem; line-height: 1.4; }
+  #qcard > .reveal > .facts { grid-column: 1; grid-row: 2; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }
+  #qcard > .reveal > .facts img { width: 80px; }
+  #qcard > .reveal > .facts dl { grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr); line-height: 1.45; }
+  #qcard > .reveal > .facts .name { font-size: 1.15rem; }
+  #qcard > .reveal > .map { grid-column: 2; grid-row: 2; height: 100%; max-height: 100%; width: auto; aspect-ratio: 16 / 9; }
+  #qcard > .reveal > .next { grid-column: 3; grid-row: 1 / -1; align-self: end; }
+  body.dopa #qcard > .reveal > .verdict { font-size: 1.3rem; }
+}
+
+/* ---------- result ---------- */
+body[data-screen="result"] #scr-result { flex: 1 0 auto; }
+#rcard { flex: 1 0 auto; padding: var(--card-pad); justify-content: center; }
+#rcard .score { font-size: clamp(3.4rem, calc(1.6rem + 2.4vw), 5.2rem); }
+#rcard .rside { display: flex; flex-direction: column; align-items: center; gap: 18px; width: 100%; }
+#rcard .rside:empty { display: none; }
+.misslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); }
+
+/* ---------- 図鑑 ---------- */
+/* list view: the toolbar becomes a small sticky card so search/filter stay reachable while scrolling 195 cards */
+#scr-book:has(> #grid:not([hidden])) > .row:first-child {
+  position: sticky; top: 8px; z-index: 5; padding: 8px 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 4px 16px rgb(0 0 0 / .06);
+}
+#scr-book input[type="search"] { width: clamp(200px, 18vw, 320px); }
+.grid { grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 10.5vw, 230px), 1fr)); gap: clamp(12px, 1vw, 18px); }
+.card b { font-size: clamp(.95rem, calc(.8rem + .2vw), 1.1rem); }
+body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; }
+.bmap { display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 24vw, 420px); gap: 20px; align-items: center; }
+#scr-book > #bmap { flex: 1 1 0; min-height: 360px; container-type: size; }
+.bmap > .mapbox { width: min(100%, calc(100cqh * 16 / 9)); justify-self: center; }
+.binfo { min-height: 240px; }
+.binfo .facts { grid-template-columns: 1fr; } .binfo .facts img { width: 100%; max-width: 320px; }
+
+/* ---------- dialog (図鑑の詳細) ---------- */
+#detail { width: min(640px, calc(100vw - 64px)); }
+
+/* ================= >= 1280 ================= */
+@media (min-width: 1280px) {
+  /* home: two-column hero, flag mosaic on the right */
+  body[data-screen="home"] #scr-home {
+    display: grid; justify-content: stretch; text-align: left;
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    grid-template-rows: 1fr auto auto auto auto 1fr;
+    grid-template-areas: ". flags" "eyebrow flags" "title flags" "menu flags" "book flags" ". flags";
+    column-gap: clamp(40px, 5vw, 120px); row-gap: clamp(14px, 2.4vh, 26px);
+    padding-inline: clamp(0px, 3vw, 64px);
+  }
+  .home .eyebrow { grid-area: eyebrow; }
+  .home h1 { grid-area: title; }
+  .home .menu { grid-area: menu; flex-direction: column; width: min(340px, 100%); }
+  .home .menu .btn { min-width: 0; }
+  #home-book { grid-area: book; justify-self: start; padding-inline: 0; }
+  .home .flags {
+    grid-area: flags; align-self: center; justify-self: center;
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(8px, .8vw, 14px);
+    width: 100%; max-width: min(100%, calc((100dvh - 2 * var(--pad-y) - 2 * clamp(16px, 5vh, 64px)) * 1.5));
+  }
+  .home .flags img { width: 100%; border-radius: 4px; }
+
+  /* setup: modes in one row of 4, then あそび方 | 地域・問題数 */
+  #scr-setup .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "modes modes" "nameopt nameopt" "kinds opts"; row-gap: 18px; }
+  #scr-setup .col:first-child { display: contents; }
+  #modes { grid-area: modes; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #nameopt-field { grid-area: nameopt; }
+  #kinds-field { grid-area: kinds; }
+  #scr-setup .col + .col { grid-area: opts; }
+  #kinds { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+  body[data-screen="setup"] #scr-setup { flex: 1 0 auto; justify-content: center; }
+  #modes .modecard { min-height: clamp(84px, 12vh, 150px); justify-content: center; padding: 18px 22px; }
+  #modes .modecard b { font-size: clamp(1.1rem, calc(.9rem + .4vw), 1.45rem); }
+  #modes .modecard span { font-size: .85rem; }
+  /* keep the row's height when the option is hidden, so the centered panel never jumps */
+  #nameopt-field[hidden] { display: flex !important; visibility: hidden; }
+
+  /* settings: fields side by side once there are several */
+  #scr-settings.narrow { max-width: 1080px; }
+  #scr-settings .panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); column-gap: var(--col-gap); align-items: start; }
+  #scr-settings .panel > h2, #scr-settings .panel > .row { grid-column: 1 / -1; }
+  body[data-screen="settings"] #scr-settings { flex: 1 0 auto; justify-content: center; }
+  #set-sound-row[hidden] { display: inline-flex !important; visibility: hidden; }
+
+  /* quiz: question | choices | answer column (3rd column is always reserved) */
+  #qcard { grid-template-columns: var(--qcols) minmax(320px, .85fr); grid-template-rows: minmax(0, 1fr); }
+  #qcard.q-flag.a-name { --qcols: minmax(0, 1.1fr) minmax(0, .95fr); }
+  #qcard.q-name.a-flag { --qcols: minmax(0, .8fr) minmax(0, 1.15fr); }
+  #qcard.q-map.a-flag  { --qcols: minmax(0, 1.8fr) minmax(0, .9fr); }
+  #qcard.q-flag.a-map  { --qcols: minmax(0, .75fr) minmax(0, 1.35fr); }
+  #qcard > .rslot, #qcard > .reveal {
+    grid-column: 3; grid-row: 1; align-self: stretch;
+    border-left: 1px dashed var(--line); padding-left: var(--col-gap); margin-left: calc(var(--col-gap) * -.5);
+  }
+  #qcard > .reveal { display: flex; flex-direction: column; justify-content: center; gap: clamp(10px, 1.8cqh, 18px); border-top: 0; padding-top: 0; }
+  #qcard > .reveal > .verdict { font-size: 1.25rem; line-height: 1.4; }
+  body.dopa #qcard > .reveal > .verdict { font-size: 1.6rem; }
+  body.dopa #qcard > .reveal > .verdict.ng { font-size: 1.3rem; }
+  #qcard > .reveal > .facts { grid-template-columns: clamp(84px, 6.5vw, 128px) minmax(0, 1fr); }
+  #qcard > .reveal > .facts img { width: 100%; }
+  #qcard > .reveal > .map { width: min(100%, calc((100cqh - 340px) * 16 / 9)); align-self: center; }
+  #qcard > .reveal > .next { align-self: stretch; }
+
+  /* result: score on the left, まちがえた国 (and future badge/reward blocks) on the right */
+  #rcard .result > .qlabel { font-size: clamp(1.3rem, calc(.9rem + .6vw), 1.8rem); }
+  #rcard .score { font-size: clamp(4rem, calc(1.6rem + 3vw), 6.4rem); }
+  #rcard .stats { font-size: 1.02rem; gap: 24px; }
+  #rcard .row.center .btn { min-width: 200px; padding-block: 14px; }
+  #rcard:has(> .rside:not(:empty)) {
+    display: grid; grid-template-columns: minmax(320px, 560px) minmax(0, 760px); justify-content: center; align-content: center;
+    column-gap: calc(var(--col-gap) * 1.5); row-gap: 28px;
+  }
+  #rcard:has(> .rside:not(:empty)) > .result { grid-column: 1; grid-row: 1; align-self: end; }
+  #rcard:has(> .rside:not(:empty)) > .row.center { grid-column: 1; grid-row: 2; align-self: start; }
+  #rcard > .rside:not(:empty) { grid-column: 2; grid-row: 1 / span 2; align-self: center; align-items: stretch; border-left: 1px dashed var(--line); padding-left: calc(var(--col-gap) * 1.5); max-height: 100%; }
+  #rcard > .rside > .qlabel { text-align: left; }
+
+  /* 図鑑の詳細: facts left, map right */
+  #detail { width: min(980px, calc(100vw - 64px)); }
+  #detail .inner { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr); gap: 16px 28px; align-items: center; }
+  #detail .inner > .close { grid-column: 1 / -1; justify-self: end; }
+  #detail .inner > .facts { grid-template-columns: 1fr; }
+  #detail .inner > .facts img { width: 100%; }
+}
+
+/* ================= >= 1600 ================= */
+@media (min-width: 1600px) {
+  .modecard { padding: 20px 22px; }
+  .choice kbd, .rslot kbd { font-size: .8rem; }
+}
+
+/* short windows (laptops at 125–150% zoom, 1366x768 with browser chrome) */
+@media (max-height: 760px) {
+  :root { --vgap: 10px; --pad-y: 12px; --card-pad: clamp(16px, 1.4vw, 24px); }
+  #qcard .qlabel { font-size: 1.15rem; }
+  #modes .modecard { min-height: 0; padding: 14px 18px; }
+  #nameopt-field[hidden] { display: none !important; }
+  .panel { gap: 14px; }
+}

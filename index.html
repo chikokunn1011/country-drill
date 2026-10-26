@@ -118,13 +118,15 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .modecard b { font-family: var(--font-display); font-size: 1rem; }
 .modecard span { font-size: .78rem; color: var(--muted); }
 .modecard[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.kind { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.kind { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; } /* 3つ並べる幅がなければ折り返す */
 
 /* クイズ */
 .progress { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: .8rem; color: var(--muted); gap: 12px; flex-wrap: wrap; }
 .bar { flex: 1 1 120px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: var(--accent); transition: width .3s; }
 .streak { color: var(--hl); font-weight: 500; }
+#ptime { color: var(--ink); font-size: .95rem; font-weight: 500; }
+#ptime:empty { display: none; }
 .qcard { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 18px; align-items: center; }
 .qlabel { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; text-align: center; margin: 0; text-wrap: balance; }
 .qflag { width: min(280px, 70%); aspect-ratio: 4/3; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 2px 10px rgb(0 0 0 / .08); object-fit: cover; }
@@ -164,6 +166,9 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .facts dd { margin: 0; font-weight: 500; min-width: 0; }
 .facts .name { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; grid-column: 1 / -1; }
 .next { align-self: flex-end; }
+.trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; contain: inline-size; } /* 長い文で欄を横に広げない（スマホでは .wrap が中身の幅になるので、問題の国旗や選択肢が動く） */
+.tv { font-size: .88rem; line-height: 1.5; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--hl) 12%, var(--surface)); }
+.tv-k { font-size: .76rem; font-weight: 700; color: var(--muted); margin-right: .6em; white-space: nowrap; }
 
 /* 結果 */
 .result { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
@@ -171,9 +176,35 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .score small { font-size: 1.2rem; color: var(--muted); }
 .stats { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; font-size: .9rem; color: var(--muted); }
 .stats b { color: var(--ink); font-family: var(--font-mono); }
+/* タイムアタックの結果：順位相当（返事が来るまで1行ぶん空けておく）とランキング登録欄。
+   スマホだと結果カードは中身の幅に縮むので、登録欄があるときは横いっぱいにして、登録後にフォームが消えても幅が変わらないようにする */
+#scr-result:has(.tabox) { width: 100%; }
+.tarank { font: 700 1.05rem var(--font-display); color: var(--accent); margin: 0; min-height: 1.6em; }
+.tabox { width: min(460px, 100%); border-top: 1px dashed var(--line); padding-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.tabox form { width: 100%; }
+.tabox input { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
+.tabox input::placeholder { font-size: .85rem; } /* スマホ幅でも「12文字まで」まで見えるように */
+.tabox .row { gap: 8px; } .tabox .btn { padding-inline: 16px; }
+.tamsg { margin: 0; font-weight: 700; text-align: center; }
+.tamsg:empty { display: none; }
+.tamsg.ok { color: var(--ok); } .tamsg.ng { color: var(--ng); }
 .misslist { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .misslist li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; text-align: left; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .misslist img { width: 48px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
+
+/* ランキング：条件のボタン・歴代/今週のタブ・上位の表。読み込み中は表を薄くするだけ */
+#rk-tabs { display: flex; }
+#rk-tabs button { flex: 1; padding-block: 8px; }
+.rklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; transition: opacity .15s; }
+.rklist[aria-busy="true"] { opacity: .45; }
+.rklist li { display: grid; grid-template-columns: 2.2em minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.rklist .no { font: 900 1rem var(--font-display); color: var(--muted); text-align: right; }
+.rklist .top .no { font-size: 1.2rem; color: var(--accent); }
+.rklist .nick { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.rklist .at { font-size: .75rem; color: var(--muted); }
+.rkempty { margin: 0; padding: 20px 0; text-align: center; font: 700 1.05rem var(--font-display); }
+.rkerror { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; text-align: center; }
+.rkerror p { margin: 0; color: var(--ng); font-weight: 700; }
 
 /* 図鑑 */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -208,6 +239,14 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 dialog .inner { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 dialog .close { align-self: flex-end; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
 footer { font-size: .75rem; color: var(--muted); text-align: center; }
+#toasts { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%);
+  display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 14px; box-shadow: 0 6px 20px rgb(0 0 0 / .15); }
+@media (min-width: 900px) { #toasts { left: auto; right: 16px; top: 72px; transform: none; } }
+#topbar-extra:empty { display: none; }
+.r-ext { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.r-ext:empty { display: none; }
 
 @media (max-width: 480px) {
   .choices { grid-template-columns: 1fr 1fr; }
@@ -216,53 +255,13 @@ footer { font-size: .75rem; color: var(--muted); text-align: center; }
   .facts { grid-template-columns: 72px 1fr; } .facts img { width: 72px; }
   .modegrid, .kind { grid-template-columns: 1fr; }
 }
-/* PC：広い画面を使う。スマホ幅はここに入らない */
+/* 2列の入れ物とクイズの問題欄（スマホの見た目。PC は pc.css で上書き） */
 .cols, .col { display: flex; flex-direction: column; gap: 14px; }
 .qmain { display: flex; flex-direction: column; gap: 18px; align-items: center; width: 100%; }
 .home .flags img:nth-child(n+15) { display: none; }
-@media (min-width: 900px) {
-  body { padding-block: 28px 48px; padding-inline: 32px; }
-  .wrap { max-width: 1200px; gap: 20px; }
-  .wrap.narrow { max-width: 680px; }
-  .wrap .wrap { width: 100%; }
-  #topbar { max-width: 1200px; width: 100%; margin-inline: auto; }
-
-  .home { padding-block: 64px 32px; gap: 28px; }
-  .home h1 { font-size: 4.4rem; }
-  .home .flags { max-width: 820px; gap: 8px; }
-  .home .flags img { width: 44px; }
-  .home .flags img:nth-child(n+15) { display: block; }
-  .home .menu { flex-direction: row; width: auto; }
-  .home .menu .btn { min-width: 200px; }
-
-  .panel { padding: 28px 32px; gap: 18px; }
-  .cols { display: grid; grid-template-columns: 1.15fr 1fr; gap: 32px; align-items: start; }
-  .cols > .col + .col { border-left: 1px dashed var(--line); padding-left: 32px; }
-  .modecard { padding: 16px 18px; }
-  .modecard b { font-size: 1.08rem; }
-
-  /* クイズ：左に問題、右に選択肢。答えたあとの解説は下に横長で出す */
-  .qcard { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 22px 36px; align-items: center; padding: 32px; }
-  .qcard.q-map { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
-  .qcard.a-map { grid-template-columns: minmax(0, .8fr) minmax(0, 1.4fr); }
-  .qcard .reveal { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 36px; align-items: center; }
-  .qcard .reveal > .verdict, .qcard .reveal > .next { grid-column: 1 / -1; }
-  .qcard .reveal > .next { justify-self: end; }
-  .qflag { width: min(380px, 90%); }
-  .qbig { font-size: 3rem; }
-  .qlabel { font-size: 1.3rem; }
-  .choices.textc { grid-template-columns: 1fr; }
-  .choice { min-height: 60px; font-size: 1.05rem; }
-  .facts { grid-template-columns: 128px 1fr; } .facts img { width: 128px; }
-
-  #rcard { padding: 36px; display: flex; }
-  .misslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
-
-  .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
-  .bmap { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
-  .binfo { min-height: 240px; }
-  .binfo .facts { grid-template-columns: 1fr; } .binfo .facts img { width: 100%; max-width: 220px; }
-}
+/* PCレイアウト（900px以上）は pc.css。スマホ幅では読み込まれても適用されない */
+.rslot { display: none; }
+.rside { display: contents; }
 /* ドパガキ向け：設定でONにしたときだけ。色を派手にして、正解のたびに光る・鳴る・飛ぶ */
 body.dopa { --accent: #ff1f7a; --accent-ink: #ffffff; --hl: #ffc400; --ok: #00b84a; --ok-soft: #d6ffe4; --ng: #ff3b30; --ng-soft: #ffe0de; }
 @media (prefers-color-scheme: dark) {
@@ -302,11 +301,15 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+<link rel="stylesheet" href="pc.css" media="(min-width: 900px)">
+<link rel="stylesheet" href="rpg.css?v=1">
+<link rel="stylesheet" href="badges.css?v=1">
 </head>
 <body>
 <div class="wrap">
   <div class="topbar" id="topbar" hidden>
     <button class="brand" id="brand"><small>FLAGS · NAMES · MAP</small>195か国ドリル</button>
+    <div id="topbar-extra" class="row"></div>
     <div class="row"><button class="linkbtn" id="to-book">図鑑</button><button class="linkbtn" id="to-settings">設定</button></div>
   </div>
 
@@ -317,6 +320,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div class="flags" id="home-flags"></div>
     <div class="menu">
       <button class="btn" id="home-play">プレイ</button>
+      <button class="btn ghost" id="home-rank">ランキング</button>
       <button class="btn ghost" id="home-settings">設定</button>
     </div>
     <button class="linkbtn" id="home-book">国旗図鑑を見る</button>
@@ -350,7 +354,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="field" id="nameopt-field">
         <label class="switch"><input type="checkbox" id="nameopt"> 国名も表示する（ヒントあり）</label>
       </div>
-      <div class="field">
+      <div class="field" id="kinds-field">
         <span class="lbl">あそび方</span>
         <div class="kind" id="kinds"></div>
       </div>
@@ -373,7 +377,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 
   <!-- クイズ -->
   <section id="scr-quiz" class="wrap" hidden>
-    <div class="progress"><span id="pnum"></span><div class="bar"><i id="pbar" style="width:0"></i></div><span id="pscore"></span><span class="streak" id="pstreak"></span><span class="pts" id="ppts"></span></div>
+    <div class="progress"><span id="pnum"></span><span id="ptime" class="mono"></span><div class="bar"><i id="pbar" style="width:0"></i></div><span id="pscore"></span><span class="streak" id="pstreak"></span><span class="pts" id="ppts"></span></div>
     <div class="qcard" id="qcard"></div>
     <div class="row end"><button class="linkbtn" id="quit">やめてモード選択へ</button></div>
   </section>
@@ -381,6 +385,37 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
   <!-- 結果 -->
   <section id="scr-result" class="wrap" hidden>
     <div class="qcard" id="rcard"></div>
+  </section>
+
+  <!-- ランキング -->
+  <section id="scr-ranking" class="wrap" hidden>
+    <div class="panel">
+      <h2>ランキング</h2>
+      <div class="cols">
+      <div class="col">
+      <div class="field">
+        <span class="lbl">モード</span>
+        <div class="chips" id="rk-modes"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">地域</span>
+        <div class="chips" id="rk-regions"></div>
+      </div>
+      <div class="field">
+        <span class="lbl">問題数</span>
+        <div class="chips" id="rk-counts"></div>
+      </div>
+      </div>
+      <div class="col">
+      <div class="seg" id="rk-tabs" role="group" aria-label="期間"><button type="button" data-p="all">歴代</button><button type="button" data-p="week">今週</button></div>
+      <p class="hint">上位50人まで。同じニックネームは自己ベストだけ。「今週」は月曜0時（日本時間）から。</p>
+      <ol class="rklist" id="rk-list" aria-busy="false"></ol>
+      <p class="rkempty" id="rk-empty" hidden>まだ誰もいない。1位のチャンス！</p>
+      <div class="rkerror" id="rk-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="rk-retry">再読み込み</button></div>
+      </div>
+      </div>
+      <div class="row end"><button class="btn" id="rk-play">この条件で遊ぶ</button></div>
+    </div>
   </section>
 
   <!-- 図鑑 -->
@@ -409,8 +444,19 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="countries.js"></script>
 <script src="flags.js"></script>
 <script src="world.js"></script>
+<script src="ranking.js"></script>
+<script src="trivia.js"></script>
 <script>
 /* ---------- データ ---------- */
+// ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ
+window.RANKING ??= {
+  enabled: false,
+  formatTime(ms) {
+    const pad2 = n => String(n).padStart(2, '0');
+    const cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = pad2(cs % 100);
+    return m ? `${m}分${pad2(s)}.${c}秒` : `${s}.${c}秒`;
+  },
+};
 const C = window.COUNTRIES;
 const byA = new Map(C.map(c => [c.a, c]));
 const feats = topojson.feature(WORLD, WORLD.objects.countries).features;
@@ -434,12 +480,14 @@ const MODES = [
 const KINDS = [
   { k: 'practice', label: '練習', desc: 'まちがえた問題は後半にもう一度出る。全部正解したら終了' },
   { k: 'challenge', label: '挑戦', desc: 'まちがえたら最初からやり直し。ノーミスでクリアを目指す' },
+  { k: 'ta', label: 'タイムアタック', desc: '1ミスで失格。クリアタイムでランキングに挑戦' },
 ];
 const COUNTS = [5, 10, 20, 'all'];
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
 const S = Object.assign({ region: 'all', dopa: false, sound: true }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
@@ -610,17 +658,36 @@ const PRAISE = ['正解！！', 'ナイス！', '天才！？', 'すごすぎ！
 const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COMBO⚡` : n >= 5 ? `🔥${n} COMBO🔥` : `${n} COMBO!`;
 
 /* ---------- 画面切り替え ---------- */
-const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book'];
+const SCREENS = ['home', 'settings', 'setup', 'quiz', 'result', 'book', 'ranking'];
+const screenRender = {};
+function registerScreen(name, render) {             // 機能ファイルが自分の画面を足す。<section> を先に作ってから呼ぶこと
+  if (!$('scr-' + name)) throw new Error('no section scr-' + name);
+  if (!SCREENS.includes(name)) SCREENS.push(name);
+  if (render) screenRender[name] = render;
+}
+function toast(html, ms = 2800) {
+  let box = $('toasts');
+  if (!box) { box = document.createElement('div'); box.id = 'toasts'; box.setAttribute('aria-live', 'polite'); document.body.append(box); }
+  const el = document.createElement('div'); el.className = 'toast'; el.innerHTML = html; box.append(el);
+  setTimeout(() => el.remove(), ms);
+}
 function show(name) {
+  if (name !== 'quiz' && name !== 'result' && G && !G.ended) endGame('quit'); // クイズを途中で離れた（やめる・トップバー）
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
+  document.body.dataset.screen = name;
   $('topbar').hidden = name === 'home';
   if (name === 'settings') renderSettings();
   if (name === 'setup') renderSetup();
   if (name === 'book') renderBook();
+  if (name === 'ranking') renderRanking();
+  screenRender[name]?.();
+  emit('drill:screen', { name });
   window.scrollTo({ top: 0 });
 }
 $('brand').onclick = () => show('home');
 $('home-play').onclick = () => show('setup');
+$('home-rank').onclick = () => openRanking();
+$('home-rank').hidden = !RANKING.enabled; // 接続先が未設定ならランキングは出さない
 $('home-settings').onclick = () => show('settings');
 $('home-book').onclick = () => show('book');
 $('to-book').onclick = () => show('book');
@@ -642,19 +709,26 @@ $('set-dopa').onchange = e => {
   if (S.dopa) { FX.sfx('correct', 3); FX.confetti(e.target.getBoundingClientRect(), 80); FX.pop('ドパミン全開！'); }
 };
 $('set-sound').onchange = e => { S.sound = e.target.checked; store.set('settings', S); if (S.sound) FX.sfx('correct', 0); };
-$('set-reset').onclick = () => { misses = {}; store.set('misses', misses); renderSettings(); };
+$('set-reset').onclick = () => { misses = {}; store.set('misses', misses); emit('drill:misses-reset', {}); renderSettings(); };
 $('set-done').onclick = () => show('home');
 
 /* ---------- モード選択 ---------- */
+// 地域と問題数のボタン（モード選択とランキングで共通）。その地域の国の数より多い問題数は選べない
+const regionChips = sel => [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === sel}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
+const fitCount = (count, region) => count !== 'all' && count > poolFor(region).length ? 'all' : count;
+function countChips(region, sel) {
+  const n = poolFor(region).length;
+  return COUNTS.map(c => `<button class="chip" aria-pressed="${c === sel}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
+}
 function renderSetup() {
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
-  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt;
+  // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
+  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || P.kind === 'ta';
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
-  $('regions').innerHTML = [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === S.region}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
-  const n = poolFor(S.region).length;
-  if (P.count !== 'all' && P.count > n) P.count = 'all';
-  $('counts').innerHTML = COUNTS.map(c => `<button class="chip" aria-pressed="${c === P.count}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
+  $('regions').innerHTML = regionChips(S.region);
+  P.count = fitCount(P.count, S.region);
+  $('counts').innerHTML = countChips(S.region, P.count);
 }
 $('modes').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.mode = b.dataset.k; store.set('setup', P); renderSetup(); };
 $('kinds').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.kind = b.dataset.k; store.set('setup', P); renderSetup(); };
@@ -666,11 +740,21 @@ $('quit').onclick = () => show('setup');
 
 /* ---------- クイズ ---------- */
 let G;
+// タイムアタックは正解するとすぐ同じ場所に次の問題が出る。ダブルクリック／ダブルタップの2回目で次の問題に答えないよう、
+// 問題を出してからこの時間（ミリ秒）のクリックは無視する。人がこの速さで新しい問題を見て答えることはない
+const TA_GUARD_MS = 250;
 function startGame() {
+  if (G && !G.ended) endGame('quit');
   const pool = poolFor(S.region);
   const n = P.count === 'all' ? pool.length : Math.min(P.count, pool.length);
   const set = shuffle(pool).slice(0, n);
-  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false };
+  // t0/timeMs/failed/shownAt はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか・いまの問題を出した時刻）
+  G = { mode: modeOf(P.mode), kind: P.kind, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0 };
+  // sid の乱数は Math.random から取らない（テストで Math.random を固定したとき、出題の並びが変わらないように）
+  G.sid = Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 4);
+  G.hint = !!(G.mode.nameOpt && P.name && G.kind !== 'ta');
+  emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: S.region, n: set.length, hint: G.hint });
+  $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
   nextQuestion();
 }
@@ -688,7 +772,7 @@ function nextQuestion() {
   const m = G.mode, box = $('qcard');
   box.innerHTML = ''; box.className = `qcard q-${m.q} a-${m.a}`;
   const main = document.createElement('div'); main.className = 'qmain'; box.append(main);
-  const showName = m.nameOpt && P.name;
+  const showName = m.nameOpt && P.name && G.kind !== 'ta';
   // 国名ONのときは選択肢に国名を出す（問題文にも出すと名前合わせで解けてしまうので出さない）
   const labels = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？', f2m: 'この国旗の国はどこ？' };
   main.insertAdjacentHTML('beforeend', `<p class="qlabel">${esc(labels[m.k])}</p>`);
@@ -705,9 +789,25 @@ function nextQuestion() {
     if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
     ch.append(b);
   });
-  ch.onclick = e => { const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
+  // タイムアタックは出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
+  ch.onclick = e => { if (G.kind === 'ta' && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
+  // タイムアタックは正解だと答えを出さずに次へ進むので、ここに出るのはまちがえたときの正解だけ
+  const slotHint = G.kind === 'ta' ? 'まちがえたら、ここに正解が出るよ' : '答えたら、ここに国のプロフィールが出るよ';
+  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys"><kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる ・ <kbd>Enter</kbd> で次へ</p></div>`);
+  G.shownAt = performance.now();
   updateProgress();
+  if (G.kind === 'ta' && G.done === 0) startTimer();
+}
+// タイムアタックの計測は1問目を出した瞬間から。クリア・失格・クイズ画面を離れたら表示の更新をやめる
+function startTimer() {
+  const g = G;
+  g.t0 = performance.now();
+  (function tick() {
+    if (G !== g || g.timeMs !== null || g.failed || $('scr-quiz').hidden) return;
+    $('ptime').textContent = RANKING.formatTime(performance.now() - g.t0);
+    requestAnimationFrame(tick);
+  })();
 }
 function updateProgress(answered) {
   const n = G.set.length, remaining = G.queue.length + (answered ? 0 : 1);
@@ -715,7 +815,7 @@ function updateProgress(answered) {
   if (G.kind === 'practice') {
     $('pnum').textContent = `覚えた ${G.done} / ${n}`;
     $('pscore').textContent = `残り ${remaining}問`;
-  } else {
+  } else { // 挑戦とタイムアタック（タイムアタックは挑戦回数が1のままなので #pscore は空）
     $('pnum').textContent = `${Math.min(G.done + 1, n)} / ${n}`;
     $('pscore').textContent = G.attempts > 1 ? `${G.attempts}回目の挑戦` : '';
   }
@@ -725,6 +825,7 @@ function updateProgress(answered) {
 }
 function answer(a) {
   if (G.answered) return;
+  const now = performance.now(); // タイムアタックは押した瞬間で計る（演出の時間は入れない）
   G.answered = true;
   const c = G.cur.c, right = a === c.a, first = !G.seen.has(c.a);
   G.seen.add(c.a);
@@ -732,6 +833,7 @@ function answer(a) {
     b.disabled = true;
     if (b.dataset.a === c.a) b.classList.add('ok'); else if (b.dataset.a === a) b.classList.add('ng');
   });
+  const mb = misses[c.a] || 0;
   if (right) {
     G.done++; G.streak++; G.best = Math.max(G.best, G.streak);
     if (first) G.firstTry++;
@@ -742,20 +844,35 @@ function answer(a) {
     if (G.kind === 'practice') G.queue.push(c); // 後半にまわす
   }
   store.set('misses', misses);
+  emit('drill:answer', { sid: G.sid, a: c.a, right, first, missesBefore: mb, missesAfter: misses[c.a] || 0,
+    mode: G.mode.k, kind: G.kind, region: S.region, hint: G.hint, streak: G.streak });
   if (S.dopa) dopaAnswer(right);
+  // タイムアタック: 正解なら解説を出さずにすぐ次へ、最後の問題ならタイム確定。不正解はその場で失格
+  if (G.kind === 'ta' && right) {
+    if (G.queue.length) return nextQuestion();
+    G.timeMs = now - G.t0;
+    return showResult();
+  }
+  if (G.kind === 'ta') { G.failed = true; $('ptime').textContent = RANKING.formatTime(now - G.t0); endGame('fail'); }
   const r = document.createElement('div');
   r.className = 'reveal';
-  let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : `ざんねん。正解は「${esc(c.n)}」`;
+  let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : G.kind === 'ta' ? `失格…\u3000正解は「${esc(c.n)}」` : `ざんねん。正解は「${esc(c.n)}」`;
   if (!right && G.kind === 'challenge') verdict += '。最初からやり直し！';
   if (!right && G.kind === 'practice') verdict += '。あとでもう一度出るよ';
-  r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}`;
+  r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
   if (G.mode.q !== 'map' && G.mode.a !== 'map') r.append(mapSvg(c, `${c.n}の位置`, { region: S.region }));
   const nx = document.createElement('button');
   nx.className = 'btn next'; nx.id = 'next';
   if (!right && G.kind === 'challenge') { nx.textContent = '最初から →'; nx.onclick = restartChallenge; }
+  else if (G.kind === 'ta') { nx.textContent = 'もう一回'; nx.onclick = startGame; }
   else { nx.textContent = G.queue.length ? '次の問題 →' : '結果を見る'; nx.onclick = nextQuestion; }
-  r.append(nx);
-  $('qcard').append(r);
+  if (G.kind === 'ta') {
+    const back = document.createElement('button'), row = document.createElement('div');
+    back.className = 'btn ghost'; back.textContent = 'モード選択へ'; back.onclick = () => show('setup');
+    row.className = 'row end'; row.append(back, nx); r.append(row);
+  } else r.append(nx);
+  const slot = $('qcard').querySelector('.rslot');
+  if (slot) slot.replaceWith(r); else $('qcard').append(r);
   updateProgress(true);
   nx.focus({ preventScroll: true });
   r.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
@@ -790,13 +907,52 @@ function factsHTML(c) {
     <dt>面積</dt><dd class="mono">${fmt(c.ar)} km²</dd>
     <dt>ISO</dt><dd class="mono">${c.a.toUpperCase()}</dd></dl></div>`;
 }
+/* 豆知識（trivia.js の window.TRIVIA = { 国: [{ k: 種類, t: 文 }] }）。読めない・形がおかしいときは何も出さない */
+const TRIVIA_LABEL = { flag: '🏳️ 国旗', geo: '🗺️ 地理', culture: '🍜 文化' };
+const triviaLast = {}; // 国ごとに前に出した文（メモリだけ。保存しない）
+const hasTriviaText = x => typeof x?.t === 'string' && x.t !== '';
+// 正解したときに出す1つ。2件以上あれば、その国で前に出した文を避けてランダムに。テストが差しかえるので TRIVIA は毎回読む
+function pickTrivia(a) {
+  const list = window.TRIVIA?.[a];
+  if (!Array.isArray(list)) return null;
+  const ok = list.filter(hasTriviaText);
+  if (!ok.length) return null;
+  const fresh = ok.length > 1 ? ok.filter(x => x.t !== triviaLast[a]) : ok, pool = fresh.length ? fresh : ok;
+  const x = pool[Math.random() * pool.length | 0];
+  triviaLast[a] = x.t;
+  return x;
+}
+// 豆知識の欄（種類のラベル付き）。全文は title にも入れる（PC の下の帯では1行で切るため）
+function triviaHTML(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  const li = items.filter(hasTriviaText).map(({ k, t }) => {
+    if (typeof k !== 'string') k = '';
+    const label = Object.hasOwn(TRIVIA_LABEL, k) ? `<span class="tv-k">${TRIVIA_LABEL[k]}</span>` : '';
+    return `<li class="tv" data-k="${esc(k)}" title="${esc(t)}">${label}${esc(t)}</li>`;
+  });
+  return li.length ? `<ul class="trivia">${li.join('')}</ul>` : '';
+}
+function endGame(outcome) {            // 1回のゲームにつき必ず1回だけ drill:result を出す
+  if (!G || G.ended) return;
+  G.ended = true;
+  emit('drill:result', { sid: G.sid, outcome, mode: G.mode.k, kind: G.kind, region: S.region,
+    n: G.set.length, done: G.done, firstTry: G.firstTry, wrongs: G.wrongs, attempts: G.attempts,
+    best: G.best, timeMs: G.timeMs ?? null, hint: G.hint, missed: [...G.missed] });
+}
+// 結果画面を出した時刻。最後の問題の連打が結果のボタンに当たらないように使う（TA_GUARD_MS）
+let resultAt = 0;
 function showResult() {
   const n = G.set.length, missed = [...G.missed].map(a => byA.get(a));
-  let head, big, stats;
+  let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}`;
   if (G.kind === 'practice') {
     head = G.wrongs === 0 ? 'パーフェクト！' : G.firstTry >= n * .7 ? 'いい感じ！' : '次はもっといけるはず';
     big = `${G.firstTry}<small> / ${n} 一発正解</small>`;
     stats = `<span>やり直し <b>${G.wrongs}</b>回</span><span>最高連続 <b>${G.best}</b></span>`;
+  } else if (G.kind === 'ta') { // 順位相当は表示してから問い合わせて入れる（taResult）
+    head = 'クリア！';
+    big = `<span id="ta-time">${RANKING.formatTime(G.timeMs)}</span>`;
+    stats = '<p class="tarank" id="ta-rank"></p>';
+    cond = `${G.mode.label}／${regionLabel(S.region)}／${P.count === 'all' ? `全部（${n}問）` : `${n}問`}`;
   } else {
     head = G.attempts === 1 ? 'ノーミスでクリア！' : 'クリア！';
     big = `${n}<small>問連続正解</small>`;
@@ -805,21 +961,113 @@ function showResult() {
   const ratio = G.firstTry / n;
   const rank = G.kind === 'challenge' ? (G.attempts === 1 ? 'S' : G.attempts <= 3 ? 'A' : 'B') : ratio === 1 ? 'S' : ratio >= .8 ? 'A' : ratio >= .6 ? 'B' : 'C';
   const dopaHead = S.dopa ? `<p class="rank">RANK ${rank}</p><p class="pts">${fmt(G.pts)} pt</p>` : '';
+  const taForm = G.kind === 'ta' && RANKING.enabled;
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
-    <p class="hint">${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}</p></div>
-    ${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}
+    <p class="hint">${cond}</p></div>
+    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><form class="field" id="ta-form" novalidate><label for="ta-name">ランキングに載せる？</label>
+      <div class="row"><input id="ta-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）"><button class="btn" id="ta-submit">載せる</button></div></form>
+      <p class="tamsg" id="ta-msg" role="status"></p><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
+  endGame('clear');
   show('result');
+  resultAt = performance.now();
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
+  if (taForm) taResult(RANKING.boardKey(G.mode.k, S.region, P.count), G.timeMs, n);
+}
+// 結果画面を出した直後のクリックは結果カードのボタンに届かせない。キャプチャで止めるので onclick もフォームの送信も起きない
+$('rcard').addEventListener('click', e => {
+  if (performance.now() - resultAt < TA_GUARD_MS && e.target.closest('button')) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+// 結果のボタンはキーの押しっぱなし（自動リピート）でも押さない。入力欄は対象外
+document.addEventListener('keydown', e => {
+  if (e.repeat && !$('scr-result').hidden && e.target.closest?.('#rcard button')) e.preventDefault();
+}, true);
+// タイムアタックの結果画面：何位相当かの問い合わせと、ランキングへの登録。
+// 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
+function taResult(board, timeMs, questions) {
+  const rank = $('ta-rank'), form = $('ta-form'), name = $('ta-name'), btn = $('ta-submit'), msg = $('ta-msg'), open = $('ta-open');
+  const ranks = r => `歴代${r.rankAll}位・今週${r.rankWeek}位`;
+  const say = (text, cls = '') => { msg.textContent = text; msg.className = `tamsg ${cls}`; };
+  name.value = store.get('nickname', '');
+  // 失敗したら画面には何も出さない（原因はコンソールに残す。オフラインと設定ミスを見分けるため）
+  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, e => console.warn('ranking rankOf', e));
+  form.onsubmit = async e => {
+    e.preventDefault();
+    const fail = reason => { say(RANKING.message(reason), 'ng'); btn.textContent = 'もう一回送る'; };
+    const chk = RANKING.checkName(name.value);
+    if (!chk.ok) return fail(chk.reason);
+    btn.disabled = true; say('送信中…'); // 連打・Enter 連打でも1回しか送らない（disabled の間は submit が起きない）
+    const r = await RANKING.submit({ board, nickname: chk.name, timeMs, questions });
+    btn.disabled = false;
+    if (!r.ok) return fail(r.reason);
+    store.set('nickname', chk.name);
+    form.hidden = true;
+    say(`載せたよ！ ${ranks(r)}`, 'ok');
+    open.hidden = false; open.onclick = () => openRanking(board);
+    open.focus({ preventScroll: true }); // フォームを隠すとフォーカスが迷子になるので、出したボタンへ
+  };
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
-  if (/^[1-4]$/.test(e.key)) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
+  // タイムアタックでは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
+  if (/^[1-4]$/.test(e.key) && !(e.repeat && G.kind === 'ta')) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
 });
+
+/* ---------- ランキング ---------- */
+// ランキング画面で見ている条件。モード選択の P/S とは別に持ち、「この条件で遊ぶ」を押したときだけ P/S に入れる
+const RK = { mode: 'f2n', region: 'all', count: 10, period: 'all', seq: 0 };
+// board（'f2n:asia:10' など）→ 条件。読めない board なら null
+function boardConds(board) {
+  const [mode, , c] = String(board).split(':'), count = c === 'all' ? 'all' : +c;
+  const region = ['all', ...REGIONS].find(r => RANKING.boardKey(mode, r, count) === board);
+  return modeOf(mode) && COUNTS.includes(count) && region ? { mode, region, count } : null;
+}
+// board を渡せばその条件、無ければ前回モード選択で選んだ条件で開く
+function openRanking(board) {
+  Object.assign(RK, (board && boardConds(board)) || { mode: P.mode, region: S.region, count: P.count });
+  show('ranking');
+}
+function renderRanking() {
+  RK.count = fitCount(RK.count, RK.region);
+  $('rk-modes').innerHTML = MODES.map(m => `<button class="chip" aria-pressed="${m.k === RK.mode}" data-k="${m.k}">${m.label}</button>`).join('');
+  $('rk-regions').innerHTML = regionChips(RK.region);
+  $('rk-counts').innerHTML = countChips(RK.region, RK.count);
+  for (const b of $('rk-tabs').children) b.setAttribute('aria-pressed', b.dataset.p === RK.period);
+  loadRanking();
+}
+// 日付は日本時間で（「今週」の区切りとそろえる）
+const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+// 読み込み中は表を薄くするだけ。返事が前後しても、最後に頼んだ条件の表だけを出す
+async function loadRanking() {
+  const seq = ++RK.seq, list = $('rk-list');
+  list.setAttribute('aria-busy', true); $('rk-retry').disabled = true;
+  let rows = null;
+  try { rows = await RANKING.top({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch (e) { console.warn('ranking top', e); }
+  if (seq !== RK.seq) return;
+  list.setAttribute('aria-busy', false); $('rk-retry').disabled = false;
+  $('rk-error').hidden = !!rows;
+  $('rk-empty').hidden = !rows || rows.length > 0;
+  let no = 0;
+  list.innerHTML = (rows ?? []).map((r, i) => {
+    if (!i || r.timeMs !== rows[i - 1].timeMs) no = i + 1; // 同じタイムは同じ順位（rank_of の「自分より速い人数＋1」とそろえる）
+    return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}</span><span class="mono">${RANKING.formatTime(r.timeMs)}</span><span class="mono at">${jstDay(r.at)}</span></li>`;
+  }).join('');
+}
+$('rk-modes').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; RK.mode = b.dataset.k; renderRanking(); };
+$('rk-regions').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; RK.region = b.dataset.r; renderRanking(); };
+$('rk-counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; RK.count = b.dataset.c === 'all' ? 'all' : +b.dataset.c; renderRanking(); };
+$('rk-tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; RK.period = b.dataset.p; renderRanking(); };
+$('rk-retry').onclick = () => loadRanking();
+// この条件のタイムアタックとしてモード選択へ
+$('rk-play').onclick = () => {
+  Object.assign(P, { mode: RK.mode, kind: 'ta', count: RK.count }); S.region = RK.region;
+  store.set('setup', P); store.set('settings', S);
+  show('setup');
+};
 
 /* ---------- 図鑑 ---------- */
 let bregion = 'all', bview = store.get('bview', 'list'), bsel = null, bmapKey = '';
@@ -899,17 +1147,20 @@ function selectBook(a, tapped) {
   bsel = a;
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
-  $('binfo').innerHTML = c ? factsHTML(c) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').innerHTML = c ? factsHTML(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').scrollTop = 0; // PC では情報欄が中でスクロールする。前の国の位置のままだと国旗が上で隠れる
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (c && tapped) emit('drill:book-open', { a });
 }
 $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
   const b = e.target.closest('.card'); if (!b) return;
   const c = byA.get(b.dataset.a), inner = $('detail-inner');
-  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}`;
+  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
   inner.append(mapSvg(c, `${c.n}の位置`));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
+  emit('drill:book-open', { a: c.a });
 };
 $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 
@@ -918,5 +1169,10 @@ applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 show(start);
 </script>
+<script src="rpg-core.js?v=1"></script>
+<script src="rpg.js?v=1"></script>
+<script src="rpg-cards.js?v=1"></script>
+<script src="rpg-battle.js?v=1"></script>
+<script src="badges.js?v=1"></script>
 </body>
 </html>
