@@ -153,9 +153,10 @@
       $('ppts').after(el);
     }
     const r = last;
-    el.innerHTML = `+${fmt(shown.game.coins)} ${COIN}`
-      + (r && r.coin > 0 && r.decay < 1 ? `<small class="rpg-decay">×${r.decay}</small>` : '')
+    const note = (r && r.coin > 0 && r.decay < 1 ? `<small class="rpg-decay">×${r.decay}</small>` : '')
       + (r && r.firstEver > 0 ? `<small class="rpg-fe">はじめて！+${r.firstEver}</small>` : '');
+    // 注は1つの箱に入れる（スマホでは行の下のすき間に出すので、#pcoin の幅を変えない。rpg.css）
+    el.innerHTML = `+${fmt(shown.game.coins)} ${COIN}` + (note && `<span class="rpg-pnote">${note}</span>`);
   };
   const queuePcoin = () => {
     if (pcoinQueued) return;

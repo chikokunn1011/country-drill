@@ -5,7 +5,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, pickSetup, answerWrong, clearByAnswering } from './helpers.mjs';
+import { startServer, pickSetup, answerCorrect, answerWrong, clearByAnswering } from './helpers.mjs';
 import { settleLayout } from './layout.mjs';
 import { openRpg, writeSave, saveWith, startBattle, battleAnswer, battleGuard, winBattle, flipAll } from './rpg_helpers.mjs';
 
@@ -98,12 +98,13 @@ t('battle_no_hscroll', async page => {
   await noHScrollAt(page, '負け');
 }, { timeout: 180_000 });
 
+const LONGEST_PCOIN = () => { $('pcoin').innerHTML = '+9,999 <i class="coin" aria-hidden="true"></i><span class="rpg-pnote"><small class="rpg-decay">×0.5</small><small class="rpg-fe">はじめて！+20</small></span>'; };
 t('quiz_progress_no_hscroll', async page => {
   await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
   await page.click('#start');
   await page.waitForSelector('#pcoin');
-  // #pcoin がいちばん長いとき（4桁・目減り・はじめて）
-  await page.evaluate(() => { $('pcoin').innerHTML = '+9,999 <i class="coin" aria-hidden="true"></i><small class="rpg-decay">×0.5</small><small class="rpg-fe">はじめて！+20</small>'; });
+  // #pcoin がいちばん長いとき（4桁・目減り・はじめて。rpg.js の drawPcoin と同じ形）
+  await page.evaluate(LONGEST_PCOIN);
   for (const vp of [PHONE, SHORT]) {
     await page.setViewportSize(vp);
     assert.ok(await noHScroll(page), `${size(vp)} で横にスクロールする`);
@@ -114,8 +115,44 @@ t('quiz_progress_no_hscroll', async page => {
     assert.ok(m.sw <= m.cw, `${size(vp)}: 進み具合の行がはみ出す（${m.sw} > ${m.cw}）`);
     assert.ok(m.coin.right <= m.iw && m.quit.right <= m.iw, `${size(vp)}: #pcoin ${m.coin.right}・#quit ${m.quit.right} > ${m.iw}`);
     assert.ok(m.coin.bottom <= m.prog.bottom, `${size(vp)}: #pcoin が進み具合の行の外（${m.coin.bottom} > ${m.prog.bottom}）`);
+    const n = await rect(page, '#pcoin .rpg-pnote'), q = await rect(page, '#qcard');
+    assert.ok(n.left >= 0 && n.right <= m.iw && n.bottom <= q.top, `${size(vp)}: 目減り・はじめての注 ${JSON.stringify(n)}（カードの上 ${q.top}）`);
   }
 }, { timeout: 180_000 });
+
+// スマホ（390×844・360×640）: #pcoin は進み具合と同じ行に入れて、冒険の表示が OFF のときより行を増やさない（クイズの画面が1行ぶん下がらない）。
+// 「はじめて！+20」「×0.5」は行の下のすき間に出す（問題のカードにかからない・画面の外に出ない）。チップの幅は +0 でも +9,999 と注つきでも同じ（計測中に折り返さない）
+const quizRow = page => page.evaluate(() => {
+  const h = () => document.querySelector('#scr-quiz > .progress').getBoundingClientRect().height;
+  const on = h();
+  document.body.classList.add('rpg-off');
+  const off = h();
+  document.body.classList.remove('rpg-off');
+  const n = document.querySelector('#pcoin .rpg-pnote')?.getBoundingClientRect();
+  return { on, off, note: n && { left: n.left, right: n.right, bottom: n.bottom }, qtop: $('qcard').getBoundingClientRect().top, iw: innerWidth };
+});
+for (const dopa of [false, true]) t(`quiz_progress_coin_same_line${dopa ? '_dopa' : ''}`, async page => {
+  for (const vp of [PHONE, SHORT]) for (const kind of ['practice', 'challenge', 'ta']) {
+    await page.setViewportSize(vp);
+    await pickSetup(page, { mode: 'f2n', kind, region: 'all', count: 10 });
+    await page.click('#start');
+    await page.waitForSelector('#pcoin');
+    const w0 = await rect(page, '#pcoin');
+    await page.evaluate(LONGEST_PCOIN);
+    assert.equal((await rect(page, '#pcoin')).width, w0.width, `${size(vp)} ${kind}: +0 と +9,999 でチップの幅が変わる`);
+    for (let i = 0; i <= 4; i++) {
+      if (i) {
+        await answerCorrect(page);
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));   // #pcoin は次のフレーム
+      }
+      const m = await quizRow(page), at = `${size(vp)} ${kind} ${i}問正解`;
+      assert.ok(m.on <= m.off + 2, `${at}: 進み具合の行 ${m.on}px（冒険 OFF は ${m.off}px）`);
+      if (m.note) assert.ok(m.note.left >= 0 && m.note.right <= m.iw && m.note.bottom <= m.qtop, `${at}: 注 ${JSON.stringify(m.note)}（カードの上 ${m.qtop}）`);
+      if (i && kind !== 'ta') await page.click('#next');
+    }
+    await page.click('#quit');
+  }
+}, { timeout: 180_000, storage: { settings: { region: 'all', dopa, sound: false } } });
 
 t('phone_sticky_top', async page => {
   await writeSave(page, PARTY);

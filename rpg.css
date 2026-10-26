@@ -39,9 +39,19 @@
 /* クイズ中のコイン（進み具合の行の #ppts の直後）。目減り（×0.5）と「はじめて！+20」は小さく */
 #pcoin { white-space: nowrap; color: var(--ink); }
 #pcoin .rpg-decay, #pcoin .rpg-fe { font-size: .8em; color: var(--muted); margin-left: .4em; }
-/* スマホでは最初（+0）から1行を取って右に寄せる。数や「はじめて！+20」で幅が変わっても折り返しが変わらず、
-   タイムアタックの計測中に問題と選択肢が下にずれない（PC は1行に収まるので今のまま） */
-@media (max-width: 899.98px) { #pcoin { flex-basis: 100%; text-align: right; } }
+/* スマホ: 進み具合と同じ行の右はしに入れて、冒険の表示が OFF のときより行を増やさない（PC は1行に収まるので今のまま）。
+   - 幅は「+9,999 ●」ぶんで固定（min-width 8.6ch ≒ 70px。タイムアタックは全部の国でも4桁まで）。注（目減り・はじめて）は
+     行の下のすき間（.wrap の gap 16px）に出して幅に入れない → 数や注が変わっても折り返しが変わらず、タイムアタックの計測中に問題と選択肢が下にずれない
+   - バーの flex-basis を 120px → 36px にして、空の #pscore（挑戦・タイムアタック）のすき間も消す。
+     バー 36 ＋ チップ 70 ＋ すき間 12 が元のバー 120 以下なので、OFF のときに入る行には ON でも入る（バーは残りの幅にのびる）
+   - 行の高さ 1.5（13.6px → 20.4px）: 1行目は #pnum（20.48px）と同じ高さ。2行目に1つで落ちても、あとから来る #ppts（ドーパミン 20px）より低くならない */
+@media (max-width: 899.98px) {
+  body:not(.rpg-off) .progress:has(> #pcoin) > .bar { flex-basis: 36px; }
+  body:not(.rpg-off) .progress:has(> #pcoin) > #pscore:empty { display: none; }
+  #pcoin { position: relative; margin-left: auto; min-width: 8.6ch; text-align: right; line-height: 1.5; }
+  #pcoin .rpg-pnote { position: absolute; top: 100%; right: 0; line-height: 1; }
+  #pcoin .rpg-pnote > :first-child { margin-left: 0; }
+}
 
 /* 結果のパネル（#r-ext の中）。スマホでは結果カードを横いっぱいにする（行の長さでカードの幅が変わらないように） */
 #scr-result:has(.rpg-res) { width: 100%; }

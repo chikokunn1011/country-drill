@@ -102,7 +102,7 @@ t('pcoin_counts', async page => {
   assert.doesNotMatch(await pcoin(page), /はじめて/);
 });
 
-// スマホ（390×844）のタイムアタック: #pcoin の数や「はじめて！+20」で幅が変わっても、計測中に問題のカードが下にずれない
+// スマホ（390×844・360×640）のタイムアタック: #pcoin の数や「はじめて！+20」で幅が変わっても、計測中に問題のカードが下にずれない
 t('pcoin_no_layout_shift', async page => {
   const tops = async () => {
     await startTa(page);
@@ -114,14 +114,18 @@ t('pcoin_no_layout_shift', async page => {
     }
     return ys;
   };
-  // まっさらなセーブ: 1問目の答えから「はじめて！+20」が付く
-  let ys = await tops();
-  assert.deepEqual(ys, Array(5).fill(ys[0]), `1〜5問目の #qcard の top: ${ys}`);
-  // 全部の国でもう +20 をもらっている: +5 → +10 で桁が増える
   const all = await page.evaluate(() => C.map(c => c.a));
-  await writeSave(page, saveWith({ intro: false, fe: Object.fromEntries(all.map(a => [a, 15])) }));
-  ys = await tops();
-  assert.deepEqual(ys, Array(5).fill(ys[0]), `1〜5問目の #qcard の top: ${ys}`);
+  for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 640 }]) {
+    await page.setViewportSize(vp);
+    // まっさらなセーブ: 1問目の答えから「はじめて！+20」が付く
+    await writeSave(page, saveWith({ intro: false }));
+    let ys = await tops();
+    assert.deepEqual(ys, Array(5).fill(ys[0]), `${vp.width}×${vp.height} 1〜5問目の #qcard の top: ${ys}`);
+    // 全部の国でもう +20 をもらっている: +5 → +10 で桁が増える
+    await writeSave(page, saveWith({ intro: false, fe: Object.fromEntries(all.map(a => [a, 15])) }));
+    ys = await tops();
+    assert.deepEqual(ys, Array(5).fill(ys[0]), `${vp.width}×${vp.height} 1〜5問目の #qcard の top: ${ys}`);
+  }
 });
 
 t('first_coin_toast', async page => {
