@@ -110,6 +110,30 @@
 .bdg-pt b { font-family: var(--font-display); overflow-wrap: anywhere; }
 .bdg-pt small { font-size: .75rem; color: var(--muted); }
 
+/* ---------- お知らせ（§5.2 結果画面のパネル・§5.3 トースト）。ボタンは .btn.ghost（ドパガキの虹色のアニメが付かない） ---------- */
+/* 取ったステップ1つ分: 2行×3列（メダル｜名前と段・称号｜コイン・［つける］） */
+.bdg-row { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; text-align: left; }
+.bdg-row > .bdg-medal { grid-row: span 2; }
+.bdg-row > p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.bdg-l1 { font: 700 .95rem/1.35 var(--font-display); }
+.bdg-l2 { font-size: .85rem; line-height: 1.35; color: var(--muted); }
+.bdg-paid { justify-self: end; font: 700 .85rem/1.35 var(--font-mono); white-space: nowrap; }
+.bdg-row > .bdg-btn, .bdg-more > .bdg-btn, .bdg-line > .bdg-btn { flex: none; justify-self: end; padding-inline: 14px; white-space: nowrap; }
+.bdg-h { margin: 0; font: 900 .95rem/1.3 var(--font-display); }
+.bdg-toast { display: flex; flex-direction: column; gap: 6px; text-align: left; }
+.bdg-toast .bdg-medal { width: 40px; height: 40px; font-size: 20px; border-width: 3px; }
+.bdg-toast.bdg-line { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+.bdg-msg { margin: 0; min-width: 0; font-weight: 700; line-height: 1.4; }
+.bdg-result { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.bdg-more { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; color: var(--muted); font-size: .9rem; }
+.bdg-tip { margin: 0; font-size: .82rem; line-height: 1.45; color: var(--muted); }
+/* 背の低い PC で結果画面が縦にはみ出さないように（はみ出したら pc.css ではなく、ここで詰める） */
+@media (min-width: 900px) and (max-height: 760px) {
+  .bdg-result { padding: 8px 12px; }
+  .bdg-result .bdg-medal { width: 32px; height: 32px; font-size: 18px; }
+  .bdg-result .bdg-row { gap: 0 8px; }
+}
+
 /* ---------- PC（900px 以上。pc.css が無くても画面いっぱいに使う） ---------- */
 @media (min-width: 900px) {
   #scr-badges.wrap { max-width: none; width: 100%; padding-inline: clamp(16px, 3vw, 48px); }

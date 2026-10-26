@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, clearTimeAttack, clearByAnswering } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC } from './helpers.mjs';
 import { measureFit, settleLayout, rectOf } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -426,3 +426,182 @@ t('home_long_title_320', async page => {
   assert.ok(await noHScroll(page));
   assert.ok((await rectOf(page, '#home-title')).right <= 320);
 }, { viewport: { width: 320, height: 640 } });
+
+/* ---------- お知らせ: 結果画面のパネル・トースト・保留（設計書 §5.1〜§5.3） ---------- */
+const toastN = page => count(page, '#toasts .toast');
+const toastWith = (page, s) => page.locator('#toasts .toast', { hasText: s });
+// #toasts に .toast が足された時刻（performance.now()）を window.__tt に積む（#toasts は最初の toast() で作られる）
+const watchToasts = page => page.evaluate(() => {
+  window.__tt = [];
+  new MutationObserver(ms => {
+    for (const m of ms) for (const n of m.addedNodes) if (n instanceof Element && n.matches('#toasts > .toast')) window.__tt.push(performance.now());
+  }).observe(document.body, { childList: true, subtree: true });
+});
+// smooth のスクロールが止まるまで待つ
+const scrollStill = page => page.evaluate(async () => {
+  for (let y = NaN; y !== scrollY;) { y = scrollY; await new Promise(ok => setTimeout(ok, 100)); }
+});
+
+t('result_panel_first_clear', async page => {
+  await page.evaluate(() => document.addEventListener('drill:result', e => { window.__sid = e.detail.sid; }));
+  await playPractice(page);
+  const p = await page.evaluate(() => {
+    const el = $('r-badges');
+    return el && { parent: el.parentElement.id, next: el.nextElementSibling?.id, sid: el.dataset.sid, want: window.__sid, text: el.textContent };
+  });
+  assert.ok(p, '#r-badges が無い');
+  assert.deepEqual([p.parent, p.next, p.sid], ['r-side', 'r-ext', p.want]);
+  for (const s of ['はじめの一歩', '銅', '称号〈ドリルの新人〉をつけたよ']) assert.ok(p.text.includes(s), `${s} が無い: ${p.text}`);
+  assert.equal(await toastN(page), 0);
+});
+
+// クイズの途中はトーストを出さない。取れたものは結果画面のパネルに出す
+t('no_toast_during_quiz', async page => {
+  await page.evaluate(() => BADGES.debug.set('right', 99));
+  await startPractice(page);
+  for (let i = 1; i <= 5; i++) {
+    await answerCorrect(page);
+    await page.waitForSelector('#next');
+    assert.equal(await toastN(page), 0, `${i}問目`);
+    await page.click('#next');
+  }
+  await page.locator('#scr-result').waitFor();
+  const rows = await page.locator('#r-badges .bdg-row').allInnerTexts();
+  assert.equal(rows.length, 2, rows.join(' | '));
+  for (const s of ['こつこつ正解', 'はじめの一歩']) assert.ok(rows.some(r => r.includes(s)), `${s} が無い: ${rows.join(' | ')}`);
+  assert.equal(await toastN(page), 0);
+});
+
+// 結果画面のまま取れたものはパネルに足す。ホームに戻ったらトースト
+t('later_steps_join_panel', async page => {
+  await playPractice(page);
+  await page.evaluate(() => BADGES.debug.set('right', 100));
+  const rows = await page.locator('#r-badges .bdg-row').allInnerTexts();
+  assert.equal(rows.length, 2, rows.join(' | '));
+  assert.ok(rows.some(r => r.includes('こつこつ正解')), rows.join(' | '));
+  assert.equal(await toastN(page), 0);
+  await page.click('#brand');
+  await page.evaluate(() => BADGES.debug.set('streak', 10));
+  await toastWith(page, 'れんぞく正解').waitFor();
+});
+
+// 図鑑の詳細（ダイアログ）を開いている間はトーストを出さず、閉じたら出す
+t('book_toast_after_dialog', async page => {
+  await page.click('#home-book');
+  for (let i = 0; i < 10; i++) {
+    await page.locator('#grid .card').nth(i).click();
+    await page.waitForSelector('#detail[open]');
+    if (i === 9) assert.equal(await toastN(page), 0, '10個目を開いた時点');
+    await page.evaluate(() => $('detail').close());
+  }
+  const toast = toastWith(page, '図鑑めくり');
+  await toast.waitFor();
+  const s = await toast.innerText();
+  for (const w of ['銅', '称号〈図鑑好き〉']) assert.ok(s.includes(w), `${w} が無い: ${s}`);
+  const h = await toast.locator('[data-bdg-equip="book@1"]').evaluate(e => e.getBoundingClientRect().height);
+  assert.ok(h >= 44, `［つける］の高さ ${h}`);
+}, { storage: { badges: { v: 1, eq: '' } } });
+
+// タイムアタックの失格（結果画面が無い）はトースト。［もう一回］［モード選択へ］に重ならない
+t('ta_fail_toast_no_overlap', async page => {
+  await page.evaluate(() => BADGES.debug.set('right', 99));
+  await pickSetup(page, { mode: 'f2n', kind: 'ta', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  await answerWrong(page);
+  await page.waitForSelector('#next');
+  await toastWith(page, 'こつこつ正解').waitFor();
+  await scrollStill(page);
+  const m = await page.evaluate(() => {
+    const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    return { toasts: [...document.querySelectorAll('#toasts .toast')].map(box), btns: [...document.querySelectorAll('#next, .reveal .row.end .btn')].map(box) };
+  });
+  const hit = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
+  assert.ok(m.toasts.length && m.btns.length >= 2, json(m));
+  for (const p of m.toasts) for (const q of m.btns) assert.ok(!hit(p, q), `重なっている: ${json({ p, q })}`);
+});
+
+// 一度に出す枚数: スマホは2枚（多ければ「ほか◯個」）、PC は3枚。400ms ずつずらす
+t('toast_limits', async page => {
+  await watchToasts(page);
+  await page.evaluate(() => BADGES.debug.set('right', 5000));   // 銅・銀・金
+  await page.waitForTimeout(1000);
+  let texts = await page.locator('#toasts .toast').allInnerTexts();
+  assert.equal(texts.length, 2, texts.join(' | '));
+  assert.match(texts[1], /ほか2個のバッジもゲット！/);
+  await page.setViewportSize(PC);
+  await page.evaluate(() => { $('toasts').replaceChildren(); window.__tt = []; BADGES.debug.reset(); BADGES.debug.set('right', 5000); });
+  await page.waitForTimeout(1000);
+  texts = await page.locator('#toasts .toast').allInnerTexts();
+  assert.equal(texts.length, 3, texts.join(' | '));
+  assert.ok(texts.every(s => !s.includes('ほか')), texts.join(' | '));
+  const tt = await page.evaluate(() => window.__tt);
+  assert.equal(tt.length, 3);
+  assert.ok(tt[2] - tt[0] >= 700, `1枚目と3枚目の差 ${tt[2] - tt[0]}ms`);
+});
+
+// トーストの文字を押すとすぐ消える。［つける］［見る］を押してもそのトーストは消える
+t('toast_click', async page => {
+  await page.evaluate(() => BADGES.debug.set('right', 100));
+  const first = toastWith(page, 'こつこつ正解');
+  await first.locator('.bdg-toast p').first().click();
+  assert.equal(await first.count(), 0);
+  await page.evaluate(() => BADGES.debug.set('streak', 10));
+  const second = toastWith(page, 'れんぞく正解');
+  await second.locator('[data-bdg-equip="streak@1"]').click();
+  assert.equal(await page.evaluate(() => BADGES.title()), '波に乗る人');
+  assert.equal(await second.count(), 0);
+  await page.evaluate(() => BADGES.debug.set('days', 30));   // 銅・銀・金
+  const more = toastWith(page, 'ほか2個のバッジもゲット！');
+  await more.locator('[data-bdg-open]').click();
+  assert.equal(await page.isVisible('#scr-badges'), true);
+  assert.equal(await more.count(), 0);
+}, { storage: { badges: { v: 1, eq: '' } } });
+
+// 国名ヒントありでクリアしたら、パネルに注意を1行（3回まで）
+t('hint_tip_three_times', async page => {
+  await pickSetup(page, { mode: 'm2f', kind: 'practice', region: 'all', count: 5 });
+  await page.check('#nameopt');
+  await page.click('#start');
+  await clearByAnswering(page);
+  assert.equal(await text(page, '#r-badges .bdg-tip'), '国名ヒントありのときは、ノーミス・モード・地域の銀と金などのバッジは進まないよ');
+  assert.equal((await saved(page)).tip, 3);
+  await settleResult(page);
+  await page.click('#r-again');
+  await clearByAnswering(page);
+  assert.equal(await count(page, '#r-badges .bdg-tip'), 0);
+}, { storage: { badges: { v: 1, tip: 2 } } });
+
+// 背の低い PC でも、7個取れた結果画面で［もう一回］がスクロールなしで押せる（パネルは4行と「ほか3個」）
+for (const viewport of [{ width: 1366, height: 657 }, { width: 1280, height: 577 }]) {
+  t(`result_panel_pc_fits_${viewport.width}x${viewport.height}`, async page => {
+    await page.evaluate(() => { BADGES.debug.set('right', 95); BADGES.debug.set('days', 2); BADGES.debug.set('last', '2000-01-01'); });
+    await playPractice(page, { count: 10 });   // first-clear answers streak prac-perfect reg-world days comeback
+    await settleLayout(page);
+    assert.equal(await count(page, '#r-badges .bdg-row'), 4);
+    assert.match(await text(page, '#r-badges .bdg-more'), /ほか3個/);
+    assert.equal(await page.evaluate(() => $('r-badges').parentElement.id), 'r-side');
+    assert.ok(await noHScroll(page));
+    const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+    assert.ok(r.bottom <= win.h && r.right <= win.w, json({ r, win }));
+  }, { viewport });
+}
+
+// 起動時の判定で取れたものは、まとめて1枚。称号は取ったなかでいちばん上の段（同じ色なら後ろ）
+t('startup_summary', async page => {
+  const ts = page.locator('#toasts .toast');
+  await ts.first().waitFor();
+  assert.equal(await ts.count(), 1);
+  assert.match(await ts.innerText(), /これまでの記録から バッジを2個もらったよ！/);
+  assert.equal(await ts.locator('[data-bdg-open]').count(), 1);
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), 'streak@1');
+}, { storage: { badges: { v: 1, s: { right: 150, streak: 12 } } } });
+
+t('dialog_blocks_toast', async page => {
+  await page.evaluate(() => $('detail').showModal());
+  await page.evaluate(() => BADGES.debug.set('right', 100));
+  assert.equal(await toastN(page), 0);
+  await page.evaluate(() => $('detail').close());
+  await page.locator('#toasts .toast').first().waitFor();
+  assert.equal(await toastN(page), 1);
+});

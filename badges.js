@@ -543,17 +543,100 @@
   const pending = [];       // まだ出していないお知らせ
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // 取れたステップを知らせる。auto（自動でつけた称号）は、ほかの commit が lastAuto を消す前に読む
+  let lastSid = null;       // いちばん新しいクリアの sid（結果画面のパネルにあとから足すかを決める）
+  let flushTimer = 0;       // ガチャの演出が終わったら flush する（タイマーは1つだけ）
+
+  // 取れたステップを知らせる（§5.1〜§5.3）。auto（自動でつけた称号）は、ほかの commit が lastAuto を消す前に読む。
+  // opts.result: drill:result の detail（clear なら結果画面のパネル）、opts.startup: 起動時の判定（まとめて1枚）
   function deliver(keys, opts = {}) {
     const auto = 'auto' in opts ? opts.auto : bs.lastAuto;
     if (auto) emitTitle(auto);
-    pending.push(...keys.map(key => ({ key, auto: key === auto })));
-    flush();
+    const res = opts.result;
+    if (opts.startup) {                        // 起動時の払いは deliver の前に済んでいる（ここでは払わない）
+      if (keys.length) { pending.push({ summary: keys.length }); flush(); }
+    } else {
+      const paid = pay(keys), items = keys.map(key => ({ key, paid: paid[key], auto: key === auto }));
+      if (res?.outcome === 'clear') { lastSid = res.sid; resultPanel(items, res); }   // パネルに出したものはトーストにしない
+      else if (!$('scr-result').hidden && $('r-badges')?.dataset.sid === lastSid) panelAdd($('r-badges'), items);
+      else { pending.push(...items); flush(); }
+    }
     renderHome();
     if (screen === 'badges') renderBadges();
   }
-  function flush() {}           // 保留していたお知らせを出す（Task 6）
   function pay(keys, retro = false) { return {}; }   // 冒険への支払い（Task 7）
+
+  // お知らせを出せるまでの ms。Infinity はイベント（drill:result・drill:screen・rpg:battle・ダイアログの close）を待つ
+  function blockedFor() {
+    if (run || battle || $('detail').open) return Infinity;   // クイズ中・バトル中・#detail の下に隠れる
+    const left = screen === 'gacha' ? lastPull + (reduced() ? 1000 : 3000) - Date.now() : 0;
+    return left > 0 ? left : 0;
+  }
+  // 保留していたお知らせを出す。まとめは1枚ずつ、ステップは上限まで（超えたら上限−1枚と「ほか◯個」）。400ms ずつずらす
+  function flush() {
+    clearTimeout(flushTimer);
+    if (!pending.length) return;
+    const wait = blockedFor();
+    if (wait === Infinity) return;
+    if (wait > 0) { flushTimer = setTimeout(flush, wait); return; }
+    const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), cap = innerWidth < 600 ? 2 : 3;
+    const html = list.filter(it => 'summary' in it).map(it => lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`));
+    if (steps.length > cap) html.push(...steps.slice(0, cap - 1).map(stepToast), lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`));
+    else html.push(...steps.map(stepToast));
+    html.forEach((h, i) => { if (i) setTimeout(() => toast(h, 4500), i * 400); else toast(h, 4500); });   // toast はいつもグローバルの名前で呼ぶ
+  }
+
+  // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］
+  function stepHTML({ key, paid, auto }) {
+    const si = stepInfo(CAT, key);
+    if (!si) return '';
+    const coin = typeof paid === 'number' && Number.isFinite(paid) && paid > 0 ? `●+${paid}` : '';   // 0 は「もう払ってある」（docs/events.md）
+    const title = `称号〈${esc(si.t.title)}〉`;
+    const l2 = auto ? `<p class="bdg-l2">${title}をつけたよ</p>`
+      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? '' : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
+    return `<div class="bdg-row"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${si.b.name} ${tierLabel(si.color)}`)}</p>`
+      + `<span class="bdg-paid">${coin}</span>${l2}</div>`;
+  }
+  // トーストの中身。<div data-bdg-toast> の中を押したら消す（document の click）
+  const stepToast = item => `<div data-bdg-toast class="bdg-toast"><p class="bdg-h">バッジゲット！</p>${stepHTML(item)}</div>`;
+  const lineToast = msg => `<div data-bdg-toast class="bdg-toast bdg-line"><p class="bdg-msg">${msg}</p><button class="btn ghost bdg-btn" data-bdg-open>見る</button></div>`;
+
+  // 結果画面のパネル（§5.2）。#r-side（無ければ #rcard）の中の #r-ext の直前（無ければボタンの行の直前）
+  const PANEL_ROWS = 4;
+  const TIP = '国名ヒントありのときは、ノーミス・モード・地域の銀と金などのバッジは進まないよ';
+  function resultPanel(items, res) {
+    const tip = !!res.hint && bs.st.tip < 3;
+    const host = $('r-side') || $('rcard');
+    if (!host || !items.length && !tip) return;
+    $('r-badges')?.remove();
+    const box = document.createElement('div');
+    box.className = 'bdg-result'; box.id = 'r-badges'; box.dataset.sid = res.sid;
+    if (tip) {
+      box.innerHTML = `<p class="bdg-tip">${TIP}</p>`;
+      bs.push(['tip']); bs.commit({ judge: false });
+    }
+    const ext = host.querySelector(':scope > #r-ext'), btns = host.querySelector(':scope > .row.center');
+    if (ext) ext.before(box); else if (btns) btns.before(box); else host.append(box);
+    panelAdd(box, items);
+  }
+  // パネルに行を足す。4行まで、それより多ければ「ほか◯個」の数を増やす（行は作り直さない）
+  function panelAdd(box, items) {
+    if (!items.length) return;
+    if (!box.querySelector(':scope > .bdg-h')) box.insertAdjacentHTML('afterbegin', '<p class="bdg-h">🏅 バッジを手に入れたよ！</p>');
+    let last = [...box.querySelectorAll(':scope > .bdg-h, :scope > .bdg-row')].pop(), rows = box.querySelectorAll(':scope > .bdg-row').length, extra = 0;
+    for (const it of items) {
+      if (rows >= PANEL_ROWS) { extra++; continue; }
+      const html = stepHTML(it);
+      if (html) { last.insertAdjacentHTML('afterend', html); last = last.nextElementSibling; rows++; }
+    }
+    if (!extra) return;
+    let more = box.querySelector(':scope > .bdg-more');
+    if (!more) {
+      last.insertAdjacentHTML('afterend', '<div class="bdg-more"><span></span><button class="btn ghost bdg-btn" data-bdg-open>バッジを見る</button></div>');
+      more = last.nextElementSibling;
+    }
+    more.dataset.n = (Number(more.dataset.n) || 0) + extra;
+    more.firstElementChild.textContent = `ほか${more.dataset.n}個`;
+  }
   // つける称号が変わった（key が null なら外した）。badge:title を出すのはここだけ
   function emitTitle(key) {
     emit('badge:title', key ? { key, title: stepInfo(CAT, key)?.t.title ?? '' } : { key: null, title: '' });
@@ -585,6 +668,7 @@
     if (d.name === 'home') renderHome();
     flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
   });
+  $('detail').addEventListener('close', flush);   // ダイアログの下に隠れるので、開いている間は保留していた
   // 閉じる・隠れるときは、残っている op を保存だけする（判定は次の起動か次の結果で）
   const save = () => { if (bs.pending()) bs.commit({ judge: false }); };
   window.addEventListener('pagehide', save);
@@ -769,19 +853,23 @@
     } catch { /* 共有もコピーもできなければ何もしない */ }
   }
 
-  // バッジのボタンは document でまとめて受ける（ホーム・バッジ画面・ダイアログ。Task 6 がトーストとパネルの分を足す）
+  // バッジのボタンは document でまとめて受ける（ホーム・バッジ画面・ダイアログ・トースト・結果画面のパネル）
   document.addEventListener('click', e => {
-    const el = e.target instanceof Element && e.target.closest('[data-bdg-equip], [data-bdg-pick], [data-bdg-open], [data-bdg-detail], [data-bdg-practice], [data-bdg-share], [data-bdg-close], [data-bdg-picker]');
-    if (!el) return;
-    const v = el.dataset;
-    if ('bdgEquip' in v) equip(v.bdgEquip);
-    else if ('bdgPick' in v) { equip(v.bdgPick); $('detail').close(); }
-    else if ('bdgOpen' in v) open(v.bdgOpen || undefined);
-    else if ('bdgDetail' in v) openDetail(v.bdgDetail);
-    else if ('bdgPractice' in v) practice(v.bdgPractice);
-    else if ('bdgShare' in v) share(v.bdgShare);
-    else if ('bdgClose' in v) $('detail').close();
-    else openPicker();             // [data-bdg-picker]（ホームの札と［称号をかえる］）
+    if (!(e.target instanceof Element)) return;
+    const el = e.target.closest('[data-bdg-equip], [data-bdg-pick], [data-bdg-open], [data-bdg-detail], [data-bdg-practice], [data-bdg-share], [data-bdg-close], [data-bdg-picker]');
+    const note = e.target.closest('[data-bdg-toast]')?.closest('.toast');
+    if (el) {
+      const v = el.dataset;
+      if ('bdgEquip' in v) equip(v.bdgEquip);
+      else if ('bdgPick' in v) { equip(v.bdgPick); $('detail').close(); }
+      else if ('bdgOpen' in v) open(v.bdgOpen || undefined);
+      else if ('bdgDetail' in v) openDetail(v.bdgDetail);
+      else if ('bdgPractice' in v) practice(v.bdgPractice);
+      else if ('bdgShare' in v) share(v.bdgShare);
+      else if ('bdgClose' in v) $('detail').close();
+      else if ('bdgPicker' in v) openPicker();   // ホームの札と［称号をかえる］
+    }
+    note?.remove();                // トーストの中を押したら（ボタンでも）すぐ消す。上に重なって下の画面のボタンを押せないので
   });
 
   // ---------- window.BADGES（設計書 §9.3）。起動時の判定より先に置く（badge:title を受けた側が title() を読めるように） ----------
