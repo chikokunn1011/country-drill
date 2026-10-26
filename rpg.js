@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // 国旗クエスト（RPG）の本体: セーブ（RPG.tx）、クイズのコインの受け取り（#pcoin・結果のパネル・トースト）、バッジのコインの支払い、
-  // 冒険ホーム（入口・はじめての画面・引き継ぎコード・開発用パネル）、タブ間の同期、RPG.snapshot()
+  // 冒険ホーム（入口・はじめての画面・引き継ぎコード・開発用パネル）、国旗ガチャと仲間の一覧、タブ間の同期、RPG.snapshot()
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // ---- 起動時のチェック。足りなければ何もしない（ボタンも画面も作らない。クイズはそのまま動く） ----
@@ -603,13 +603,243 @@
     if ($('rpg-data')?.open) fillCode();
     if (focus) $(focus)?.focus({ preventScroll: true });
   };
-  // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・いまの冒険ホームを描き直す
-  const refresh = () => {
+
+  /* ---------- 仲間のカード・国旗ガチャ（#scr-gacha）・仲間の一覧（#scr-cards） ---------- */
+  const STAR_NAME = ['', 'ブロンズ', 'シルバー', 'ゴールド'];
+  // 地域のチップ: 全世界と、国の数が少ない順の6地域（ダンジョンの順）。値は S.region と同じ形（'all' か地域名）
+  const AREAS = ['all', ...DG.filter(g => g.r !== 'all').map(g => g.r)];
+  const AREA_N = Object.fromEntries(AREAS.map(r => [r, r === 'all' ? TOTAL : C.filter(c => c.r === r).length]));
+  const inArea = (a, r) => r === 'all' || byA.get(a)?.r === r;
+  const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const dots = n => '●'.repeat(n) + '○'.repeat(T.card.stackMax - n);   // かさね ●●○○
+  const backBtn = '<button type="button" class="linkbtn rpg-back">← 冒険</button>';
+  // チップは1回だけ作り、押した状態と「持っている数/国の数」だけ描き直す（押したチップのフォーカスが外れない）
+  const chipsHTML = allLabel => AREAS.map(r => `<button type="button" class="chip" aria-pressed="false" data-r="${r}">${r === 'all' ? allLabel : r}<span class="mono"></span></button>`).join('');
+  const drawChips = (box, d, sel) => {
+    const as = Object.keys(d.cards);
+    for (const b of box.children) {
+      const r = b.dataset.r;
+      b.setAttribute('aria-pressed', String(r === sel));
+      b.lastElementChild.textContent = ` ${as.filter(a => inArea(a, r)).length}/${AREA_N[r]}`;
+    }
+  };
+
+  // 仲間のカード（<button>）: 国旗・国名・★・かさね・なかよし度。持っていない国は国旗をグレーで薄く（.is-none）、あと何回正解で仲間になるか
+  // （なかよし度が5以上なのに持っていない国には出さない）。face: 'back' は裏向き（.is-back。方位磁針の模様）
+  const cardHTML = (a, d, { face = 'up', label = '' } = {}) => {
+    const c = byA.get(a);
+    if (!c) return '';
+    const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = T.card.frJoin - fr, back = face === 'back';
+    const mid = card
+      ? `<span class="rpg-card-star">${'★'.repeat(star)}</span><span class="rpg-card-stack" title="かさね ${card[1]}/${T.card.stackMax}">${dots(card[1])}</span>`
+      : rest > 0 ? `<span class="rpg-card-hint">あと${rest}回正解で仲間に（1回のゲームで1回ぶん）</span>` : '';
+    return `<button type="button" class="rpg-card rpg-s${star}${card ? '' : ' is-none'}${back ? ' is-back' : ''}" data-a="${a}" data-star="${star}"${back ? ' aria-label="裏向きのカード"' : ''}>`
+      + `<span class="rpg-card-face">${label ? `<span class="rpg-lab">${label}</span>` : ''}<img class="rpg-card-flag" src="${flag(a)}" alt="">`
+      + `<b class="rpg-card-name">${esc(c.n)}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
+      + '<span class="rpg-card-back" aria-hidden="true"><span>🧭</span></span></button>';
+  };
+  // #detail に国の情報とカードの強さ。id があればそのダンジョンでの値（地域ボーナス ×1.5 が付くか）
+  const openCard = (a, id) => {
+    const c = byA.get(a), dlg = $('detail'), inner = $('detail-inner');
+    if (!c || !dlg || !inner) return;
+    const d = get(), card = d.cards[a], fr = d.fr[a] || 0, g = id ? K.dungeonOf(id) : null;
+    let info;
+    if (card) {
+      const bonus = !!g && (g.r === 'all' || g.r === c.r), atk = K.cardAtk(card, fr, bonus);
+      const nw = s => `<span class="rpg-nowrap">${s}</span>`;
+      info = `<p>${nw(`★${card[0]} ${STAR_NAME[card[0]]}`)}・${nw(`かさね ${dots(card[1])}`)}・${nw(`なかよし度 ♥${fr}/${T.card.frMax}`)}</p>`
+        + `<p class="rpg-cd-pow">${nw(`こうげき ${atk.toFixed(1)}`)}${nw(`（地域ボーナス ${bonus ? 'あり' : 'なし'}）`)}・${nw(`HP ${(atk * T.card.hpMul).toFixed(1)}`)}</p>`
+        + (g ? '' : `<p class="hint">${esc(c.r)}のダンジョンと地図喰いの巣では、地域ボーナスで ×${T.card.regionMul}</p>`);
+    } else {
+      info = `<p class="rpg-cd-pow">まだ仲間じゃない（なかよし度 ♥${fr}/${T.card.frMax}）</p>`
+        + (fr < T.card.frJoin ? `<p class="hint">あと${T.card.frJoin - fr}回正解で仲間に（1回のゲームで1回ぶん）</p>` : '');
+    }
+    inner.innerHTML = `<button class="close">閉じる</button>${factsHTML(c)}<div class="rpg-cd-info">${info}</div>`;
+    inner.querySelector('.close').onclick = () => dlg.close();
+    if (!dlg.open) dlg.showModal();
+  };
+
+  // ---- 国旗ガチャ ----
+  const GA_NOTE = '※コインはクイズで集めるゲームの中のコインだけ。お金はかからないし、買うこともできないよ。';
+  const GA_LABEL = { new: () => 'NEW', up: () => 'ランクアップ', stack: () => 'かさね+1', refund: star => `おかえし ${COIN}${fmt(T.gacha.refund[star])}` };
+  const GACHA_HTML = `<div class="rpg-head">${backBtn}<h2 class="rpg-h2">国旗ガチャ</h2><span class="rpg-hcoin" id="ga-coins"></span></div>`
+    + '<div class="rpg-ga-side"><p class="rpg-warn" id="ga-warn" role="status" hidden></p><p class="rpg-lbl" id="ga-q">どこの国と出会う？</p>'
+    + `<div class="chips" id="ga-regions" role="group" aria-labelledby="ga-q">${chipsHTML('全世界')}</div>`
+    + `<p class="hint" id="ga-hint">選んだ地域のダンジョンでは、その地域の仲間が ×${T.card.regionMul} で強い</p>`
+    + '<div class="rpg-ga-btns"><button class="btn ghost" id="ga-free"></button><button class="btn" id="ga-1"></button><button class="btn" id="ga-10"></button></div>'
+    + '<p class="rpg-ga-need" id="ga-need" hidden></p><p class="rpg-ga-pity" id="ga-pity"></p>'
+    + `<div class="rpg-ga-rates" id="ga-rates"></div><p class="rpg-ga-note" id="ga-note">${GA_NOTE}</p></div>`
+    + '<div class="rpg-ga-main" id="ga-main"><p class="rpg-lbl">結果</p><p class="hint" id="ga-empty">引いたカードがここに並ぶよ</p>'
+    + '<div class="rpg-ga-res" id="ga-res"></div><button class="btn ghost" id="ga-flipall" hidden>ぜんぶめくる</button></div>';
+  // 提供割合。表示する値も抽選と同じ TUNING.gacha から（gachaRates）
+  const ratesHTML = r => {
+    const R = K.gachaRates(), n = AREA_N[r];
+    return '<p class="rpg-ga-rh">出る確率</p><ul>'
+      + `<li>★3 ゴールド ${R.r3}% / ★2 シルバー ${R.r2}%</li><li>★1 ブロンズ ${R.r1}%</li>`
+      + `<li>10回引くと10枚目は★2以上（★3 ${R.tenR3}% / ★2 ${R.tenR2}%）</li>`
+      + `<li>★3が出ないまま${R.pity}回目 → ★3確定</li>`
+      + `<li>国は選んだ地域から同じ確率（${r === 'all' ? '全世界' : r}なら 各 1/${n} = ${(100 / n).toFixed(1)}%）</li>`
+      + `<li>天井込みの★3の目安: 約${R.eff3.toFixed(1)}%</li></ul>`;
+  };
+  // gaBusy: 引いてから全部めくれるまで（そのあいだはどのボタンも押せない）
+  let gaRegion = 'all', gaBusy = false, gaTimer = null;
+  // 最初に選んでおく地域: RPG.open で渡したもの → 次に挑むダンジョンの地域 → 全部クリアなら前回の地域、それも無ければ全世界
+  const firstRegion = d => {
+    const want = RPG.opts?.region, nf = nextFloor(d);
+    if (AREAS.includes(want)) return want;
+    return nf ? K.dungeonOf(nf.id).r : AREAS.includes(d.gr) ? d.gr : 'all';
+  };
+  // ボタン・チップ・天井・提供割合・コイン（結果はそのまま）。新しい版のデータのあいだは引けない（書けないので）
+  const drawGacha = (d = get()) => {
+    if (!$('ga-regions')) return;
+    const { one, ten, pity } = T.gacha, free = $('ga-free'), need = $('ga-need'), warn = $('ga-warn'), stop = gaBusy || status === 'readOnly';
+    warn.textContent = WARN[status] || '';
+    warn.hidden = !WARN[status];
+    $('ga-coins').innerHTML = coinHTML(d.coins);
+    drawChips($('ga-regions'), d, gaRegion);
+    free.textContent = d.day.free ? 'また明日' : d.day.first ? '無料1回' : '今日クイズを1回クリアすると無料1回';
+    free.disabled = stop || !d.day.first || d.day.free;
+    $('ga-1').innerHTML = `1回 ${COIN}${fmt(one)}`;
+    $('ga-1').disabled = stop || d.coins < one;
+    $('ga-10').innerHTML = `10回 ${COIN}${fmt(ten)}`;
+    $('ga-10').disabled = stop || d.coins < ten;
+    need.hidden = d.coins >= ten;
+    need.innerHTML = need.hidden ? '' : `あと${COIN}${fmt(ten - d.coins)}`;
+    $('ga-pity').textContent = `★3確定まで あと${pity - d.pity}回`;
+    $('ga-rates').innerHTML = ratesHTML(gaRegion);
+  };
+  const flipCard = el => { el.classList.remove('is-back'); el.removeAttribute('aria-label'); };
+  // 残りを全部表にして、ボタンを戻す（［ぜんぶめくる］もここ）
+  const endFlip = () => {
+    clearInterval(gaTimer);
+    gaTimer = null;
+    $('ga-res').querySelectorAll('.rpg-card.is-back').forEach(flipCard);
+    gaBusy = false;
+    drawGacha();
+  };
+  const startFlip = () => {
+    clearInterval(gaTimer);
+    gaTimer = setInterval(() => {
+      const el = $('ga-res').querySelector('.rpg-card.is-back');
+      if (el) flipCard(el);
+      if (!$('ga-res').querySelector('.rpg-card.is-back')) endFlip();
+    }, T.gacha.flipMs);
+  };
+  const clearResults = () => {
+    clearInterval(gaTimer);
+    gaTimer = null;
+    gaBusy = false;
+    $('ga-res').innerHTML = '';
+    $('ga-flipall').hidden = true;
+    $('ga-empty').hidden = false;
+  };
+  // 結果を裏向きで並べて flipMs ずつめくる（reduced motion なら最初から表）。カードは1枚ずつ足していったときの★とかさね
+  const drawResults = (res, before, d) => {
+    const box = $('ga-res'), back = !reduced(), now = { cards: { ...before }, coins: 0, earned: 0 };
+    box.innerHTML = res.map(r => {
+      K.addCard(now, r.a, r.star);
+      return cardHTML(r.a, { cards: { [r.a]: now.cards[r.a] }, fr: d.fr }, { face: back ? 'back' : 'up', label: GA_LABEL[r.out](r.star) });
+    }).join('');
+    res.forEach((r, i) => {
+      const el = box.children[i];
+      el.dataset.out = r.out;
+      if (r.star === 3) el.classList.add('is-gold');   // ★3 は裏のうちから金色に光る
+    });
+    $('ga-flipall').hidden = false;
+    $('ga-empty').hidden = true;
+    if (back) {
+      if (['ga-free', 'ga-1', 'ga-10'].includes(document.activeElement?.id)) $('ga-flipall').focus({ preventScroll: true });
+      startFlip();
+    } else endFlip();
+    // スマホは結果がボタンと確率の下なので、結果まで送る
+    if (innerWidth < 900) $('ga-main').scrollIntoView({ block: 'nearest', behavior: back ? 'smooth' : 'auto' });
+  };
+  // 1回の tx で コインを引く（無料なら day.free）→ 抽選 → gr。書けてから結果を描き、イベントは tx が返ってから
+  const pullGacha = (count, free) => {
+    if (gaBusy) return;
+    gaBusy = true;
+    for (const id of ['ga-free', 'ga-1', 'ga-10']) $(id).disabled = true;   // 連打で二重に引かない
+    const region = gaRegion, cost = free ? 0 : count === 10 ? T.gacha.ten : T.gacha.one;
+    let d = null, res = null, before = null;
+    tx(x => {
+      if (free ? !x.day.first || x.day.free : x.coins < cost) return;
+      before = { ...x.cards };
+      if (free) x.day.free = true;
+      else x.coins -= cost;
+      res = K.pull(x, region, count, Math.random, C);
+      x.gr = region;
+      d = x;
+    });
+    if (!d || !wrote) { gaBusy = false; drawGacha(); return; }   // 足りなかった（別のタブで使った）・保存できなかった
+    let owned0 = Object.keys(d.cards).length - res.filter(r => r.out === 'new').length;
+    emit('rpg:pull', { region, count, free, results: res.map(r => ({ ...r })), pity: d.pity, pulls: d.pulls });
+    for (const r of res) {
+      if (r.out === 'new') emit('rpg:join', { a: r.a, via: 'gacha', owned: ++owned0 });
+      if (r.out === 'up') emit('rpg:promote', { a: r.a, star: r.star, via: 'gacha' });
+    }
+    emitCoins(d, -cost, 'gacha');
+    emitCoins(d, res.reduce((s, r) => s + (r.out === 'refund' ? T.gacha.refund[r.star] : 0), 0), 'refund');
+    drawResults(res, before, d);
+    drawGacha();
+  };
+  // screenRender.gacha: 開くたびに地域を選び直し、前の結果を消す
+  const renderGacha = () => {
     const d = get();
+    gaRegion = firstRegion(d);
+    clearResults();
+    drawGacha(d);
+  };
+  const bindGacha = sec => {
+    sec.querySelector('.rpg-back').onclick = () => show('rpg');
+    $('ga-regions').onclick = e => {
+      const b = e.target.closest('.chip');
+      if (!b || !AREAS.includes(b.dataset.r)) return;
+      gaRegion = b.dataset.r;
+      drawGacha();
+    };
+    // ダブルクリックの2回目（e.detail > 1）は無視する
+    const onPull = (count, free) => e => { if (e.detail <= 1) pullGacha(count, free); };
+    $('ga-free').onclick = onPull(1, true);
+    $('ga-1').onclick = onPull(1, false);
+    $('ga-10').onclick = onPull(10, false);
+    $('ga-flipall').onclick = endFlip;
+    $('ga-res').onclick = e => { const b = e.target.closest('.rpg-card'); if (b) openCard(b.dataset.a); };
+  };
+
+  // ---- 仲間の一覧（★の多い順 → 国名の順で固定。地図 #cd-map の中身は Task 12） ----
+  const CARDS_HTML = `<div class="rpg-head">${backBtn}<h2 class="rpg-h2" id="cd-count"></h2></div>`
+    + `<div class="chips" id="cd-regions" role="group" aria-label="地域でしぼりこむ">${chipsHTML('すべて')}</div>`
+    + '<div class="rpg-cd-map" id="cd-map"></div><div class="rpg-cd-grid" id="cd-grid"></div>';
+  let cdRegion = 'all', byName = null;
+  const drawCards = (d = get()) => {
+    if (!$('cd-grid')) return;
+    byName ||= C.map(c => c.a).sort((x, y) => byA.get(x).n.localeCompare(byA.get(y).n, 'ja'));
+    const star = a => d.cards[a]?.[0] || 0;
+    $('cd-count').textContent = `仲間 ${owned(d)} / ${TOTAL}`;
+    drawChips($('cd-regions'), d, cdRegion);
+    // sort は安定なので、同じ★の中は国名の順のまま
+    $('cd-grid').innerHTML = byName.filter(a => inArea(a, cdRegion)).sort((x, y) => star(y) - star(x)).map(a => cardHTML(a, d)).join('');
+  };
+  const bindCards = sec => {
+    sec.querySelector('.rpg-back').onclick = () => show('rpg');
+    $('cd-regions').onclick = e => {
+      const b = e.target.closest('.chip');
+      if (!b || !AREAS.includes(b.dataset.r)) return;
+      cdRegion = b.dataset.r;
+      drawCards();
+    };
+    $('cd-grid').onclick = e => { const b = e.target.closest('.rpg-card'); if (b) openCard(b.dataset.a); };
+  };
+
+  // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・いまの冒険の画面を描き直す（ガチャの結果は消さない）
+  const refresh = () => {
+    const d = get(), screen = document.body.dataset.screen;
     document.body.classList.toggle('rpg-off', d.show === false);
     drawEntrances(d);
     if ($('set-rpg')) $('set-rpg').checked = d.show !== false;
-    if (document.body.dataset.screen === 'rpg') renderHome();
+    if (screen === 'rpg') renderHome();
+    if (screen === 'gacha') drawGacha(d);
+    if (screen === 'cards') drawCards(d);
   };
   // 別のタブがセーブを書いたら（storage イベント。localStorage.clear() のときは key が null）再読み込みなしで描き直す。
   // 描き直しの tx は変わらなければ書かないので、タブどうしで書き合いにならない
@@ -636,11 +866,18 @@
   // 起動時に1回: 画面（<section> を作ってから登録）、ホームのボタン、トップバーのチップ、設定のスイッチ
   const setupEntrances = () => {
     document.body.classList.toggle('rpg-off', get().show === false);   // ボタンとチップを作る前に（OFF の人に一瞬でも見せない）
-    const wrap = document.querySelector('body > .wrap'), sec = document.createElement('section');
-    sec.id = 'scr-rpg'; sec.className = 'wrap'; sec.hidden = true;
-    const foot = wrap.querySelector(':scope > footer');
-    if (foot) foot.before(sec); else wrap.append(sec);
-    registerScreen('rpg', renderHome);
+    // 画面: footer の直前に <section> を作ってから登録する
+    const wrap = document.querySelector('body > .wrap'), foot = wrap.querySelector(':scope > footer');
+    const addScreen = (name, render, html = '') => {
+      const sec = document.createElement('section');
+      sec.id = `scr-${name}`; sec.className = 'wrap'; sec.hidden = true; sec.innerHTML = html;
+      if (foot) foot.before(sec); else wrap.append(sec);
+      registerScreen(name, render);
+      return sec;
+    };
+    addScreen('rpg', renderHome);
+    bindGacha(addScreen('gacha', renderGacha, GACHA_HTML));
+    bindCards(addScreen('cards', drawCards, CARDS_HTML));
 
     const hb = document.createElement('button');
     hb.className = 'btn ghost'; hb.id = 'home-rpg';
@@ -670,7 +907,7 @@
 
   /* ---------- window.RPG ---------- */
   const RPG = window.RPG = {
-    tx, get, emitCoins, announce, coinHTML,
+    tx, get, emitCoins, announce, coinHTML, cardHTML, openCard,
     get status() { return status; },
     refresh, open, nextFloor, unlocked, snapshot,
     opts: {},   // RPG.open で渡したもの（開いた画面が読む）
