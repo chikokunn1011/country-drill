@@ -131,7 +131,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - RPG 設計 §10.3 の `badge:earned {id, tier?, title?}` は、この detail の一部（キーを足しただけ）。ずれはバッジ設計 §8.4 で決めたとおり。
 - `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。
 - badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）か `false`（払えなかった）を書く。`undefined`（書いていない）は古い rpg.js。
-- rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。
+- rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。ただし `retro: true` で新しく払った分は、まとめて1回だけ「バッジのごほうび ●+合計」のトーストを出してよい（バッジ設計 §8.4 #1）。
 - 称号は `window.BADGES?.title?.()`（かっこなしの文字列。なければ `''`）があれば、旅人カードに〈〉を付けて出す。`badge:title` が来たら描き直す。
 
 ## 9. 読み込みの順番
