@@ -46,6 +46,14 @@
     const st = sec.querySelector('.rpg-stage');
     if (st) st.dataset.phase = p;
   };
+  // スマホでは上の列（.rpg-btop）が画面の上に固定される（rpg.css の sticky）。その下に隠れないように、
+  // el に scroll-margin-top（上の列の高さ + 8px）を付けて true。PC のステージ（sticky でない）は何もしないで false
+  const clearTop = el => {
+    const top = sec.querySelector('.rpg-btop');
+    if (!top || getComputedStyle(top).position !== 'sticky') return false;
+    el.style.scrollMarginTop = `${top.offsetHeight + 8}px`;
+    return true;
+  };
   const stopTimer = () => { if (B) { clearTimeout(B.timer); B.waiting = false; } };
 
   // ---- 上の列（モンスター・HP・のこりミス・仲間・取りもどした旗・ログ） ----
@@ -220,6 +228,7 @@
     });
     box.append(ch);
     $('bt-col').replaceChildren(box);
+    clearTop(box);   // 答え合わせのあとで下までスクロールしていても、問いの文が上の列の下に隠れない
     box.scrollIntoView({ block: 'nearest' });
     B.shownAt = performance.now();
   };
@@ -313,7 +322,8 @@
     rv.append(nx);
     sec.querySelector('#bt-q .choices').replaceWith(rv);
     nx.focus({ preventScroll: true });
-    rv.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' });
+    // スマホは上の列のすぐ下に答え合わせの頭を出す。PC は選択肢の場所に収まるのでスクロールしない
+    if (clearTop(rv)) rv.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
   };
   // ［つぎへ］: HP が 0 なら思い出して復活（1バトル1回。まちがえた国が無ければ無し）か負け。復活の問題をまちがえたら負け
   const next = () => {
@@ -403,6 +413,7 @@
       + (b.next ? '<button type="button" class="btn" id="bt-nextfloor">つぎのフロアへ</button>' : '')
       + '</div></div>';
     $('bt-col').innerHTML = html;
+    clearTop($('bt-end'));
     $('bt-end').scrollIntoView({ block: 'nearest' });
     ($('bt-nextfloor') || $('bt-again') || $('bt-home')).focus({ preventScroll: true });
   };
