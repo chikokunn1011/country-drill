@@ -16,6 +16,9 @@
 /* クイズ中のコイン（進み具合の行の #ppts の直後）。目減り（×0.5）と「はじめて！+20」は小さく */
 #pcoin { white-space: nowrap; color: var(--ink); }
 #pcoin .rpg-decay, #pcoin .rpg-fe { font-size: .8em; color: var(--muted); margin-left: .4em; }
+/* スマホでは最初（+0）から1行を取って右に寄せる。数や「はじめて！+20」で幅が変わっても折り返しが変わらず、
+   タイムアタックの計測中に問題と選択肢が下にずれない（PC は1行に収まるので今のまま） */
+@media (max-width: 899.98px) { #pcoin { flex-basis: 100%; text-align: right; } }
 
 /* 結果のパネル（#r-ext の中）。スマホでは結果カードを横いっぱいにする（行の長さでカードの幅が変わらないように） */
 #scr-result:has(.rpg-res) { width: 100%; }

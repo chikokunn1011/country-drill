@@ -97,6 +97,28 @@ t('pcoin_counts', async page => {
   assert.doesNotMatch(await pcoin(page), /はじめて/);
 });
 
+// スマホ（390×844）のタイムアタック: #pcoin の数や「はじめて！+20」で幅が変わっても、計測中に問題のカードが下にずれない
+t('pcoin_no_layout_shift', async page => {
+  const tops = async () => {
+    await startTa(page);
+    const ys = [];
+    for (let i = 0; i < 5; i++) {
+      await frames(page); // #pcoin は答えの次のフレームで描き直す
+      ys.push(await page.evaluate(() => $('qcard').getBoundingClientRect().top));
+      if (i < 4) await answerCorrect(page);
+    }
+    return ys;
+  };
+  // まっさらなセーブ: 1問目の答えから「はじめて！+20」が付く
+  let ys = await tops();
+  assert.deepEqual(ys, Array(5).fill(ys[0]), `1〜5問目の #qcard の top: ${ys}`);
+  // 全部の国でもう +20 をもらっている: +5 → +10 で桁が増える
+  const all = await page.evaluate(() => C.map(c => c.a));
+  await writeSave(page, saveWith({ intro: false, fe: Object.fromEntries(all.map(a => [a, 15])) }));
+  ys = await tops();
+  assert.deepEqual(ys, Array(5).fill(ys[0]), `1〜5問目の #qcard の top: ${ys}`);
+});
+
 t('first_coin_toast', async page => {
   await writeSave(page, saveWith({ intro: false }));
   await startPractice(page);
@@ -256,6 +278,30 @@ t('missing_v_rescued', async page => {
   await playPractice(page);
   assert.equal(await coins(page), headNum(await resLines(page)));
 });
+
+// 消されにくい保存（navigator.storage.persist）は、稼いだコインをはじめて書いたときに頼む。
+// 起動時の書き直し（まっさら・古い日付）とゲームの開始では頼まない（Firefox は確認を出すので）。冒険の表示が OFF なら頼まない
+t('persist_after_first_earn', async page => {
+  const asked = () => page.evaluate(() => window.__persist || 0);
+  assert.notEqual(await readSave(page), null); // まっさらでも起動時にセーブを書く
+  assert.equal(await asked(), 0);
+  await writeSave(page, { ...saveWith({ coins: 500, earned: 500 }), day: { d: '2000-01-01', n: {}, first: false, free: false } });
+  assert.equal((await readSave(page)).day.d, localToday()); // 起動時に古い日付を書き直した
+  assert.equal(await asked(), 0);
+  await startPractice(page);
+  await page.waitForSelector('#qcard .choice');
+  assert.equal(await asked(), 0);
+  await clearByAnswering(page);
+  await page.locator('#rpg-res').waitFor();
+  assert.equal(await asked(), 1);
+  await playPractice(page);
+  assert.equal(await asked(), 1);
+  // 冒険の表示が OFF: コインは貯まるが頼まない
+  await writeSave(page, saveWith({ show: false }));
+  await playPractice(page);
+  assert.ok(await coins(page) > 0);
+  assert.equal(await asked(), 0);
+}, { init: () => { StorageManager.prototype.persist = function () { window.__persist = (window.__persist || 0) + 1; return Promise.resolve(false); }; } });
 
 t('storage_blocked_memory', async page => {
   assert.equal(await page.evaluate(() => RPG.status), 'memory');

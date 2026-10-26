@@ -73,7 +73,6 @@
       if (!saidQuota) { saidQuota = true; toast(MSG.quota); }
       return false;
     }
-    if (!persisted) { persisted = true; try { navigator.storage?.persist?.()?.catch?.(() => {}); } catch {} }
     return true;
   };
   // RPG.refresh() を次のフレームで1回（同じフレームの中の予約はまとめる）
@@ -97,10 +96,13 @@
         backupRaw(raw);
         if (!saidBroken) { saidBroken = true; toast(MSG.broken); }
       }
-      const out = fn(r.d), str = JSON.stringify(r.d);
+      const e0 = r.d.earned, out = fn(r.d), str = JSON.stringify(r.d);
       wrote = true;
       // 変わらなければ書かない（描き直しから tx を呼んでも、書く → 描き直す の輪にならない）
       if (str !== raw) { wrote = writeRaw(str); if (wrote) queueRefresh(); }
+      // 消されにくい保存（persist）は、稼いだコインを書けたときに頼む（ページを開くごとに1回まで）。Firefox は確認を出すので、
+      // 起動時の書き直し・日付の書き直し・ゲームの開始では頼まない。冒険の表示が OFF のときも頼まない
+      if (wrote && ls && !persisted && r.d.earned > e0 && r.d.show !== false) { persisted = true; try { navigator.storage?.persist?.()?.catch?.(() => {}); } catch {} }
       return out;
     } catch (e) { console.error('[rpg]', e); wrote = false; return null; }
   };
