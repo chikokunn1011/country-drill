@@ -117,10 +117,10 @@ export const SCENES = {
   },
 };
 
-// 場面を開いて落ち着くまで待つ。戻り値は openApp と同じ（閉じるのは呼んだ側）
-export async function openScene(browser, { scene, viewport, url, dopa, colorScheme } = {}) {
+// 場面を開いて落ち着くまで待つ。戻り値は openApp と同じ（閉じるのは呼んだ側）。blockScripts は openApp にそのまま渡す
+export async function openScene(browser, { scene, viewport, url, dopa, colorScheme, blockScripts = [] } = {}) {
   if (!SCENES[scene]) throw new Error(`そんな場面はない: ${scene}`);
-  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, storage: dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {} });
+  const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, blockScripts, storage: dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {} });
   try {
     await SCENES[scene](app.page);
     await settleLayout(app.page);

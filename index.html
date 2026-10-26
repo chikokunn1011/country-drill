@@ -302,6 +302,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 <link rel="stylesheet" href="pc.css" media="(min-width: 900px)">
+<link rel="stylesheet" href="rpg.css?v=1">
 </head>
 <body>
 <div class="wrap">
@@ -1165,5 +1166,8 @@ applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 show(start);
 </script>
+<script src="rpg-core.js?v=1"></script>
+<script src="rpg.js?v=1"></script>
+<script src="rpg-battle.js?v=1"></script>
 </body>
 </html>

@@ -96,8 +96,11 @@ async function supabaseRoute(route, db) {
 // 新しいブラウザコンテキストでサイトを開く。supabase: 'fake'（偽DB）か 'down'（つながらない）
 // seed: Math.random を決まった列にする（mulberry32）。reducedMotion・colorScheme は newContext にそのまま渡す
 // storage: ページのスクリプトより前に localStorage へ入れておく値（キー → JSON にする値）
-// 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, storage } = {}) {
+// blockScripts: 中身を空にするスクリプトのファイル名（'rpg.js' など。?v=1 は見ない）。止めずに空の script を返すので console error にならない
+// init: 読み込むたびにページのスクリプトより前に走らせる関数か文字列（context.addInitScript に渡す）
+// 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字、
+// consoleErrors は console.error の文字（再読み込みをまたいで積む）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, storage, blockScripts = [], init } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
   const context = await browser.newContext({ viewport, reducedMotion, colorScheme });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
@@ -109,6 +112,9 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
   if (storage) await context.addInitScript(storage => {
     try { for (const [k, v] of Object.entries(storage)) localStorage.setItem(k, JSON.stringify(v)); } catch {}
   }, storage);
+  if (init) await context.addInitScript(init);
+  if (blockScripts.length) await context.route(u => blockScripts.includes(new URL(u).pathname.slice(1)),
+    route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   const db = fakeDb();
   db.down = supabase === 'down';
   const origin = new URL(url).origin;
@@ -118,11 +124,14 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (new URL(target).hostname.endsWith('.supabase.co')) return supabaseRoute(route, db);
     return route.abort(); // フォントなどその他の外部通信はしない
   });
-  const page = await context.newPage(), errors = [], warnings = [];
+  const page = await context.newPage(), errors = [], warnings = [], consoleErrors = [];
   page.on('pageerror', e => errors.push(e));
-  page.on('console', m => { if (m.type() === 'warning') warnings.push(m.text()); });
+  page.on('console', m => {
+    if (m.type() === 'warning') warnings.push(m.text());
+    if (m.type() === 'error') consoleErrors.push(m.text());
+  });
   await page.goto(url);
-  return { page, context, db, errors, warnings, close: () => context.close() };
+  return { page, context, db, errors, warnings, consoleErrors, close: () => context.close() };
 }
 
 // console.warn はページから少し遅れて届くので、re に合うものが来るまで（最大2秒）待つ。来たら true

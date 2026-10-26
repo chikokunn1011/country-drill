@@ -8,6 +8,7 @@ import { rm } from 'node:fs/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, PHONE } from './helpers.mjs';
 import { SCENES, openScene, settleLayout, measureFit, rectOf, pageGeometry, parseViewports, resolveGeomBase, extractTree } from './layout.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -144,8 +145,8 @@ test('rslot_ta_fail', async () => {
 });
 
 test('rside_contents', { timeout: 120_000 }, async () => {
-  const scene = async (name, check) => {
-    const app = await openScene(browser, { scene: name, viewport: PHONE });
+  const scene = async (name, check, opts = {}) => {
+    const app = await openScene(browser, { scene: name, viewport: PHONE, ...opts });
     try { await check(app.page, sel => app.page.locator(sel).count()); noErrors(app); } finally { await app.close(); }
   };
   await scene('result_miss', async (page, count) => {
@@ -155,7 +156,7 @@ test('rside_contents', { timeout: 120_000 }, async () => {
   });
   await scene('result', async page => {
     assert.equal(await page.evaluate(() => $('r-side').children.length === 1 && $('r-ext').childNodes.length === 0), true); // ノーミスなら中身は空の #r-ext だけ（右列は出ない）
-  });
+  }, { blockScripts: RPG_FILES });
   await scene('ta_result', async (page, count) => {
     assert.equal(await count('#r-side .tabox #ta-form'), 1);
     assert.equal(await count('#r-side #ta-rank'), 0); // 順位相当はスマホの並びを変えないため .stats のまま
@@ -241,8 +242,8 @@ async function checkFit(problems, scene, viewport, dopa = false) {
   finally { await app?.close(); }
 }
 // 場面を開いて check(page) を呼ぶ。最後に例外が無いのも見る
-async function inScene(scene, viewport, check) {
-  const app = await openScene(browser, { scene, viewport });
+async function inScene(scene, viewport, check, opts = {}) {
+  const app = await openScene(browser, { scene, viewport, ...opts });
   try { await check(app.page); noErrors(app); } finally { await app.close(); }
 }
 const rects = (page, ...sels) => Promise.all(sels.map(s => rectOf(page, s)));
@@ -423,7 +424,7 @@ test('result_single_column_when_side_empty', { timeout: 120_000 }, async () => {
     const [card, res] = await rects(page, '#rcard', '#rcard > .result'), mid = r => (r.left + r.right) / 2;
     assert.ok(Math.abs(mid(card) - mid(res)) <= 2, `真ん中にない: ${json({ card, res })}`);
   };
-  const app = await openApp(browser, { viewport: W1366, seed: 1, reducedMotion: 'reduce' });
+  const app = await openApp(browser, { viewport: W1366, seed: 1, reducedMotion: 'reduce', blockScripts: RPG_FILES });
   try {
     const { page } = app;
     // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じ）
@@ -438,7 +439,7 @@ test('result_single_column_when_side_empty', { timeout: 120_000 }, async () => {
     await centered(page);
     noErrors(app);
   } finally { await app.close(); }
-  await inScene('result', W1366, centered);
+  await inScene('result', W1366, centered, { blockScripts: RPG_FILES });
 });
 
 // モードやドパガキ向けを切り替えても、メニューのパネルが上下に動かない（設計書 9章 5。高さ 760px より大きいとき）

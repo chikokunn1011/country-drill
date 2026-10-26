@@ -1,0 +1,37 @@
+/* 国旗クエスト（rpg.js）の見た目。クラスは .rpg- で始まるものと .coin・.bq だけ。
+   色は既存のトークンと、ここで足すトークン（:root・ダークモード・data-theme="dark" の3か所に書く） */
+:root { --rpg-coin: #f2b630; --rpg-coin-hi: #fff3c2; --rpg-coin-lo: #c98810; --rpg-coin-rim: #a06a08; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --rpg-coin: #e8ae2e; --rpg-coin-hi: #ffe7a0; --rpg-coin-lo: #b07612; --rpg-coin-rim: #f0c75a; }
+}
+:root[data-theme="dark"] { --rpg-coin: #e8ae2e; --rpg-coin-hi: #ffe7a0; --rpg-coin-lo: #b07612; --rpg-coin-rim: #f0c75a; }
+
+/* コイン: 金色の丸（文字の大きさに合わせる）。🪙 は使わない */
+.coin {
+  display: inline-block; width: .95em; aspect-ratio: 1; border-radius: 50%; vertical-align: -.12em; flex: none;
+  background: radial-gradient(circle at 35% 30%, var(--rpg-coin-hi) 0 14%, var(--rpg-coin) 46%, var(--rpg-coin-lo) 100%);
+  box-shadow: inset 0 0 0 .09em var(--rpg-coin-rim);
+}
+
+/* クイズ中のコイン（進み具合の行の #ppts の直後）。目減り（×0.5）と「はじめて！+20」は小さく */
+#pcoin { white-space: nowrap; color: var(--ink); }
+#pcoin .rpg-decay, #pcoin .rpg-fe { font-size: .8em; color: var(--muted); margin-left: .4em; }
+
+/* 結果のパネル（#r-ext の中）。スマホでは結果カードを横いっぱいにする（行の長さでカードの幅が変わらないように） */
+#scr-result:has(.rpg-res) { width: 100%; }
+.rpg-res { width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; border-top: 1px dashed var(--line); padding-top: 12px; }
+.rpg-res p { margin: 0; }
+.rpg-res-head { font: 900 1.3rem var(--font-display); line-height: 1.3; }
+.rpg-now { margin-left: .4em; font: 500 .82rem var(--font-mono); color: var(--muted); white-space: nowrap; }
+.rpg-res-rows { list-style: none; margin: 0; padding: 0; font-size: .88rem; line-height: 1.5; color: var(--muted); }
+/* 日本語は文節で折り返す（Chrome 119+。ほかは無視する） */
+.rpg-res-x { font-size: .9rem; font-weight: 700; line-height: 1.45; word-break: auto-phrase; }
+.rpg-res .btn { align-self: flex-end; margin-top: 4px; padding: 8px 18px; font-size: .95rem; text-wrap: balance; word-break: auto-phrase; }
+.rpg-nowrap { white-space: nowrap; }   /* コインの丸と数を離さない */
+
+/* PC の 900〜1279px は結果カードが1列で、パネルは下に横長に入る。背が低い画面でもスクロールしないように、内訳を2段に組む */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  .rpg-res-rows { width: min(100%, 36em); columns: 2; column-gap: var(--col-gap, 24px); }
+  .rpg-res-rows li { break-inside: avoid; }
+  .rpg-res .btn { margin-top: 0; }
+}
