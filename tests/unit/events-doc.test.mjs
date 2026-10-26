@@ -47,3 +47,10 @@ test('events_doc_covers_badges', () => {
   for (const s of ['paid', 'retro', 'badge:earned', 'badge:title', 'BADGES.title()', 'maxCombo', 'via', 'intro', 'floors'])
     assert.ok(d.includes('`' + s + '`'), `docs/events.md に \`${s}\` がない`);
 });
+
+test('events_doc_rpg_answer_timing', () => {
+  // 10章: クイズの外で積んだ rpg:answer をいつ判定するか（次に判定するイベント＝ふつうは rpg:battle、または pagehide のあとの次の起動）
+  const sec = doc().split(/^## /m).find(s => s.startsWith('10.')) ?? '';
+  const line = sec.split('\n').find(l => l.startsWith('- ') && l.includes('`rpg:answer`')) ?? '';
+  for (const s of ['`rpg:battle`', '`pagehide`', '次の起動']) assert.ok(line.includes(s), `10章の rpg:answer の行に ${s} がない: ${line}`);
+});

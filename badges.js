@@ -197,9 +197,9 @@
         break;
       }
       case 'tip': d.tip = Math.min(3, d.tip + 1); break;
-      case 'set': {                                  // デバッグ用。fresh().s にあるフィールドに、同じ種類の値のときだけ
-        const [, k, val] = op, def = fresh().s;
-        if (own(def, k) && typeof val === typeof def[k] && val !== null && Array.isArray(val) === Array.isArray(def[k])) s[k] = val;
+      case 'set': {                                  // デバッグ用。fresh().s にある数か文字のフィールドに、同じ種類の値のときだけ
+        const [, k, val] = op, def = fresh().s;      // オブジェクトは入れない（op のものがそのまま入り、壊れた形だとあとの op が落ちる）
+        if (own(def, k) && ['number', 'string'].includes(typeof def[k]) && typeof val === typeof def[k]) s[k] = val;
         break;
       }
     }
@@ -459,7 +459,7 @@
       get st() { return st; },
       get ro() { return ro; },
       get lastAuto() { return auto; },                // 直前の commit で自動でつけたキー。次の commit の前に読む
-      push(op) { ops.push(op); apply(st, op, X); },    // 積んで表示にだけ当てる（保存・判定はしない）
+      push(op) { apply(st, op, X); ops.push(op); },    // 表示に当ててから積む（保存・判定はしない）。当てて落ちる op は積まない（次の commit でも落ちるので）
       // 読む → ops を重ねる → 判定 → 書く。取れたステップ（カタログの順）を返す。drill:answer からは呼ばない
       commit({ judge = true } = {}) {
         if (inCommit) return [];                      // 判定の中（ctx() など）から呼ばれたら何もしない
@@ -535,6 +535,12 @@
     storage: { getItem: k => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v), removeItem: k => localStorage.removeItem(k) },
     X, cat: CAT, ctx, warn: m => console.warn(m),
   });
+  // 時間（ms）
+  const TOAST_MS = 4500;                               // バッジのトーストを出しておく時間（§5.3）
+  const TOAST_GAP = 400;                               // 続けて出すトーストのずらし（§5.3）
+  const GACHA_HOLD = 3000, GACHA_HOLD_REDUCED = 1000;  // 最後の rpg:pull から、ガチャの演出中としてお知らせを待つ時間。reduced motion なら短く（§5.1）
+  const PANEL_FX_DELAY = 700;                          // 結果のファンファーレから、パネルの音と紙吹雪まで（§5.4）
+  const COPIED_MS = 2000;                              // シェアの「コピーしたよ」を出しておく時間（§6.3）
   let run = null;           // クイズ中なら { sid }。drill:start で作り、drill:result で捨てる（保留の判定に使う）
   let battle = false;       // バトル画面にいる
   let screen = document.body.dataset.screen || 'home';   // 最初の drill:screen は badges.js を読む前に出るので、body から読む
@@ -573,7 +579,7 @@
   // お知らせを出せるまでの ms。Infinity はイベント（drill:result・drill:screen・rpg:battle・ダイアログの close）を待つ
   function blockedFor() {
     if (run || battle || $('detail').open) return Infinity;   // クイズ中・バトル中・#detail の下に隠れる
-    const left = screen === 'gacha' ? lastPull + (reduced() ? 1000 : 3000) - Date.now() : 0;
+    const left = screen === 'gacha' ? lastPull + (reduced() ? GACHA_HOLD_REDUCED : GACHA_HOLD) - Date.now() : 0;
     return left > 0 ? left : 0;
   }
   // 保留していたお知らせを出す。同じタスクで続けて来た分（バトルの終わりの rpg:battle → rpg:clear → 仲間など）は
@@ -584,16 +590,17 @@
     flushQueued = true;
     queueMicrotask(() => { flushQueued = false; flushNow(); });
   }
-  // まとめは1枚ずつ、ステップは上限まで（超えたら上限−1枚と「ほか◯個」）。400ms ずつずらす
+  // 起動時のまとめは1枚ずつ、ステップは残りの枚数まで（超えたら残り−1枚と「ほか◯個」）。まとめも上限の枚数に数える。400ms ずつずらす
   function flushNow() {
     clearTimeout(flushTimer);
     if (!pending.length) return;
     const wait = blockedFor();
     if (wait === Infinity) return;
     if (wait > 0) { flushTimer = setTimeout(flush, wait); return; }
-    const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), cap = innerWidth < 600 ? 2 : 3;
+    const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), sums = list.filter(it => 'summary' in it);
+    const cap = Math.max(1, (innerWidth < 600 ? 2 : 3) - sums.length);   // ステップに使える枚数（まとめは起動時の1枚だけ）
     // { html, key, src }。key があるのは個別のトースト（ドパガキの演出をする）。src はそのトーストにしたお知らせ
-    const out = list.filter(it => 'summary' in it).map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`), src: [it] }));
+    const out = sums.map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`), src: [it] }));
     const single = it => ({ html: stepToast(it), key: it.key, src: [it] });
     if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`), src: steps.slice(cap - 1) });
     else out.push(...steps.map(single));
@@ -604,7 +611,7 @@
         if (blockedFor()) { requeue(); flush(); return; }
         toastTimers.splice(toastTimers.indexOf(tm), 1);
         showToast(o);
-      }, (i + 1) * 400);
+      }, (i + 1) * TOAST_GAP);
       toastTimers.push(tm);
     });
   }
@@ -619,13 +626,15 @@
   }
   // トーストを1枚出す（toast はいつもグローバルの名前で呼ぶ）。個別のトーストは、ドパガキなら音と、金・虹なら紙吹雪（§5.4）
   function showToast({ html, key }) {
-    toast(html, 4500);
+    toast(html, TOAST_MS);
     if (!key || !S.dopa) return;
     FX.sfx('correct', 8);
     const el = $('toasts')?.lastElementChild;   // toast() は何も返さないので、いま足した1枚
     if (el && (stepInfo(CAT, key)?.color ?? 0) >= 3 && !reduced()) FX.confetti(el.getBoundingClientRect(), 60);
   }
 
+  // つけている称号の印。［つける］を押して描き直したら、ここにフォーカスを移す（refocus）
+  const ON_HTML = '<span class="bdg-on" tabindex="-1">つけてる中</span>';
   // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］（つけている称号なら「つけてる中」）
   // data-key・data-paid は、称号をつけかえたときにパネルの行を描き直すため（redrawPanel）
   function stepHTML({ key, paid, auto }) {
@@ -634,7 +643,7 @@
     const coin = typeof paid === 'number' && Number.isFinite(paid) && paid > 0 ? paid : 0;   // 0 は「もう払ってある」（docs/events.md）
     const title = `称号〈${esc(si.t.title)}〉`;
     const l2 = auto ? `<p class="bdg-l2">${title}をつけたよ</p>`
-      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? '<span class="bdg-on">つけてる中</span>' : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
+      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? ON_HTML : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
     return `<div class="bdg-row" data-key="${key}" data-paid="${coin}"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${si.b.name} ${tierLabel(si.color)}`)}</p>`
       + `<span class="bdg-paid">${coin ? `●+${coin}` : ''}</span>${l2}</div>`;
   }
@@ -659,7 +668,7 @@
     const ext = host.querySelector(':scope > #r-ext'), btns = host.querySelector(':scope > .row.center');
     if (ext) ext.before(box); else if (btns) btns.before(box); else host.append(box);
     panelAdd(box, items);
-    if (S.dopa && items.length) setTimeout(() => panelFx(box), 700);   // 結果のファンファーレのあと（ヒントの注意だけのパネルでは鳴らさない）
+    if (S.dopa && items.length) setTimeout(() => panelFx(box), PANEL_FX_DELAY);   // 結果のファンファーレのあと（ヒントの注意だけのパネルでは鳴らさない）
   }
   // 結果パネルのドパガキの演出（§5.4）。結果画面を離れた・次の結果に変わったら何もしない。
   // 紙吹雪はパネルの真ん中が画面内に見えていればそこから、見えていなければ画面の中央（null）から
@@ -754,8 +763,9 @@
   const masked = (b, d) => !!b.secret && topOf(b, d) < 0;   // ひみつのバッジで、まだ取っていない（条件と称号を出さない）
   // NEW: 取った段の時刻のどれかが、詳細を最後に開いた時刻（sn）より新しい
   const isNew = (b, d) => b.tiers.some((_, i) => { const k = stepKey(b, i); return own(d.got, k) && d.got[k] > (d.sn[b.id] || 0); });
-  // 進み具合の文。ta-speed（lower）は「2.43→2.0秒」（記録が無ければ「記録なし」）、ほかは「34 / 100」
-  const progText = (b, v, goal) => b.lower ? (v > 0 ? `${(v / 1000).toFixed(2)}→${(goal / 1000).toFixed(1)}秒` : '記録なし') : `${fmt(Math.min(v, goal))} / ${fmt(goal)}`;
+  // 進み具合の文。ta-speed（lower）は「2.43→2.0秒」（記録が無ければ「記録なし」）、goal が 1（地域の銅・銀、1段だけのバッジなど）は「まだ」か「達成」、ほかは「34 / 100」
+  const progText = (b, v, goal) => b.lower ? (v > 0 ? `${(v / 1000).toFixed(2)}→${(goal / 1000).toFixed(1)}秒` : '記録なし')
+    : goal === 1 ? (v >= 1 ? '達成' : 'まだ') : `${fmt(Math.min(v, goal))} / ${fmt(goal)}`;
   const barHTML = r => `<div class="bdg-bar"><i style="width:${Math.round(r * 100)}%"></i></div>`;
   const medalHTML = (b, d) => { const top = topOf(b, d); return `<span class="bdg-medal ${top < 0 ? 'off' : 't' + b.tiers[top].color}" aria-hidden="true"><i>${masked(b, d) ? '？' : esc(b.icon)}</i></span>`; };
   const monthDay = t => { const dt = new Date(t); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
@@ -791,7 +801,7 @@
     const top = topOf(b, d), hide = masked(b, d), p = progressOf(b, d, x), next = p.next >= 0 ? b.tiers[p.next] : null;
     const prog = next ? progText(b, p.v, p.goal) : 'コンプリート！';
     const label = hide ? `ひみつのバッジ。${b.hint}` : !next ? `${b.name}。コンプリート`
-      : `${b.name}。${top < 0 ? 'まだ取っていない' : tierLabel(b.tiers[top].color) + 'まで取った'}。次の${tierLabel(next.color)}は${next.desc}、いま ${prog}`;
+      : `${b.name}。${top < 0 ? 'まだ取っていない' : tierLabel(b.tiers[top].color) + 'まで取った'}。次の${tierLabel(next.color)}は${next.desc}、${p.goal === 1 ? '' : 'いま '}${prog}`;
     const dots = b.tiers.map((t, i) => own(d.got, stepKey(b, i)) ? `<i class="t${t.color}">●</i>` : '<i>○</i>').join('');
     return `<button class="bdg-tile" data-bdg-detail="${b.id}" aria-label="${esc(label)}">${medalHTML(b, d)}`
       + `<b class="bdg-name">${hide ? '？？？' : esc(b.name)}</b>${b.sub && !hide ? `<small class="bdg-sub">${esc(b.sub)}</small>` : ''}`
@@ -843,7 +853,7 @@
       const key = stepKey(b, i), got = own(d.got, key), v = valOf(b, t, d.s, x);
       const state = got ? `<p class="bdg-when">✓ ${monthDay(d.got[key])}</p>`
         : `<div class="bdg-tprog">${barHTML(ratioOf(b, v, t.goal))}<span class="bdg-prog">${esc(progText(b, v, t.goal))}</span></div>`;
-      const act = got && d.eq === key ? '<span class="bdg-on">つけてる中</span>'
+      const act = got && d.eq === key ? ON_HTML
         : got ? `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>` : '<span class="bdg-lock">（取ると使える）</span>';
       return `<li class="bdg-tier" data-key="${key}"><span class="bdg-tl t${t.color}">${tierLabel(t.color)}</span><div class="bdg-tbody">`
         + `<p class="bdg-cond">${esc(t.desc)}</p>${state}<div class="bdg-trow"><p class="bdg-ttl">称号〈${esc(t.title)}〉</p>${act}</div></div></li>`;
@@ -887,43 +897,62 @@
   }
 
   function open(id) { show('badges'); if (id) openDetail(id); }
-  // 称号をつける（'' なら外す）。取っていないキーは何もしない
+  // 称号をつける（'' なら外す）。取っていないキーと、もうつけているキー（称号えらびで同じものを押した・古いトーストの［つける］）は何もしない
   function equip(key) {
     if (typeof key !== 'string' || key !== '' && !own(bs.st.got, key)) return;
     const was = bs.st.eq;
+    if (key === was) return;      // badge:title を出し直さない
     bs.push(['eq', key]);
     deliver(bs.commit());          // ホームの札とバッジ画面も、ここで描き直す
     emitTitle(key || null);
     redrawDialog();
     redrawPanel();                 // 結果画面のパネル（ドパガキ OFF だと、ほかに押した手ごたえが出ない）
-    if (key && key !== was && S.dopa && !reduced()) {   // つけた称号が変わった（外したときは出さない）
+    refocus(key);
+    if (key && S.dopa && !reduced()) {   // つけた称号が変わった（外したときは出さない）
       FX.pop('称号チェンジ！', 'small');
       // FX.pop は body に足すが、showModal の #detail は top layer で z-index に関係なく上に来る。開いたままなら中へ移す
       const popEl = $('detail').open && document.querySelector('body > .fx-pop');
       if (popEl) $('detail').append(popEl);
     }
   }
-  // 地域・モードのバッジの条件でモード選択へ（P.name は変えない。詳細の注意書きで知らせる）
+  // 描き直しで押したボタンが消えてフォーカスが body に落ちたら、つけた段・行の「つけてる中」へ（無ければダイアログの［閉じる］）
+  function refocus(key) {
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const dlg = $('detail').open, box = dlg ? $('detail-inner') : $('r-badges');
+    (box?.querySelector(`[data-key="${key}"] .bdg-on`) ?? (dlg ? box.querySelector(':scope > .close') : null))?.focus();
+  }
+  // 地域・モードのバッジの条件でモード選択へ（P.name は変えない。詳細の注意書きで知らせる）。
+  // 地域は、いまの問題数で次の段が取れなければ、取れるいちばん少ない数にする（銅は「10問以上」で10問、銀は「全部」）
   function practice(id) {
     const b = CAT.find(e => e.id === id);
     if (b?.cat === 'region') {
       S.region = X.regionOf(b.rk); store.set('settings', S);
-      if (progressOf(b, bs.st, ctx()).next === 1) P.count = 'all';   // 次の段が銀（「全部」をヒントなしでクリア）
+      const next = progressOf(b, bs.st, ctx()).next;
+      if (next === 1) P.count = 'all';
+      else if (next === 0 && P.count !== 'all' && P.count < 10) P.count = 10;   // どの地域も10か国以上ある
     } else if (b?.cat === 'mode') P.mode = b.mode;
     else return;
     store.set('setup', P);
     $('detail').close();
     show('setup');
   }
-  // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする
-  function share(id) {
+  // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする。btn は押した［シェア］
+  function share(id, btn) {
     const b = CAT.find(e => e.id === id), top = b ? topOf(b, bs.st) : -1;
     if (top < 0) return;
     const t = b.tiers[top], text = `195か国ドリルでバッジ『${b.name}（${tierLabel(t.color)}）』を取ったよ！ 称号〈${t.title}〉 ${SITE}`;
     try {
       if (navigator.share) navigator.share({ text }).catch(() => {});
-      else navigator.clipboard?.writeText(text).then(() => toast('コピーしたよ', 2000), () => {});
+      else navigator.clipboard?.writeText(text).then(() => copied(btn), () => {});
     } catch { /* 共有もコピーもできなければ何もしない */ }
+  }
+  // コピーできた。トーストはモーダルの #detail の下に隠れるので、開いている間は押したボタンの文字をしばらく「コピーしたよ」にする
+  let copiedTimer = 0;
+  function copied(btn) {
+    if (!$('detail').open || !btn?.isConnected) { toast('コピーしたよ', COPIED_MS); return; }   // コピーが終わる前に閉じた
+    clearTimeout(copiedTimer);
+    btn.textContent = 'コピーしたよ';
+    copiedTimer = setTimeout(() => { btn.textContent = 'シェア'; }, COPIED_MS);
   }
 
   // バッジのボタンは document でまとめて受ける（ホーム・バッジ画面・ダイアログ・トースト・結果画面のパネル）
@@ -938,7 +967,7 @@
       else if ('bdgOpen' in v) open(v.bdgOpen || undefined);
       else if ('bdgDetail' in v) openDetail(v.bdgDetail);
       else if ('bdgPractice' in v) practice(v.bdgPractice);
-      else if ('bdgShare' in v) share(v.bdgShare);
+      else if ('bdgShare' in v) share(v.bdgShare, el);
       else if ('bdgClose' in v) $('detail').close();
       else if ('bdgPicker' in v) openPicker();   // ホームの札と［称号をかえる］
     }

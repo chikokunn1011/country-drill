@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC, QUIET_BADGES } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC, PHONE, QUIET_BADGES } from './helpers.mjs';
 import { measureFit, settleLayout, rectOf } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -286,6 +286,27 @@ t('tile_states', async page => {
   assert.deepEqual(await page.locator('#bdg-soon li').allInnerTexts(), ['⚡ スピードスター 銀 あと0.43秒', '📚 こつこつ正解 銀 あと400問']);
 });
 
+// 段の goal が 1（地域の銅・銀、1段だけのバッジなど）は「0 / 1」ではなく「まだ」（届いていれば「達成」）
+t('goal_one_progress', async page => {
+  const tile = id => `#bdg-list [data-bdg-detail="${id}"]`;
+  await page.evaluate(() => { BADGES.debug.grant('reg-europe@1'); show('badges'); });
+  for (const [id, want] of [['reg-asia', 'まだ'], ['reg-europe', 'まだ'], ['comeback', null], ['answers', '0 / 100']]) {
+    const s = await text(page, tile(id));
+    assert.ok(!/\d \/ 1$/m.test(s), `${id}: ${s}`);
+    if (want) assert.equal(await text(page, `${tile(id)} .bdg-prog`), want, id);
+  }
+  assert.equal(await page.getAttribute(tile('reg-asia'), 'aria-label'), 'アジア大陸横断。まだ取っていない。次の銅はアジアで10問以上のゲームをクリア、まだ');
+  await page.evaluate(() => BADGES.open('reg-europe'));
+  assert.deepEqual(await page.locator('#detail-inner .bdg-tier .bdg-prog').allInnerTexts(), ['まだ', '0 / 184']);   // 銀・金（銅は取った日）
+}, { storage: { badges: { ...QUIET_BADGES } } });
+
+// 新しい版のセーブ（読むだけ・判定しない）では、届いていても取れていないので「達成」と出る
+t('goal_one_reached', async page => {
+  await page.evaluate(() => show('badges'));
+  assert.equal(await text(page, '#bdg-list [data-bdg-detail="first-clear"] .bdg-prog'), '達成');
+  assert.equal(await text(page, '#bdg-list [data-bdg-detail="reg-world"] .bdg-prog'), '達成');
+}, { storage: { badges: { v: 2, s: { clears: 1, rc: { world: 1 } } } } });
+
 t('detail_and_new', async page => {
   await playPractice(page);
   assert.equal(await count(page, '#home-badges .bdg-dot'), 1);
@@ -314,6 +335,28 @@ t('equip_from_detail', async page => {
   assert.equal(await text(page, '#detail-inner .bdg-note'), '※ 国名ヒントありの正解は数えないよ');
 });
 
+// 詳細の［つける］をキーボードで押しても、描き直したあとのフォーカスはダイアログの中（つけた段の「つけてる中」）。
+// もうつけている称号をもう一度つけても（称号えらび・古いトーストの［つける］）、badge:title は出し直さない
+t('equip_focus_no_reemit', async page => {
+  await listenTitle(page);
+  await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
+  await page.focus('.bdg-tier[data-key="reg-asia@2"] [data-bdg-equip]');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), 'reg-asia@2');
+  const focus = () => page.evaluate(() => { const a = document.activeElement; return { dialog: $('detail').contains(a), on: a.matches('.bdg-on'), key: a.closest('[data-key]')?.dataset.key ?? null }; });
+  assert.deepEqual(await focus(), { dialog: true, on: true, key: 'reg-asia@2' });
+  await page.keyboard.press('Tab');   // 「つけてる中」から先へ進める
+  assert.equal(await page.evaluate(() => $('detail').contains(document.activeElement) && document.activeElement.matches('button')), true);
+  await page.click('#detail-inner [data-bdg-close]');
+  await page.evaluate(() => show('home'));
+  await page.click('#home-title');
+  await page.click('#detail [data-bdg-pick="reg-asia@2"]');
+  await page.evaluate(() => { const b = document.createElement('button'); b.dataset.bdgEquip = 'reg-asia@2'; b.textContent = 'x'; document.body.append(b); });
+  await page.click('body > [data-bdg-equip]');
+  assert.deepEqual(await page.evaluate(() => window.__bt), [{ key: 'reg-asia@2', title: 'アジア通' }]);
+  assert.equal(await page.evaluate(() => BADGES.titleKey()), 'reg-asia@2');
+});
+
 t('practice_button', async page => {
   await page.evaluate(() => { P.name = true; BADGES.debug.grant('reg-asia@1'); BADGES.open('reg-asia'); });
   await page.click('#detail-inner [data-bdg-practice]');
@@ -325,16 +368,44 @@ t('practice_button', async page => {
   assert.deepEqual(await page.evaluate(() => [P.mode, P.name, JSON.parse(localStorage.getItem('setup')).mode]), ['m2f', true, 'm2f']);
 });
 
+// 次の段が銅（「10問以上」）なら、取れない問題数（5問）を10問にする。取れる数（20問・全部）はそのまま。モードのバッジは問題数を変えない
+t('practice_button_count', async page => {
+  const go = async (id, count) => {
+    await page.evaluate(([id, count]) => { P.count = count; store.set('setup', P); BADGES.open(id); }, [id, count]);
+    await page.click('#detail-inner [data-bdg-practice]');
+    return page.evaluate(() => [P.count, JSON.parse(localStorage.getItem('setup')).count, $('counts').querySelector('[aria-pressed="true"]').dataset.c]);
+  };
+  assert.deepEqual(await go('reg-europe', 5), [10, 10, '10']);
+  assert.deepEqual(await go('reg-europe', 20), [20, 20, '20']);
+  assert.deepEqual(await go('reg-europe', 'all'), ['all', 'all', 'all']);
+  assert.deepEqual(await go('mode-f2m', 5), [5, 5, '5']);
+});
+
+// navigator.share が無ければコピー。トーストはモーダルの #detail の下に隠れるので、開いている間は［シェア］の文字を2秒だけ「コピーしたよ」にする。
+// コピーが終わる前にダイアログを閉じていたらトースト
 t('share_copies', async (page, app) => {
   await app.context.addInitScript(() => {
     delete Navigator.prototype.share;
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText: s => { window.__clip = s; return Promise.resolve(); } } });
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: s => { window.__clip = s; return window.__hold ? new Promise(ok => { window.__done = ok; }) : Promise.resolve(); } } });
   });
   await page.reload();
   await page.evaluate(() => { BADGES.debug.grant('reg-asia@1'); BADGES.debug.grant('reg-asia@2'); BADGES.open('reg-asia'); });
-  await page.click('#detail-inner [data-bdg-share]');
-  await page.locator('#toasts .toast', { hasText: 'コピーしたよ' }).waitFor();
+  const shown = await page.evaluate(() => new Promise(ok => {   // 「コピーしたよ」になってから「シェア」に戻るまで（ms）
+    const b = document.querySelector('#detail-inner [data-bdg-share]');
+    let t0 = 0;
+    new MutationObserver(() => {
+      if (b.textContent === 'コピーしたよ') t0 = performance.now();
+      else if (t0) ok({ ms: performance.now() - t0, back: b.textContent, toasts: document.querySelectorAll('#toasts .toast').length });
+    }).observe(b, { childList: true, characterData: true, subtree: true });
+    b.click();
+  }));
+  assert.ok(shown.ms >= 1900 && shown.ms < 2600, json(shown));
+  assert.deepEqual([shown.back, shown.toasts], ['シェア', 0], json(shown));
   assert.equal(await page.evaluate(() => window.__clip), '195か国ドリルでバッジ『アジア大陸横断（銀）』を取ったよ！ 称号〈アジア通〉 https://chikokunn1011.github.io/country-drill/');
+  await page.evaluate(() => { window.__hold = true; });
+  await page.click('#detail-inner [data-bdg-share]');
+  await page.evaluate(() => { $('detail').close(); window.__done(); });
+  await page.locator('#toasts .toast', { hasText: 'コピーしたよ' }).waitFor();
   await page.evaluate(() => BADGES.open('book'));
   assert.equal(await count(page, '#detail-inner .bdg-detail'), 1);
   assert.equal(await count(page, '#detail-inner [data-bdg-share]'), 0);
@@ -499,6 +570,7 @@ t('panel_equip_feedback', async (page, app) => {
   assert.equal(await page.evaluate(() => BADGES.titleKey()), key);
   assert.match(await rows.nth(1).innerText(), /つけてる中/);
   assert.equal(await rows.nth(1).locator('[data-bdg-equip]').count(), 0);
+  assert.equal(await page.evaluate(key => document.activeElement.matches(`#r-badges > .bdg-row[data-key="${key}"] > .bdg-on`), key), true);   // 描き直してもフォーカスは押した行に
   const first = await rows.nth(0).innerText();
   assert.doesNotMatch(first, /をつけたよ/);
   assert.equal(await rows.nth(0).locator('[data-bdg-equip]').count(), 1, first);
@@ -565,13 +637,13 @@ t('ta_retry_hides_toasts', async page => {
 t('toast_limits', async page => {
   await watchToasts(page);
   await page.evaluate(() => BADGES.debug.set('right', 5000));   // 銅・銀・金
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => window.__tt.length >= 2);
   let texts = await page.locator('#toasts .toast').allInnerTexts();
   assert.equal(texts.length, 2, texts.join(' | '));
   assert.match(texts[1], /ほか2個のバッジもゲット！/);
   await page.setViewportSize(PC);
   await page.evaluate(() => { $('toasts').replaceChildren(); window.__tt = []; BADGES.debug.reset(); BADGES.debug.set('right', 5000); });
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => window.__tt.length >= 3);
   texts = await page.locator('#toasts .toast').allInnerTexts();
   assert.equal(texts.length, 3, texts.join(' | '));
   assert.ok(texts.every(s => !s.includes('ほか')), texts.join(' | '));
@@ -653,6 +725,25 @@ for (const viewport of [{ width: 1366, height: 657 }, { width: 1280, height: 577
     const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
     assert.ok(r.bottom <= win.h && r.right <= win.w, json({ r, win }));
   }, { viewport });
+
+  // まちがえた国の一覧（7か国）とパネル（4行と「ほか」）が #r-side に並んでも、［もう一回］はスクロールなしで押せる
+  t(`result_panel_pc_fits_misses_${viewport.width}x${viewport.height}`, async page => {
+    await page.evaluate(() => { BADGES.debug.set('right', 95); BADGES.debug.set('days', 2); BADGES.debug.set('last', '2000-01-01'); });
+    await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 10 });
+    await page.click('#start');
+    for (let i = 0; i < 7; i++) { await answerWrong(page); await page.click('#next'); }   // まちがえた国は後ろに回る
+    await clearByAnswering(page);   // first-clear answers streak reg-world days comeback
+    await settleLayout(page);
+    assert.equal(await count(page, '#r-side .misslist li'), 7);
+    assert.equal(await count(page, '#r-badges .bdg-row'), 4);
+    assert.match(await text(page, '#r-badges .bdg-more'), /ほか2個/);
+    assert.ok(await noHScroll(page));
+    const r = await rectOf(page, '#r-again'), win = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+    assert.ok(r.top >= 0 && r.bottom <= win.h && r.right <= win.w, json({ r, win }));
+    // 詰めても行の［つける］は 44px 以上
+    const btn = await page.locator('#r-badges .bdg-row [data-bdg-equip]').first().evaluate(e => e.getBoundingClientRect().height);
+    assert.ok(btn >= 44, `［つける］の高さ ${btn}`);
+  }, { viewport });
 }
 
 // 起動時の判定で取れたものは、まとめて1枚。称号は取ったなかでいちばん上の段（同じ色なら後ろ）
@@ -664,6 +755,31 @@ t('startup_summary', async page => {
   assert.equal(await ts.locator('[data-bdg-open]').count(), 1);
   assert.equal(await page.evaluate(() => BADGES.titleKey()), 'streak@1');
 }, { storage: { badges: { v: 1, s: { right: 150, streak: 12 } } } });
+
+// 起動時のまとめの1枚も、一度に出す枚数（PC 3枚・スマホ 2枚）に数える。
+// 起動時の払いの中で rpg.js がレベルアップを出すと、その3段（銅・銀・金）がまとめの1枚と同じ回に出る
+for (const [viewport, want] of [[PC, ['これまでの記録から バッジを1個もらったよ！', '旅人のレベル 銅', 'ほか2個のバッジもゲット！']],
+  [PHONE, ['これまでの記録から バッジを1個もらったよ！', 'ほか3個のバッジもゲット！']]]) {
+  t(`startup_summary_counts_toward_cap_${viewport.width}`, async (page, app) => {
+    await app.context.addInitScript(() => {
+      window.__tt = [];   // 出たトーストの文字（出た順）
+      new MutationObserver(ms => {
+        for (const m of ms) for (const n of m.addedNodes) if (n instanceof Element && n.matches('#toasts > .toast')) window.__tt.push(n.textContent);
+      }).observe(document, { childList: true, subtree: true });
+      window.RPG = { snapshot: () => ({}) };
+      let once = false;
+      document.addEventListener('badge:earned', e => {
+        e.detail.paid = 50;
+        if (!once) { once = true; document.dispatchEvent(new CustomEvent('rpg:levelup', { detail: { lv: 50 } })); }
+      });
+    });
+    await page.reload();   // storage の初めの値で起動し直す（こつこつ正解の銅が起動時の判定で取れる）
+    await toastWith(page, /ほか\d+個のバッジもゲット！/).waitFor();   // まとめの最後の1枚
+    const tt = await page.evaluate(() => window.__tt);
+    assert.equal(tt.length, want.length, tt.join(' | '));
+    want.forEach((s, i) => assert.ok(tt[i].includes(s), `${i}枚目に ${s} が無い: ${tt.join(' | ')}`));
+  }, { viewport, storage: { badges: { v: 1, s: { right: 150 } } } });
+}
 
 t('dialog_blocks_toast', async page => {
   await page.evaluate(() => $('detail').showModal());
@@ -916,7 +1032,7 @@ t('reduced_motion_static', async page => {
   assert.ok(fx.some(c => json(c) === json(['sfx', 'correct', 10])), json(fx));
   await page.evaluate(() => show('home'));
   await page.evaluate(() => BADGES.debug.set('right', 1000));
-  await toastWith(page, 'こつこつ正解').first().waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('#toasts [data-bdg-toast]').length >= 2);   // 銅と、400ms あとの銀
   assert.equal(await badgeAnims(page), 0);
   await page.evaluate(() => { BADGES.debug.grant('answers@3'); show('badges'); });   // 金のメダルも止まっている
   assert.equal(await badgeAnims(page), 0);
@@ -977,14 +1093,25 @@ t('dopa_tip_only_quiet', async page => {
   assert.deepEqual(await fxCalls(page), []);
 }, { reducedMotion: 'no-preference', storage: { settings: DOPA, badges: { ...QUIET_BADGES, tip: 0 } } });
 
+// 文字の色と、下に見えている背景（いちばん近い、背景色が透明でない祖先）の色のコントラスト比（WCAG の式）
+const contrastOf = (page, sel) => page.evaluate(sel => {
+  const rgba = s => { const [r, g, b, a = 1] = s.match(/[\d.]+/g).map(Number); return { r, g, b, a }; };
+  const lum = ({ r, g, b }) => { const f = c => (c /= 255) <= .03928 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4; return .2126 * f(r) + .7152 * f(g) + .0722 * f(b); };
+  const el = document.querySelector(sel);
+  let under = el;
+  while (under.parentElement && rgba(getComputedStyle(under).backgroundColor).a === 0) under = under.parentElement;
+  const fg = getComputedStyle(el).color, bg = getComputedStyle(under).backgroundColor, [p, q] = [lum(rgba(fg)), lum(rgba(bg))];
+  return { fg, bg, under: under.id || under.tagName, ratio: (Math.max(p, q) + .05) / (Math.min(p, q) + .05) };
+}, sel);
+
 t('dark_dopa_layouts', async page => {
   for (const [width, height] of [[390, 844], [1440, 900]]) {
     const key = `${width}x${height}`;
     await page.setViewportSize({ width, height });
     await page.evaluate(() => show('home'));
     assert.ok(await noHScroll(page), `home ${key}`);
-    const c = await page.evaluate(() => { const s = getComputedStyle($('home-badges')); return [s.color, s.backgroundColor]; });
-    assert.notEqual(c[0], c[1], `#home-badges ${key}`);
+    const c = await contrastOf(page, '#home-badges');   // .btn.ghost は背景が透明なので、下に見えている背景と比べる
+    assert.ok(c.ratio >= 4.5, `#home-badges ${key}: ${json(c)}`);
     await page.evaluate(() => show('badges'));
     assert.ok(await noHScroll(page), `badges ${key}`);
   }

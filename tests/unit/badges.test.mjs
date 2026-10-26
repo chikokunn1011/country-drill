@@ -327,6 +327,15 @@ test('save_ops', () => {
   assert.equal(d.s.last, '2026-01-01');
   assert.deepEqual(plain(d.s.m), {});
   assert.deepEqual(plain(d.s.cf), []);
+  // 数と文字だけ。オブジェクト・配列は op のものをそのまま入れてしまう（あとの op が壊れた形にさわって落ちる）ので入れない
+  const rpg0 = d.s.rpg, cf0 = plain(d.s.cf);
+  run(K, X, [['set', 'rpg', {}], ['set', 'cf', ['f2n:asia:10']], ['set', 'm', { jp: 1 }], ['set', 'ov', { jp: 1 }]], d);
+  assert.equal(d.s.rpg, rpg0);
+  assert.deepEqual(plain(d.s.cf), cf0);
+  assert.deepEqual(plain(d.s.m), {});
+  assert.deepEqual(plain(d.s.ov), {});
+  assert.doesNotThrow(() => run(K, X, [['rpg', 'clear', { dungeon: 'asia' }, DAY]], d));
+  assert.deepEqual(plain(d.s.rpg.boss), ['asia']);
   // 知らない op は何もしない
   const before = plain(d);
   run(K, X, [['nope', 1], [], null, 'ans', ['rpg', 'nope', {}, DAY], ['rpg', 'levelup', null, DAY], ['res', null, false, DAY]], d);
@@ -693,6 +702,20 @@ test('push_applies_in_place', () => {
   assert.equal(s.pending(), 0);
   assert.equal(saved(m).s.right, 3);
   assert.equal(s.st.s.right, 3);
+});
+
+// 当てると例外を投げる op は ops に残さない（残すと、そのあとの commit がずっと落ちて保存できなくなる）
+test('push_throwing_op_not_kept', () => {
+  const { mk } = stores();
+  const m = mem(), s = mk(m);
+  s.push(ans('jp', true, false));
+  const bad = ['res', { get region() { throw new Error('boom'); } }, false, DAY];
+  assert.throws(() => s.push(bad), /boom/);
+  assert.equal(s.pending(), 1);
+  s.push(ans('jp', true, false));
+  assert.doesNotThrow(() => s.commit());
+  assert.equal(s.pending(), 0);
+  assert.equal(saved(m).s.right, 2);
 });
 
 test('last_auto_cleared_by_next_commit', () => {
