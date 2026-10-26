@@ -334,8 +334,8 @@
   };
   const judgeOf = (d, id, floor) => K.judge(K.battleStats(d, id, floor), K.enemy(id, floor));
   const owned = d => Object.keys(d.cards).length;
-  // ガチャ・仲間・バトルへはここを通す（まだ無い画面なら opts を置くだけ）
-  const open = (name, opts = {}) => { RPG.opts = opts; if (SCREENS.includes(name)) show(name); };
+  // ガチャ・仲間・バトルへはここを通す。その画面が無い（rpg-cards.js / rpg-battle.js が読み込めなかった）ときは、opts を置いて冒険ホームを開く
+  const open = (name, opts = {}) => { RPG.opts = opts; show(SCREENS.includes(name) ? name : 'rpg'); };
   // ガチャ・仲間の画面があるか（rpg-cards.js が登録する。読み込めなかったときは、冒険ホームにガチャ・仲間の入口を出さない）
   const hasCards = () => SCREENS.includes('gacha') && SCREENS.includes('cards');
   // 称号（badges.js が無い・空なら出さない）

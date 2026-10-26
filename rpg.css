@@ -568,6 +568,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 #rpg-map { display: none; }
 @media (min-width: 1400px) {
   #rpg-map { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+  #rpg-map:empty { display: none; }   /* rpg-cards.js が読み込めなかった（地図を描かない）ときは、空の枠を出さない */
 }
 
 /* シェア（「🎉 仲間が50か国になった！［シェア］」。ガチャの結果の下・クイズの結果のパネルの中・バトルの終わりの画面・

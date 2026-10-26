@@ -419,6 +419,26 @@ t('works_without_cards', async page => {
   assert.equal(await page.locator('#rpg-to-gacha, #rpg-to-cards').count(), 0);
   const next = await page.textContent('#rpg-next');
   assert.ok(!next.includes('ガチャ') && next.includes('F1'), next);
+  // 今日の無料ガチャもすすめない
+  await writeSave(page, saveWith({ pulls: 1, day: { d: localToday(), n: {}, first: true, free: false } }));
+  await page.evaluate(() => show('rpg'));
+  const free = await page.textContent('#rpg-next');
+  assert.ok(!free.includes('ガチャ') && free.includes('F1'), free);
+  // 1400px 以上: 仲間の世界地図が無いので、右の列に空の枠を出さない
+  await page.setViewportSize({ width: 1440, height: 900 });
+  assert.equal(await page.locator('#rpg-map').count(), 1);
+  assert.equal(await page.isVisible('#rpg-map'), false);
+  await page.setViewportSize({ width: 390, height: 844 });
+  // 全クリアの「仲間にしよう」と RPG.open('cards' / 'gacha') は、画面が無いので冒険ホームを開く（例外を出さない）
+  await writeSave(page, saveWith({ floors: { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 } }));
+  await page.evaluate(() => show('rpg'));
+  assert.ok((await page.textContent('#rpg-next')).includes('全クリア！'));
+  await page.click('#rpg-next');
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'rpg');
+  for (const name of ['cards', 'gacha']) {
+    assert.equal(await page.evaluate(name => { show('home'); RPG.open(name); return document.body.dataset.screen; }, name), 'rpg', name);
+    assert.equal(await page.isVisible('#rpg-next'), true);
+  }
   // クイズのコインと結果のパネル
   await writeSave(page, saveWith({ intro: false }));
   await playPractice(page);

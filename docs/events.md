@@ -149,7 +149,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
 - 起動時に使うグローバルを `typeof` で確かめ、足りなければ `console.error('[rpg] …')` のように出して何もしない（ボタンも画面も作らない）。クイズはそのまま動く。
-  - `rpg-cards.js` は rpg.js の作った `window.RPG` に足すだけなので、`window.RPG` が無ければ（rpg.js が読めない・起動しなかった）黙って何もしない（知らせるのは rpg.js と rpg-battle.js）。`rpg-cards.js` だけが読めなかったときは、rpg.js の `window.RPG` にある代わり（地図・シェア・演出なし）で冒険ホーム・クイズのコイン・バトルが動き、ガチャと仲間の画面と入口は無い。
+  - `rpg-cards.js` は rpg.js の作った `window.RPG` に足すだけなので、`window.RPG` が無ければ（rpg.js が読めない・起動しなかった）黙って何もしない（知らせるのは rpg.js と rpg-battle.js）。`rpg-cards.js` だけが読めなかったときは、rpg.js の `window.RPG` にある代わり（地図・シェア・演出なし）で冒険ホーム・クイズのコイン・バトルが動き、ガチャと仲間の画面と入口は無い（つぎにやることでガチャをすすめず、`RPG.open('gacha')` `RPG.open('cards')` は冒険ホームを開く。1400px 以上の冒険ホームの右の列に、空の地図の枠は出さない）。
 - 機能ファイルと、それを読みこむ index.html の行は同じコミットで公開し、`?v=` を上げる（キャッシュの食い違いを防ぐ）。
 
 ## 10. badges.js が読むもの・出すもの
