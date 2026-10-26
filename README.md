@@ -25,6 +25,14 @@
 - 開発用パネル（コインを足す・Lv を変える・フロアを開く）は URL に `?rpgdebug=1` を付けると冒険ホームに出る
 - 値段・確率・強さなどの数値は全部 `rpg-core.js` の `TUNING` にある（ペースは `tests/unit/rpg-balance.test.mjs` で確かめる）
 
+## バッジ・称号
+
+クイズと冒険の記録でバッジを取り、称号をつけられる（`badges.js` `badges.css`。ホームの［バッジ］と称号の札、結果画面のパネル、トースト）。
+
+- 記録はこの端末の localStorage（キー `badges`）にだけ保存する。バッジを取ると冒険のコイン（●+50）を rpg.js がはらう
+- 冒険（rpg.js）が無くても動く（冒険のバッジは出ない）。読み込みの順番とイベントの約束は `docs/events.md`
+- 開発用（`BADGES.debug` で記録を書きかえる）は URL に `?bdgdebug=1` を付けると使える
+
 ## クレジット
 
 - 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）

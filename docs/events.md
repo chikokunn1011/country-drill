@@ -112,7 +112,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `rpg:clear` | `{dungeon}` | ボスを初めて倒した |
 | `rpg:overcome` | `{a, total}` | |
 | `rpg:bounty` | `{a, doneAll, totalDays}` | |
-| `rpg:share` | `{kind}` | シェアボタンを押した |
+| `rpg:share` | `{kind}` | シェアボタンを押した。`kind` は `boss-{id}`（ボスを倒した。`id` はダンジョン id）・`final`（地図喰いを倒した）・`cards-{n}`（仲間の節目。`n` は `50`・`100`・`195`）・`region-{id}`（その地域の国を全部仲間にした）・`test`（テストだけ） |
 
 足すこと（バッジ設計 §8.2・§8.4）:
 
@@ -131,13 +131,12 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `badge:earned` | `{id, badge, tier, title, color, retro}`。rpg.js が同期で `paid` を書き足す | バッジのステップを取ったとき。`window.RPG` があるときだけ出す |
 | `badge:title` | `{key, title}`（外したときは `{key: null, title: ''}`） | つける称号が変わったとき |
 
-- rpg.js の受け取り（RPG 計画 Task 8 で決めたこと）: `paid` は「新しく払った `50`／すでに払った `0`／払えなかった `false`」（`false` は保存できないとき: 新しい版のデータ `RPG.status === 'readOnly'`・メモリだけ `'memory'`・書きこみの失敗）。新しく払ったときだけ、そのあとに `rpg:coins {delta: 50, reason: 'badge'}` を出す。`retro: true` で新しく払った（`paid === 50`）分は、同じタスクの中のもの（`setTimeout(…, 0)` まで）をまとめてトースト1つ「バッジのごほうび ●+合計」（冒険の表示が OFF なら出さない）。`retro: false` ではトーストを出さない。`badge:title` を受けたら、その場で（同期で）旅人カードの称号を `window.BADGES.title()` から描き直す。
 - `badge:earned` の `id` はステップのキー（`'reg-asia@2'`）。`badge`（`'reg-asia'`）・`tier`（`2`）・`color`（`1`〜`4`）・`title`（称号）は足したキー。rpg.js は `id` で二重払いを防ぐ。
 - RPG 設計 §10.3 の `badge:earned {id, tier?, title?}` は、この detail の一部（キーを足しただけ）。ずれはバッジ設計 §8.4 で決めたとおり。
 - `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。どちらも起動時にまとめて出す: 起動時の判定で取れたステップ（`RPG.snapshot()` からのさかのぼりなど）と、払い残し（`got` にあって `sent` に無い、見えているステップ全部。前に `false` だったものもふくむ）。冒険のイベントやクイズで取ったときの `retro` は `false`。
-- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）・`0`（もう払ってある）・`false`（払えなかった）のどれかを書く。`undefined`（書いていない）は古い rpg.js で、badges.js は払ったとみなす（`sent` に入れる。●+ は出さない）。badges.js は `0` を「払った」とみなし（送り直さない）、●+ は出さない（●+ を出すのは `paid` が1以上の数のときだけ）。`false` のステップは `sent` に入れず、次の起動で `retro: true` で送り直す。
-- rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。ただし `retro: true` で新しく払った分は、まとめて1回だけ「バッジのごほうび ●+合計」のトーストを出してよい（バッジ設計 §8.4 #1）。
-- 称号は `window.BADGES?.title?.()`（かっこなしの文字列。なければ `''`）があれば、旅人カードに〈〉を付けて出す。`badge:title` が来たら描き直す。
+- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（新しく払った額）・`0`（もう払ってある）・`false`（払えなかった。保存できないとき: 新しい版のデータ `RPG.status === 'readOnly'`・メモリだけ `'memory'`・書きこみの失敗）のどれかを書き、新しく払ったときだけ、そのあとに `rpg:coins {delta: 50, reason: 'badge'}` を出す。`undefined`（書いていない）は古い rpg.js で、badges.js は払ったとみなす（`sent` に入れる。●+ は出さない）。badges.js は `0` を「払った」とみなし（送り直さない）、●+ は出さない（●+ を出すのは `paid` が1以上の数のときだけ）。`false` のステップは `sent` に入れず、次の起動で `retro: true` で送り直す。
+- rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。ただし `retro: true` で新しく払った（`paid === 50`）分は、同じタスクの中のもの（`setTimeout(…, 0)` まで）をまとめて1回だけ「バッジのごほうび ●+合計」のトーストを出す（バッジ設計 §8.4 #1。冒険の表示が OFF なら出さない）。`retro: false` ではトーストを出さない。
+- 称号は `window.BADGES?.title?.()`（かっこなしの文字列。なければ `''`）があれば、旅人カードに〈〉を付けて出す。`badge:title` を受けたら、その場で（同期で）描き直す。
   - `BADGES.title()` が返すのは、かっこ〈〉の無い称号の文字列。つけていない（またはいまのカタログに無いキーをつけている）ときは `''`。badges.js が無いこともあるので、呼ぶ側は `window.BADGES?.title?.()` と書く（badges.js が無ければ `undefined` になるので `''` と同じに扱う）。〈〉は表示する側が付ける。
   - `badge:title {key, title}` は、自分でつけかえたときも、はじめてバッジを取って自動でつけたときも出る。外したときは `{key: null, title: ''}`。
 
