@@ -322,8 +322,10 @@
     rv.append(nx);
     sec.querySelector('#bt-q .choices').replaceWith(rv);
     nx.focus({ preventScroll: true });
-    // スマホは上の列のすぐ下に答え合わせの頭を出す。PC は選択肢の場所に収まるのでスクロールしない
+    // スマホは上の列のすぐ下に答え合わせの頭を出す。PC はふつう選択肢の場所に収まるので動かない。
+    // 収まらないとき（幅 900〜1050px・横向きのスマホなど）だけ、右の列の中を［つぎへ］が見えるまでスクロールする（PC のページはスクロールしない）
     if (clearTop(rv)) rv.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
+    else nx.scrollIntoView({ block: 'nearest' });
   };
   // ［つぎへ］: HP が 0 なら思い出して復活（1バトル1回。まちがえた国が無ければ無し）か負け。復活の問題をまちがえたら負け
   const next = () => {

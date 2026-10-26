@@ -357,18 +357,19 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
     #scr-battle .bq { --rpg-free: calc(100cqh - 2 * var(--card-pad, 20px) - 2px - 1.84rem - 14px - var(--rpg-xt, 0px) - var(--rpg-xr, 0px)); }
     #scr-battle .bq:has(> .rpg-tags) { --rpg-xt: 38px; }
     #scr-battle .bq:has(> .rpg-rvh) { --rpg-xr: 44px; }
+    /* 背の低い PC の画面（横向きのスマホ 932×430 など）でも、国旗は幅 64px・地図は幅 128px より小さくしない（入らないぶんは右の列の中がスクロールする） */
     /* f2n: 国旗の下に文字の4択（2段。長い国名の2行ぶん 160px を取る） */
-    #scr-battle .bq > .qflag { width: min(100%, 560px, calc((var(--rpg-free) - 184px) * 4 / 3)); }
+    #scr-battle .bq > .qflag { width: min(100%, 560px, max(64px, calc((var(--rpg-free) - 184px) * 4 / 3))); }
     /* n2f: 国名（2行まで）の下に国旗の4択（2×2）。幅は高さから決める（1マス = 国旗 + 52px） */
     #scr-battle .bq > .qbig { font-size: clamp(1.6rem, 5.5cqh, 2.6rem); }
-    #scr-battle .bq:not(:has(> .mapbox)) > .choices:not(.textc) { width: min(100%, calc(((var(--rpg-free) - 6.5rem - 34px) / 2 - 52px) * 8 / 3 + 56px)); }
+    #scr-battle .bq:not(:has(> .mapbox)) > .choices:not(.textc) { width: min(100%, max(184px, calc(((var(--rpg-free) - 6.5rem - 34px) / 2 - 52px) * 8 / 3 + 56px))); }
     /* m2f: 地図（7割）の下に国旗の4択を1列に（3割） */
-    #scr-battle .bq > .mapbox { width: min(100%, calc((var(--rpg-free) * .7 - 24px) * 16 / 9)); }
-    #scr-battle .bq:has(> .mapbox) > .choices { grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(100%, calc(((var(--rpg-free) * .3 - 50px) * 4 / 3 + 23px) * 4 + 30px)); }
+    #scr-battle .bq > .mapbox { width: min(100%, max(128px, calc((var(--rpg-free) * .7 - 24px) * 16 / 9))); }
+    #scr-battle .bq:has(> .mapbox) > .choices { grid-template-columns: repeat(4, minmax(0, 1fr)); width: min(100%, max(378px, calc(((var(--rpg-free) * .3 - 50px) * 4 / 3 + 23px) * 4 + 30px))); }
     /* 答え合わせのあいだは、問いの国旗・地図を小さくして場所を空ける（答え合わせの高さ ≒ 53px + 国の情報か地図と［つぎへ］の高いほう） */
     #bt-reveal > .map { width: min(100%, calc(var(--rpg-free) * .32 * 16 / 9)); }
-    #scr-battle .rpg-stage[data-phase="reveal"] .bq > .qflag { width: min(100%, 560px, calc((var(--rpg-free) - 77px - max(200px, var(--rpg-free) * .32 + 58px)) * 4 / 3)); }
-    #scr-battle .rpg-stage[data-phase="reveal"] .bq > .mapbox { width: min(100%, calc((var(--rpg-free) - 274px) * 16 / 9)); }
+    #scr-battle .rpg-stage[data-phase="reveal"] .bq > .qflag { width: min(100%, 560px, max(64px, calc((var(--rpg-free) - 77px - max(200px, var(--rpg-free) * .32 + 58px)) * 4 / 3))); }
+    #scr-battle .rpg-stage[data-phase="reveal"] .bq > .mapbox { width: min(100%, max(128px, calc((var(--rpg-free) - 274px) * 16 / 9))); }
   }
 }
 /* 動き（当たるとモンスターが横に揺れて白く光る・ダメージの数字が浮かぶ・HP バーが縮む）。reduced motion では止める */

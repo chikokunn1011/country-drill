@@ -210,6 +210,40 @@ t('pc_stage_fits', async page => {
   await fits('ボスの問題');
 }, { viewport: WIDE, timeout: 180_000 });
 
+// PC のレイアウトでも幅 900〜1050px や横向きのスマホ（932×430）では答え合わせが右の列に入りきらない。
+// そのときは右の列の中だけをスクロールして［つぎへ］を見せる（ページはスクロールしない）。背の低い画面でも問いの国旗・地図・国旗の4択は小さくなりすぎない
+t('pc_reveal_next_reachable', async page => {
+  await writeSave(page, PARTY);
+  const TABLET = { width: 1024, height: 768 }, SMALL = { width: 960, height: 600 }, LAND = { width: 932, height: 430 };
+  // 問いの国旗・地図の幅と、国旗の4択のいちばん小さい国旗の幅（無ければ Infinity）
+  const sizes = () => page.evaluate(() => ({
+    q: document.querySelector('#bt-q > .qflag, #bt-q > .mapbox')?.getBoundingClientRect().width ?? Infinity,
+    opt: Math.min(...[...document.querySelectorAll('#bt-q .choice img')].map(i => i.getBoundingClientRect().width)),
+  }));
+  for (const [vp, mode] of [[TABLET, 'm2f'], [SMALL, 'f2n'], [LAND, 'f2n'], [LAND, 'n2f'], [LAND, 'm2f']]) {
+    const at = `${mode}（${size(vp)}）`;
+    await page.setViewportSize(vp);
+    await startBattle(page, 'samerica', 1);
+    await page.evaluate(([a, m]) => RPG_BATTLE.force(a, m), [LONG, mode]);
+    let s = await sizes();
+    assert.ok(s.q >= 63, `問題（${at}）: 問いの国旗・地図の幅 ${s.q}`);
+    assert.ok(s.opt >= 47, `問題（${at}）: 4択の国旗の幅 ${s.opt}`);
+    await answerWrongOnly(page);
+    assert.ok(await noVScroll(page), `答え合わせ（${at}）: 縦にスクロールする`);
+    const m = await page.evaluate(() => {
+      const r = el => el.getBoundingClientRect(), col = r($('bt-col'));
+      const inside = el => { const b = r(el); return b.top >= col.top - 1 && b.bottom <= col.bottom + 1 && b.bottom <= innerHeight; };
+      return { next: inside($('bt-next')), verdict: inside(document.querySelector('#bt-reveal > .verdict')), y: scrollY };
+    });
+    assert.ok(m.next, `答え合わせ（${at}）: ［つぎへ］が右の列の見えている所の外`);
+    assert.equal(m.y, 0, `答え合わせ（${at}）: ページがスクロールした`);
+    if (vp !== LAND) assert.ok(m.verdict, `答え合わせ（${at}）: 答え合わせの文が右の列の見えている所の外`);
+    s = await sizes();
+    assert.ok(s.q >= 63, `答え合わせ（${at}）: 問いの国旗・地図の幅 ${s.q}`);
+    await page.click('#bt-next');
+  }
+}, { timeout: 180_000 });
+
 t('pc_two_columns', async page => {
   await writeSave(page, PARTY);
   await startBattle(page, 'samerica', 1);
