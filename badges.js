@@ -431,8 +431,91 @@
     }));
   }
 
+  // ---------- セーブ（設計書 §7.1）。base（最後に読めた・書けたもの）に ops（まだ書けていない op）を重ねたものが st ----------
+  const clone = d => JSON.parse(JSON.stringify(d));
+  // storage は getItem / setItem / removeItem を持つもの（どれも例外を投げてよい）。ctx() は判定に使う x を返す
+  function createStore({ storage, X, cat, ctx, now = () => Date.now(), warn = () => {} }) {
+    let base = fresh(), ops = [], st = clone(base);   // st と base はいつも別のオブジェクト（push が base を変えないように）
+    let ro = false, inCommit = false, auto = null, warned = false;
+    function readBase() {                             // { d, ro }。storage が使えなければ null
+      let raw;
+      try { raw = storage.getItem('badges'); } catch { return null; }
+      if (raw == null) return { d: fresh(), ro: false };
+      let obj;
+      try { obj = JSON.parse(raw); } catch {
+        try { storage.setItem('badges-broken', raw); } catch { /* 退避できなくても新しく始める */ }   // 1件だけ、上書き
+        return { d: fresh(), ro: false };
+      }
+      return migrate(obj, X);                         // v > VERSION なら ro: true
+    }
+    function take(r) {
+      base = r.d; ro = r.ro;
+      if (ro && !warned) { warned = true; warn('[badges] 新しい版のセーブなので読むだけにする'); }
+    }
+    const layered = () => { const d = clone(base); for (const op of ops) apply(d, op, X); return d; };
+    const write = d => { try { storage.setItem('badges', JSON.stringify(d)); return true; } catch { return false; } };
+    return {
+      get st() { return st; },
+      get ro() { return ro; },
+      get lastAuto() { return auto; },                // 直前の commit で自動でつけたキー。次の commit の前に読む
+      push(op) { ops.push(op); apply(st, op, X); },    // 積んで表示にだけ当てる（保存・判定はしない）
+      // 読む → ops を重ねる → 判定 → 書く。取れたステップ（カタログの順）を返す。drill:answer からは呼ばない
+      commit({ judge = true } = {}) {
+        if (inCommit) return [];                      // 判定の中（ctx() など）から呼ばれたら何もしない
+        inCommit = true; auto = null;
+        try {
+          const r = readBase();
+          if (r) take(r);
+          const d = layered();
+          if (ro) { st = d; return []; }              // 新しい版のセーブ: 書かない・取らない・払わない
+          let gotNow = [];
+          if (judge) {
+            gotNow = evaluate(cat, d, ctx());
+            const t = now();
+            for (const k of gotNow) { const op = ['got', k, t]; apply(d, op, X); ops.push(op); }   // 取ったことも op にする（書けなくても2回知らせない）
+            if (gotNow.length && d.eq === null) { auto = bestKey(cat, gotNow); const op = ['eq', auto]; apply(d, op, X); ops.push(op); }
+          }
+          if (write(d) || !r) { base = clone(d); ops = []; }   // 書けた、または storage が使えない（メモリだけで続ける）
+          st = d;                                     // 書けなかったとき（容量など）は ops を残し、次の commit でもう一度
+          return gotNow;
+        } finally { inCommit = false; }
+      },
+      reload() { const r = readBase(); if (r) take(r); st = layered(); },   // ほかのタブが書いたとき。判定も保存もしない
+      pending: () => ops.length,
+      reset() {                                       // デバッグ用。記録をすべて消す
+        try { storage.removeItem('badges'); } catch { /* 消せなくてもメモリは新しくする */ }
+        base = fresh(); ops = []; st = clone(base); ro = false;
+      },
+    };
+  }
+
+  // ---------- 冒険への支払い（設計書 §8.3） ----------
+  // 見えているステップのうち、got にあって sent に無いキー（カタログの順）
+  function pendingPay(bs, cat, x) {
+    const { got, sent } = bs.st;
+    return visible(cat, x).flatMap(b => b.tiers.map((_, i) => stepKey(b, i))).filter(k => own(got, k) && !sent.includes(k));
+  }
+  // badge:earned を出して払う。dispatch(detail) は rpg.js が書いた paid を返す。false（払えなかった）は sent に入れず次の起動で送り直す。
+  // 数（0 = もう払ってある）と undefined（古い rpg.js）は払ったとみなす。戻り値は払ったキー → 数か undefined
+  function payout(bs, cat, keys, { rpg, retro = false, dispatch }) {
+    const out = {};
+    if (!rpg || bs.ro) return out;
+    let n = 0;
+    for (const key of keys) {
+      const si = stepInfo(cat, key);
+      if (!si || bs.st.sent.includes(key)) continue;   // dispatch の中の commit で st が変わるので、毎回 bs.st を読む
+      const paid = dispatch({ id: key, badge: si.b.id, tier: si.tier, title: si.t.title, color: si.color, retro });
+      if (paid === false) continue;
+      bs.push(['sent', key]); n++;
+      out[key] = typeof paid === 'number' ? paid : undefined;
+    }
+    if (n) bs.commit({ judge: false });
+    return out;
+  }
+
   const CORE = { VERSION, KEY_RE, MODE_BIT, makeX, fresh, sanitize, migrate, today, dayNum, addDay, applyResult, apply, pickResult, pickRpg, sidGate,
-    CAT_LABEL, makeCatalog, makeCtx, snapOvercome, reached, valOf, visible, evaluate, stepInfo, tierLabel, bestKey, progressOf, summarize, listView };
+    CAT_LABEL, makeCatalog, makeCtx, snapOvercome, reached, valOf, visible, evaluate, stepInfo, tierLabel, bestKey, progressOf, summarize, listView,
+    createStore, pendingPay, payout };
   globalThis.BADGES_CORE = CORE;
   if (typeof document === 'undefined') return;   // node の vm ではここで終わる
   // ---------- ブラウザ（Task 4 から） ----------

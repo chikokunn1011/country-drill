@@ -656,3 +656,310 @@ test('progress_and_summary', () => {
   assert.equal(a.icon, '📚');
   assert.equal(a.cat, 'quiz');
 });
+
+// ---------- セーブと支払い（Task 3） ----------
+// テスト用の偽 storage。fail = 書けない（容量など）、down = 読み書きとも例外（プライベートモードなど）
+const mem = (init = {}) => ({
+  data: { ...init }, fail: false, down: false, io: 0,
+  getItem(k) { this.io++; if (this.down) throw new Error('down'); return k in this.data ? this.data[k] : null; },
+  setItem(k, v) { this.io++; if (this.down || this.fail) throw new Error('quota'); this.data[k] = String(v); },
+  removeItem(k) { this.io++; delete this.data[k]; },
+});
+const rights = n => Array.from({ length: n }, () => ans('jp', true, false));
+const RPG0 = { snapshot: () => null };   // 冒険あり・記録なし
+// rpg を渡すと冒険ありの store になる
+function stores() {
+  const { K, X, cat } = cat0();
+  return { K, X, cat, mk: (storage, rpg = null) => K.createStore({ storage, X, cat, ctx: () => K.makeCtx(X, rpg) }) };
+}
+const pushAll = (s, ops) => { for (const op of ops) s.push(op); };
+const saved = m => JSON.parse(m.data.badges);
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+// dispatch の代わり。呼ばれた detail を覚えて paid を返す
+const spy = paid => { const calls = []; return { calls, dispatch: d => { calls.push(plain(d)); return paid; } }; };
+
+test('push_applies_in_place', () => {
+  const { mk } = stores();
+  const m = mem(), s = mk(m);
+  const st0 = s.st;
+  m.io = 0;
+  for (let i = 0; i < 3; i++) s.push(ans('jp', true, false));
+  assert.equal(s.st.s.right, 3);
+  assert.equal(s.st, st0);           // 作り直さない
+  assert.equal(s.pending(), 3);
+  assert.equal(m.io, 0);             // storage にさわらない
+  assert.equal(m.data.badges, undefined);
+  s.commit();
+  assert.equal(s.pending(), 0);
+  assert.equal(saved(m).s.right, 3);
+  assert.equal(s.st.s.right, 3);
+});
+
+test('last_auto_cleared_by_next_commit', () => {
+  const { mk } = stores();
+  const m = mem(), s = mk(m);
+  pushAll(s, rights(100));
+  assert.deepEqual(plain(s.commit()), ['answers@1']);
+  assert.equal(s.lastAuto, 'answers@1');
+  assert.deepEqual(plain(s.commit({ judge: false })), []);
+  assert.equal(s.lastAuto, null);
+  assert.equal(saved(m).eq, 'answers@1');   // つけた称号は残る（lastAuto だけが消える）
+});
+
+test('broken_json_backup', () => {
+  const { K, mk } = stores();
+  const m = mem({ badges: '{oops' });
+  assert.deepEqual(plain(mk(m).commit()), []);
+  assert.equal(m.data['badges-broken'], '{oops');
+  assert.deepEqual(saved(m), plain(K.fresh()));
+  m.data.badges = '{x';
+  mk(m).commit();
+  assert.equal(m.data['badges-broken'], '{x');   // 1件だけ、上書き
+  assert.deepEqual(Object.keys(m.data).sort(), ['badges', 'badges-broken']);
+  // 退避が書けなくても落ちない
+  const f = mem({ badges: '{y' });
+  f.fail = true;
+  assert.doesNotThrow(() => mk(f).commit());
+  assert.equal(f.data['badges-broken'], undefined);
+});
+
+test('newer_save_readonly', () => {
+  const { K, X, cat } = stores();
+  const raw = JSON.stringify({ v: 2, s: { right: 500 } }), m = mem({ badges: raw }), warns = [];
+  const s = K.createStore({ storage: m, X, cat, ctx: () => K.makeCtx(X, null), warn: w => warns.push(w) });
+  pushAll(s, rights(1));
+  assert.deepEqual(plain(s.commit()), []);   // 501 問でも取らない
+  assert.deepEqual(plain(s.commit()), []);
+  assert.equal(m.data.badges, raw);          // 書かない
+  assert.equal(s.ro, true);
+  assert.equal(s.st.s.right, 501);           // 表示は base + ops（op は1回だけ当たる）
+  assert.deepEqual(plain(s.st.got), {});
+  assert.equal(s.lastAuto, null);
+  s.reload();
+  assert.equal(s.st.s.right, 501);
+  assert.deepEqual(warns, ['[badges] 新しい版のセーブなので読むだけにする']);
+});
+
+test('write_failure_no_double', () => {
+  const { mk } = stores();
+  const m = mem(), s = mk(m);
+  pushAll(s, rights(100));
+  m.fail = true;
+  assert.deepEqual(plain(s.commit()), ['answers@1']);
+  assert.deepEqual(plain(s.commit()), []);   // 取ったことも op に残っている
+  assert.ok(s.pending() > 0);
+  assert.equal(s.st.s.right, 100);
+  m.fail = false;
+  assert.deepEqual(plain(s.commit()), []);
+  assert.equal(s.pending(), 0);
+  assert.ok(has(saved(m).got, 'answers@1'));
+  assert.equal(saved(m).s.right, 100);
+  assert.equal(saved(m).eq, 'answers@1');
+});
+
+test('storage_unavailable_memory', () => {
+  const { mk } = stores();
+  const m = mem();
+  m.down = true;
+  const s = mk(m);
+  pushAll(s, rights(100));
+  assert.deepEqual(plain(s.commit()), ['answers@1']);
+  assert.deepEqual(plain(s.commit()), []);
+  assert.equal(s.pending(), 0);
+  assert.equal(s.st.s.right, 100);
+  pushAll(s, rights(1));
+  assert.equal(s.st.s.right, 101);
+  s.commit();
+  assert.equal(s.st.s.right, 101);           // op が2回当たらない（push が base を変えていない）
+  s.reload();
+  assert.equal(s.st.s.right, 101);
+  assert.equal(s.ro, false);
+});
+
+test('two_tabs_add_up', () => {
+  const { mk } = stores();
+  const m = mem(), a = mk(m), b = mk(m);
+  pushAll(a, rights(3));
+  pushAll(b, rights(4));
+  a.commit();
+  b.commit();
+  assert.equal(saved(m).s.right, 7);
+  pushAll(a, rights(93));
+  assert.deepEqual(plain(a.commit()), ['answers@1']);
+  // reload: 読み直した base に自分の ops を重ねる（判定も書き込みもしない）
+  pushAll(b, rights(2));
+  const before = m.data.badges;
+  b.reload();
+  assert.equal(b.st.s.right, 102);
+  assert.ok(has(b.st.got, 'answers@1'));
+  assert.equal(b.pending(), 2);
+  assert.equal(m.data.badges, before);
+  assert.deepEqual(plain(b.commit()), []);   // A が取った answers@1 を B はもう一度取らない
+  assert.equal(saved(m).s.right, 102);
+  assert.equal(Object.keys(saved(m).got).length, 1);
+});
+
+test('auto_equip', () => {
+  const { mk } = stores();
+  let m = mem(), s = mk(m);
+  pushAll(s, rights(100));
+  s.commit();
+  assert.equal(s.st.eq, 'answers@1');
+  assert.equal(s.lastAuto, 'answers@1');
+  // 一度にいくつも取ったら色のいちばん大きいもの
+  m = mem(); s = mk(m);
+  s.push(res({ n: 40 }));
+  assert.deepEqual(plain(s.commit()), ['first-clear@1', 'prac-perfect@1', 'prac-perfect@2', 'prac-perfect@3', 'reg-world@1']);
+  assert.equal(s.lastAuto, 'prac-perfect@3');
+  assert.equal(saved(m).eq, 'prac-perfect@3');
+  // 「つけない」を選んだ人にはつけない
+  m = mem({ badges: JSON.stringify({ v: 1, eq: '' }) }); s = mk(m);
+  pushAll(s, rights(100));
+  assert.deepEqual(plain(s.commit()), ['answers@1']);
+  assert.equal(s.st.eq, '');
+  assert.equal(s.lastAuto, null);
+  assert.equal(saved(m).eq, '');
+  // もうつけていれば変えない
+  m = mem({ badges: JSON.stringify({ v: 1, eq: 'answers@1', got: { 'answers@1': 1 }, s: { right: 100 } }) }); s = mk(m);
+  pushAll(s, rights(900));
+  assert.deepEqual(plain(s.commit()), ['answers@2']);
+  assert.equal(s.st.eq, 'answers@1');
+  assert.equal(s.lastAuto, null);
+});
+
+test('nested_commit_noop', () => {
+  const { K, X, cat } = stores();
+  const inner = [];
+  const s = K.createStore({ storage: mem(), X, cat, ctx: () => { inner.push(plain(s.commit())); return K.makeCtx(X, null); } });
+  pushAll(s, rights(100));
+  assert.deepEqual(plain(s.commit()), ['answers@1']);
+  assert.deepEqual(inner, [[]]);
+  assert.equal(s.lastAuto, 'answers@1');     // 入れ子の commit は lastAuto を変えない
+});
+
+test('payout_rules', () => {
+  const { K, X, cat, mk } = stores();
+  const got100 = () => { const m = mem(), s = mk(m, RPG0); pushAll(s, rights(100)); s.commit(); return { m, s }; };
+  const pay = (s, p, more = {}) => K.payout(s, cat, ['answers@1'], { rpg: true, dispatch: p.dispatch, ...more });
+  // 冒険が無ければ何もしない
+  let { m, s } = got100(), p = spy(50);
+  assert.deepEqual(plain(pay(s, p, { rpg: false })), {});
+  assert.equal(p.calls.length, 0);
+  assert.deepEqual(saved(m).sent, []);
+  // 払えた
+  assert.equal(s.lastAuto, 'answers@1');
+  assert.deepEqual(plain(pay(s, p)), { 'answers@1': 50 });
+  assert.deepEqual(p.calls, [{ id: 'answers@1', badge: 'answers', tier: 1, title: 'こつこつ派', color: 1, retro: false }]);
+  assert.deepEqual(saved(m).sent, ['answers@1']);
+  assert.equal(s.lastAuto, null);            // 払ったあとの commit({ judge: false }) で消える
+  assert.deepEqual(plain(pay(s, p)), {});    // 同じキーは2回払わない
+  assert.equal(p.calls.length, 1);
+  // 払えなかった（false）は sent に入れず、次に送り直す
+  ({ m, s } = got100()); p = spy(false);
+  const io = m.io;
+  assert.deepEqual(plain(pay(s, p)), {});
+  assert.equal(p.calls.length, 1);
+  assert.equal(m.io, io);                    // 1つも積まなければ書かない
+  assert.deepEqual(saved(m).sent, []);
+  assert.deepEqual(plain(K.pendingPay(s, cat, K.makeCtx(X, RPG0))), ['answers@1']);
+  // 古い rpg.js（paid を書かない）は払ったとみなす
+  ({ m, s } = got100()); p = spy(undefined);
+  const r = pay(s, p);
+  assert.deepEqual(Object.keys(r), ['answers@1']);
+  assert.equal(r['answers@1'], undefined);
+  assert.deepEqual(saved(m).sent, ['answers@1']);
+  // 0（もう払ってある）も払ったとみなす
+  ({ m, s } = got100()); p = spy(0);
+  assert.deepEqual(plain(pay(s, p)), { 'answers@1': 0 });
+  assert.deepEqual(saved(m).sent, ['answers@1']);
+  assert.deepEqual(plain(K.pendingPay(s, cat, K.makeCtx(X, RPG0))), []);
+  // retro
+  ({ m, s } = got100()); p = spy(50);
+  pay(s, p, { retro: true });
+  assert.equal(p.calls[0].retro, true);
+  // 新しい版のセーブ（readOnly）では払わない
+  m = mem({ badges: JSON.stringify({ v: 2, got: { 'answers@1': 1 } }) }); s = mk(m, RPG0); p = spy(50);
+  s.commit();
+  assert.equal(s.ro, true);
+  assert.deepEqual(plain(pay(s, p)), {});
+  assert.equal(p.calls.length, 0);
+});
+
+test('pending_pay_order', () => {
+  const { K, X, cat, mk } = stores();
+  const m = mem({ badges: JSON.stringify({ v: 1, got: { 'rpg-lv@1': 1, 'answers@1': 2, 'first-clear@1': 3, 'future@1': 4 }, sent: ['answers@1'] }) });
+  const s = mk(m);
+  s.commit({ judge: false });
+  assert.deepEqual(plain(K.pendingPay(s, cat, K.makeCtx(X, null))), ['first-clear@1']);   // 冒険のバッジは見えない
+  assert.deepEqual(plain(K.pendingPay(s, cat, K.makeCtx(X, RPG0))), ['first-clear@1', 'rpg-lv@1']);   // カタログの順
+});
+
+test('late_rpg_once', () => {
+  const { K, X, cat, mk } = stores();
+  const m = mem(), s = mk(m);                 // 冒険なしで取った
+  s.push(res());
+  assert.deepEqual(plain(s.commit()), ['first-clear@1']);
+  const x = K.makeCtx(X, RPG0), p = spy(50);
+  const late = rpg => K.payout(s, cat, K.pendingPay(s, cat, x), { rpg, retro: true, dispatch: p.dispatch });
+  assert.deepEqual(plain(late(false)), {});
+  assert.equal(p.calls.length, 0);
+  assert.deepEqual(plain(late(true)), { 'first-clear@1': 50 });
+  assert.deepEqual(p.calls, [{ id: 'first-clear@1', badge: 'first-clear', tier: 1, title: 'ドリルの新人', color: 1, retro: true }]);
+  assert.deepEqual(plain(late(true)), {});
+  assert.equal(p.calls.length, 1);
+  assert.deepEqual(saved(m).sent, ['first-clear@1']);
+});
+
+test('nested_payment', () => {
+  const { K, cat, mk } = stores();
+  const m = mem(), s = mk(m, RPG0);
+  pushAll(s, rights(100));
+  const keys = s.commit();
+  let inner = null;
+  const calls = [];
+  // badge:earned のリスナーの中で rpg:levelup が来て、その結果も払う（ブラウザの deliver → pay と同じ流れ）
+  const dispatch = d => {
+    calls.push(d.id);
+    if (d.id === 'answers@1') {
+      s.push(['rpg', 'levelup', { lv: 10 }, DAY]);
+      inner = plain(s.commit());
+      K.payout(s, cat, inner, { rpg: true, dispatch });
+    }
+    return 50;
+  };
+  assert.deepEqual(plain(K.payout(s, cat, keys, { rpg: true, dispatch })), { 'answers@1': 50 });
+  assert.deepEqual(inner, ['rpg-lv@1']);     // answers@1 は入らない
+  assert.deepEqual(calls, ['answers@1', 'rpg-lv@1']);
+  const sv = saved(m);
+  assert.deepEqual(sv.sent.filter(k => k === 'answers@1'), ['answers@1']);
+  assert.deepEqual([...sv.sent].sort(), ['answers@1', 'rpg-lv@1']);
+  assert.ok(has(sv.got, 'rpg-lv@1'));
+  assert.equal(sv.s.rpg.lv, 10);
+  assert.equal(sv.s.right, 100);
+  assert.equal(s.pending(), 0);
+});
+
+test('reset_starts_over', () => {
+  const { K, mk } = stores();
+  const m = mem({ badges: JSON.stringify({ v: 1, s: { right: 7 } }) }), s = mk(m);
+  pushAll(s, rights(2));
+  s.commit();
+  assert.equal(saved(m).s.right, 9);
+  pushAll(s, rights(1));                     // 積んだだけのものも消える
+  s.reset();
+  assert.equal(m.data.badges, undefined);
+  assert.equal(s.pending(), 0);
+  assert.deepEqual(plain(s.st), plain(K.fresh()));
+  // st は base と別のオブジェクト（push が base を変えない）。storage が使えなくても op は1回だけ当たる
+  m.down = true;
+  pushAll(s, rights(1));
+  s.commit();
+  assert.equal(s.st.s.right, 1);
+  // 新しい版のセーブを消したら、読むだけではなくなる
+  const n = mem({ badges: JSON.stringify({ v: 2 }) }), r = mk(n);
+  r.commit();
+  assert.equal(r.ro, true);
+  r.reset();
+  assert.equal(r.ro, false);
+  assert.equal(n.data.badges, undefined);
+});
