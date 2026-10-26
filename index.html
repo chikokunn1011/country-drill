@@ -790,7 +790,9 @@ function nextQuestion() {
   // タイムアタックは出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
   ch.onclick = e => { if (G.kind === 'ta' && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
-  box.insertAdjacentHTML('beforeend', '<div class="rslot" aria-hidden="true"><p class="rslot-hint">答えたら、ここに国のプロフィールが出るよ</p><p class="rslot-keys"><kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる ・ <kbd>Enter</kbd> で次へ</p></div>');
+  // タイムアタックは正解だと答えを出さずに次へ進むので、ここに出るのはまちがえたときの正解だけ
+  const slotHint = G.kind === 'ta' ? 'まちがえたら、ここに正解が出るよ' : '答えたら、ここに国のプロフィールが出るよ';
+  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys"><kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる ・ <kbd>Enter</kbd> で次へ</p></div>`);
   G.shownAt = performance.now();
   updateProgress();
   if (G.kind === 'ta' && G.done === 0) startTimer();

@@ -132,8 +132,14 @@ test('rslot_ta_fail', async () => {
   const app = await openApp(browser);
   try {
     const { page } = app;
+    const hint = () => page.evaluate(() => document.querySelector('#qcard > .rslot .rslot-hint').textContent);
     await startF2n(page, 'ta');
     assert.equal(await page.locator('#qcard > .rslot').count(), 1); // 失格の .reveal もこれと置きかわる
+    // タイムアタックは正解だと答えを出さずに次へ進むので、プロフィールが出ると書かない
+    assert.equal(await hint(), 'まちがえたら、ここに正解が出るよ');
+    await answerCorrect(page);
+    await page.waitForFunction(() => G.done === 1 && !G.answered);
+    assert.equal(await hint(), 'まちがえたら、ここに正解が出るよ');
     await answerWrong(page);
     await page.waitForSelector('#next');
     assert.equal(await page.locator('.rslot').count(), 0);
