@@ -166,7 +166,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .facts dd { margin: 0; font-weight: 500; min-width: 0; }
 .facts .name { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; grid-column: 1 / -1; }
 .next { align-self: flex-end; }
-.trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; contain: inline-size; } /* 長い文で欄を横に広げない（スマホでは .wrap が中身の幅になるので、問題の国旗や選択肢が動く） */
 .tv { font-size: .88rem; line-height: 1.5; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--hl) 12%, var(--surface)); }
 .tv-k { font-size: .76rem; font-weight: 700; color: var(--muted); margin-right: .6em; white-space: nowrap; }
 
@@ -1144,6 +1144,7 @@ function selectBook(a, tapped) {
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
   $('binfo').innerHTML = c ? factsHTML(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').scrollTop = 0; // PC では情報欄が中でスクロールする。前の国の位置のままだと国旗が上で隠れる
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   if (c && tapped) emit('drill:book-open', { a });
 }

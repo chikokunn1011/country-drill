@@ -208,6 +208,43 @@ t('works_without_trivia_js', async page => {
   assert.equal(await count(page, '#binfo .trivia'), 0);
 });
 
+/* ---------- スマホ（〜899px）で横に広がらない ---------- */
+// いちばん長い豆知識でも、正解したときにクイズの欄が横に広がらず、問題の国旗と選択肢が動かない。図鑑の地図で国を押しても地図の欄が広がらない
+// （位置はページの先頭から。答えたあとや地図を押したあとのスクロールでは差にしない）
+t('phone_answer_no_widen', async page => {
+  const rects = sels => page.evaluate(sels => Object.fromEntries(Object.entries(sels).map(([k, s]) => {
+    const r = document.querySelector(s).getBoundingClientRect();
+    return [k, { x: r.x, y: r.y + scrollY, width: r.width, height: r.height }];
+  })), sels);
+  const problems = [], diff = (key, before, after, props = {}) => {
+    for (const [k, r] of Object.entries(before)) for (const p of props[k] ?? ['x', 'y', 'width', 'height'])
+      if (Math.abs(after[k][p] - r[p]) > 0.5) problems.push(`${key} ${k}.${p} ${r[p]} → ${after[k][p]}`);
+  };
+  const longest = await page.evaluate(() => Object.values(TRIVIA).flat().reduce((x, y) => y.t.length > x.t.length ? y : x));
+  const QUIZ = { scr: '#scr-quiz', qflag: '#qcard .qflag', choice: '#qcard .choice' };
+  for (const viewport of [{ width: 390, height: 844 }, { width: 600, height: 900 }, { width: 899, height: 900 }]) {
+    await page.setViewportSize(viewport);
+    await start(page);
+    await fix(page, 'jp');
+    await page.evaluate(t => { TRIVIA.jp = [t]; }, longest);
+    await settleLayout(page);
+    const before = await rects(QUIZ);
+    await correct(page);
+    await settleLayout(page);
+    assert.equal(await count(page, '.reveal .trivia .tv'), 1);
+    diff(`${vpName(viewport)} f2n`, before, await rects(QUIZ), { scr: ['x', 'width'] });
+  }
+  // 図鑑の地図（899×900）: 情報欄に豆知識が出ても地図の欄の大きさが変わらない
+  await openBookMap(page);
+  await settleLayout(page);
+  const before = await rects({ box: '#bmapbox' });
+  await page.locator('#bmapbox path[data-a="jp"]').first().dispatchEvent('click');
+  await settleLayout(page);
+  assert.equal(await count(page, '#binfo .trivia .tv'), 1);
+  diff('899x900 book_map', before, await rects({ box: '#bmapbox' }));
+  assert.deepEqual(problems, []);
+}, { viewport: { width: 390, height: 844 }, seed: 1, reducedMotion: 'reduce' }, 60_000);
+
 /* ---------- PC で収まるか ---------- */
 // 国名がいちばん長い国（vc）と首都がいちばん長い国（lk）を順に今の問題にし、豆知識を全データでいちばん長い文1件にして正解する。
 // 答え合わせが画面とカードに収まるか見て、収まらないところを返す（1px までの誤差は許す）
@@ -258,17 +295,19 @@ const FIT_OPTS = { seed: 1, reducedMotion: 'reduce' };
 t('fits_pc', page => fitsAll(page, [[1280, 577], [1366, 657], [1366, 768], [1536, 730], [1920, 1080]].map(([width, height]) => ({ width, height }))), FIT_OPTS, 180_000);
 t('fits_strip', page => fitsAll(page, [{ width: 900, height: 700 }, { width: 1024, height: 768 }]), FIT_OPTS, 180_000);
 
+// 豆知識が4件ある国のうち「国名＋4件の文」の文字数がいちばん多い国
+const wordiest = page => page.evaluate(() => Object.entries(TRIVIA).filter(([, v]) => v.length === 4)
+  .map(([a, v]) => [a, byA.get(a).n.length + v.reduce((n, x) => n + x.t.length, 0)])
+  .reduce((x, y) => y[1] > x[1] ? y : x)[0]);
 // 図鑑の地図（PC）: 豆知識が4件で文字のいちばん多い国でも、情報欄の先頭が欄の上で切れず、ページは縦にスクロールしない
 t('book_map_fits_pc', async page => {
-  const a = await page.evaluate(() => Object.entries(TRIVIA).filter(([, v]) => v.length === 4)
-    .map(([a, v]) => [a, byA.get(a).n.length + v.reduce((n, x) => n + x.t.length, 0)])
-    .reduce((x, y) => y[1] > x[1] ? y : x)[0]);
+  const a = await wordiest(page);
   await page.click('#home-book');
   await openBookMap(page);
   const problems = [];
   for (const viewport of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }]) {
     await page.setViewportSize(viewport);
-    await page.evaluate(a => { selectBook(a, true); $('binfo').scrollTop = 0; }, a);
+    await page.evaluate(a => selectBook(a, true), a);
     await settleLayout(page);
     const m = await page.evaluate(() => ({ facts: document.querySelector('#binfo .facts').getBoundingClientRect().top, info: $('binfo').getBoundingClientRect().top,
       tvs: document.querySelectorAll('#binfo .trivia .tv').length, docH: document.documentElement.scrollHeight, ih: innerHeight }));
@@ -276,6 +315,42 @@ t('book_map_fits_pc', async page => {
     if (m.tvs !== 4) problems.push(`${key}: .tv が ${m.tvs} 件`);
     if (!(m.facts >= m.info - 1)) problems.push(`${key}: .facts.top ${m.facts} < #binfo.top ${m.info}`);
     if (!(m.docH <= m.ih + 1)) problems.push(`${key}: 縦スクロール ${m.docH}/${m.ih}`);
+  }
+  assert.deepEqual(problems, []);
+}, { viewport: { width: 1280, height: 577 }, ...FIT_OPTS });
+
+// 図鑑の地図（PC）: 情報欄を下までスクロールしたあとで別の国を押しても、検索で1件にしぼっても、新しい国は情報欄の先頭から見える
+t('book_map_scroll_resets', async page => {
+  const a = await wordiest(page), problems = [];
+  await page.click('#home-book');
+  await openBookMap(page);
+  // 文字のいちばん多い国を出して、情報欄をいちばん下までスクロールする
+  const scrollDown = async key => {
+    const top = await page.evaluate(a => { selectBook(a, true); $('binfo').scrollTop = 1e6; return $('binfo').scrollTop; }, a);
+    if (!(top > 0)) problems.push(`${key}: ${a} で情報欄がスクロールしない`);
+  };
+  const check = async key => {
+    await settleLayout(page);
+    const m = await page.evaluate(() => ({ st: $('binfo').scrollTop, facts: document.querySelector('#binfo .facts').getBoundingClientRect().top, info: $('binfo').getBoundingClientRect().top }));
+    if (m.st !== 0) problems.push(`${key}: scrollTop ${m.st}`);
+    if (!(m.facts >= m.info - 1)) problems.push(`${key}: .facts.top ${m.facts} < #binfo.top ${m.info}`);
+  };
+  for (const viewport of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }]) {
+    const key = vpName(viewport);
+    await page.setViewportSize(viewport);
+    await settleLayout(page);
+    await scrollDown(key);
+    await page.locator('#bmapbox [data-a="nz"]').first().dispatchEvent('click');
+    assert.equal(await page.evaluate(() => bsel), 'nz');
+    await check(`${key} nz をタップ`);
+    // 検索で1件にしぼったときの自動選択
+    await scrollDown(key);
+    await page.fill('#q', '日本');
+    await page.waitForFunction(() => $('bcount').textContent === '1か国');
+    assert.equal(await page.evaluate(() => bsel), 'jp');
+    await check(`${key} 検索で jp`);
+    await page.fill('#q', '');
+    await page.waitForFunction(() => $('bcount').textContent !== '1か国');
   }
   assert.deepEqual(problems, []);
 }, { viewport: { width: 1280, height: 577 }, ...FIT_OPTS });
