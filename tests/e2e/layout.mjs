@@ -230,6 +230,7 @@ export const rectOf = (page, selector) => page.evaluate(selector => {
 
 /* ---------- 比較の基準 ---------- */
 // 'auto' なら index.html に初めて rslot が入ったコミットの親（まだ無ければ HEAD）。それ以外はそのまま（コミット ID や HEAD~3）
+// （auto は PC レイアウトを入れたときのためのもの。そのあと冒険・バッジでスマホの見た目をわざと変えたので、いまは必ず差が出る。README）
 export function resolveGeomBase(value) {
   if (value !== 'auto') return value;
   const revs = execSync(`git -C ${sh(ROOT)} log -S rslot --format=%H -- index.html`, { encoding: 'utf8' }).trim().split('\n').filter(Boolean);

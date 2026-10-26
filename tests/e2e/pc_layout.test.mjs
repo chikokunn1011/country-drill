@@ -1,5 +1,5 @@
 // PC 全画面レイアウト。計測の場面がちゃんとその画面まで進むか、スマホ幅の見た目が変わっていないか、PC で画面に収まるか
-// （phone_geometry_unchanged は GEOM_BASE=auto などを指定したときだけ。全要素の位置を変更前のコミットと比べる）
+// （phone_geometry_unchanged は GEOM_BASE=<コミット> を指定したときだけ。全要素の位置をそのコミットと比べる。auto は古いので使わない（README））
 // PC の大きさは PC_VIEWPORTS（例: PC_VIEWPORTS=1280x720,1440x900）で変えられる
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
