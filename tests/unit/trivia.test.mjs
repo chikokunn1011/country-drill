@@ -66,3 +66,25 @@ test('make_trivia_rejects_bad_kind', () => withTmp(dir => {
     e => e.status !== 0 && e.status != null && String(e.stderr).includes('bad item 5:'));
   assert.equal(existsSync(out), false, 'だめなデータでも出力ファイルが作られた');
 }));
+
+test('make_trivia_rejects_blank_text', () => withTmp(dir => {
+  const items = JSON.parse(read('data/trivia_facts.json'));
+  items.splice(3, 0, { a: 'jp', k: 'geo', t: ' 　\n', note: 'テスト用（空白だけ）' });
+  const src = join(dir, 'blank.json'), out = join(dir, 'trivia.js');
+  writeFileSync(src, JSON.stringify(items));
+  assert.throws(() => execFileSync('python3', ['tools/make_trivia.py', src, out], { cwd: ROOT, stdio: 'pipe' }),
+    e => e.status !== 0 && e.status != null && String(e.stderr).includes('bad item 3:'));
+  assert.equal(existsSync(out), false, '空白だけの文でも出力ファイルが作られた');
+}));
+
+// 元データが読めない（無い・JSON でない・UTF-8 でない）ときは、トレースバックでなく bad source: で止まる
+test('make_trivia_rejects_unreadable_source', () => withTmp(dir => {
+  const out = join(dir, 'trivia.js');
+  writeFileSync(join(dir, 'broken.json'), '[{"a": "jp",');
+  writeFileSync(join(dir, 'latin1.json'), Buffer.from([0x5b, 0x22, 0xe9, 0x22, 0x5d])); // ["é"] を Latin-1 で
+  for (const name of ['missing.json', 'broken.json', 'latin1.json']) {
+    assert.throws(() => execFileSync('python3', ['tools/make_trivia.py', join(dir, name), out], { cwd: ROOT, stdio: 'pipe' }),
+      e => e.status === 1 && String(e.stderr).startsWith('bad source: ') && !String(e.stderr).includes('Traceback'), name);
+  }
+  assert.equal(existsSync(out), false, '読めない元データでも出力ファイルが作られた');
+}));

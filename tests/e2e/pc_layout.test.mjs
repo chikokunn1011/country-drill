@@ -132,8 +132,14 @@ test('rslot_ta_fail', async () => {
   const app = await openApp(browser);
   try {
     const { page } = app;
+    const hint = () => page.evaluate(() => document.querySelector('#qcard > .rslot .rslot-hint').textContent);
     await startF2n(page, 'ta');
     assert.equal(await page.locator('#qcard > .rslot').count(), 1); // 失格の .reveal もこれと置きかわる
+    // タイムアタックは正解だと答えを出さずに次へ進むので、プロフィールが出ると書かない
+    assert.equal(await hint(), 'まちがえたら、ここに正解が出るよ');
+    await answerCorrect(page);
+    await page.waitForFunction(() => G.done === 1 && !G.answered);
+    assert.equal(await hint(), 'まちがえたら、ここに正解が出るよ');
     await answerWrong(page);
     await page.waitForSelector('#next');
     assert.equal(await page.locator('.rslot').count(), 0);
@@ -282,6 +288,9 @@ test('answer_does_not_move', { timeout: 300_000 }, async () => {
       await page.waitForSelector('#next');
       await settleLayout(page);
       const after = await parts();
+      // rectOf は要素が無いと null を返し、[null, null] どうしも等しくなってしまうので、先に有無を見る
+      if (before.some(r => !r)) problems.push(`${key}: 答える前に .qmain/.choices が無い`);
+      if (after.some(r => !r)) problems.push(`${key}: 答えたあとに .qmain/.choices が無い`);
       if (!isDeepStrictEqual(before, after)) problems.push(`${key}: ${json(before)} → ${json(after)}`);
       if (app.errors.length) problems.push(`${key}: ページで例外 ${app.errors.map(String).join(' | ')}`);
     } catch (e) { problems.push(`${key}: ${e.message.split('\n')[0]}`); }
@@ -467,6 +476,22 @@ test('menus_do_not_jump', { timeout: 120_000 }, async () => {
     finally { await app.close(); }
   }
   assert.deepEqual(problems, []);
+});
+
+// キーボードの無いタッチ端末（横向きの iPad。900px 以上なので pc.css が効く）では、答えの場所にキーの案内を出さない
+test('rslot_keys_hidden_on_touch', async () => {
+  const IPAD = { width: 1366, height: 1024 };
+  for (const hasTouch of [false, true]) {
+    const app = await openApp(browser, { viewport: IPAD, hasTouch, seed: 1, reducedMotion: 'reduce' });
+    try {
+      const { page } = app;
+      assert.equal(await page.evaluate(() => matchMedia('(hover: none) and (pointer: coarse)').matches), hasTouch);
+      await startF2n(page, 'practice');
+      assert.equal(await page.isVisible('#qcard > .rslot .rslot-hint'), true, `hasTouch=${hasTouch}`);
+      assert.equal(await page.isVisible('#qcard > .rslot .rslot-keys'), !hasTouch, `hasTouch=${hasTouch}`);
+      noErrors(app);
+    } finally { await app.close(); }
+  }
 });
 
 // PC でも 1〜4 キーと Enter が動き、答えたら「次の問題 →」にフォーカスの枠が出る（設計書 9章 10）

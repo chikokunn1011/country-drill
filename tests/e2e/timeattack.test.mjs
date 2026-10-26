@@ -204,7 +204,8 @@ t('works_without_ranking_js', async page => {
   await page.click('#quit');
 
   await startTa(page);
-  assert.equal(await text(page, '#ptime'), '0.00秒');
+  // 計測はもう動いているので、ぴったり 0.00秒 とは限らない（並列で重いと 0.0x秒 になる）。1秒未満なら 0 から始まっている
+  assert.match(await text(page, '#ptime'), /^0\.\d{2}秒$/);
   await answerWrong(page);
   assert.match(await text(page, '.reveal'), /失格/);
   assert.match(await text(page, '#ptime'), /^\d+\.\d{2}秒$/);

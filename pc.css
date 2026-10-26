@@ -95,6 +95,8 @@ body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
 .rslot-hint { font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
 .rslot-keys { font-size: .85rem; }
 .rslot kbd { font-family: var(--font-mono); font-size: .75rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: var(--surface); }
+/* キーボードの無いタッチ端末（横向きの iPad など 900px 以上）ではキーの案内を出さない */
+@media (hover: none) and (pointer: coarse) { .rslot-keys { display: none; } }
 #qcard .reveal .verdict, #qcard .qlabel, #qcard .qbig { text-wrap: balance; word-break: auto-phrase; overflow-wrap: anywhere; } /* auto-phrase: Chrome 119+ breaks Japanese at phrase boundaries; others ignore it */
 
 /* 900–1279: question | choices, answer strip below */
@@ -119,7 +121,7 @@ body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
   #qcard > .reveal > .trivia { grid-column: 1; grid-row: 3; }
   #qcard > .reveal:has(> .trivia) > .map { grid-row: 2 / -1; }
   #qcard > .reveal > .trivia .tv { font-size: .76rem; line-height: 1.35; padding: 0 8px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
-  #qcard > .reveal:has(> .trivia) > .facts dl { line-height: 1.35; } /* strip: make room for the 1-line trivia without changing the 150px height (R9) */
+  #qcard > .reveal:has(> .trivia) > .facts dl { line-height: 1.35; } /* 帯の高さ150pxは変えずに、豆知識1行ぶんの場所を作る */
 }
 
 /* ---------- result ---------- */

@@ -22,15 +22,19 @@ def problem(it):
         return f'a が小文字2文字でない: {a!r}'
     if k not in KINDS:
         return f'k が {"/".join(KINDS)} のどれでもない: {k!r}'
-    if not (isinstance(t, str) and t):
-        return f't が空か文字列でない: {t!r}'
+    if not (isinstance(t, str) and t.strip()):
+        return f't が空（空白だけ）か文字列でない: {t!r}'
     return None
 
 
 def main():
     src = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'data' / 'trivia_facts.json'
     out = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / 'trivia.js'
-    items = json.loads(src.read_text(encoding='utf-8'))
+    # 無い・読めない・UTF-8 でない・JSON でない元データは、トレースバックを出さずに止まる（UnicodeDecodeError と JSONDecodeError は ValueError）
+    try:
+        items = json.loads(src.read_text(encoding='utf-8'))
+    except (OSError, ValueError) as e:
+        sys.exit(f'bad source: {src}: {e}')
     if not isinstance(items, list):
         sys.exit(f'bad source: 配列でない: {src}')
     for i, it in enumerate(items):
