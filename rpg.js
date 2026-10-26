@@ -1,6 +1,7 @@
 (() => {
   'use strict';
-  // 国旗クエスト（RPG）の本体: セーブ（RPG.tx）、クイズのコインの受け取り（#pcoin・結果のパネル・トースト）、バッジのコインの支払い
+  // 国旗クエスト（RPG）の本体: セーブ（RPG.tx）、クイズのコインの受け取り（#pcoin・結果のパネル・トースト）、バッジのコインの支払い、
+  // 冒険ホーム（入口・はじめての画面・引き継ぎコード・開発用パネル）、タブ間の同期、RPG.snapshot()
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // ---- 起動時のチェック。足りなければ何もしない（ボタンも画面も作らない。クイズはそのまま動く） ----
@@ -113,7 +114,13 @@
 
   /* ---------- コインのイベントと表示の部品 ---------- */
   const coinHTML = n => COIN + K.shortCoins(n);
-  const emitCoins = (d, delta, reason) => { if (delta) emit('rpg:coins', { delta, reason, coins: d.coins, earned: d.earned }); };
+  // rpg:coins。coins と earned は d ではなく出す時点のセーブから読む（tx が返ってから先に出したイベントのリスナー＝badges.js が
+  // 同期でバッジのコインを払っていても、いまの額になる）。呼び出しの形 (d, delta, reason) はそのまま
+  const emitCoins = (_d, delta, reason) => {
+    if (!delta) return;
+    const now = get();
+    emit('rpg:coins', { delta, reason, coins: now.coins, earned: now.earned });
+  };
   // レシートの仲間・昇格・克服・手配書をイベントにする（tx が返ってから呼ぶ。バトルも使う）。owned と total はその時点の数
   const announce = (rc, d) => {
     const owned = Object.keys(d.cards).length, st = d.st;
@@ -236,7 +243,7 @@
       rc.zeroed && 'タイムが速すぎたので、この回のコインはなし',
     ].filter(Boolean);
     ext.innerHTML = `<div class="rpg-res" id="rpg-res">`
-      + `<p class="rpg-res-head">${COIN} +${fmt(rc.sum)} コイン <span class="rpg-now">いま ${fmt(d.coins)}</span></p>`
+      + `<p class="rpg-res-head">${COIN} +${fmt(rc.sum)} コイン <span class="rpg-now">いま ${fmt(get().coins)}</span></p>`
       + (rows ? `<ul class="rpg-res-rows">${rows}</ul>` : '')
       + lines.map(l => `<p class="rpg-res-x">${l}</p>`).join('')
       + `<button class="btn ghost" id="rpg-res-go">冒険へ →${d.intro ? '' : `（はじめてなら <span class="rpg-nowrap">${COIN}${fmt(T.start)}</span> のお祝いつき）`}</button></div>`;
@@ -244,6 +251,14 @@
   };
 
   /* ---------- バッジのコイン（badges.js が同期で e.detail.paid を読む: 50 払った／0 もう払ってある／false 払えなかった） ---------- */
+  // トーストは出さない（●+50 はバッジ側が出す）。retro: true（さかのぼり・払い残し）で新しく払った分だけは、
+  // 同じタスクの中のものを数えておき、まとめてトースト1つ「バッジのごほうび ●+合計」
+  let retroSum = 0;
+  const retroToast = () => {
+    const n = retroSum;
+    retroSum = 0;
+    try { if (n > 0 && get().show !== false) toast(`バッジのごほうび ${COIN}+${fmt(n)}`); } catch (e) { console.error('[rpg]', e); }
+  };
   document.addEventListener('badge:earned', e => {
     try {
       const det = e.detail;
@@ -260,7 +275,13 @@
         return T.badge;
       });
       det.paid = paid === null ? false : paid === 0 ? 0 : wrote ? paid : false;
-      if (det.paid > 0) emitCoins(d, det.paid, 'badge');
+      if (det.paid > 0) {
+        emitCoins(d, det.paid, 'badge');
+        if (det.retro === true) {
+          if (!retroSum) setTimeout(retroToast, 0);
+          retroSum += det.paid;
+        }
+      }
     } catch (err) { console.error('[rpg]', err); }
   });
 
@@ -305,6 +326,13 @@
   const titleOf = () => {
     try { return String(window.BADGES?.title?.() || ''); } catch (e) { console.error('[rpg]', e); return ''; }
   };
+  // 称号が変わったら（badge:title）旅人カードの称号だけその場で描き直す。冒険ホームを開いていなければ、次に開いたときに出る
+  on('badge:title', () => {
+    const el = $('rpg-title');
+    if (!el) return;
+    const t = titleOf();
+    el.textContent = t ? `〈${t}〉` : '';
+  });
 
   // ホームの［冒険］の小さいコインと NEW、トップバーのチップ
   const drawEntrances = (d = get()) => {
@@ -345,6 +373,90 @@
     emitCoins(d, -spent, 'levelup');
   };
 
+  // ---- データ（引き継ぎコード・冒険データを消す）。はじめての画面には、別の端末から引っ越してきた人のための復元だけ ----
+  // tx の中で使う: d の中身をそっくり src に入れかえる
+  const replaceSave = (d, src) => { for (const k of Object.keys(d)) delete d[k]; Object.assign(d, src); };
+  const wipeSave = () => tx(d => replaceSave(d, K.fresh(todayStr())));   // misses はそのまま
+  const dataHTML = full => '<details class="rpg-data" id="rpg-data"><summary>データ（引き継ぎコード）</summary><div class="rpg-data-in">'
+    + (full ? '<label class="rpg-lbl" for="rpg-code-out">引き継ぎコード（ほかの端末の「コードで復元」に入れる）</label>'
+      + '<textarea class="rpg-code" id="rpg-code-out" rows="3" readonly></textarea>'
+      + '<button class="btn ghost" id="rpg-code-copy">コピー</button>' : '')
+    + '<label class="rpg-lbl" for="rpg-code-in">コードで復元（前の端末でコピーしたコードをはりつける）</label>'
+    + '<textarea class="rpg-code" id="rpg-code-in" rows="3" spellcheck="false" autocomplete="off" placeholder="CQ1.…"></textarea>'
+    + '<button class="btn ghost" id="rpg-code-load">コードで復元</button>'
+    + '<p class="rpg-code-msg" id="rpg-code-msg" role="status"></p>'
+    + (full ? '<button class="btn ghost rpg-danger" id="rpg-wipe">冒険データを消す</button>' : '')
+    + '</div></details>';
+  const sayData = s => { const el = $('rpg-code-msg'); if (el) el.textContent = s; };
+  // 開いたとき（と描き直したとき）に、いまのセーブと misses からコードを作る
+  const fillCode = () => { const out = $('rpg-code-out'); if (out) out.value = K.encodeCode(get(), missesNow()); };
+  const copyCode = async () => {
+    try {
+      fillCode();
+      try {
+        if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('no clipboard');
+        await navigator.clipboard.writeText($('rpg-code-out').value);
+        sayData('コピーしたよ');
+      } catch {
+        const out = $('rpg-code-out');   // 待つあいだに描き直していても、いまの欄を選ぶ
+        out?.focus();
+        out?.select();
+        sayData('コピーできなかったので、選んである文字をコピーしてね');
+      }
+    } catch (e) { console.error('[rpg]', e); }
+  };
+  // コードを読む → 上書きしてよいか聞く → 今の文字列を写す（rpg-broken-*）→ 書く → まちがえた記録も入れかえるか聞く → 描き直す
+  const loadCode = () => {
+    const r = K.decodeCode($('rpg-code-in')?.value ?? '', todayStr());
+    if (!r.ok) { sayData('コードが正しくないみたい'); return; }
+    if (status === 'readOnly') { sayData(MSG.readOnly); return; }
+    const cur = get();
+    if (!confirm(`今のデータを上書きする？（Lv${cur.lv}・仲間${owned(cur)} → Lv${r.rpg.lv}・仲間${owned(r.rpg)}）`)) return;
+    backupRaw(readRaw());
+    if (!tx(d => { replaceSave(d, r.rpg); return true; }) || !wrote) {   // 書けなかった（保存できなかったトーストは tx が出す）
+      if (status === 'readOnly') sayData(MSG.readOnly);
+      return;
+    }
+    if (r.hasM && confirm('まちがえた記録も入れかえる？')) { misses = r.m; store.set('misses', misses); }
+    introAv = null;
+    refresh();
+    window.scrollTo({ top: 0 });
+    toast('引き継ぎコードで復元したよ');
+  };
+  const wipeAsk = () => {
+    if (status === 'readOnly') { sayData(MSG.readOnly); return; }
+    if (!confirm('冒険データを消す？（コイン・Lv・仲間が全部なくなる）') || !confirm('ほんとうに消す？ もとにもどせないよ')) return;
+    wipeSave();
+    introAv = null;
+    refresh();
+  };
+  const bindData = () => {
+    const box = $('rpg-data');
+    if (!box) return;
+    box.addEventListener('toggle', () => { if (box.open) fillCode(); });
+    $('rpg-code-load').onclick = loadCode;
+    if ($('rpg-code-copy')) $('rpg-code-copy').onclick = copyCode;
+    if ($('rpg-wipe')) $('rpg-wipe').onclick = wipeAsk;
+  };
+
+  // ---- 開発用パネル（?rpgdebug=1 のときだけ冒険ホームの最後に出す。RPG.debug はいつもある） ----
+  const DEBUG = (() => { try { return new URLSearchParams(location.search).get('rpgdebug') === '1'; } catch { return false; } })();
+  const DEBUG_GIVE = 10000;   // ●+10,000（設計書 §5.4）
+  const debugHTML = d => !DEBUG ? '' : '<div class="rpg-debug" id="rpg-debug"><p class="rpg-lbl">開発用パネル（?rpgdebug=1）</p><div class="rpg-debug-row">'
+    + `<button class="btn ghost" id="rpg-dbg-give">${COIN}+${fmt(DEBUG_GIVE)}</button>`
+    + `<span class="rpg-debug-lv"><label for="rpg-dbg-lv">Lv</label><input type="number" id="rpg-dbg-lv" min="1" max="${T.hero.maxLv}" value="${d.lv}">`
+    + '<button class="btn ghost" id="rpg-dbg-setlv">Lv にする</button></span>'
+    + '<button class="btn ghost" id="rpg-dbg-unlock">全部のフロアを開く</button>'
+    + '<button class="btn ghost" id="rpg-dbg-wipe">冒険データを消す</button></div></div>';
+  const bindDebug = () => {
+    if (!$('rpg-debug')) return;
+    $('rpg-dbg-give').onclick = () => RPG.debug.give(DEBUG_GIVE);
+    $('rpg-dbg-setlv').onclick = () => RPG.debug.setLv($('rpg-dbg-lv').value);
+    // どのダンジョンもボスまで行けるようにする（もう倒したボスはそのまま。倒したことにはしない）
+    $('rpg-dbg-unlock').onclick = () => tx(x => { for (const g of DG) x.floors[g.id] = Math.max(cleared(x, g.id), BOSS - 1); });
+    $('rpg-dbg-wipe').onclick = wipeAsk;
+  };
+
   // ---- はじめての画面 ----
   let introAv = null;   // はじめての画面で選んでいるアバター（描き直しても残す）
   const warnHTML = () => WARN[status] ? `<p class="rpg-warn" id="rpg-warn" role="status">${WARN[status]}</p>` : '';
@@ -355,7 +467,7 @@
       + `<div class="rpg-story">${STORY.map(s => `<p>${s}</p>`).join('')}</div>`
       + '<p class="rpg-lbl" id="rpg-avlbl">旅人のすがたをえらぶ</p>'
       + `<div class="rpg-avpick" role="group" aria-labelledby="rpg-avlbl">${AV.map((e, i) => `<button type="button" data-av="${i}" aria-pressed="${i === av}">${e}</button>`).join('')}</div>`
-      + '<button class="btn" id="rpg-go">旅に出る</button></div>';
+      + `<button class="btn" id="rpg-go">旅に出る</button>${dataHTML(false)}</div>${debugHTML(d)}`;
   };
   const bindIntro = d => {
     const box = $('scr-rpg').querySelector('.rpg-avpick');
@@ -445,7 +557,7 @@
       + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
       + `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
       + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div></div>'
-      + `<div class="rpg-main"><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}</div>`
+      + `<div class="rpg-main"><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}</div>`;
   };
   const bindHome = nx => {
@@ -469,10 +581,12 @@
     let d = null;
     tx(x => { K.ensureDay(x, m, t, Math.random); d = x; });
     d = d || get();   // 新しい版のデータのときは読むだけ
-    // 描き直してもフォーカスと開いた <details> はそのまま
-    const focus = sec.contains(document.activeElement) ? document.activeElement.id : '';
-    const opened = [...sec.querySelectorAll('details[open]')].map(x => x.id);
-    sec.dataset.view = d.intro ? 'home' : 'intro';
+    // 同じ画面（はじめての画面／ホーム）のまま描き直すときは、フォーカス・開いた <details>・入れかけの引き継ぎコードとメッセージはそのまま
+    const view = d.intro ? 'home' : 'intro', same = sec.dataset.view === view;
+    const focus = same && sec.contains(document.activeElement) ? document.activeElement.id : '';
+    const opened = same ? [...sec.querySelectorAll('details[open]')].map(x => x.id) : [];
+    const codeIn = same ? $('rpg-code-in')?.value ?? '' : '', msg = same ? $('rpg-code-msg')?.textContent ?? '' : '';
+    sec.dataset.view = view;
     if (d.intro) {
       const nf = nextFloor(d), nx = nextAction(d, nf);
       sec.innerHTML = homeHTML(d, nf, nx);
@@ -481,7 +595,12 @@
       sec.innerHTML = introHTML(d);
       bindIntro(d);
     }
+    bindData();
+    bindDebug();
     for (const id of opened) if ($(id)) $(id).open = true;
+    if ($('rpg-code-in')) $('rpg-code-in').value = codeIn;
+    sayData(msg);
+    if ($('rpg-data')?.open) fillCode();
     if (focus) $(focus)?.focus({ preventScroll: true });
   };
   // チップ・ホームのボタン・設定のスイッチ・冒険の表示の ON/OFF・いまの冒険ホームを描き直す
@@ -491,6 +610,28 @@
     drawEntrances(d);
     if ($('set-rpg')) $('set-rpg').checked = d.show !== false;
     if (document.body.dataset.screen === 'rpg') renderHome();
+  };
+  // 別のタブがセーブを書いたら（storage イベント。localStorage.clear() のときは key が null）再読み込みなしで描き直す。
+  // 描き直しの tx は変わらなければ書かないので、タブどうしで書き合いにならない
+  window.addEventListener('storage', e => {
+    if (e.key !== KEY && e.key !== null) return;
+    try { refresh(); } catch (err) { console.error('[rpg]', err); }
+  });
+  // バッジのさかのぼり（badges.js の起動時）が同期で読む写し（docs/events.md 7章）。ボスを倒したダンジョンは cleared（floors[id] >= 5）
+  const REGION_DG = DG.filter(g => g.r !== 'all');
+  const snapshot = () => {
+    const d = get(), as = Object.keys(d.cards);
+    const ownedByStar = { 1: 0, 2: 0, 3: 0 }, ownedByRegion = Object.fromEntries(REGION_DG.map(g => [g.id, 0]));
+    for (const a of as) {
+      const star = d.cards[a][0], g = REGION_DG.find(g => g.r === byA.get(a)?.r);
+      if (star in ownedByStar) ownedByStar[star]++;
+      if (g) ownedByRegion[g.id]++;
+    }
+    return {
+      intro: d.intro, lv: d.lv, coins: d.coins, owned: as.length, ownedByStar, ownedByRegion,
+      floors: { ...d.floors }, cleared: DG.filter(g => cleared(d, g.id) >= BOSS).map(g => g.id),
+      earned: d.earned, st: { ...d.st }, overcome: d.st.overcome, bountyDays: d.st.bountyDays,
+    };
   };
   // 起動時に1回: 画面（<section> を作ってから登録）、ホームのボタン、トップバーのチップ、設定のスイッチ
   const setupEntrances = () => {
@@ -531,8 +672,9 @@
   const RPG = window.RPG = {
     tx, get, emitCoins, announce, coinHTML,
     get status() { return status; },
-    refresh, open, nextFloor, unlocked,
+    refresh, open, nextFloor, unlocked, snapshot,
     opts: {},   // RPG.open で渡したもの（開いた画面が読む）
+    // 開発用（e2e と ?rpgdebug=1 のパネルが使う）。コインを変えたら rpg:coins の reason は 'debug'
     debug: {
       cur: () => window.RPG_BATTLE?.cur?.() ?? null,
       give(n) {
@@ -546,7 +688,14 @@
         if (delta) emitCoins(d, delta, 'debug');
         return delta;
       },
-      wipe: () => tx(d => { for (const k of Object.keys(d)) delete d[k]; Object.assign(d, K.fresh(todayStr())); }),
+      // Lv を n にする（1..50 におさめる。コインは変わらない）。書いた Lv を返す
+      setLv: n => tx(x => { x.lv = Math.max(1, Math.min(T.hero.maxLv, Math.round(+n) || 1)); return x.lv; }),
+      // ダンジョン id のクリアした最高フロアを floor にする（0..5。4 でボスまで全部のフロアに行ける、5 でボスを倒したことになる）。
+      // 書いた値を返す。知らない id は何もせず null
+      unlock: (id, floor) => DG.some(g => g.id === id)
+        ? tx(x => { x.floors[id] = Math.max(0, Math.min(BOSS, Math.round(+floor) || 0)); return x.floors[id]; })
+        : null,
+      wipe: wipeSave,
       save: () => get(),
     },
   };

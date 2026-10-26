@@ -148,6 +148,29 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-earn-t :is(th, td):last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 #rpg-earn-go { margin-top: 10px; }
 
+/* データ（引き継ぎコード・冒険データを消す）。はじめての画面の下にも出す（そこは復元だけ） */
+.rpg-data { min-width: 0; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.rpg-intro .rpg-data { align-self: stretch; background: var(--bg); }
+.rpg-data summary { cursor: pointer; font: 700 .95rem var(--font-display); }
+.rpg-data-in { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
+.rpg-data-in .rpg-lbl { margin-top: 4px; }
+/* 長いコードは欄の中で折り返す（ページを横に広げない） */
+.rpg-code { box-sizing: border-box; width: 100%; min-width: 0; resize: vertical; font: .78rem/1.45 var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; word-break: break-all; }
+.rpg-intro .rpg-code { background: var(--surface); }
+#rpg-code-out { color: var(--muted); }
+.rpg-data-in .btn { padding: 8px 18px; font-size: .95rem; }
+.rpg-code-msg { margin: 0; font-size: .85rem; font-weight: 700; }
+.rpg-code-msg:empty { display: none; }
+.rpg-data-in .rpg-danger { margin-top: 8px; color: var(--ng); border-color: var(--ng); }
+
+/* 開発用パネル（?rpgdebug=1 のときだけ） */
+.rpg-debug { min-width: 0; display: flex; flex-direction: column; gap: 8px; border: 1.5px dashed var(--muted); border-radius: 12px; padding: 10px 14px; }
+.rpg-debug p { margin: 0; }
+.rpg-debug-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rpg-debug-row .btn { padding: 6px 12px; font-size: .85rem; }
+.rpg-debug-lv { display: inline-flex; align-items: center; gap: 6px; font: 700 .85rem var(--font-mono); }
+#rpg-dbg-lv { width: 4.5em; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+
 /* PC: 左に旅人の列（上に固定）、右に図版。1400px 以上は右にもう1列（手配書。Task 12 で小さい地図も） */
 @media (min-width: 900px) {
   #scr-rpg[data-view="home"] {
@@ -159,6 +182,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   #scr-rpg .rpg-aside { grid-area: aside; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   .rpg-dgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
   .rpg-intro { width: 100%; max-width: 720px; margin-inline: auto; padding: var(--card-pad, 24px); }
+  .rpg-intro ~ .rpg-debug { box-sizing: border-box; width: 100%; max-width: 720px; margin-inline: auto; }
 }
 @media (min-width: 1400px) {
   #scr-rpg[data-view="home"] { grid-template-columns: 320px minmax(0, 1fr) 360px; grid-template-areas: "side main aside"; grid-template-rows: auto; }
