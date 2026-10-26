@@ -1,0 +1,4676 @@
+[
+{
+"a": "af",
+"k": "flag",
+"t": "アフガニスタンは、20世紀に世界でいちばん多く国旗のデザインを変えた国と言われる",
+"note": "CIA World Factbook flag note: 'more changes to its national flag in the 20th century - 19 by one count - than any other country'; hedged with と言われる"
+},
+{
+"a": "af",
+"k": "geo",
+"t": "アフガニスタンは海のない内陸国で、細長い「ワハーン回廊」の先で中国と国境を接する",
+"note": "Landlocked; the Wakhan Corridor panhandle reaches the short Afghanistan-China border"
+},
+{
+"a": "af",
+"k": "culture",
+"t": "長い毛が優雅な犬種「アフガン・ハウンド」は、アフガニスタンの山岳地帯がふるさと",
+"note": "Breed standards (AKC/FCI): Afghan Hound originates from the mountains of Afghanistan"
+},
+{
+"a": "af",
+"k": "culture",
+"t": "アフガニスタンの国技ブズカシは、馬に乗った騎手たちがヤギを奪い合う豪快な競技",
+"note": "Buzkashi is widely described as Afghanistan's national sport; mounted riders compete for a goat carcass"
+},
+{
+"a": "am",
+"k": "flag",
+"t": "アルメニアの国旗は赤・青・オレンジの横三色で、オレンジは勤勉さと創造性を表す",
+"note": "Armenian law on the flag: orange = creative talent and hard-working nature of the people"
+},
+{
+"a": "am",
+"k": "geo",
+"t": "アルメニア最大の湖セヴァン湖は、標高約1900mの高地に広がる淡水湖",
+"note": "TIGHTENED: dropped 'largest in Caucasus' (Caspian Sea, often called a lake, borders the Caucasus). Wikipedia 'Lake Sevan': altitude 1,900 m, largest body of water in Armenia, freshwater alpine lake"
+},
+{
+"a": "am",
+"k": "culture",
+"t": "アルメニアは西暦301年、世界で初めてキリスト教を国の宗教に定めた国とされる",
+"note": "Traditional date 301 AD for adoption of Christianity as state religion; hedged with とされる because some historians date it c.314"
+},
+{
+"a": "am",
+"k": "culture",
+"t": "アルメニア語は、5世紀に考案された独自の「アルメニア文字」で書かれる",
+"note": "Armenian alphabet created by Mesrop Mashtots c. 405 AD"
+},
+{
+"a": "az",
+"k": "flag",
+"t": "アゼルバイジャンの国旗の青はトルコ系民族、赤は近代化、緑はイスラムを表す",
+"note": "Official color meanings: blue = Turkic origin, red = modern state/progress, green = Islamic civilization"
+},
+{
+"a": "az",
+"k": "geo",
+"t": "アゼルバイジャンの首都バクーは海抜マイナス約28mにあり、世界で最も低い首都とされる",
+"note": "Wikipedia 'Baku': '28 metres below sea level, which makes it the lowest lying national capital in the world' (added country name for clarity)"
+},
+{
+"a": "az",
+"k": "geo",
+"t": "「火の国」と呼ばれるアゼルバイジャンのヤナル・ダグでは、天然ガスの炎が山肌で燃え続けている",
+"note": "Yanar Dag near Baku: natural gas seeping through sandstone burns continuously on a hillside; travel and reference sources confirm it still burns"
+},
+{
+"a": "az",
+"k": "culture",
+"t": "アゼルバイジャンの伝統音楽「ムガーム」は、ユネスコの無形文化遺産に登録されている",
+"note": "Azerbaijani Mugham: UNESCO Masterpiece 2003, inscribed on the Representative List 2008"
+},
+{
+"a": "bh",
+"k": "flag",
+"t": "バーレーンの国旗の白いギザギザは5つあり、イスラム教の五行（5つの柱）を表す",
+"note": "Since 2002 the serrated edge has 5 white points representing the Five Pillars of Islam"
+},
+{
+"a": "bh",
+"k": "geo",
+"t": "島国バーレーンは、全長約25kmの海上道路でサウジアラビアとつながっている",
+"note": "King Fahd Causeway, about 25 km, opened 1986"
+},
+{
+"a": "bh",
+"k": "culture",
+"t": "バーレーンはかつて天然真珠の採取で栄え、その歴史を伝える遺産群が世界遺産になっている",
+"note": "UNESCO World Heritage 'Pearling, Testimony of an Island Economy' (2012)"
+},
+{
+"a": "bh",
+"k": "culture",
+"t": "国名「バーレーン」は、アラビア語で「2つの海」という意味",
+"note": "al-Bahrayn = dual of bahr (sea), 'the two seas'"
+},
+{
+"a": "bd",
+"k": "flag",
+"t": "バングラデシュの国旗の赤い円は、風になびいたとき中央に見えるよう少し旗竿寄りにある",
+"note": "Wikipedia 'Flag of Bangladesh': red circle 'offset slightly toward the hoist so that it appears centred when the flag is flying'"
+},
+{
+"a": "bd",
+"k": "geo",
+"t": "バングラデシュの国土の大部分は、ガンジス川とブラマプトラ川が作る世界最大級のデルタ地帯",
+"note": "Ganges-Brahmaputra (Bengal) Delta, among the world's largest, covers most of Bangladesh"
+},
+{
+"a": "bd",
+"k": "culture",
+"t": "2月21日の「国際母語デー」は、現在のバングラデシュで起きたベンガル語を守る運動に由来する",
+"note": "UNESCO International Mother Language Day commemorates the 21 Feb 1952 Bengali Language Movement in Dhaka"
+},
+{
+"a": "bd",
+"k": "culture",
+"t": "国名バングラデシュは、ベンガル語で「ベンガルの国」という意味",
+"note": "Bangla (Bengal/Bengali) + desh (country)"
+},
+{
+"a": "bt",
+"k": "flag",
+"t": "ブータンの国旗には、宝珠をつかんだ白い龍「ドゥク（雷龍）」が描かれている",
+"note": "Druk, the Thunder Dragon, holding norbu (jewels) in its claws"
+},
+{
+"a": "bt",
+"k": "geo",
+"t": "ブータンは憲法で、国土の60%以上を森林として保ち続けることを定めている",
+"note": "Constitution of Bhutan Art. 5(3): minimum 60% of total land maintained under forest cover for all time"
+},
+{
+"a": "bt",
+"k": "culture",
+"t": "ブータンは経済の豊かさだけでなく、「国民総幸福量（GNH）」を大切にする国として有名",
+"note": "Gross National Happiness concept, also referenced in the Constitution (Art. 9)"
+},
+{
+"a": "bt",
+"k": "culture",
+"t": "ブータンの国民食エマ・ダツィは、唐辛子をチーズで煮込んだ激辛料理",
+"note": "Ema datshi: chili peppers stewed in cheese, regarded as the national dish"
+},
+{
+"a": "bn",
+"k": "flag",
+"t": "ブルネイの国旗の黄色は、国を治めるスルタン（国王）を表す色",
+"note": "Yellow field represents the Sultan"
+},
+{
+"a": "bn",
+"k": "geo",
+"t": "ブルネイの国土は、マレーシア領をはさんで東西2つに分かれている",
+"note": "Temburong district separated from the rest of Brunei by Malaysia's Limbang district (Sarawak)"
+},
+{
+"a": "bn",
+"k": "culture",
+"t": "正式な国名ブルネイ・ダルサラームの「ダルサラーム」は「平和の地」という意味",
+"note": "Darussalam = 'abode of peace' in Arabic"
+},
+{
+"a": "bn",
+"k": "culture",
+"t": "ブルネイの首都には水上集落カンポン・アイールがあり、高床の家々が水の上に並ぶ",
+"note": "Kampong Ayer stilt village in Bandar Seri Begawan"
+},
+{
+"a": "kh",
+"k": "flag",
+"t": "カンボジアの国旗の中央には遺跡アンコール・ワットが描かれていて、建物が入った珍しい国旗だ",
+"note": "Angkor Wat depicted in the center; CIA Factbook notes it as a flag incorporating a building (worded as 珍しい, not 唯一)"
+},
+{
+"a": "kh",
+"k": "geo",
+"t": "カンボジアのトンレサップ湖は雨季に面積が数倍に広がり、つながる川の流れが逆向きになる",
+"note": "Tonle Sap expands several-fold in the wet season; the Tonle Sap River reverses direction"
+},
+{
+"a": "kh",
+"k": "culture",
+"t": "アンコール・ワットは世界最大級の宗教建築で、もとはヒンドゥー教の寺院として建てられた",
+"note": "Built in the 12th century as a Vishnu temple; Guinness lists it as the largest religious monument"
+},
+{
+"a": "kh",
+"k": "culture",
+"t": "カンボジアの名物料理アモックは、魚とココナッツミルクをバナナの葉で包んで蒸したもの",
+"note": "Fish amok: steamed fish coconut curry in banana leaf"
+},
+{
+"a": "cn",
+"k": "flag",
+"t": "中国の国旗「五星紅旗」の小さな4つの星は、どれも大きな星のほうを向いている",
+"note": "Official specification: each small star has one point aimed at the large star's center"
+},
+{
+"a": "cn",
+"k": "geo",
+"t": "中国は東西に約5000kmも広がるのに、標準時は「北京時間」ひとつだけ",
+"note": "Single official time zone UTC+8 despite ~5,000+ km east-west extent"
+},
+{
+"a": "cn",
+"k": "geo",
+"t": "野生のジャイアントパンダがすむのは、中国の山岳地帯だけ",
+"note": "Wild giant pandas live only in mountain ranges of Sichuan, Shaanxi and Gansu"
+},
+{
+"a": "cn",
+"k": "culture",
+"t": "紙・印刷術・羅針盤・火薬は、まとめて「中国の四大発明」と呼ばれる",
+"note": "Standard term: Four Great Inventions of China"
+},
+{
+"a": "ge",
+"k": "flag",
+"t": "ジョージアの国旗は、大きな赤い十字と4つの小さな十字が並ぶ「5つの十字の旗」",
+"note": "Known as the Five Cross Flag"
+},
+{
+"a": "ge",
+"k": "geo",
+"t": "ジョージアは西で黒海に面し、北には大コーカサス山脈が連なる",
+"note": "Black Sea coast to the west, Greater Caucasus along the northern border"
+},
+{
+"a": "ge",
+"k": "culture",
+"t": "ジョージアでは約8000年前のワイン造りの跡が見つかっていて、ワイン発祥の地のひとつとされる",
+"note": "2017 PNAS study: wine residue c. 6000 BC at Gadachrili Gora; hedged as ひとつ"
+},
+{
+"a": "ge",
+"k": "culture",
+"t": "日本での呼び名は、2015年に「グルジア」から英語読みの「ジョージア」に変わった",
+"note": "Japanese law amended, effective April 2015, at Georgia's request"
+},
+{
+"a": "in",
+"k": "flag",
+"t": "インドの国旗の中央にある青い法輪「アショーカ・チャクラ」には24本のスポークがある",
+"note": "Navy-blue Ashoka Chakra with 24 spokes"
+},
+{
+"a": "in",
+"k": "geo",
+"t": "ヒマラヤ山脈は、インドを乗せたプレートがユーラシア大陸にぶつかってできた",
+"note": "Formed by collision of the Indian Plate with the Eurasian Plate"
+},
+{
+"a": "in",
+"k": "culture",
+"t": "チェスの起源は、古代インドの盤上遊戯「チャトランガ」だと考えられている",
+"note": "Chaturanga is generally regarded as the ancestor of chess; hedged with 考えられている"
+},
+{
+"a": "in",
+"k": "culture",
+"t": "「ゼロ」を数として計算に使う考え方は、インドの数学で発展した",
+"note": "TIGHTENED (dropped 古代, since Brahmagupta's rules for zero date to 628 CE). Brahmagupta gave arithmetic rules treating zero as a number"
+},
+{
+"a": "id",
+"k": "flag",
+"t": "インドネシアの国旗は上が赤・下が白で、モナコの国旗とそっくりだが縦横の比率が違う",
+"note": "TIGHTENED (no longer says ratio is the ONLY difference). Wikipedia 'Flag of Monaco': graphically similar to Indonesia's, differing in ratio (Monaco 4:5, Indonesia 2:3)"
+},
+{
+"a": "id",
+"k": "geo",
+"t": "インドネシアは1万を超える島々から成る、世界最大の群島国家",
+"note": "World's largest archipelagic state, over 17,000 islands"
+},
+{
+"a": "id",
+"k": "geo",
+"t": "世界最大のトカゲ、コモドオオトカゲはインドネシアの島々にだけ生息している",
+"note": "Komodo dragon, largest living lizard, endemic to Komodo, Rinca, Flores, Gili Motang, Gili Dasami"
+},
+{
+"a": "id",
+"k": "culture",
+"t": "インドネシアのジャワ島にあるボロブドゥールは、世界最大級の仏教寺院遺跡",
+"note": "Borobudur, 9th-century Buddhist temple, UNESCO World Heritage; often cited as the largest Buddhist temple"
+},
+{
+"a": "ir",
+"k": "flag",
+"t": "イランの国旗の緑と赤の帯の縁には、「神は偉大なり」という文字が計22回書かれている",
+"note": "Takbir written 22 times (11 on each band edge) in stylized Kufic"
+},
+{
+"a": "ir",
+"k": "geo",
+"t": "イランのダマーヴァンド山は標高5600mを超え、アジアで最も高い火山とされる",
+"note": "Wikipedia 'Mount Damavand': 5,609 m (all cited figures exceed 5,600 m), 'the highest volcano in Asia'; hedged with とされる due to Kunlun claim"
+},
+{
+"a": "ir",
+"k": "culture",
+"t": "イランの正月「ノウルーズ」は、春分の日に祝われる",
+"note": "Nowruz, Persian New Year, at the vernal equinox"
+},
+{
+"a": "ir",
+"k": "culture",
+"t": "イランは1935年まで、国際的には「ペルシャ」と呼ばれていた",
+"note": "In 1935 the government asked foreign countries to use the name Iran"
+},
+{
+"a": "iq",
+"k": "flag",
+"t": "イラクの国旗の中央には、緑色のアラビア文字で「神は偉大なり」と書かれている",
+"note": "Takbir in green Kufic script on the white band (2008 flag)"
+},
+{
+"a": "iq",
+"k": "geo",
+"t": "イラクを流れるチグリス川とユーフラテス川の間の地域は、古代「メソポタミア（川の間の土地）」と呼ばれた",
+"note": "Mesopotamia = Greek 'land between rivers'"
+},
+{
+"a": "iq",
+"k": "culture",
+"t": "世界最古級の文字である楔形文字は、今のイラクにあたるメソポタミアで生まれた",
+"note": "Cuneiform developed in Sumer (southern Iraq) c. 3200 BC"
+},
+{
+"a": "iq",
+"k": "culture",
+"t": "1時間＝60分のような60進法は、古代メソポタミアのシュメール人にさかのぼる",
+"note": "Sexagesimal system originated with the Sumerians and was passed on via the Babylonians"
+},
+{
+"a": "il",
+"k": "flag",
+"t": "イスラエルの国旗の青い2本線は、ユダヤ教の祈りのショール「タリート」の模様がモチーフ",
+"note": "Flag design based on the stripes of the tallit (prayer shawl)"
+},
+{
+"a": "il",
+"k": "geo",
+"t": "イスラエル北部のガリラヤ湖は海抜マイナス約210mにあり、世界で最も低い淡水湖とされる",
+"note": "Wikipedia 'Sea of Galilee': level fluctuates about 209-215 m below sea level; 'lowest freshwater lake on Earth'"
+},
+{
+"a": "il",
+"k": "culture",
+"t": "ヘブライ語は長く日常会話で使われなかったが、19世紀末から話し言葉として復活した",
+"note": "Revival of Hebrew as a spoken language in the late 19th century (Ben-Yehuda era)"
+},
+{
+"a": "il",
+"k": "culture",
+"t": "少しずつ水を垂らす現代的な「点滴灌漑」は、イスラエルで実用化された農業技術",
+"note": "Modern drip irrigation developed by Simcha Blass and commercialized by Netafim (1965)"
+},
+{
+"a": "jp",
+"k": "flag",
+"t": "日本の国旗「日の丸」の赤い円の直径は、旗の縦の長さの5分の3と決められている",
+"note": "Act on National Flag and Anthem (1999): disc diameter 3/5 of the height"
+},
+{
+"a": "jp",
+"k": "geo",
+"t": "日本最大の湖・琵琶湖は、滋賀県の面積のおよそ6分の1を占めている",
+"note": "Lake Biwa ~669 km2 vs Shiga ~4,017 km2 (about 1/6)"
+},
+{
+"a": "jp",
+"k": "culture",
+"t": "インスタントラーメンは、1958年に日本で発明された",
+"note": "Chicken Ramen by Momofuku Ando, 1958"
+},
+{
+"a": "jp",
+"k": "culture",
+"t": "「emoji（絵文字）」は日本の携帯電話から生まれ、そのまま英語にもなった言葉",
+"note": "Emoji originated on Japanese mobile phones in the late 1990s; entered the Oxford English Dictionary"
+},
+{
+"a": "jo",
+"k": "flag",
+"t": "ヨルダンの国旗の白い七角星は、コーランの最初の章の7つの節を表している",
+"note": "Seven-pointed star = seven verses of Al-Fatiha"
+},
+{
+"a": "jo",
+"k": "geo",
+"t": "ヨルダンが面する死海は塩分がとても濃く、泳がなくても体がぷかぷか浮く",
+"note": "Dead Sea salinity about 34%, very high buoyancy"
+},
+{
+"a": "jo",
+"k": "culture",
+"t": "岩をくりぬいて造られたヨルダンの古代都市ペトラは、映画『インディ・ジョーンズ／最後の聖戦』にも登場した",
+"note": "Petra's Treasury (Al-Khazneh) featured in Indiana Jones and the Last Crusade (1989)"
+},
+{
+"a": "jo",
+"k": "culture",
+"t": "ヨルダンの国民食マンサフは、羊肉を発酵乳のソースで煮込んでご飯にのせた料理",
+"note": "Mansaf: lamb cooked in jameed (fermented dried yogurt) sauce served over rice"
+},
+{
+"a": "kz",
+"k": "flag",
+"t": "カザフスタンの国旗は空色の地に、金色の太陽と翼を広げたワシが描かれている",
+"note": "Sky blue field with golden sun and steppe eagle"
+},
+{
+"a": "kz",
+"k": "geo",
+"t": "カザフスタンは、海に面していない国の中で世界最大の面積をもつ",
+"note": "World's largest landlocked country (~2.72 million km2)"
+},
+{
+"a": "kz",
+"k": "geo",
+"t": "栽培リンゴの祖先とされる野生リンゴは、カザフスタンの天山山脈のふもとなどに自生している",
+"note": "TIGHTENED (Malus sieversii range also covers Kyrgyzstan, Tajikistan, Xinjiang, so made non-exclusive with など). Malus sieversii, primary ancestor of the domestic apple, grows wild in Tian Shan foothills"
+},
+{
+"a": "kz",
+"k": "culture",
+"t": "人類初の有人宇宙飛行でガガーリンが飛び立ったのは、今のカザフスタンにあるバイコヌール",
+"note": "Vostok 1 launched from Baikonur Cosmodrome in 1961 (then USSR, now Kazakhstan territory)"
+},
+{
+"a": "kp",
+"k": "flag",
+"t": "北朝鮮の国旗は青・白・赤・白・青の帯で、白い円の中に赤い星が描かれている",
+"note": "Blue-white-red-white-blue bands with a red star in a white disc"
+},
+{
+"a": "kp",
+"k": "geo",
+"t": "中国との国境にある白頭山は朝鮮半島の最高峰で、山頂にカルデラ湖「天池」がある",
+"note": "Paektu Mountain 2,744 m, highest on the Korean Peninsula; Heaven Lake crater lake"
+},
+{
+"a": "kp",
+"k": "culture",
+"t": "冷たいスープでそば粉の麺を食べる冷麺は、平壌の名物料理として知られる",
+"note": "Pyongyang naengmyeon: buckwheat noodles in cold broth"
+},
+{
+"a": "kp",
+"k": "culture",
+"t": "北朝鮮の開城は高麗王朝の都だった町で、その史跡群は世界遺産に登録されている",
+"note": "Historic Monuments and Sites in Kaesong, UNESCO 2013"
+},
+{
+"a": "kr",
+"k": "flag",
+"t": "韓国の国旗「太極旗」の四隅の記号は、天・地・水・火を表している",
+"note": "Four trigrams geon, gon, gam, ri = heaven, earth, water, fire"
+},
+{
+"a": "kr",
+"k": "geo",
+"t": "韓国の済州島にある漢拏山は標高約1950mで、韓国でいちばん高い山",
+"note": "Hallasan 1,947 m, highest mountain in South Korea"
+},
+{
+"a": "kr",
+"k": "culture",
+"t": "ハングルは15世紀に世宗大王が作った文字で、10月9日は韓国の「ハングルの日」",
+"note": "Hunminjeongeum created 1443 and promulgated 1446 under King Sejong; Hangul Day 9 Oct in South Korea"
+},
+{
+"a": "kr",
+"k": "culture",
+"t": "冬に家族や近所で大量のキムチを漬ける韓国の「キムジャン」は、ユネスコ無形文化遺産",
+"note": "Kimjang, UNESCO Intangible Cultural Heritage 2013"
+},
+{
+"a": "kw",
+"k": "flag",
+"t": "クウェートの国旗の4色の意味は、中世アラブの詩の一節に由来するとされる",
+"note": "TIGHTENED (the colors themselves are pan-Arab; only their meanings come from the poem). Wikipedia 'Flag of Kuwait': 'The colours' meaning came from a poem by Safi al-Din al-Hilli' (14th c.); hedged with とされる"
+},
+{
+"a": "kw",
+"k": "geo",
+"t": "クウェートには、一年中水が流れる川がひとつもない",
+"note": "No permanent rivers, only seasonal wadis"
+},
+{
+"a": "kw",
+"k": "culture",
+"t": "国名クウェートは、アラビア語で「小さな砦」を意味する言葉に由来する",
+"note": "Diminutive of Arabic kut (fortress)"
+},
+{
+"a": "kw",
+"k": "culture",
+"t": "海沿いに立つ3本の塔「クウェート・タワーズ」は、クウェートを代表するシンボル",
+"note": "Kuwait Towers on the Gulf coast, opened 1979, national landmark"
+},
+{
+"a": "kg",
+"k": "flag",
+"t": "キルギスの国旗の太陽は40本の光を放ち、伝説の40の部族を表している",
+"note": "Wikipedia 'Flag of Kyrgyzstan' (current 2023 design): 'forty uniformly spaced rays, representing the forty clans united in legend by Manas'"
+},
+{
+"a": "kg",
+"k": "geo",
+"t": "キルギスのイシク・クル湖は「温かい湖」という意味で、高い山の中にあるのに冬も凍らない",
+"note": "Issyk-Kul ('warm lake'), ~1,600 m elevation, never freezes"
+},
+{
+"a": "kg",
+"k": "culture",
+"t": "キルギスに語り継がれる英雄叙事詩『マナス』は、世界でも指折りの長さをもつ物語",
+"note": "Manas epic, among the longest epic poems in the world; UNESCO Intangible Heritage 2013"
+},
+{
+"a": "kg",
+"k": "culture",
+"t": "白いフェルト製の帽子「カルパック」は、キルギス男性の伝統的なかぶりもの",
+"note": "Ak kalpak, traditional Kyrgyz felt hat for men"
+},
+{
+"a": "la",
+"k": "flag",
+"t": "ラオスの国旗の中央の白い円は、メコン川の上に昇る満月を表す",
+"note": "White disc = full moon over the Mekong River"
+},
+{
+"a": "la",
+"k": "geo",
+"t": "ラオスは、東南アジアで唯一の海に面していない内陸国",
+"note": "Only landlocked country in Southeast Asia"
+},
+{
+"a": "la",
+"k": "culture",
+"t": "ラオスの主食はもち米で、手で小さく丸めておかずと一緒に食べる",
+"note": "Sticky rice (khao niao) is the staple, rolled and eaten by hand"
+},
+{
+"a": "la",
+"k": "culture",
+"t": "ラオスの古都ルアンパバーンでは、早朝にオレンジの衣の僧侶たちが托鉢に歩く",
+"note": "Tak bat morning alms procession in Luang Prabang (UNESCO town)"
+},
+{
+"a": "lb",
+"k": "flag",
+"t": "レバノンの国旗の真ん中に描かれた緑の木は、国の象徴レバノン杉",
+"note": "Lebanese flag: green Lebanon cedar (Cedrus libani) centered on the white band between two red stripes."
+},
+{
+"a": "lb",
+"k": "geo",
+"t": "レバノンの面積は約1万km²で、日本の岐阜県とほぼ同じくらいの広さ",
+"note": "Lebanon 10,452 km2 (countries.js ar); Gifu Prefecture about 10,621 km2. Both figures are stable."
+},
+{
+"a": "lb",
+"k": "culture",
+"t": "アルファベットの祖先とされるフェニキア文字は、今のレバノン沿岸を中心に栄えたフェニキア人が使っていた",
+"note": "Phoenician core cities Byblos, Tyre and Sidon are on the modern Lebanese coast; the Phoenician alphabet is the ancestor of the Greek and Latin alphabets."
+},
+{
+"a": "lb",
+"k": "culture",
+"t": "「レバノン」という国名は「白い」を意味する古い言葉が由来で、雪をかぶったレバノン山脈にちなむ",
+"note": "Name from the Semitic root LBN 'white', referring to the snow-capped Mount Lebanon range."
+},
+{
+"a": "my",
+"k": "flag",
+"t": "マレーシアの国旗の赤白14本の縞は、13の州と連邦政府を表している",
+"note": "Jalur Gemilang: the 14 stripes stand for the equal status of the 13 member states and the federal government."
+},
+{
+"a": "my",
+"k": "geo",
+"t": "マレーシアの国土はマレー半島とボルネオ島北部の2つに分かれ、南シナ海で隔てられている",
+"note": "Peninsular Malaysia and East Malaysia (Sabah, Sarawak on Borneo) are separated by the South China Sea."
+},
+{
+"a": "my",
+"k": "culture",
+"t": "マレーシアの国王は、9つの州の君主の中から5年任期で選ばれる珍しい仕組み",
+"note": "Tightened: the Conference of Rulers elects the Yang di-Pertuan Agong from the nine hereditary state rulers for a five-year term. The rotation is only a convention and reigns can end early (2019 abdication), so '5年ごとに交代で務める' became '5年任期で選ばれる'."
+},
+{
+"a": "my",
+"k": "culture",
+"t": "ココナッツミルクで炊いたご飯「ナシレマ」は、マレーシアの国民食と言われる",
+"note": "Nasi lemak is rice cooked in coconut milk and is widely called Malaysia's national dish; hedged with 'と言われる'."
+},
+{
+"a": "mv",
+"k": "flag",
+"t": "モルディブの国旗は赤地に緑の長方形、その中に白い三日月が描かれている",
+"note": "Maldives flag: red field, central green rectangle, white crescent."
+},
+{
+"a": "mv",
+"k": "geo",
+"t": "モルディブは国内で一番高い場所でも海抜数mほどしかなく、世界一「低い」国とされる",
+"note": "Rewritten: '国土のほとんどが海抜1〜2m' clashed with sources saying most land is under 1 m. Wikipedia Geography of the Maldives gives an average of 1.5-1.8 m and a highest point of 2.4 m or 5.1 m (sources differ, '数m' covers both), and calls it the lowest country with the lowest high point of any country."
+},
+{
+"a": "mv",
+"k": "geo",
+"t": "モルディブは約1200の島々が、26の環礁に分かれて並ぶ島国",
+"note": "About 1,190 coral islands grouped in 26 natural atolls."
+},
+{
+"a": "mv",
+"k": "culture",
+"t": "「環礁」を意味する英語「アトール」は、モルディブの言葉ディベヒ語が語源",
+"note": "English 'atoll' comes from Dhivehi 'atholhu' (OED etymology)."
+},
+{
+"a": "mn",
+"k": "flag",
+"t": "モンゴルの国旗の左側にある黄色い模様は、「ソヨンボ」と呼ばれる国のシンボル",
+"note": "The gold Soyombo symbol sits on the red stripe at the hoist side; it is a national symbol of Mongolia."
+},
+{
+"a": "mn",
+"k": "geo",
+"t": "モンゴルはロシアと中国の2か国だけに囲まれた内陸国",
+"note": "Mongolia is landlocked and borders only Russia and China."
+},
+{
+"a": "mn",
+"k": "geo",
+"t": "モンゴルの首都ウランバートルは、年平均気温が世界で最も低い首都とされる",
+"note": "Ulaanbaatar (annual mean about -1 C) is commonly cited as the coldest national capital; hedged with 'とされる'."
+},
+{
+"a": "mn",
+"k": "culture",
+"t": "モンゴルの夏の祭典ナーダムの主役は、モンゴル相撲・競馬・弓射の伝統の3競技",
+"note": "Tightened: the old wording implied there were only three events, but ankle-bone shooting is now also held. UNESCO describes Naadam as centred on the three games of wrestling, horse racing and archery."
+},
+{
+"a": "mm",
+"k": "flag",
+"t": "ミャンマーの国旗は黄・緑・赤の横3色の真ん中に、大きな白い星が1つ輝く",
+"note": "Flag in use since 2010: yellow-green-red horizontal tricolour with a large white five-pointed star."
+},
+{
+"a": "mm",
+"k": "geo",
+"t": "ミャンマー最大の川エーヤワディー川（イラワジ川）は、国土を北から南へ縦断して流れる",
+"note": "The Ayeyarwady (Irrawaddy), Myanmar's largest river, runs north to south into the Andaman Sea."
+},
+{
+"a": "mm",
+"k": "culture",
+"t": "ミャンマーでは「タナカ」という木の粉を顔に塗る、日焼け止めのような習慣がある",
+"note": "Thanaka paste, made from ground bark, is put on the face as a cosmetic and sun protection."
+},
+{
+"a": "mm",
+"k": "culture",
+"t": "ミャンマーの首都は2000年代半ばに、ヤンゴンから新しく造られたネピドーへ移った",
+"note": "The government moved from Yangon to the purpose-built Naypyidaw in November 2005, and the name was announced in 2006."
+},
+{
+"a": "np",
+"k": "flag",
+"t": "ネパールの国旗は2つの三角形を重ねた形で、世界で唯一四角形ではない国旗",
+"note": "Nepal's flag is two stacked pennants and is the only non-rectangular national flag."
+},
+{
+"a": "np",
+"k": "geo",
+"t": "世界最高峰エベレストは、ネパールと中国の国境にそびえている",
+"note": "Mount Everest lies on the Nepal-China border."
+},
+{
+"a": "np",
+"k": "geo",
+"t": "標高8000mを超える世界の14座のうち、8座がネパール国内か国境にある",
+"note": "Everest, Kangchenjunga, Lhotse, Makalu and Cho Oyu are on the border; Dhaulagiri, Manaslu and Annapurna are inside Nepal. That makes 8. Shishapangma is wholly in China."
+},
+{
+"a": "np",
+"k": "culture",
+"t": "仏教を開いたブッダが生まれたとされるルンビニは、ネパール南部にある",
+"note": "Lumbini, the traditional birthplace of the Buddha, is in southern Nepal and is a UNESCO World Heritage site."
+},
+{
+"a": "om",
+"k": "flag",
+"t": "オマーンの国旗の左上には、短剣ハンジャルと交差した2本の剣の国章が描かれている",
+"note": "The national emblem (a khanjar over two crossed swords) is in the upper hoist corner of the red band."
+},
+{
+"a": "om",
+"k": "geo",
+"t": "オマーンのムサンダム半島は、アラブ首長国連邦をはさんで本土から離れた飛び地",
+"note": "Musandam Governorate is an exclave, separated from mainland Oman by UAE territory."
+},
+{
+"a": "om",
+"k": "culture",
+"t": "オマーン南部は古くから乳香の名産地で、その交易の遺跡は「乳香の土地」として世界遺産に登録",
+"note": "Tightened: the inscribed property is the set of frankincense-trade sites in Dhofar, not all of southern Oman. UNESCO 'Land of Frankincense' (2000)."
+},
+{
+"a": "om",
+"k": "culture",
+"t": "オマーンには「ファラジ」と呼ばれる古い用水路が今も使われ、その一部は世界遺産に登録",
+"note": "Tightened: UNESCO 'Aflaj Irrigation Systems of Oman' (2006) inscribes five representative aflaj, not the whole network, and these are still in use."
+},
+{
+"a": "pk",
+"k": "flag",
+"t": "パキスタンの国旗の左側にある白い帯は、国内の宗教的少数派を表している",
+"note": "The white vertical stripe at the hoist stands for religious minorities; the green field carries a crescent and star."
+},
+{
+"a": "pk",
+"k": "geo",
+"t": "インダス川はパキスタンを北から南へ縦断し、アラビア海に注いでいる",
+"note": "The Indus runs the length of Pakistan to the Arabian Sea near Karachi."
+},
+{
+"a": "pk",
+"k": "culture",
+"t": "古代インダス文明の都市遺跡モヘンジョダロは、パキスタン南部にある",
+"note": "Mohenjo-daro is in Sindh province and is a UNESCO World Heritage site."
+},
+{
+"a": "pk",
+"k": "culture",
+"t": "パキスタンの首都イスラマバードは、1960年代に首都として計画的に造られた都市",
+"note": "Islamabad was planned and built from 1961 to replace Karachi as the capital."
+},
+{
+"a": "ph",
+"k": "flag",
+"t": "フィリピンの国旗は、戦時には青と赤を上下逆にして掲げる決まりがある",
+"note": "Republic Act 8491: in time of war the flag is displayed with the red field on top."
+},
+{
+"a": "ph",
+"k": "geo",
+"t": "フィリピンは7000を超える島々からなる島国で、ルソン島とミンダナオ島が特に大きい",
+"note": "About 7,641 islands; Luzon and Mindanao are the two largest."
+},
+{
+"a": "ph",
+"k": "culture",
+"t": "「フィリピン」という国名は、のちのスペイン国王フェリペ2世の名前に由来する",
+"note": "Villalobos named the islands 'Las Islas Filipinas' in 1543 after Prince Philip, who became Philip II in 1556."
+},
+{
+"a": "ph",
+"k": "culture",
+"t": "フィリピンの家庭料理アドボは、肉を酢としょうゆなどで煮込んだ定番の味",
+"note": "Tightened with 'など': adobo is braised in vinegar, garlic and usually soy sauce, and some variants (adobong puti) have no soy sauce."
+},
+{
+"a": "qa",
+"k": "flag",
+"t": "カタールの国旗は横の長さが縦の約2.5倍もあり、世界で最も横長な国旗",
+"note": "Flag ratio is 11:28 (about 2.55), the widest of any national flag."
+},
+{
+"a": "qa",
+"k": "flag",
+"t": "カタールの国旗の白と海老茶色の境目は、9つの山形のギザギザになっている",
+"note": "A serrated edge with nine white points separates the white and maroon parts."
+},
+{
+"a": "qa",
+"k": "geo",
+"t": "カタールはペルシャ湾に突き出た半島の国で、陸の国境はサウジアラビアとだけ接する",
+"note": "Qatar is a peninsula whose only land border is with Saudi Arabia."
+},
+{
+"a": "qa",
+"k": "culture",
+"t": "2022年、中東で初めてのサッカーW杯がカタールで開催された",
+"note": "The 2022 FIFA World Cup in Qatar was the first held in the Middle East. This is a fixed historical fact."
+},
+{
+"a": "sa",
+"k": "flag",
+"t": "サウジアラビアの国旗には聖なる言葉が書かれているため、半旗にしない決まりがある",
+"note": "The flag carries the Shahada, so it is never flown at half-mast."
+},
+{
+"a": "sa",
+"k": "geo",
+"t": "サウジアラビアには、一年中水が流れ続ける川が一本もない",
+"note": "Saudi Arabia has no permanent rivers, only seasonal wadis."
+},
+{
+"a": "sa",
+"k": "geo",
+"t": "サウジアラビア南部のルブアルハリ砂漠は、世界最大級の砂の砂漠",
+"note": "The Rub' al Khali is among the largest continuous sand deserts; the '最大級' hedge avoids a strict ranking."
+},
+{
+"a": "sa",
+"k": "culture",
+"t": "「サウジアラビア」という国名は「サウード家のアラビア」という意味",
+"note": "The country is named after the House of Saud (al-Mamlaka al-Arabiyya as-Saudiyya)."
+},
+{
+"a": "sg",
+"k": "flag",
+"t": "シンガポールの国旗の5つの星は、民主主義・平和・進歩・正義・平等を表す",
+"note": "This is the official symbolism of the five stars."
+},
+{
+"a": "sg",
+"k": "geo",
+"t": "シンガポールは海の埋め立てによって、独立したころより国土を2割以上も広げてきた",
+"note": "Land area grew from about 581.5 km2 in the 1960s to about 730 km2 today (about +25%), so '2割以上' holds."
+},
+{
+"a": "sg",
+"k": "culture",
+"t": "シンガポールという国名は、サンスクリット語で「ライオンの町」という意味",
+"note": "Singapura comes from Sanskrit simha (lion) + pura (city)."
+},
+{
+"a": "sg",
+"k": "culture",
+"t": "シンガポールの公用語は英語・中国語・マレー語・タミル語の4つ",
+"note": "Four official languages: English, Mandarin, Malay and Tamil."
+},
+{
+"a": "lk",
+"k": "flag",
+"t": "スリランカの国旗には、剣を持った金色のライオンが描かれている",
+"note": "Lion Flag: a golden lion holding a sword on a maroon field."
+},
+{
+"a": "lk",
+"k": "geo",
+"t": "スリランカの首都スリジャヤワルダナプラコッテは、最大都市コロンボのすぐ隣にある",
+"note": "Sri Jayawardenepura Kotte borders Colombo, inside the Colombo metropolitan area."
+},
+{
+"a": "lk",
+"k": "culture",
+"t": "スリランカの旧国名はセイロンで、紅茶「セイロンティー」にその名が残る",
+"note": "The country was called Ceylon until 1972, and Ceylon tea keeps the name."
+},
+{
+"a": "lk",
+"k": "culture",
+"t": "スリランカのシーギリヤには、巨大な岩山の上に築かれた古代の王宮跡がある",
+"note": "Sigiriya is a 5th-century rock fortress and palace and a UNESCO World Heritage site."
+},
+{
+"a": "sy",
+"k": "flag",
+"t": "シリアの国旗は横3色に星を並べたデザインで、汎アラブ色の赤・白・黒・緑が使われている",
+"note": "True of both the earlier flag (red-white-black with two green stars) and the current one (green-white-black with three red stars, set in the 2025 constitutional declaration). The wording is version-neutral and politically neutral."
+},
+{
+"a": "sy",
+"k": "geo",
+"t": "トルコから流れ出るユーフラテス川は、シリアを横切ってイラクへと流れる",
+"note": "The Euphrates rises in Turkey, crosses Syria and flows on into Iraq."
+},
+{
+"a": "sy",
+"k": "culture",
+"t": "シリアの首都ダマスカスは、世界で最も古くから人が住み続けている都市の一つとされる",
+"note": "Damascus is commonly cited among the oldest continuously inhabited cities; hedged with '一つとされる'."
+},
+{
+"a": "sy",
+"k": "culture",
+"t": "オリーブオイルとローレルの油で作る「アレッポの石けん」は、シリア北部の伝統品",
+"note": "Aleppo soap is made from olive oil and laurel oil, and Aleppo is in northern Syria."
+},
+{
+"a": "tj",
+"k": "flag",
+"t": "タジキスタンの国旗の中央には、王冠とその上に弧を描いて並ぶ7つの星が描かれている",
+"note": "A gold crown sits under an arc of seven stars in the central white band (FOTW flag description)."
+},
+{
+"a": "tj",
+"k": "geo",
+"t": "タジキスタンは国土の9割以上が山で、「世界の屋根」パミール高原が広がる",
+"note": "About 93% of the country is mountainous, and the Pamirs are called the Roof of the World."
+},
+{
+"a": "tj",
+"k": "culture",
+"t": "タジキスタンの首都ドゥシャンベは、タジク語で「月曜日」という意味",
+"note": "Dushanbe means Monday, after a village that held a Monday market."
+},
+{
+"a": "tj",
+"k": "culture",
+"t": "タジキスタンの公用語タジク語は、ペルシャ語にとても近い言葉",
+"note": "Tajik is a variety of Persian written in Cyrillic."
+},
+{
+"a": "th",
+"k": "flag",
+"t": "タイの国旗は赤・白・青の5本の横縞で、「トン・トライロン（三色旗）」と呼ばれる",
+"note": "Thong Trairong: five horizontal stripes, red-white-blue-white-red."
+},
+{
+"a": "th",
+"k": "geo",
+"t": "タイの大河チャオプラヤー川は、首都バンコクの街を流れてタイ湾に注ぐ",
+"note": "The Chao Phraya flows through Bangkok into the Gulf of Thailand."
+},
+{
+"a": "th",
+"k": "culture",
+"t": "タイは東南アジアで唯一、ヨーロッパ諸国の植民地にならなかった国",
+"note": "Thailand (Siam) is the only Southeast Asian country never colonised by a European power."
+},
+{
+"a": "th",
+"k": "culture",
+"t": "首都バンコクのタイ語での正式名称はとても長く、ふだんは「クルンテープ」と略される",
+"note": "The ceremonial name 'Krung Thep Maha Nakhon...' is usually shortened to Krung Thep."
+},
+{
+"a": "tl",
+"k": "flag",
+"t": "東ティモールの国旗の白い星は「行く手を照らす光」を表し、白は平和の色とされる",
+"note": "Constitution s.15 as quoted on Wikipedia 'Flag of Timor-Leste': 'The white star, or \"the light that guides\", is white to represent peace.'"
+},
+{
+"a": "tl",
+"k": "geo",
+"t": "東ティモールはティモール島の東半分に加え、島の西側にオエクシという飛び地を持つ",
+"note": "The Oecusse exclave lies on the north coast of West Timor."
+},
+{
+"a": "tl",
+"k": "culture",
+"t": "東ティモールは2002年に独立した、21世紀で最初に誕生した独立国",
+"note": "Independence was restored on 20 May 2002, making it the first new sovereign state of the 21st century."
+},
+{
+"a": "tl",
+"k": "culture",
+"t": "東ティモールの公用語は、テトゥン語とポルトガル語の2つ",
+"note": "The constitution names Tetum and Portuguese as the official languages."
+},
+{
+"a": "tr",
+"k": "flag",
+"t": "トルコの国旗は赤地に白い三日月と星で、「アイ・ユルドゥズ（月星）」と呼ばれる",
+"note": "The Turkish flag's nickname is Ay Yildiz (moon star)."
+},
+{
+"a": "tr",
+"k": "geo",
+"t": "トルコ最大の都市イスタンブールは、ボスポラス海峡をはさんでヨーロッパとアジアにまたがる",
+"note": "Istanbul lies on both sides of the Bosphorus, in Europe and Asia."
+},
+{
+"a": "tr",
+"k": "culture",
+"t": "トルコの首都はイスタンブールではなく、内陸の都市アンカラ",
+"note": "Ankara has been the capital since 1923."
+},
+{
+"a": "tr",
+"k": "culture",
+"t": "サンタクロースのモデル聖ニコラオスは、今のトルコ南部にあった町ミラの司教だった",
+"note": "Saint Nicholas was bishop of Myra (modern Demre, Antalya Province)."
+},
+{
+"a": "tm",
+"k": "flag",
+"t": "トルクメニスタンの国旗には、伝統的な絨毯の模様が5つ縦に並んで描かれている",
+"note": "A vertical band at the hoist holds five carpet guls of the major tribes."
+},
+{
+"a": "tm",
+"k": "geo",
+"t": "トルクメニスタンの国土の大部分は、カラクム砂漠に覆われている",
+"note": "The Karakum Desert covers about 70% or more of the country."
+},
+{
+"a": "tm",
+"k": "culture",
+"t": "美しい毛並みで知られる名馬「アハルテケ」は、トルクメニスタン原産",
+"note": "The Akhal-Teke breed, known for its metallic-sheen coat, is native to Turkmenistan."
+},
+{
+"a": "tm",
+"k": "culture",
+"t": "トルクメニスタンの首都アシガバットは、白い大理石の建物が立ち並ぶ街並みで知られる",
+"note": "Ashgabat is known as the white-marble city and holds a Guinness record for the density of white-marble buildings."
+},
+{
+"a": "ae",
+"k": "flag",
+"t": "アラブ首長国連邦の国旗は、赤・緑・白・黒の汎アラブ色を使ったデザイン",
+"note": "A red vertical band at the hoist with green-white-black horizontal stripes, all Pan-Arab colours."
+},
+{
+"a": "ae",
+"k": "geo",
+"t": "アラブ首長国連邦は、ペルシャ湾とオマーン湾の両方の海に面している",
+"note": "The UAE has coastline on the Persian Gulf and on the Gulf of Oman (Fujairah)."
+},
+{
+"a": "ae",
+"k": "culture",
+"t": "アラブ首長国連邦は、アブダビやドバイなど7つの首長国が集まった連邦国家",
+"note": "The UAE is a federation of seven emirates."
+},
+{
+"a": "ae",
+"k": "culture",
+"t": "アラブ首長国連邦の首都は、有名なドバイではなくアブダビ",
+"note": "The capital is Abu Dhabi."
+},
+{
+"a": "uz",
+"k": "flag",
+"t": "ウズベキスタンの国旗の12個の星は、ウズベクの歴史的な伝統と古代の太陽暦を表す",
+"note": "Rewritten to match the official text: gov.uz/en/pages/symbols says the twelve stars 'signify the historical traditions of the Uzbek people, as well as ancient solar calendar'. The '12か月' reading was an interpretation."
+},
+{
+"a": "uz",
+"k": "geo",
+"t": "ウズベキスタンは隣の国もすべて海に面していない「二重内陸国」で、こうした国は世界に2つしかない",
+"note": "The only doubly landlocked countries are Uzbekistan and Liechtenstein; the Caspian counts as a lake."
+},
+{
+"a": "uz",
+"k": "culture",
+"t": "シルクロードの要衝サマルカンドは、青いタイルの美しさから「青の都」と呼ばれる",
+"note": "Samarkand is a Silk Road city famed for blue-tiled architecture, and '青の都' is its common Japanese nickname. UNESCO site."
+},
+{
+"a": "uz",
+"k": "culture",
+"t": "肉と米を炊き込んだ「プロフ」はウズベキスタンの国民食で、無形文化遺産にも登録",
+"note": "'Palov culture and tradition' of Uzbekistan was inscribed as UNESCO intangible heritage in 2016."
+},
+{
+"a": "vn",
+"k": "flag",
+"t": "ベトナムの国旗は赤地に黄色い星で、「金星紅旗」と呼ばれる",
+"note": "Co do sao vang (red flag with a yellow star); the Japanese name is 金星紅旗."
+},
+{
+"a": "vn",
+"k": "geo",
+"t": "ベトナムは南北に細長いS字型の国で、長い海岸線を持つ",
+"note": "Vietnam is S-shaped with a coastline of about 3,260 km."
+},
+{
+"a": "vn",
+"k": "geo",
+"t": "石灰岩の島々が海に浮かぶハロン湾は、ベトナムを代表する世界遺産",
+"note": "Ha Long Bay's limestone karst islands are a UNESCO World Heritage site."
+},
+{
+"a": "vn",
+"k": "culture",
+"t": "ベトナム語はアルファベットに声調記号などを付けた「クオック・グー」で書かれる",
+"note": "Chu Quoc Ngu is a Latin-based script with diacritics that mark tones."
+},
+{
+"a": "ye",
+"k": "flag",
+"t": "イエメンの国旗は赤・白・黒の横3色だけの、とてもシンプルなデザイン",
+"note": "A plain red-white-black horizontal tricolour with no emblem."
+},
+{
+"a": "ye",
+"k": "geo",
+"t": "イエメンのソコトラ島には、傘のような形をした「竜血樹」が生える独特の自然がある",
+"note": "The umbrella-shaped dragon's blood tree (Dracaena cinnabari) is endemic to Socotra, a UNESCO natural site."
+},
+{
+"a": "ye",
+"k": "culture",
+"t": "コーヒーの「モカ」という名前は、イエメンの港町モカに由来する",
+"note": "Mocha coffee is named after the Red Sea port of Mocha (al-Makha)."
+},
+{
+"a": "ye",
+"k": "culture",
+"t": "イエメンのシバームは泥れんがの高層住宅が並び、「砂漠のマンハッタン」と呼ばれる",
+"note": "The Old Walled City of Shibam, with its mud-brick tower houses, is a UNESCO site."
+},
+{
+"a": "al",
+"k": "flag",
+"t": "アルバニアの国旗は赤地に黒い双頭の鷲で、英雄スカンデルベグの紋章に由来するとされる",
+"note": "Albanian flag: black double-headed eagle on red, traditionally derived from Skanderbeg's 15th-century emblem; hedged with とされる."
+},
+{
+"a": "al",
+"k": "culture",
+"t": "アルバニア人は自国を「シュチパリア」と呼び、「鷲の国」という意味だと言われる",
+"note": "Endonym Shqipëria; the 'land of the eagles' reading is a popular (folk) etymology, so it is hedged with と言われる."
+},
+{
+"a": "al",
+"k": "culture",
+"t": "ティラナの国際空港には、アルバニア系のマザー・テレサの名前が付けられている",
+"note": "Official name 'Tirana International Airport Nënë Tereza'; Mother Teresa was ethnically Albanian (born in Skopje), so アルバニア系 is accurate."
+},
+{
+"a": "al",
+"k": "geo",
+"t": "アルバニアはアドリア海とイオニア海、2つの海に面している",
+"note": "Albania's coast runs along the Adriatic (north) and the Ionian Sea (south of the Strait of Otranto)."
+},
+{
+"a": "ad",
+"k": "flag",
+"t": "アンドラの国旗は青・黄・赤の縦三色旗で、中央の紋章がルーマニア国旗との大きな違い",
+"note": "Andorra's vertical blue-yellow-red tricolour carries the coat of arms in the centre; Romania's otherwise similar flag has none."
+},
+{
+"a": "ad",
+"k": "geo",
+"t": "アンドラはピレネー山脈にある内陸国で、首都はヨーロッパで最も標高が高い",
+"note": "Landlocked between France and Spain in the Pyrenees; Andorra la Vella (about 1,023 m) is the standard example of Europe's highest capital."
+},
+{
+"a": "ad",
+"k": "culture",
+"t": "アンドラの元首は「共同大公」と呼ばれ、フランス大統領とスペインのウルヘル司教の2人が務める",
+"note": "Under the 1993 Andorran Constitution the co-princes are the President of France and the Bishop of Urgell (seat at La Seu d'Urgell, Spain)."
+},
+{
+"a": "ad",
+"k": "culture",
+"t": "アンドラは、カタルーニャ語だけを公用語にしている世界で唯一の国",
+"note": "Catalan is Andorra's only official language (Constitution art. 2); everywhere else it is co-official at most."
+},
+{
+"a": "at",
+"k": "flag",
+"t": "オーストリア国旗の赤白赤は、血に染まった公爵の服がベルト部分だけ白く残った伝説に由来",
+"note": "The well-known legend of Duke Leopold V at the Siege of Acre (1191); presented explicitly as 伝説."
+},
+{
+"a": "at",
+"k": "geo",
+"t": "オーストリアは海のない内陸国で、国土の大部分をアルプス山脈が占める",
+"note": "Austria is landlocked; the Alps cover about 62% of its territory."
+},
+{
+"a": "at",
+"k": "culture",
+"t": "作曲家モーツァルトは、現在のオーストリアにあるザルツブルクで生まれた",
+"note": "Mozart was born in Salzburg in 1756. Salzburg was then an independent prince-archbishopric, hence 現在の."
+},
+{
+"a": "at",
+"k": "culture",
+"t": "「ウィンナーソーセージ」の「ウィンナー」は、ドイツ語で「ウィーンの」という意味",
+"note": "German 'Wiener' is the adjective 'of Vienna' (Wien)."
+},
+{
+"a": "by",
+"k": "flag",
+"t": "ベラルーシの国旗は、左端に赤と白の伝統的な刺繍模様が縦に入っている",
+"note": "The official red and green flag has a vertical red-on-white traditional ornament (rushnyk pattern) at the hoist. This is a neutral description of the official flag."
+},
+{
+"a": "by",
+"k": "geo",
+"t": "ベラルーシは海のない内陸国だが、国内には1万を超える湖があるとされる",
+"note": "TIGHTENED (added とされる). Belarus is landlocked. Wikipedia 'Geography of Belarus' (Water resources) gives about 11,000 lakes, and Belarusian government sources say more than 10,000. Its intro gives a lower 4,000, so the claim is hedged."
+},
+{
+"a": "by",
+"k": "geo",
+"t": "ベラルーシとポーランドの国境にまたがる「ビャウォヴィエジャの森」には、ヨーロッパバイソンが暮らす",
+"note": "This UNESCO transboundary site spans Belarus and Poland and is the best-known home of the European bison (wisent)."
+},
+{
+"a": "by",
+"k": "culture",
+"t": "ベラルーシの国名の「ベラ」は、「白い」という意味の言葉に由来する",
+"note": "Belarus means 'White Rus'', from bel-/biel- meaning 'white'."
+},
+{
+"a": "be",
+"k": "flag",
+"t": "ベルギー国旗の黒・黄・赤は、ブラバント公国の紋章「黒地に赤い爪の金色のライオン」に由来",
+"note": "The arms of the Duchy of Brabant are 'Sable, a lion Or, armed and langued Gules', the source of the 1830/1831 tricolour."
+},
+{
+"a": "be",
+"k": "culture",
+"t": "ベルギーの公用語は、オランダ語・フランス語・ドイツ語の3つ",
+"note": "Belgium has three official/national languages under the constitutional language-region system."
+},
+{
+"a": "be",
+"k": "culture",
+"t": "ブリュッセルの小便小僧は衣装持ちで、その数は1000着を超える",
+"note": "The GardeRobe MannekenPis museum in Brussels holds over 1,000 costumes. The number only increases, so the claim stays true."
+},
+{
+"a": "be",
+"k": "geo",
+"t": "ベルギーのバールレ=ヘルトフはオランダの中に飛び地が点在し、家の中を国境が通る場所もある",
+"note": "Baarle-Hertog consists largely of Belgian enclaves inside the Netherlands (Baarle-Nassau), and the border runs through some houses and shops."
+},
+{
+"a": "ba",
+"k": "flag",
+"t": "ボスニア・ヘルツェゴビナ国旗の黄色い三角形は、国土のおおまかな形を表しているとされる",
+"note": "TIGHTENED (added とされる). The triangle is described as approximating the country's shape, and its three points are also said to stand for the constituent peoples."
+},
+{
+"a": "ba",
+"k": "geo",
+"t": "ボスニア・ヘルツェゴビナの海岸線は、ネウム周辺のわずか20kmほどしかない",
+"note": "BiH's only coast is about 20 km around Neum (CIA World Factbook: 20 km)."
+},
+{
+"a": "ba",
+"k": "culture",
+"t": "モスタルの古い橋「スタリ・モスト」では、約20mの高さから川へ飛び込む伝統がある",
+"note": "Wikipedia 'Stari Most': clearance of about 20 m at mid-span (varies with water level; the text says it stands 24 m over the river). Diving from it is a long-standing local tradition, with a formal competition since 1968."
+},
+{
+"a": "ba",
+"k": "culture",
+"t": "ボスニア・ヘルツェゴビナの首都サラエボでは、1984年に冬季オリンピックが開かれた",
+"note": "The XIV Olympic Winter Games were held in Sarajevo in February 1984."
+},
+{
+"a": "bg",
+"k": "flag",
+"t": "ブルガリア国旗は白・緑・赤の横三色旗で、緑は豊かな大地と農業を表すとされる",
+"note": "In the common interpretation white stands for peace, green for fertile land and agriculture, and red for courage; hedged."
+},
+{
+"a": "bg",
+"k": "culture",
+"t": "ブルガリアでは伝統的に、首を縦に振ると「いいえ」、横に振ると「はい」の意味になる",
+"note": "TIGHTENED (added 伝統的に, since some younger or internationally exposed people adapt). The reversed nod/shake convention is well documented for Bulgaria."
+},
+{
+"a": "bg",
+"k": "culture",
+"t": "ヨーグルトに使われる乳酸菌「ブルガリクス菌」は、ブルガリアにちなんで名付けられた",
+"note": "Lactobacillus delbrueckii subsp. bulgaricus was identified by the Bulgarian Stamen Grigorov and named after Bulgaria."
+},
+{
+"a": "bg",
+"k": "geo",
+"t": "ブルガリアのムサラ山(標高2925m)は、バルカン半島で最も高い山",
+"note": "Musala (Rila, 2,925 m) is the highest peak of Bulgaria and of the Balkan Peninsula, just above Mt Olympus (2,918 m)."
+},
+{
+"a": "hr",
+"k": "flag",
+"t": "クロアチア国旗の中央には、赤と白のチェック模様の紋章が描かれている",
+"note": "The šahovnica red-white checkerboard coat of arms sits at the centre of the flag."
+},
+{
+"a": "hr",
+"k": "culture",
+"t": "ネクタイの起源はクロアチア兵が首に巻いた布とされ、「クラバット」の語源にもなった",
+"note": "Neckerchiefs of 17th-century Croatian mercenaries in France; French 'cravate' comes from 'Croate'. Hedged with とされ."
+},
+{
+"a": "hr",
+"k": "culture",
+"t": "犬種「ダルメシアン」の名前は、クロアチアのダルマチア地方に由来する",
+"note": "The Dalmatian breed is named after Dalmatia on the Croatian coast."
+},
+{
+"a": "hr",
+"k": "geo",
+"t": "クロアチアのアドリア海沿岸には、岩礁まで含めると1000を超える島々が点在する",
+"note": "The official count of 1,244 is 78 islands, 524 islets and 642 rocks/reefs, so 岩礁まで含めると is required for 1000超."
+},
+{
+"a": "cy",
+"k": "flag",
+"t": "キプロスの国旗には島の形が銅色で描かれ、その下に平和を表す2本のオリーブの枝がある",
+"note": "The flag shows a copper-orange map of the whole island above two crossed olive branches (peace). Neutral description."
+},
+{
+"a": "cy",
+"k": "culture",
+"t": "「銅」を意味する英語「copper」は、銅の産地だったキプロスの名に由来するとされる",
+"note": "Latin cuprum comes from aes Cyprium, 'metal of Cyprus', an ancient copper source. Hedged."
+},
+{
+"a": "cy",
+"k": "culture",
+"t": "愛の女神アフロディーテは海の泡から生まれ、キプロス島にたどり着いたとギリシャ神話で語られる",
+"note": "REWORDED. In Hesiod's Theogony Aphrodite arises from sea foam, passes Cythera and comes ashore on Cyprus (Petra tou Romiou tradition). The old wording 'born from Cyprus's sea foam' ignored the Cythera variant."
+},
+{
+"a": "cy",
+"k": "geo",
+"t": "キプロス島は、シチリア島・サルデーニャ島に次ぐ地中海で3番目に大きな島",
+"note": "By area the Mediterranean's largest islands are Sicily (about 25,700 km²), Sardinia (about 24,100) and Cyprus (about 9,250)."
+},
+{
+"a": "cz",
+"k": "flag",
+"t": "チェコの国旗は、旧チェコスロバキアの国旗をそのまま受け継いでいる",
+"note": "The Czech Republic kept the 1920 Czechoslovak flag after the 1993 dissolution."
+},
+{
+"a": "cz",
+"k": "culture",
+"t": "「ロボット」という言葉は、チェコの作家カレル・チャペックの戯曲から生まれた",
+"note": "The word was introduced in Karel Čapek's play R.U.R. (1920) and coined by his brother Josef."
+},
+{
+"a": "cz",
+"k": "culture",
+"t": "世界中で飲まれるピルスナービールは、チェコのプルゼニ(ピルゼン)で生まれた",
+"note": "The first pilsner was brewed in Plzeň in 1842 (Pilsner Urquell)."
+},
+{
+"a": "cz",
+"k": "geo",
+"t": "チェコは海のない内陸国だが、エルベ川(ラベ川)を通じて北海とつながっている",
+"note": "The Elbe (Labe) rises in Czechia and flows through Germany into the North Sea at Cuxhaven."
+},
+{
+"a": "dk",
+"k": "flag",
+"t": "デンマーク国旗「ダンネブロ」は、今も使われる国旗の中で最も古いとされる",
+"note": "The Dannebrog is widely cited (incl. Guinness) as the oldest national flag in continuous use. Hedged."
+},
+{
+"a": "dk",
+"k": "culture",
+"t": "ブロック玩具レゴはデンマーク生まれで、名前は「よく遊べ」という意味の言葉から",
+"note": "LEGO comes from the Danish 'leg godt' ('play well'); the company was founded in Billund."
+},
+{
+"a": "dk",
+"k": "culture",
+"t": "童話作家アンデルセンは、デンマークのオーデンセで生まれた",
+"note": "Hans Christian Andersen was born in Odense on 2 April 1805."
+},
+{
+"a": "dk",
+"k": "geo",
+"t": "デンマーク本土は最高地点でも標高200mに満たず、全体的に平らな土地",
+"note": "The highest natural point Møllehøj is about 171 m. 本土 excludes Greenland and the Faroe Islands."
+},
+{
+"a": "ee",
+"k": "flag",
+"t": "エストニア国旗の青・黒・白は、空・大地・雪を表すと言われる",
+"note": "A popular interpretation (Visit Estonia); hedged with と言われる."
+},
+{
+"a": "ee",
+"k": "culture",
+"t": "通話アプリ「Skype」の開発には、エストニアの技術者たちが深く関わった",
+"note": "Skype's software was written by the Estonian developers Ahti Heinla, Priit Kasesalu and Jaan Tallinn."
+},
+{
+"a": "ee",
+"k": "culture",
+"t": "エストニアは2005年、世界で初めて全国規模の選挙でインターネット投票を行った",
+"note": "The 2005 nationwide local elections were the world's first legally binding nationwide elections with internet voting."
+},
+{
+"a": "ee",
+"k": "geo",
+"t": "エストニアには2000を超える島があり、最大の島はサーレマー島",
+"note": "Recent Estonian Land Board counts give 2,222 (2015) and 2,355 (Wikipedia 'List of islands of Estonia'), so 2000超 holds either way. Saaremaa (about 2,673 km²) is the largest."
+},
+{
+"a": "fi",
+"k": "flag",
+"t": "フィンランド国旗の青い十字は湖と空、白は雪を表すとされる",
+"note": "Common interpretation of the blue Nordic cross on white; hedged."
+},
+{
+"a": "fi",
+"k": "geo",
+"t": "フィンランドは「森と湖の国」と呼ばれ、湖の数は18万以上もある",
+"note": "The Finnish Environment Institute counts about 188,000 lakes (over 5 ares)."
+},
+{
+"a": "fi",
+"k": "culture",
+"t": "「サウナ」はフィンランド語で、フィンランドのサウナ文化はユネスコ無形文化遺産にもなった",
+"note": "'Sauna' is a Finnish loanword. Sauna culture in Finland was inscribed on the UNESCO Intangible Heritage list in December 2020."
+},
+{
+"a": "fi",
+"k": "culture",
+"t": "ムーミンの作者トーベ・ヤンソンは、フィンランドの作家・画家",
+"note": "Tove Jansson (1914-2001) was a Finnish (Swedish-speaking) author and artist."
+},
+{
+"a": "fr",
+"k": "flag",
+"t": "フランス国旗の青と赤はパリ市の色、白はかつての王家の色に由来するとされる",
+"note": "Standard account of the Revolutionary tricolore (Paris blue and red plus Bourbon white); hedged."
+},
+{
+"a": "fr",
+"k": "geo",
+"t": "フランス本土はその形から、「六角形(エグザゴーヌ)」という愛称で呼ばれる",
+"note": "Metropolitan France is commonly called l'Hexagone."
+},
+{
+"a": "fr",
+"k": "culture",
+"t": "フランスでは4月1日に、紙で作った魚を人の背中にこっそり貼るいたずらをする",
+"note": "The poisson d'avril April Fools' tradition."
+},
+{
+"a": "fr",
+"k": "culture",
+"t": "エッフェル塔は、1889年のパリ万国博覧会に合わせて建てられた",
+"note": "Built as the entrance arch for the 1889 Exposition Universelle."
+},
+{
+"a": "de",
+"k": "flag",
+"t": "ドイツ国旗の黒・赤・金は、ナポレオン戦争時の義勇軍の軍服の色に由来するとされる",
+"note": "Commonly traced to the uniforms of the Lützow Free Corps (black with red facings and gold buttons, 1813); hedged."
+},
+{
+"a": "de",
+"k": "geo",
+"t": "ドイツはデンマークやフランスなど、9つの国と国境を接している",
+"note": "Germany's neighbours are Denmark, Poland, Czechia, Austria, Switzerland, France, Luxembourg, Belgium and the Netherlands (9)."
+},
+{
+"a": "de",
+"k": "culture",
+"t": "ヨーロッパで活版印刷を広めたグーテンベルクは、ドイツのマインツ出身",
+"note": "Johannes Gutenberg was born in Mainz and built his printing press around 1450. Movable type existed earlier in East Asia, hence ヨーロッパで."
+},
+{
+"a": "de",
+"k": "culture",
+"t": "ミュンヘンのオクトーバーフェストは、1810年のバイエルン王太子の結婚祝いが始まり",
+"note": "It began with the celebrations for Crown Prince Ludwig of Bavaria's wedding to Therese of Saxe-Hildburghausen on 12 October 1810."
+},
+{
+"a": "gr",
+"k": "flag",
+"t": "ギリシャ国旗の9本の縞は、「自由か死か」というギリシャ語の9音節を表すとされる",
+"note": "Popular explanation: 'Eleftheria i Thanatos' has nine syllables. Hedged."
+},
+{
+"a": "gr",
+"k": "geo",
+"t": "ギリシャには大小合わせて約6000もの島や小島があるとされる",
+"note": "TIGHTENED. The about-6,000 islands and islets figure is widely cited. The inhabited-island figure (227 vs 166 or less in other counts) changes and varies by source, so it was removed."
+},
+{
+"a": "gr",
+"k": "geo",
+"t": "神々が住むとされたオリンポス山は、ギリシャで最も高い山",
+"note": "Mount Olympus (Mytikas, about 2,918 m) is Greece's highest peak."
+},
+{
+"a": "gr",
+"k": "culture",
+"t": "オリンピックの起源は、古代ギリシャのオリンピアで開かれた競技祭",
+"note": "The ancient Olympic Games at Olympia (traditionally from 776 BC) inspired the modern Games."
+},
+{
+"a": "va",
+"k": "flag",
+"t": "バチカンの国旗は、スイスと並んで世界に2つしかない正方形の国旗",
+"note": "Only Vatican City and Switzerland have square (1:1) national flags."
+},
+{
+"a": "va",
+"k": "geo",
+"t": "バチカンは面積が0.5km²にも満たない、世界で最も小さな国",
+"note": "Its area is 0.44 km² traditionally and 0.49 km² in newer figures, under 0.5 km² either way. Smallest sovereign state."
+},
+{
+"a": "va",
+"k": "geo",
+"t": "バチカンは周りをすべてイタリアの首都ローマに囲まれている",
+"note": "Vatican City is an enclave entirely within the city of Rome."
+},
+{
+"a": "va",
+"k": "culture",
+"t": "ローマ教皇を守る衛兵は伝統的にスイス人で、1506年から続いている",
+"note": "The Pontifical Swiss Guard was founded in 1506 under Pope Julius II; recruits must be Swiss citizens."
+},
+{
+"a": "hu",
+"k": "flag",
+"t": "ハンガリー国旗は赤・白・緑の横三色旗で、赤は力、白は忠誠、緑は希望を表すとされる",
+"note": "Common interpretation of the Hungarian tricolour; hedged."
+},
+{
+"a": "hu",
+"k": "culture",
+"t": "パズルの「ルービックキューブ」は、ハンガリーのルービック・エルネーが発明した",
+"note": "Invented by Ernő Rubik in Budapest in 1974; the Japanese spelling uses Hungarian name order."
+},
+{
+"a": "hu",
+"k": "culture",
+"t": "ハンガリーでは日本と同じように、名字を先、名前を後に書く",
+"note": "Hungarian uses Eastern name order (family name first)."
+},
+{
+"a": "hu",
+"k": "geo",
+"t": "バラトン湖は中央ヨーロッパ最大の湖で、「ハンガリーの海」と呼ばれる",
+"note": "Lake Balaton (about 592 km²) is Central Europe's largest lake, nicknamed 'magyar tenger'."
+},
+{
+"a": "is",
+"k": "flag",
+"t": "アイスランド国旗の赤は火山の炎、白は氷と雪を表すとされる",
+"note": "Common interpretation of the red cross edged in white on blue; hedged."
+},
+{
+"a": "is",
+"k": "geo",
+"t": "アイスランドは、北米プレートとユーラシアプレートの境目の上にある島",
+"note": "Iceland sits on the Mid-Atlantic Ridge, and the rift between the plates is visible at Þingvellir."
+},
+{
+"a": "is",
+"k": "geo",
+"t": "間欠泉を意味する英語「geyser」は、アイスランドの間欠泉「ゲイシール」が語源",
+"note": "English 'geyser' derives from Geysir in Haukadalur, Iceland."
+},
+{
+"a": "is",
+"k": "culture",
+"t": "アイスランドでは多くの人が名字を持たず、父親の名前に「息子」「娘」を付けて名乗る",
+"note": "Patronymic naming (-son / -dóttir) is the norm in Iceland. 多くの人 allows for family names and matronymics."
+},
+{
+"a": "ie",
+"k": "flag",
+"t": "アイルランド国旗の緑・白・橙は、コートジボワール国旗と色の並びが左右逆",
+"note": "Ireland has green at the hoist and Côte d'Ivoire has orange at the hoist."
+},
+{
+"a": "ie",
+"k": "geo",
+"t": "アイルランドは緑豊かな景色から「エメラルドの島」と呼ばれる",
+"note": "'The Emerald Isle' is a well-known nickname."
+},
+{
+"a": "ie",
+"k": "culture",
+"t": "ハロウィンの起源は古代ケルトの祭り「サウィン」とされ、アイルランドとゆかりが深い",
+"note": "Halloween is traced to the Gaelic festival Samhain; hedged with とされ."
+},
+{
+"a": "ie",
+"k": "culture",
+"t": "アイルランドの国章は竪琴(ハープ)で、ユーロ硬貨にもハープが描かれている",
+"note": "The harp is Ireland's state emblem and appears on the national side of all Irish euro coins."
+},
+{
+"a": "it",
+"k": "flag",
+"t": "イタリア国旗は緑・白・赤の縦三色旗で、「トリコローレ(三色)」と呼ばれる",
+"note": "The Italian flag is known as Il Tricolore."
+},
+{
+"a": "it",
+"k": "geo",
+"t": "イタリア半島は、長靴のような形をしていることで有名",
+"note": "The boot shape of the Italian peninsula is well known."
+},
+{
+"a": "it",
+"k": "geo",
+"t": "イタリアの国土の中には、バチカンとサンマリノという2つの独立国がある",
+"note": "Both are enclaves entirely surrounded by Italy."
+},
+{
+"a": "it",
+"k": "culture",
+"t": "ピザ・マルゲリータは、バジル・モッツァレラ・トマトでイタリア国旗の3色を表したとされる",
+"note": "Popular story of the 1889 pizza named for Queen Margherita; hedged with とされる."
+},
+{
+"a": "xk",
+"k": "flag",
+"t": "コソボの国旗は、青地に金色で国土の形を描き、その上に6つの白い星を並べている",
+"note": "The 2008 flag shows a gold map on blue with six white stars in an arc above it. Neutral description."
+},
+{
+"a": "xk",
+"k": "geo",
+"t": "コソボは海に面しておらず、南部にはシャル山脈の山々がそびえる",
+"note": "Kosovo is landlocked; the Šar (Sharr) Mountains lie along its southern edge."
+},
+{
+"a": "xk",
+"k": "culture",
+"t": "コソボではアルバニア語とセルビア語の2つが公用語とされている",
+"note": "Kosovo's constitution (Art. 5) names Albanian and Serbian as official languages."
+},
+{
+"a": "xk",
+"k": "culture",
+"t": "コソボの伝統料理「フリア」は、薄い生地を何層も重ねて時間をかけて焼き上げる",
+"note": "Flija/Flia is layers of crepe-like batter baked for hours under a saç lid, a traditional dish in Kosovo and northern Albania."
+},
+{
+"a": "lv",
+"k": "flag",
+"t": "ラトビアの赤白赤の国旗は、13世紀の記録にも登場するとされる歴史の古い旗",
+"note": "TIGHTENED (added とされる). The Livonian Rhymed Chronicle (about 1279) describes a red banner with a white stripe, which Latvia cites as the flag's origin."
+},
+{
+"a": "lv",
+"k": "geo",
+"t": "ラトビアは国土の半分以上が森林に覆われた、緑豊かな国",
+"note": "TIGHTENED (was 23 chars and vague). Forest cover is about 52-55% of land (Latvian State Forests and FAO), and the share has been rising."
+},
+{
+"a": "lv",
+"k": "culture",
+"t": "ラトビアの夏至祭「ヤーニ」では、花や葉の冠をかぶり焚き火を囲んで夜を明かす",
+"note": "Jāņi midsummer traditions: oak-leaf and flower wreaths, bonfires and staying up all night."
+},
+{
+"a": "lv",
+"k": "culture",
+"t": "ラトビアの「歌と踊りの祭典」は、バルト三国共同でユネスコ無形文化遺産に登録されている",
+"note": "The 'Baltic song and dance celebrations' (Estonia, Latvia, Lithuania) were proclaimed in 2003 and inscribed in 2008 as a joint element."
+},
+{
+"a": "li",
+"k": "flag",
+"t": "リヒテンシュタインの国旗は1936年の五輪でハイチの国旗とそっくりだと分かり、翌年に王冠が加えられた",
+"note": "TIGHTENED (it was the flag, not the crown, found identical). Wikipedia 'Flag of Liechtenstein': found identical to Haiti's civil flag at the 1936 Summer Olympics; the crown was added in 1937."
+},
+{
+"a": "li",
+"k": "geo",
+"t": "リヒテンシュタインは内陸国だけに囲まれた「二重内陸国」で、ほかにはウズベキスタンしかない",
+"note": "TIGHTENED wording. Surrounded only by landlocked Switzerland and Austria; Liechtenstein and Uzbekistan are the only doubly landlocked countries."
+},
+{
+"a": "li",
+"k": "culture",
+"t": "リヒテンシュタインという国名は、この土地を買い取った君主一家の家名がそのまま付いたもの",
+"note": "KEPT. House of Liechtenstein bought Schellenberg (1699) and Vaduz (1712); these became the Principality of Liechtenstein in 1719."
+},
+{
+"a": "li",
+"k": "culture",
+"t": "リヒテンシュタインは1868年に軍隊を廃止して以来、軍隊を持たない国",
+"note": "KEPT. The army was disbanded in 1868 to save money; the country has had no standing army since."
+},
+{
+"a": "lt",
+"k": "flag",
+"t": "リトアニアの国旗の黄・緑・赤は、太陽、森、祖国のために流された血を表している",
+"note": "KEPT. Standard interpretation: yellow = sun and prosperity, green = forests and nature, red = blood shed for the country."
+},
+{
+"a": "lt",
+"k": "geo",
+"t": "フランス国立地理院の計算によると、ヨーロッパの地理的中心はリトアニアの首都ビリニュスの近くにある",
+"note": "KEPT. The claim is attributed to IGN, which matters because other places also claim to be Europe's centre. In 1989 IGN placed it near Purnuskes, about 26 km north of Vilnius."
+},
+{
+"a": "lt",
+"k": "culture",
+"t": "第二次大戦中、リトアニアのカウナスで日本の外交官・杉原千畝がユダヤ人難民に「命のビザ」を発給した",
+"note": "KEPT. Chiune Sugihara, Japanese vice-consul in Kaunas, issued transit visas mainly to Jewish refugees in July-August 1940, after WWII had begun."
+},
+{
+"a": "lt",
+"k": "culture",
+"t": "リトアニア名物「ツェペリナイ」は、飛行船ツェッペリンに形が似たじゃがいも団子",
+"note": "KEPT. Cepelinai, the national dish, are potato dumplings named after the Zeppelin airship because of their shape."
+},
+{
+"a": "lu",
+"k": "flag",
+"t": "ルクセンブルクの国旗はオランダの国旗とそっくりだが、青がより明るい水色になっている",
+"note": "KEPT. Both are horizontal red-white-blue tricolours; Luxembourg uses a lighter sky blue and a longer ratio."
+},
+{
+"a": "lu",
+"k": "geo",
+"t": "ルクセンブルクはベルギー・フランス・ドイツの3か国に囲まれた内陸国",
+"note": "KEPT. Landlocked; its only neighbours are Belgium, France and Germany."
+},
+{
+"a": "lu",
+"k": "culture",
+"t": "ルクセンブルクは、大公が国家元首を務める世界でただ一つの「大公国」",
+"note": "KEPT. The only sovereign grand duchy left in the world."
+},
+{
+"a": "lu",
+"k": "culture",
+"t": "国境審査をなくす「シェンゲン協定」の名前は、ルクセンブルクの村シェンゲンに由来する",
+"note": "KEPT. Signed in 1985 on a ship on the Moselle at Schengen, Luxembourg."
+},
+{
+"a": "mt",
+"k": "flag",
+"t": "マルタの国旗の左上の十字は、第二次大戦中の勇敢さをたたえて英国王から贈られたジョージ・クロス勲章",
+"note": "KEPT. King George VI awarded the George Cross to Malta on 15 April 1942, during the siege. It appears in the upper hoist (left) of the white stripe."
+},
+{
+"a": "mt",
+"k": "geo",
+"t": "マルタはイタリアのシチリア島の南に浮かぶ、地中海の小さな島国",
+"note": "KEPT. An archipelago (Malta, Gozo, Comino) about 80-90 km south of Sicily."
+},
+{
+"a": "mt",
+"k": "culture",
+"t": "マルタには、エジプトのピラミッドよりも古い時代に造られた巨石神殿が残っている",
+"note": "KEPT. The Megalithic Temples of Malta (UNESCO; Ggantija c. 3600-3200 BC) are older even than the earliest Egyptian pyramid (Djoser, c. 2670 BC)."
+},
+{
+"a": "mt",
+"k": "culture",
+"t": "マルタ語はアラビア語に近いセム語派の言葉なのに、ラテン文字で書かれる",
+"note": "KEPT. Maltese is a Semitic language descended from Siculo-Arabic and is written in the Latin alphabet."
+},
+{
+"a": "md",
+"k": "flag",
+"t": "モルドバの国旗の中央の国章には、くちばしに十字架をくわえたワシが描かれている",
+"note": "KEPT. Wikipedia 'Coat of arms of Moldova': the eagle holds a gold cross in its beak, with an olive branch and a sceptre in its talons."
+},
+{
+"a": "md",
+"k": "geo",
+"t": "モルドバはルーマニアとウクライナに挟まれた、海に面していない内陸国",
+"note": "KEPT. Landlocked; borders only Romania and Ukraine. Its short Danube bank at Giurgiulesti is river access, not a coastline."
+},
+{
+"a": "md",
+"k": "culture",
+"t": "モルドバのワイナリー「クリコバ」には、全長100kmを超える地下のワイン貯蔵トンネルがある",
+"note": "KEPT. Cricova's underground cellar tunnels are about 120 km long (Wikipedia 'Cricova', amusingplanet.com)."
+},
+{
+"a": "md",
+"k": "culture",
+"t": "モルドバでは3月1日に、赤と白のひもで作るお守り「マルツィショール」を贈り春を祝う",
+"note": "KEPT. Martisor is a 1 March spring custom, listed by UNESCO as intangible heritage in 2017 (shared with Bulgaria, North Macedonia and Romania)."
+},
+{
+"a": "mc",
+"k": "flag",
+"t": "モナコの国旗はインドネシアの国旗とほぼ同じ赤白の二色旗で、おもな違いは縦横の比率",
+"note": "KEPT. Both are red over white; Monaco is 4:5 and Indonesia 2:3."
+},
+{
+"a": "mc",
+"k": "geo",
+"t": "モナコの面積は約2平方キロで、バチカンに次いで世界で2番目に小さい国",
+"note": "KEPT. About 2.0-2.1 km2, even after land reclamation; the second-smallest sovereign state after Vatican City."
+},
+{
+"a": "mc",
+"k": "culture",
+"t": "F1のモナコグランプリは、街の公道を閉鎖して作るコースで行われる",
+"note": "KEPT. Circuit de Monaco is a street circuit on closed public roads in Monte Carlo and La Condamine."
+},
+{
+"a": "mc",
+"k": "culture",
+"t": "モナコのグリマルディ家は修道士に変装して要塞を奪ったと伝わり、国章にも剣を持つ修道士が描かれる",
+"note": "KEPT (hedged with 'と伝わり'). In 1297 Francois Grimaldi, disguised as a Franciscan friar, took the fortress. The arms are supported by two sword-bearing friars (Wikipedia 'Coat of arms of Monaco')."
+},
+{
+"a": "me",
+"k": "flag",
+"t": "モンテネグロの国旗は、金色の縁取りがある赤地の中央に双頭のワシの国章を配したデザイン",
+"note": "KEPT. Flag adopted in 2004: a red field with a gold border and the double-headed eagle coat of arms."
+},
+{
+"a": "me",
+"k": "geo",
+"t": "モンテネグロの入り組んだコトル湾に面した古都コトルは、世界遺産に登録されている",
+"note": "KEPT. UNESCO 'Natural and Culturo-Historical Region of Kotor' (1979)."
+},
+{
+"a": "me",
+"k": "geo",
+"t": "スカダル湖はバルカン半島最大の湖で、モンテネグロとアルバニアにまたがる",
+"note": "KEPT. Lake Skadar/Shkoder (about 370-530 km2, depending on season) is larger than Ohrid (358 km2) and is the largest lake on the Balkan Peninsula, shared with Albania."
+},
+{
+"a": "me",
+"k": "culture",
+"t": "モンテネグロは「黒い山」という意味で、現地語の国名ツルナ・ゴーラも同じ意味",
+"note": "KEPT. Venetian 'Monte Negro' and native 'Crna Gora' both mean 'Black Mountain'."
+},
+{
+"a": "nl",
+"k": "flag",
+"t": "オランダの国旗は、もとはオレンジ・白・青の「プリンスの旗」で、のちにオレンジが赤に変わった",
+"note": "KEPT. The Prinsenvlag (orange-white-blue) of William of Orange; red gradually replaced orange during the 17th century."
+},
+{
+"a": "nl",
+"k": "geo",
+"t": "オランダは国土の約4分の1が海面より低い土地にある",
+"note": "KEPT. About 26% of the land lies below sea level."
+},
+{
+"a": "nl",
+"k": "culture",
+"t": "オランダの現地での国名「ネーデルラント」は、「低い土地」という意味",
+"note": "KEPT. 'Nederland' means 'low land(s)'."
+},
+{
+"a": "nl",
+"k": "culture",
+"t": "江戸時代の鎖国中も、オランダは長崎の出島で日本との貿易を続けた",
+"note": "KEPT. The Dutch were the only Europeans allowed to trade with Japan during sakoku, through Dejima (1641-1859). The claim does not say they were the only partner, which would be false because China also traded."
+},
+{
+"a": "mk",
+"k": "flag",
+"t": "北マケドニアの国旗は、赤地の中央から8本の光が広がる黄色い太陽を描いている",
+"note": "KEPT. The 1995 flag shows a yellow sun with eight broadening rays on red."
+},
+{
+"a": "mk",
+"k": "geo",
+"t": "北マケドニアのオフリド湖はヨーロッパ最古級の湖で、アルバニアにまたがる世界遺産になっている",
+"note": "KEPT. Lake Ohrid is one of Europe's oldest lakes (over 1 million years). The UNESCO site was extended to the Albanian side in 2019."
+},
+{
+"a": "mk",
+"k": "geo",
+"t": "北マケドニアは海に面していない、バルカン半島の内陸国",
+"note": "KEPT. A landlocked country on the Balkan Peninsula."
+},
+{
+"a": "mk",
+"k": "culture",
+"t": "マザー・テレサは、北マケドニアの首都スコピエの生まれ",
+"note": "KEPT. Born in Skopje in 1910; the city has the Memorial House of Mother Teresa."
+},
+{
+"a": "no",
+"k": "flag",
+"t": "ノルウェーの国旗は、デンマークの国旗の白十字に青い十字を重ねたようなデザイン",
+"note": "KEPT. Fredrik Meltzer's 1821 design puts a blue cross inside the white cross of a Danish-style red flag."
+},
+{
+"a": "no",
+"k": "geo",
+"t": "ノルウェーのガイランゲルフィヨルドとネーロイフィヨルドは、世界遺産に登録されている",
+"note": "KEPT. UNESCO 'West Norwegian Fjords - Geirangerfjord and Naeroyfjord' (2005)."
+},
+{
+"a": "no",
+"k": "culture",
+"t": "日本でサーモン寿司が広まったのは、1980年代にノルウェーが生食用サーモンを売り込んだのがきっかけといわれる",
+"note": "KEPT (hedged). Norway's 'Project Japan' (from 1985, Bjorn Eirik Olsen) promoted raw salmon for sushi; the Norwegian Seafood Council credits it."
+},
+{
+"a": "no",
+"k": "culture",
+"t": "ノーベル賞のうち平和賞だけは、スウェーデンではなくノルウェーのオスロで授与される",
+"note": "KEPT. Under Nobel's will the Norwegian Nobel Committee awards the Peace Prize in Oslo; the other prizes, and the separate Economics prize, are awarded in Stockholm."
+},
+{
+"a": "pl",
+"k": "flag",
+"t": "ポーランドの国旗は上が白・下が赤で、インドネシアやモナコの国旗と上下が逆",
+"note": "KEPT. Poland is white over red; Indonesia and Monaco are red over white."
+},
+{
+"a": "pl",
+"k": "geo",
+"t": "ポーランドとベラルーシにまたがるビャウォヴィエジャの森には、ヨーロッパバイソンが暮らす",
+"note": "KEPT. Bialowieza Forest is a cross-border UNESCO site and the main refuge of the European bison."
+},
+{
+"a": "pl",
+"k": "culture",
+"t": "ポーランドのヴィエリチカ岩塩坑には、壁もシャンデリアも塩でできた地下の礼拝堂がある",
+"note": "KEPT. St. Kinga's Chapel in the Wieliczka Salt Mine (UNESCO) has walls carved from rock salt and chandeliers made of salt crystals."
+},
+{
+"a": "pl",
+"k": "culture",
+"t": "ワルシャワ生まれのキュリー夫人は、発見した元素を祖国にちなみ「ポロニウム」と名付けた",
+"note": "KEPT. Marie Sklodowska-Curie, born in Warsaw in 1867, named polonium (1898) after Poland."
+},
+{
+"a": "pt",
+"k": "flag",
+"t": "ポルトガルの国旗の中央には、大航海時代を象徴する天文観測器「渾天儀」が描かれている",
+"note": "KEPT. The armillary sphere (渾天儀) on the flag symbolizes the Age of Discovery."
+},
+{
+"a": "pt",
+"k": "geo",
+"t": "ポルトガルのロカ岬はユーラシア大陸の最西端で、「ここに地終わり海始まる」の碑が立つ",
+"note": "KEPT. Cabo da Roca is the westernmost point of mainland Eurasia. Its monument quotes Camoes: 'Onde a terra se acaba e o mar comeca'."
+},
+{
+"a": "pt",
+"k": "culture",
+"t": "日本語の「パン」や「ボタン」は、ポルトガル語から入ってきた言葉",
+"note": "KEPT. From Portuguese pao and botao, borrowed in the 16th-17th centuries."
+},
+{
+"a": "pt",
+"k": "culture",
+"t": "1543年、種子島に漂着した船に乗っていたポルトガル人が日本に鉄砲を伝えた",
+"note": "KEPT. The standard textbook account. The wording 'the ship they were on' correctly avoids calling it a Portuguese ship; it was a Chinese junk."
+},
+{
+"a": "ro",
+"k": "flag",
+"t": "ルーマニアの国旗は青・黄・赤の縦三色で、チャドの国旗とほとんど見分けがつかない",
+"note": "KEPT. Both are vertical blue-yellow-red; Chad's blue is only slightly darker."
+},
+{
+"a": "ro",
+"k": "geo",
+"t": "ドナウ川は黒海に注ぐ手前で、おもにルーマニアに広がる大湿地「ドナウデルタ」をつくる",
+"note": "TIGHTENED (added 'おもに'). About 80% of the Danube Delta is in Romania and the rest in Ukraine. UNESCO World Heritage site (1991)."
+},
+{
+"a": "ro",
+"k": "culture",
+"t": "小説『ドラキュラ』のモデルとされるのは、15世紀に今のルーマニア南部のワラキアを治めたヴラド3世",
+"note": "KEPT (hedged with 'とされる', since scholars debate how much Stoker drew on him). Vlad III Dracula was 15th-century voivode of Wallachia."
+},
+{
+"a": "ro",
+"k": "culture",
+"t": "ルーマニアという国名は「ローマ人の国」という意味で、ルーマニア語もラテン語から生まれた言葉",
+"note": "KEPT. 'Romania' comes from Latin Romanus; Romanian is a Romance language."
+},
+{
+"a": "ru",
+"k": "flag",
+"t": "ロシアの国旗の白・青・赤は、スラブ系の国々の旗によく使われる「汎スラブ色」のもとになったとされる",
+"note": "TIGHTENED (hedged; several Slavic flags already used these colours before 1848). Wikipedia 'Pan-Slavic colors': defined by the 1848 Prague Slavic Congress, 'based on the symbolism of the colors of the flag of Russia'."
+},
+{
+"a": "ru",
+"k": "geo",
+"t": "ロシアは世界で最も面積の広い国で、ヨーロッパとアジアにまたがっている",
+"note": "KEPT. The largest country by area (about 17.1 million km2), spanning Eastern Europe and Northern Asia."
+},
+{
+"a": "ru",
+"k": "geo",
+"t": "シベリアのバイカル湖は水深が1600mを超え、世界で最も深い湖",
+"note": "KEPT. Lake Baikal's maximum depth is about 1,642 m, the deepest lake in the world."
+},
+{
+"a": "ru",
+"k": "culture",
+"t": "マトリョーシカは、日本の箱根の入れ子人形がヒントになったという説がある",
+"note": "KEPT (worded as a theory). A widely cited account says the 1890s matryoshka was inspired by a Japanese nesting doll from Hakone."
+},
+{
+"a": "sm",
+"k": "flag",
+"t": "サンマリノの国旗の国章には、ティターノ山にそびえる3つの塔が描かれている",
+"note": "KEPT. The state flag's arms show the three towers (Guaita, Cesta, Montale) on Monte Titano."
+},
+{
+"a": "sm",
+"k": "geo",
+"t": "サンマリノは周りをすべてイタリアに囲まれた内陸の小国",
+"note": "KEPT. An enclave entirely surrounded by Italy."
+},
+{
+"a": "sm",
+"k": "culture",
+"t": "サンマリノは西暦301年の建国とされ、現存する世界最古の共和国といわれる",
+"note": "KEPT (hedged). Traditionally founded on 3 September 301; widely described as the oldest surviving sovereign republic."
+},
+{
+"a": "sm",
+"k": "culture",
+"t": "サンマリノでは、2人の執政が半年ごとに交代しながら国家元首を務める",
+"note": "KEPT. Two Captains Regent are elected every six months as joint heads of state."
+},
+{
+"a": "rs",
+"k": "flag",
+"t": "セルビアの国旗は赤・青・白の横三色で、ロシアの国旗の色の順番を上下逆にした配色",
+"note": "KEPT. Serbia is red-blue-white from top to bottom; Russia is white-blue-red."
+},
+{
+"a": "rs",
+"k": "geo",
+"t": "セルビアの首都ベオグラードは、ドナウ川とサヴァ川が合流する場所にある",
+"note": "KEPT. Belgrade lies where the Sava flows into the Danube."
+},
+{
+"a": "rs",
+"k": "culture",
+"t": "ベオグラードという地名は、セルビア語で「白い町」という意味",
+"note": "KEPT. Beograd = beo (white) + grad (city or town)."
+},
+{
+"a": "rs",
+"k": "culture",
+"t": "ベオグラードの空港には、発明家ニコラ・テスラの名前が付けられている",
+"note": "KEPT. The airport's name is Belgrade Nikola Tesla Airport."
+},
+{
+"a": "sk",
+"k": "flag",
+"t": "スロバキアの国旗の国章には、3つの山の上に立つ白い二重十字が描かれている",
+"note": "KEPT. The arms show a white double cross on three blue hills (traditionally Tatra, Fatra and Matra)."
+},
+{
+"a": "sk",
+"k": "geo",
+"t": "スロバキアのゲルラホフスキー峰は、カルパティア山脈全体で最も高い山",
+"note": "KEPT. Gerlachovsky stit (about 2,655 m) in the High Tatras is the highest peak of the Carpathians."
+},
+{
+"a": "sk",
+"k": "geo",
+"t": "スロバキアの首都ブラチスラバは、オーストリアとハンガリーの2か国と国境を接する珍しい首都",
+"note": "TIGHTENED (added the country name). Bratislava borders both Austria and Hungary; Wikipedia calls it the only national capital that borders two sovereign states."
+},
+{
+"a": "sk",
+"k": "culture",
+"t": "スロバキアの名物料理は、じゃがいも団子に羊のチーズをからめた「ブリンゾベー・ハルシュキ」",
+"note": "KEPT. Bryndzove halusky, the national dish: potato dumplings with bryndza sheep cheese."
+},
+{
+"a": "si",
+"k": "flag",
+"t": "スロベニアの国旗の国章には、国内最高峰トリグラフ山と3つの星が描かれている",
+"note": "KEPT. The arms show Triglav (2,864 m, Slovenia's highest peak), wavy lines and three six-pointed gold stars."
+},
+{
+"a": "si",
+"k": "geo",
+"t": "石灰岩の地形を表す「カルスト」という言葉は、スロベニアのクラス地方が語源",
+"note": "KEPT. 'Karst' comes from the Kras plateau in Slovenia (German 'Karst')."
+},
+{
+"a": "si",
+"k": "geo",
+"t": "スロベニアのブレッド湖には小さな島が浮かび、その上に教会が建っている",
+"note": "KEPT. Bled Island, with the Church of the Assumption, lies in Lake Bled."
+},
+{
+"a": "si",
+"k": "culture",
+"t": "スロベニア語には単数・複数のほかに、2つのものを表す「双数」という形がある",
+"note": "KEPT. Slovene keeps the grammatical dual number."
+},
+{
+"a": "es",
+"k": "flag",
+"t": "スペインの国旗は赤・黄・赤の横縞で、真ん中の黄色の帯は赤の2倍の幅がある",
+"note": "KEPT. The stripes are in a 1:2:1 proportion."
+},
+{
+"a": "es",
+"k": "geo",
+"t": "スペインとモロッコの間のジブラルタル海峡は、最も狭い所で幅約14kmしかない",
+"note": "REWORDED. 'スペインとアフリカを隔てる' was inexact because Spain has territory in Africa, so the narrowest crossing is now named as Spain-Morocco. The strait is about 14 km wide at its narrowest (Punta de Tarifa area to Point Cires)."
+},
+{
+"a": "es",
+"k": "geo",
+"t": "スペイン最高峰のテイデ山は、本土ではなく大西洋のカナリア諸島テネリフェ島にある",
+"note": "KEPT. Teide (3,715 m) on Tenerife is Spain's highest peak."
+},
+{
+"a": "es",
+"k": "culture",
+"t": "スペインのブニョールでは毎年8月、トマトを投げ合う祭り「ラ・トマティーナ」が開かれる",
+"note": "KEPT. La Tomatina is held in Bunol (Valencia) on the last Wednesday of August."
+},
+{
+"a": "se",
+"k": "flag",
+"t": "スウェーデンの国旗の青と黄色は、青地に金色の王冠や十字を配した国章の色に由来するとされる",
+"note": "KEPT (hedged). Wikipedia 'Flag of Sweden': the colours are believed to come from the coat of arms (gold crowns or cross on blue)."
+},
+{
+"a": "se",
+"k": "geo",
+"t": "スウェーデンのゴットランド島は、まわりをすべてバルト海に囲まれた島としては最も大きい",
+"note": "QUALIFIED. 'Largest island in the Baltic' is contested because Denmark's Zealand (about 7,000 km2) lies in the Danish straits. Wikipedia 'Gotland': 'the largest island fully encompassed by the Baltic Sea' (2,994 km2, ahead of Saaremaa at 2,673 km2)."
+},
+{
+"a": "se",
+"k": "culture",
+"t": "温度の単位「セルシウス度（℃）」は、スウェーデンの天文学者セルシウスにちなむ",
+"note": "KEPT. Named after Anders Celsius (1701-1744) of Uppsala."
+},
+{
+"a": "se",
+"k": "culture",
+"t": "ノーベル賞は、ダイナマイトを発明したスウェーデンのアルフレッド・ノーベルの遺言で始まった",
+"note": "KEPT. Established by Alfred Nobel's 1895 will; first awarded in 1901."
+},
+{
+"a": "ch",
+"k": "flag",
+"t": "スイスの国旗は正方形で、正方形の国旗はスイスとバチカンの2つだけ",
+"note": "KEPT. Switzerland and Vatican City are the only sovereign states with square national flags."
+},
+{
+"a": "ch",
+"k": "flag",
+"t": "赤十字のマークは、創設者デュナンの祖国スイスの国旗の色を反転させたもの",
+"note": "KEPT. The 1864 Geneva Convention adopted the reversed Swiss flag in honour of Switzerland, the homeland of Henry Dunant (ICRC)."
+},
+{
+"a": "ch",
+"k": "geo",
+"t": "スイスの最高峰はマッターホルンではなく、モンテ・ローザ山群のデュフールシュピッツェ",
+"note": "KEPT. Dufourspitze (4,634 m) is higher than the Matterhorn (4,478 m)."
+},
+{
+"a": "ch",
+"k": "culture",
+"t": "スイスにはドイツ語・フランス語・イタリア語・ロマンシュ語の4つの国語がある",
+"note": "KEPT. Article 4 of the Swiss Federal Constitution names four national languages."
+},
+{
+"a": "ua",
+"k": "flag",
+"t": "ウクライナの国旗の青と黄は、青い空と黄金色の小麦畑を表すといわれる",
+"note": "KEPT (hedged with 'といわれる'). This is the most common popular reading of the blue-yellow flag; there is no single official meaning."
+},
+{
+"a": "ua",
+"k": "geo",
+"t": "ウクライナには肥沃な黒い土「チェルノーゼム」が広く分布し、豊かな穀倉地帯になっている",
+"note": "KEPT. Chernozem black soils cover much of Ukraine, long called the breadbasket of Europe."
+},
+{
+"a": "ua",
+"k": "culture",
+"t": "ろうを使って卵に細かな模様を描く「ピサンカ」は、ウクライナの伝統工芸",
+"note": "KEPT. Pysanka are eggs decorated with a wax-resist method."
+},
+{
+"a": "ua",
+"k": "culture",
+"t": "バンドゥーラはたくさんの弦を持つ弦楽器で、ウクライナを代表する民族楽器",
+"note": "KEPT. The bandura is a plucked folk instrument with roughly 20-65 strings and a symbol of Ukrainian music."
+},
+{
+"a": "gb",
+"k": "flag",
+"t": "イギリスの国旗ユニオンジャックは3つの十字を重ねたもので、ウェールズの要素は入っていない",
+"note": "KEPT. It combines the crosses of St George, St Andrew and St Patrick; Wales is not represented."
+},
+{
+"a": "gb",
+"k": "geo",
+"t": "1884年の国際会議で、ロンドンのグリニッジ天文台を通る子午線が経度0度の基準に決まった",
+"note": "KEPT. The International Meridian Conference (1884) adopted the Greenwich meridian as the prime meridian. It is stated as a historical decision because today's reference meridian is about 100 m east of it."
+},
+{
+"a": "gb",
+"k": "culture",
+"t": "世界初の郵便切手「ペニー・ブラック」は、1840年にイギリスで発行された",
+"note": "KEPT. The Penny Black, issued in May 1840, was the world's first adhesive postage stamp."
+},
+{
+"a": "gb",
+"k": "culture",
+"t": "今のサッカーのルールの原型は、1863年にロンドンで生まれたサッカー協会（FA）が作った",
+"note": "KEPT. The Football Association, founded in London in 1863, wrote the Laws of the Game. 'Prototype' leaves room for earlier codes such as the Cambridge and Sheffield rules."
+},
+{
+"a": "dz",
+"k": "flag",
+"t": "アルジェリアの国旗は左が緑、右が白の二色で、中央に赤い三日月と星が描かれている",
+"note": "Algerian flag: green (hoist) and white vertical halves with a red crescent and star."
+},
+{
+"a": "dz",
+"k": "geo",
+"t": "アルジェリアはアフリカ大陸で最も面積が広い国で、国土の大部分をサハラ砂漠が占める",
+"note": "Largest African country since South Sudan's 2011 secession (~2.38M km2, matches countries.js ar). The Sahara covers over 80% of it."
+},
+{
+"a": "dz",
+"k": "geo",
+"t": "アルジェリアの首都アルジェの旧市街「カスバ」は、迷路のような路地が残る世界遺産だ",
+"note": "Kasbah of Algiers, UNESCO World Heritage site since 1992."
+},
+{
+"a": "dz",
+"k": "culture",
+"t": "クスクスの食文化は、アルジェリアなどマグレブ4か国の共同申請でユネスコ無形文化遺産に登録された",
+"note": "Couscous knowledge, know-how and practices inscribed in 2020 on a joint file from Algeria, Mauritania, Morocco and Tunisia."
+},
+{
+"a": "ao",
+"k": "flag",
+"t": "アンゴラの国旗には、労働者を表す歯車と農民を表すなたが黄色で描かれている",
+"note": "Angolan flag: yellow half cog wheel (industrial workers), machete (peasants/agriculture) and star."
+},
+{
+"a": "ao",
+"k": "geo",
+"t": "アンゴラのカビンダ州は、コンゴ民主共和国の領土を挟んで本土から離れた飛び地だ",
+"note": "Cabinda exclave is cut off from mainland Angola by the DRC's narrow corridor at the Congo River mouth."
+},
+{
+"a": "ao",
+"k": "geo",
+"t": "アンゴラ南西部の砂漠には、生涯2枚の葉だけを伸ばし続け、千年以上生きるものもある植物ウェルウィッチアが育つ",
+"note": "Tightened: lifespan changed to 千年以上生きるものもある, because estimates of 1,000-2,000 years apply to the oldest plants and not to every plant. Welwitschia mirabilis grows in the Namib Desert of SW Angola (Namibe) and Namibia and keeps two permanent leaves for life."
+},
+{
+"a": "ao",
+"k": "culture",
+"t": "世界中で踊られているダンス音楽「キゾンバ」は、アンゴラ発祥だ",
+"note": "Kizomba is widely credited as originating in Angola in the 1980s."
+},
+{
+"a": "bj",
+"k": "flag",
+"t": "ベナンの国旗は、左に緑の縦帯、右に黄と赤の横帯を並べた汎アフリカ色のデザインだ",
+"note": "Benin flag: green vertical band at the hoist, yellow over red horizontal bands (Pan-African colours)."
+},
+{
+"a": "bj",
+"k": "geo",
+"t": "ベナンの憲法上の首都はポルトノボだが、政府機関の多くは最大都市コトヌーに置かれている",
+"note": "Porto-Novo is the constitutional capital (matches countries.js). Cotonou is the de facto seat of government and largest city."
+},
+{
+"a": "bj",
+"k": "geo",
+"t": "ベナンのノコウエ湖には水上の村ガンビエがあり「アフリカのベネチア」と呼ばれる",
+"note": "Ganvie, a stilt village on Lake Nokoue, is nicknamed the Venice of Africa."
+},
+{
+"a": "bj",
+"k": "culture",
+"t": "ベナンはブードゥー信仰の発祥地とされ、毎年1月にはブードゥーの祭典が開かれ祝日にもなる",
+"note": "Tightened 国を挙げた to 祝日にもなる (verifiable). Deputies voted in July 2024 to move the festival from Jan 10 to the second Friday of January (beninwebtv), and the Thursday-Friday pair was a holiday in 2026 (Jan 8-9, afrique-sur7). A proposal in Jul-Aug 2026 to lengthen it to a week (lanouvelletribune) keeps it in January."
+},
+{
+"a": "bw",
+"k": "flag",
+"t": "ボツワナの国旗の水色は、乾いた土地で何より大切な雨と水を表している",
+"note": "Light blue on the Botswana flag symbolises water and rain (pula)."
+},
+{
+"a": "bw",
+"k": "geo",
+"t": "ボツワナは国土の約7割をカラハリ砂漠が占める内陸国だ",
+"note": "The Kalahari is commonly cited as covering about 70% of Botswana, which is landlocked."
+},
+{
+"a": "bw",
+"k": "geo",
+"t": "ボツワナのオカバンゴ・デルタは、海に注がず内陸で消える大湿地で、1000件目に登録された世界遺産だ",
+"note": "Okavango Delta is an inland (endorheic) delta, inscribed in June 2014 as the 1000th World Heritage site."
+},
+{
+"a": "bw",
+"k": "culture",
+"t": "ボツワナの通貨「プラ」は、ツワナ語で「雨」という意味だ",
+"note": "Pula means rain in Setswana. It is also the national motto."
+},
+{
+"a": "bf",
+"k": "flag",
+"t": "ブルキナファソの国旗は赤と緑の横二色で、中央に黄色い星が輝く",
+"note": "Red over green horizontal bicolour with a yellow five-pointed star."
+},
+{
+"a": "bf",
+"k": "geo",
+"t": "ブルキナファソは海のない内陸国で、6つの国と国境を接している",
+"note": "Landlocked. Borders Mali, Niger, Benin, Togo, Ghana and Cote d'Ivoire."
+},
+{
+"a": "bf",
+"k": "culture",
+"t": "ブルキナファソという国名は、現地の2つの言語の単語を組み合わせたもので「高潔な人々の国」という意味だ",
+"note": "Burkina (Moore: upright/honest) + Faso (Dioula: fatherland), adopted in 1984."
+},
+{
+"a": "bf",
+"k": "culture",
+"t": "ブルキナファソの首都ワガドゥグでは、アフリカ最大級の映画祭「FESPACO」が2年に1度開かれる",
+"note": "FESPACO is a biennial pan-African film festival held in Ouagadougou since 1969."
+},
+{
+"a": "bi",
+"k": "flag",
+"t": "ブルンジの国旗は白い斜め十字で4つに区切られ、中央の白い円に赤い星が3つ描かれている",
+"note": "A white saltire divides red and green fields, with three red stars in a central white disc."
+},
+{
+"a": "bi",
+"k": "geo",
+"t": "ブルンジが面するタンガニーカ湖は、バイカル湖に次いで世界で2番目に深い湖だ",
+"note": "Lake Tanganyika reaches ~1,470 m, second deepest after Baikal."
+},
+{
+"a": "bi",
+"k": "geo",
+"t": "ブルンジの首都はギテガで、かつての首都ブジュンブラは湖畔の最大都市だ",
+"note": "Political capital moved to Gitega in 2019 (matches countries.js). Bujumbura, on Lake Tanganyika, remains by far the largest city."
+},
+{
+"a": "bi",
+"k": "culture",
+"t": "ブルンジの王の太鼓を使った儀礼の踊りは、ユネスコ無形文化遺産に登録されている",
+"note": "Ritual dance of the royal drum, UNESCO Intangible Cultural Heritage since 2014."
+},
+{
+"a": "cv",
+"k": "flag",
+"t": "カーボベルデの国旗の10個の星は、国を構成する主要な10の島を表している",
+"note": "The ten yellow stars represent the ten main islands."
+},
+{
+"a": "cv",
+"k": "geo",
+"t": "カーボベルデの最高峰は、フォゴ島にそびえる活火山ピコ・ド・フォゴだ",
+"note": "Pico do Fogo (2,829 m) is an active volcano that last erupted in 2014-15."
+},
+{
+"a": "cv",
+"k": "culture",
+"t": "カーボベルデはポルトガル語で「緑の岬」の意味だが、その名はセネガルの岬に由来する",
+"note": "Named after the Cap-Vert peninsula (Dakar, Senegal)."
+},
+{
+"a": "cv",
+"k": "culture",
+"t": "カーボベルデの哀愁ただよう歌「モルナ」は、ユネスコ無形文化遺産に登録されている",
+"note": "Morna was inscribed on UNESCO's Intangible Cultural Heritage list in 2019."
+},
+{
+"a": "cm",
+"k": "flag",
+"t": "カメルーンの国旗は緑・赤・黄の縦三色で、中央の赤い帯に黄色い星がある",
+"note": "Green-red-yellow vertical tricolour with a yellow star in the centre."
+},
+{
+"a": "cm",
+"k": "geo",
+"t": "カメルーンは砂漠から熱帯雨林、火山まであり「アフリカの縮図」と呼ばれる",
+"note": "Commonly nicknamed Africa in miniature."
+},
+{
+"a": "cm",
+"k": "geo",
+"t": "カメルーン山は標高約4000mの活火山で、カメルーンの最高峰だ",
+"note": "Mount Cameroon (~4,040-4,095 m) is an active volcano that last erupted in 2012."
+},
+{
+"a": "cm",
+"k": "culture",
+"t": "カメルーンという国名は、ポルトガル語の「エビの川」に由来する",
+"note": "From Rio dos Camaroes (River of Prawns), the name given by Portuguese explorers."
+},
+{
+"a": "cf",
+"k": "flag",
+"t": "中央アフリカの国旗は、青・白・緑・黄の横縞を赤い縦帯が貫く珍しいデザインだ",
+"note": "Four horizontal stripes crossed by a vertical red band, plus a yellow star."
+},
+{
+"a": "cf",
+"k": "geo",
+"t": "中央アフリカはその名の通り、アフリカ大陸のほぼ真ん中にある内陸国だ",
+"note": "Landlocked and near the geographic centre of Africa."
+},
+{
+"a": "cf",
+"k": "geo",
+"t": "中央アフリカの首都バンギはウバンギ川のほとりにあり、対岸はコンゴ民主共和国だ",
+"note": "Bangui lies on the Ubangi River facing Zongo in the DRC."
+},
+{
+"a": "cf",
+"k": "culture",
+"t": "中央アフリカでは、フランス語と並んで現地のサンゴ語も公用語になっている",
+"note": "Official languages are French and Sango."
+},
+{
+"a": "td",
+"k": "flag",
+"t": "チャドの国旗はルーマニアの国旗とそっくりで、色合いがわずかに違うだけだ",
+"note": "Both are blue-yellow-red vertical tricolours that differ only in exact shades (the blue most notably)."
+},
+{
+"a": "td",
+"k": "geo",
+"t": "チャドのエミクーシ山は標高約3400mで、サハラ砂漠で最も高い山だ",
+"note": "Emi Koussi (3,415 m) in the Tibesti is the highest peak of the Sahara."
+},
+{
+"a": "td",
+"k": "geo",
+"t": "チャドの国名の由来になったチャド湖は、1960年代と比べて面積が大きく縮小した",
+"note": "The country is named after Lake Chad, which has shrunk greatly since the 1960s (often cited as ~90%)."
+},
+{
+"a": "td",
+"k": "culture",
+"t": "約700万年前の最古級の人類化石とされる「トゥーマイ」は、チャドで発見された",
+"note": "Sahelanthropus tchadensis 'Toumai' (~7 Mya) was found in northern Chad in 2001. Hedged with とされる because its hominin status is debated."
+},
+{
+"a": "km",
+"k": "flag",
+"t": "コモロの国旗は黄・白・赤・青の横縞に、緑の三角と白い三日月、4つの星を配している",
+"note": "Four horizontal stripes and a green hoist triangle with a white crescent and four white stars."
+},
+{
+"a": "km",
+"k": "geo",
+"t": "コモロのグランドコモロ島には、活火山のカルタラ山がそびえる",
+"note": "Tightened: removed 今も活動を続ける, which implies ongoing eruption. Mount Karthala is an active shield volcano on Grande Comore that last erupted in 2007."
+},
+{
+"a": "km",
+"k": "culture",
+"t": "コモロという国名は、アラビア語で「月」を意味する言葉に由来するとされる",
+"note": "From Arabic qamar (moon), as in Juzur al-Qamar."
+},
+{
+"a": "km",
+"k": "culture",
+"t": "コモロは香水の原料イランイランの産地として知られ「香水の島々」と呼ばれる",
+"note": "Known as the Perfume Islands (Iles aux parfums) and a major producer of ylang-ylang."
+},
+{
+"a": "cg",
+"k": "flag",
+"t": "コンゴ共和国の国旗は、緑と赤の間を黄色の帯が斜めに横切るデザインだ",
+"note": "A diagonal yellow band separates green and red triangles."
+},
+{
+"a": "cg",
+"k": "geo",
+"t": "コンゴ共和国の首都ブラザビルとコンゴ民主共和国の首都キンシャサは、コンゴ川を挟んで向かい合う",
+"note": "Brazzaville and Kinshasa face each other across the Congo River (Pool Malebo)."
+},
+{
+"a": "cg",
+"k": "culture",
+"t": "コンゴ共和国の首都ブラザビルの名は、この地を探検したフランスの探検家ブラザにちなむ",
+"note": "Named after Pierre Savorgnan de Brazza, an Italian-born explorer naturalised French who explored for France."
+},
+{
+"a": "cg",
+"k": "culture",
+"t": "コンゴ共和国には、派手なスーツで着飾るおしゃれ紳士「サプール」の文化がある",
+"note": "La Sape (sapeurs) dandy culture is centred in Brazzaville."
+},
+{
+"a": "cd",
+"k": "flag",
+"t": "コンゴ民主共和国の国旗は、水色の地に黄色で縁取った赤い斜め帯と黄色い星が入る",
+"note": "2006 flag: sky blue field, red diagonal with yellow fimbriation and a yellow star in the canton."
+},
+{
+"a": "cd",
+"k": "geo",
+"t": "コンゴ民主共和国を流れるコンゴ川は、深さ200mを超える場所があり、世界で最も深い川とされる",
+"note": "Added country name for consistency. Depths over 220 m were measured on the lower Congo (DRC territory below Kinshasa), the deepest river recorded."
+},
+{
+"a": "cd",
+"k": "geo",
+"t": "類人猿のボノボは、野生ではコンゴ民主共和国にしか生息していない",
+"note": "The bonobo (Pan paniscus) is endemic to the DRC."
+},
+{
+"a": "cd",
+"k": "culture",
+"t": "コンゴのルンバは、コンゴ民主共和国とコンゴ共和国の共同でユネスコ無形文化遺産になった",
+"note": "Congolese rumba was inscribed in 2021 on a joint nomination by the DRC and the Republic of the Congo."
+},
+{
+"a": "ci",
+"k": "flag",
+"t": "コートジボワールの国旗は、アイルランドの国旗と色の並びが左右逆になっている",
+"note": "Tightened: the flags have different proportions (2:3 vs 1:2) and shades, so 形 became 色の並び. Orange-white-green vs Ireland's green-white-orange."
+},
+{
+"a": "ci",
+"k": "geo",
+"t": "コートジボワールの首都はヤムスクロだが、最大の経済都市は港町アビジャンだ",
+"note": "Yamoussoukro has been the official capital since 1983 (matches countries.js). Abidjan is the economic hub and port."
+},
+{
+"a": "ci",
+"k": "culture",
+"t": "コートジボワールはフランス語で「象牙海岸」の意味で、国は訳さずこの名で呼ぶよう求めている",
+"note": "The government asked in 1985 that the French name be used untranslated."
+},
+{
+"a": "ci",
+"k": "culture",
+"t": "コートジボワールは、チョコレートの原料カカオ豆の一大生産国だ",
+"note": "A long-time leading cocoa producer. Phrased without a ranking."
+},
+{
+"a": "dj",
+"k": "flag",
+"t": "ジブチの国旗は水色と緑の横二色に、赤い星をのせた白い三角形が左から食い込む",
+"note": "Light blue over green, with a white hoist triangle bearing a red star."
+},
+{
+"a": "dj",
+"k": "geo",
+"t": "ジブチのアッサル湖は海抜マイナス約155mで、アフリカ大陸で最も低い地点だ",
+"note": "Lake Assal lies about 155 m below sea level, the lowest point in Africa."
+},
+{
+"a": "dj",
+"k": "geo",
+"t": "ジブチは、紅海とアデン湾を結ぶバブ・エル・マンデブ海峡に面している",
+"note": "Tightened 入り口に位置する to 面している. Djibouti lies on the western shore of the Bab-el-Mandeb strait."
+},
+{
+"a": "dj",
+"k": "culture",
+"t": "ジブチは首都の名前も「ジブチ」で、国名と首都名が同じ国だ",
+"note": "Removed the remaining redundancy. The capital is Djibouti City (countries.js c: ジブチ)."
+},
+{
+"a": "eg",
+"k": "flag",
+"t": "エジプトの国旗は赤・白・黒の横三色で、中央に金色の「サラディンの鷲」が描かれる",
+"note": "Red-white-black horizontal tricolour with the golden Eagle of Saladin."
+},
+{
+"a": "eg",
+"k": "geo",
+"t": "エジプトはシナイ半島がアジア側にあり、アフリカとアジアにまたがる国だ",
+"note": "The Sinai Peninsula lies in Asia, so Egypt is transcontinental."
+},
+{
+"a": "eg",
+"k": "geo",
+"t": "エジプトのスエズ運河は1869年に開通し、地中海と紅海を結んでいる",
+"note": "The Suez Canal opened in November 1869."
+},
+{
+"a": "eg",
+"k": "culture",
+"t": "エジプトにあるギザの大ピラミッドは、古代の世界七不思議で唯一現存する建造物だ",
+"note": "The only surviving Wonder of the Ancient World."
+},
+{
+"a": "gq",
+"k": "flag",
+"t": "赤道ギニアの国旗の中央には、パンヤノキと6つの星を描いた国章がある",
+"note": "Coat of arms: silk-cotton (ceiba) tree and six stars (the mainland plus five islands)."
+},
+{
+"a": "gq",
+"k": "geo",
+"t": "国名に「赤道」とつくが、赤道ギニアの本土を赤道は通っていない",
+"note": "Rio Muni lies at roughly 1-2.3 N, and the equator passes through Gabon. Only Annobon island is south of the equator."
+},
+{
+"a": "gq",
+"k": "culture",
+"t": "赤道ギニアはかつてスペイン領だったため、アフリカでは珍しくスペイン語が公用語だ",
+"note": "Former Spanish Guinea. Spanish is an official language."
+},
+{
+"a": "er",
+"k": "flag",
+"t": "エリトリアの国旗の赤い三角形には、金色のオリーブの枝と葉の輪が描かれている",
+"note": "A gold olive branch inside an olive wreath on the red triangle."
+},
+{
+"a": "er",
+"k": "geo",
+"t": "エリトリアの首都アスマラは標高約2300mの高地にあり、意外と涼しい",
+"note": "Asmara lies at ~2,325 m and has a mild climate."
+},
+{
+"a": "er",
+"k": "culture",
+"t": "エリトリアという国名は、紅海を指すギリシャ語「赤い海」に由来する",
+"note": "From Greek Erythra Thalassa (Red Sea), via Latin Mare Erythraeum."
+},
+{
+"a": "er",
+"k": "culture",
+"t": "エリトリアの首都アスマラは、イタリア統治時代のモダニズム建築が残る街として世界遺産になった",
+"note": "'Asmara: A Modernist African City', UNESCO World Heritage site in 2017."
+},
+{
+"a": "sz",
+"k": "flag",
+"t": "エスワティニの国旗の中央には、黒と白の伝統的な盾と2本の槍が描かれている",
+"note": "Flag of Eswatini: the crimson band carries a horizontal black-and-white Nguni shield with two assegai spears and a tasselled staff."
+},
+{
+"a": "sz",
+"k": "geo",
+"t": "エスワティニは南アフリカとモザンビークに囲まれた、海のない小さな国",
+"note": "Landlocked; borders only South Africa and Mozambique; area about 17,364 km2 (matches countries.js)."
+},
+{
+"a": "sz",
+"k": "culture",
+"t": "エスワティニは2018年、国名を「スワジランド」から今の名前に改めた",
+"note": "King Mswati III renamed the country from Swaziland to the Kingdom of Eswatini on 19 April 2018."
+},
+{
+"a": "sz",
+"k": "culture",
+"t": "エスワティニの行政首都はムババーネだが、議会や王室の村があるロバンバは「王室・立法の首都」と呼ばれる",
+"note": "Mbabane is the executive capital. Lobamba is the royal and legislative capital (Parliament, Ludzidzini royal village)."
+},
+{
+"a": "et",
+"k": "flag",
+"t": "多くのアフリカ諸国の国旗に使われる緑・黄・赤は、エチオピアの国旗の色がルーツ",
+"note": "The Pan-African green-yellow-red come from the Ethiopian flag, a symbol of independence. Ghana adopted them in 1957 and other new states followed."
+},
+{
+"a": "et",
+"k": "geo",
+"t": "エチオピアのタナ湖は、ナイル川の大きな支流・青ナイル川の源流として知られる",
+"note": "The Blue Nile flows out of Lake Tana and joins the White Nile at Khartoum. The hedge 'として知られる' covers the Little Abay inflow."
+},
+{
+"a": "et",
+"k": "culture",
+"t": "エチオピアはコーヒー（アラビカ種）の原産地とされている",
+"note": "Coffea arabica is native to the highland forests of southwestern Ethiopia, and genomic studies place its origin there. The wording is hedged with 'とされている'."
+},
+{
+"a": "et",
+"k": "culture",
+"t": "エチオピア独自の暦では1年が13か月あり、最後の月は5〜6日しかない",
+"note": "Ethiopian calendar: 12 months of 30 days, then Pagume with 5 days (6 in leap years)."
+},
+{
+"a": "ga",
+"k": "flag",
+"t": "ガボンの国旗は緑・黄・青の横三色で、黄色は国を通る赤道を表すとされる",
+"note": "Green-yellow-blue horizontal tricolour. FOTW and common sources say yellow is the equator (sometimes the sun); the hedge 'とされる' covers this."
+},
+{
+"a": "ga",
+"k": "geo",
+"t": "ガボンは赤道直下にあり、国土の大部分が熱帯雨林に覆われている",
+"note": "The equator crosses Gabon, and about 85-88% of its land is forest."
+},
+{
+"a": "ga",
+"k": "culture",
+"t": "ガボンの首都リーブルビルの名は、フランス語で「自由の町」という意味",
+"note": "Libreville means 'free town'. It was founded in 1849 as a settlement for freed slaves from the slave ship Elizia."
+},
+{
+"a": "ga",
+"k": "culture",
+"t": "ノーベル平和賞を受けたシュヴァイツァー博士は、ガボンのランバレネで医療活動を行った",
+"note": "Albert Schweitzer founded his hospital at Lambaréné in 1913 and received the 1952 Nobel Peace Prize."
+},
+{
+"a": "gm",
+"k": "flag",
+"t": "ガンビアの国旗の青い帯は、国の真ん中を流れるガンビア川を表している",
+"note": "Gambian flag: the white-edged blue stripe stands for the Gambia River, which runs through the middle of the country."
+},
+{
+"a": "gm",
+"k": "geo",
+"t": "ガンビアは、島国を除けばアフリカ大陸で最も面積の小さい国",
+"note": "About 10,689 km2, the smallest state on mainland Africa; the next smallest is Eswatini at 17,364 km2. Island states such as Seychelles are smaller."
+},
+{
+"a": "gm",
+"k": "geo",
+"t": "ガンビアは川沿いに細長く延び、海側以外の三方をセネガルに囲まれている",
+"note": "A narrow strip along the Gambia River, surrounded by Senegal except for its short Atlantic coast."
+},
+{
+"a": "gm",
+"k": "culture",
+"t": "小説『ルーツ』の主人公クンタ・キンテの故郷は、ガンビアの村とされている",
+"note": "In Alex Haley's Roots, Kunta Kinte's home is Juffure in The Gambia; nearby Kunta Kinteh Island is a UNESCO site."
+},
+{
+"a": "gh",
+"k": "flag",
+"t": "ガーナの国旗の中央にある黒い星は「アフリカの自由」の象徴",
+"note": "Designer Theodosia Okoh and official descriptions call the black star the 'lodestar of African freedom'."
+},
+{
+"a": "gh",
+"k": "geo",
+"t": "ガーナの港町テマには、経度0度の本初子午線が通っている",
+"note": "The Greenwich meridian crosses eastern Ghana at Tema (about 0°00'), where there is a Greenwich Meridian landmark."
+},
+{
+"a": "gh",
+"k": "geo",
+"t": "ガーナのヴォルタ湖は、ダムでせき止めてできた面積世界最大級の人造湖",
+"note": "Lake Volta (about 8,500 km2), impounded by the Akosombo Dam, is cited, for example by Guinness, as the largest reservoir by surface area. The hedge '最大級' is safe."
+},
+{
+"a": "gh",
+"k": "culture",
+"t": "野口英世は、黄熱病の研究のために訪れた現在のガーナのアクラで亡くなった",
+"note": "Hideyo Noguchi died of yellow fever in Accra (then the Gold Coast) on 21 May 1928 while researching the disease."
+},
+{
+"a": "gn",
+"k": "flag",
+"t": "ギニアの国旗は赤・黄・緑の縦三色で、マリの国旗とは色の並びが逆",
+"note": "Guinea is a red-yellow-green vertical tricolour and Mali is green-yellow-red, so the order is reversed."
+},
+{
+"a": "gn",
+"k": "geo",
+"t": "ギニアは「西アフリカの給水塔」と呼ばれ、ニジェール川やセネガル川の源流がある",
+"note": "Guinea is commonly called the 'water tower of West Africa'. The Niger rises in the Guinea Highlands, and the Bafing (main headstream of the Senegal) rises in the Fouta Djallon."
+},
+{
+"a": "gn",
+"k": "geo",
+"t": "ギニアとコートジボワールにまたがるニンバ山厳正自然保護区は世界遺産",
+"note": "Mount Nimba Strict Nature Reserve is a UNESCO World Heritage site (1981/82) shared by Guinea and Côte d'Ivoire."
+},
+{
+"a": "gn",
+"k": "culture",
+"t": "ギニアは1958年、フランスが提案した共同体への参加を国民投票で拒み、独立した",
+"note": "Guinea voted 'No' in the 28 September 1958 referendum on the French Community and became independent on 2 October 1958."
+},
+{
+"a": "gw",
+"k": "flag",
+"t": "ギニアビサウの国旗は、黒い星のある赤い縦帯と、黄・緑の横帯の組み合わせ",
+"note": "A red vertical band at the hoist with a black star, beside yellow-over-green horizontal bands."
+},
+{
+"a": "gw",
+"k": "geo",
+"t": "ギニアビサウのビジャゴス諸島には、海を泳いで島の間を行き来することもある珍しいカバがいる",
+"note": "TIGHTENED to 'ことがある' because sources describe this as occasional. Responsible Travel: 'saltwater hippos can sometimes be spotted swimming along the shoreline and even between the islands' (Orango)."
+},
+{
+"a": "gw",
+"k": "culture",
+"t": "ギニアビサウは国名に首都「ビサウ」を付けて、隣国ギニアと区別している",
+"note": "'Bissau' was added to the country's name to distinguish it from neighbouring Guinea."
+},
+{
+"a": "gw",
+"k": "culture",
+"t": "ギニアビサウはカシューナッツの一大産地で、輸出の大半をカシューナッツが占める",
+"note": "For decades cashew nuts have made up roughly 80-90% or more of Guinea-Bissau's exports (World Bank, IMF), a long-standing structural fact."
+},
+{
+"a": "ke",
+"k": "flag",
+"t": "ケニアの国旗の中央には、マサイ族の盾と2本の槍が描かれている",
+"note": "The Kenyan flag shows a traditional Maasai shield and two crossed white spears."
+},
+{
+"a": "ke",
+"k": "geo",
+"t": "ケニアでは、国土のほぼ真ん中を東西に赤道が通っている",
+"note": "Kenya spans about 5°N to 4.7°S, so the equator crosses the centre of the country (for example near Nanyuki)."
+},
+{
+"a": "ke",
+"k": "geo",
+"t": "ケニアの国名は、アフリカで2番目に高い山・ケニア山に由来する",
+"note": "The country is named after Mount Kenya (5,199 m), Africa's second-highest peak after Kilimanjaro."
+},
+{
+"a": "ke",
+"k": "culture",
+"t": "ケニアの公用語の一つ、スワヒリ語の「ハクナ・マタタ」は「心配ないさ」という意味",
+"note": "Kenya's official languages are Swahili and English. 'Hakuna matata' means 'no worries'."
+},
+{
+"a": "ls",
+"k": "flag",
+"t": "レソトの国旗の中央には、伝統的なバソト帽（モコロトロ）が黒く描かれている",
+"note": "The flag adopted in 2006 shows a black mokorotlo (Basotho hat) on the white band."
+},
+{
+"a": "ls",
+"k": "geo",
+"t": "レソトは周りをぐるりと南アフリカに囲まれた、「国の中にある国」",
+"note": "Lesotho is completely enclaved by South Africa."
+},
+{
+"a": "ls",
+"k": "geo",
+"t": "レソトは国土のすべてが標高1000m以上にある、世界で唯一の国",
+"note": "Wikipedia 'Geography of Lesotho': 'the only independent state in the world that lies entirely above 1,000 metres'; its lowest point is 1,400 m."
+},
+{
+"a": "ls",
+"k": "culture",
+"t": "レソトの人々は、伝統の「バソト・ブランケット」をマントのように羽織る",
+"note": "Basotho blankets are worn as cloaks and are a national cultural symbol."
+},
+{
+"a": "lr",
+"k": "flag",
+"t": "リベリアの国旗は星条旗に似ていて、11本の縞と1つの星がある",
+"note": "11 red and white stripes and a single white star on a blue canton, modelled on the US flag."
+},
+{
+"a": "lr",
+"k": "geo",
+"t": "リベリアの森は、珍しいコビトカバの主な生息地の一つ",
+"note": "Liberia holds the largest share of the remaining wild pygmy hippo population (IUCN)."
+},
+{
+"a": "lr",
+"k": "culture",
+"t": "リベリアの首都モンロビアの名は、アメリカ第5代大統領モンローにちなむ",
+"note": "Monrovia is named after James Monroe, the 5th US President."
+},
+{
+"a": "lr",
+"k": "culture",
+"t": "リベリアの国名は、ラテン語で「自由」を意味する言葉に由来する",
+"note": "The name comes from Latin 'liber' (free), because the colony was founded for freed slaves."
+},
+{
+"a": "ly",
+"k": "flag",
+"t": "リビアの旧国旗（1977〜2011年）は緑一色で、世界で唯一の無地の国旗だった",
+"note": "The 1977-2011 Libyan Jamahiriya flag was plain green, the only national flag of its time with a single colour and no design."
+},
+{
+"a": "ly",
+"k": "geo",
+"t": "リビアはとても乾燥していて、一年中水が流れる川が一本もない",
+"note": "Libya has no permanent rivers, only seasonal wadis."
+},
+{
+"a": "ly",
+"k": "culture",
+"t": "リビアでは、砂漠の地下水を都市へ運ぶ巨大な水路「大人工河川」が造られた",
+"note": "The Great Man-Made River pipes fossil groundwater from Saharan aquifers (Nubian Sandstone) to the coastal cities."
+},
+{
+"a": "ly",
+"k": "culture",
+"t": "リビアのレプティス・マグナは、保存状態の良い古代ローマ都市の遺跡で世界遺産",
+"note": "Leptis Magna (inscribed 1982) is a UNESCO World Heritage site and one of the best-preserved Roman cities."
+},
+{
+"a": "mg",
+"k": "flag",
+"t": "マダガスカルの国旗は、左に白い縦帯、右に赤と緑の横帯を組み合わせたデザイン",
+"note": "A white vertical band at the hoist, with red-over-green horizontal bands."
+},
+{
+"a": "mg",
+"k": "geo",
+"t": "マダガスカルは、グリーンランド、ニューギニア島、ボルネオ島に次ぐ世界で4番目に大きい島",
+"note": "Madagascar (about 587,000 km2) is the world's 4th-largest island after Greenland, New Guinea and Borneo."
+},
+{
+"a": "mg",
+"k": "geo",
+"t": "世界に8種あるバオバブのうち、6種はマダガスカルにしか自生しない",
+"note": "Adansonia has 8 accepted species (confirmed by the 2024 Nature genomics study). Six are Malagasy endemics; A. digitata grows in mainland Africa and A. gregorii in Australia."
+},
+{
+"a": "mg",
+"k": "culture",
+"t": "マダガスカル語は、遠く離れたボルネオ島の言語と近い親戚関係にある",
+"note": "Malagasy is an Austronesian (Barito) language, closest to Ma'anyan of southern Borneo."
+},
+{
+"a": "mw",
+"k": "flag",
+"t": "マラウイの国旗は、上の黒い帯から赤い太陽が昇るデザイン",
+"note": "The current flag (restored in 2012) is a black-red-green horizontal tricolour with a red rising sun of 31 rays in the black band."
+},
+{
+"a": "mw",
+"k": "geo",
+"t": "マラウイの国土の約5分の1は、マラウイ湖が占めている",
+"note": "CIA World Factbook: total area 118,484 km2 (same as countries.js), of which 24,404 km2 is water (about 20%), mostly Lake Malawi."
+},
+{
+"a": "mw",
+"k": "geo",
+"t": "マラウイ湖には数百種のシクリッドが暮らし、その多くがこの湖だけの固有種",
+"note": "Lake Malawi has hundreds of cichlid species (estimates exceed 700), and the vast majority are endemic."
+},
+{
+"a": "mw",
+"k": "culture",
+"t": "マラウイは「アフリカの温かい心（ウォーム・ハート・オブ・アフリカ）」という愛称を持つ",
+"note": "'The Warm Heart of Africa' is Malawi's long-standing national nickname, used in its tourism branding."
+},
+{
+"a": "ml",
+"k": "flag",
+"t": "マリの国旗は緑・黄・赤の縦三色で、中央の星がないこと以外はセネガルの国旗とそっくり",
+"note": "Mali and Senegal both use a green-yellow-red vertical tricolour; Senegal adds a green star in the centre."
+},
+{
+"a": "ml",
+"k": "geo",
+"t": "マリではニジェール川が、広大な湿地帯「内陸デルタ」をつくっている",
+"note": "The Inner Niger Delta is a vast inland floodplain wetland in central Mali and a Ramsar site."
+},
+{
+"a": "ml",
+"k": "culture",
+"t": "マリのジェンネにある大モスクは、世界最大級の泥れんが建築",
+"note": "The Great Mosque of Djenné is widely cited as the largest mud-brick building in the world and is part of a UNESCO site. The hedge '最大級' is safe."
+},
+{
+"a": "ml",
+"k": "culture",
+"t": "マリのトンブクトゥは、かつて学問の都として栄え、多くの古い写本が残る",
+"note": "Timbuktu was a centre of Islamic learning in the 15th-16th centuries and is famous for its manuscripts; UNESCO site."
+},
+{
+"a": "mr",
+"k": "flag",
+"t": "モーリタニアの国旗は、2017年に緑地の上下へ赤い帯が加えられた",
+"note": "Red stripes were added at the top and bottom after the August 2017 constitutional referendum."
+},
+{
+"a": "mr",
+"k": "geo",
+"t": "モーリタニアの砂漠には、宇宙からも見える巨大な円形の地形「サハラの目」がある",
+"note": "The Richat Structure, about 40 km across, is a well-known landmark that astronauts use from orbit."
+},
+{
+"a": "mr",
+"k": "geo",
+"t": "モーリタニアの鉄鉱石を運ぶ貨物列車は、全長2kmを超える世界最長級の列車",
+"note": "Amusing Planet and other sources: the Zouérat-Nouadhibou train 'stretches for 2.5 kilometers' and is 'one of the heaviest and longest in the world'. The hedges '超える' and '最長級' are safe."
+},
+{
+"a": "mr",
+"k": "culture",
+"t": "モーリタニアは、日本で食べられるタコの主要な産地の一つ",
+"note": "Japanese trade statistics, MOFA and JETRO name Mauritania, with Morocco, as a long-time top source of Japan's imported octopus."
+},
+{
+"a": "mu",
+"k": "flag",
+"t": "モーリシャスの国旗は、赤・青・黄・緑の4本の横縞でできている",
+"note": "Four equal horizontal stripes: red, blue, yellow and green."
+},
+{
+"a": "mu",
+"k": "geo",
+"t": "モーリシャスのル・モーン沖には、空から見ると海の中に滝があるように見える場所がある",
+"note": "The 'underwater waterfall' off Le Morne Brabant is an optical illusion of sand and silt runoff seen from the air."
+},
+{
+"a": "mu",
+"k": "geo",
+"t": "モーリシャスのシャマレルには、色とりどりの砂が縞模様をつくる「七色の大地」がある",
+"note": "The Chamarel Seven Coloured Earths are bands of differently coloured sand in southwestern Mauritius."
+},
+{
+"a": "mu",
+"k": "culture",
+"t": "絶滅した鳥ドードーは、かつてモーリシャスにだけ生息していた",
+"note": "The dodo (Raphus cucullatus) was endemic to Mauritius and extinct by the late 17th century."
+},
+{
+"a": "ma",
+"k": "flag",
+"t": "モロッコの国旗は、赤地の中央に緑の線で五芒星を描いたデザイン",
+"note": "A red field with a green interlaced pentagram (Seal of Solomon) in the centre."
+},
+{
+"a": "ma",
+"k": "geo",
+"t": "モロッコとヨーロッパを隔てるジブラルタル海峡は、いちばん狭い所で幅約14kmしかない",
+"note": "Wikipedia, Strait of Gibraltar: Europe and Africa are 14.3 km apart at the narrowest point (Punta de Tarifa area to Point Cires)."
+},
+{
+"a": "ma",
+"k": "geo",
+"t": "モロッコのトゥブカル山は標高4167mで、北アフリカの最高峰",
+"note": "Jbel Toubkal (4,167 m) in the High Atlas is the highest peak in North Africa."
+},
+{
+"a": "ma",
+"k": "culture",
+"t": "とんがり帽子のような蓋の土鍋「タジン」は、モロッコを代表する料理道具",
+"note": "The tagine, a clay pot with a conical lid, is iconic Moroccan cookware and also the name of the dish cooked in it."
+},
+{
+"a": "mz",
+"k": "flag",
+"t": "モザンビークの国旗には、本とくわ、そして自動小銃が描かれている",
+"note": "The emblem on the flag shows an AK-47 rifle crossed with a hoe over an open book, on a yellow star. The flag remains unchanged since 1983."
+},
+{
+"a": "mz",
+"k": "geo",
+"t": "モザンビークとマダガスカルの間には、モザンビーク海峡が広がる",
+"note": "The Mozambique Channel separates Mozambique from Madagascar."
+},
+{
+"a": "mz",
+"k": "culture",
+"t": "モザンビークの国名は、かつて首都が置かれた北部の「モザンビーク島」に由来する",
+"note": "Named after Ilha de Moçambique, the Portuguese colonial capital until 1898; UNESCO site."
+},
+{
+"a": "mz",
+"k": "culture",
+"t": "モザンビークは1995年、イギリス領になったことのない国として初めて英連邦に加わった",
+"note": "Mozambique joined the Commonwealth in November 1995, the first member never part of the British Empire (Rwanda followed in 2009, Gabon and Togo in 2022)."
+},
+{
+"a": "na",
+"k": "flag",
+"t": "ナミビアの国旗には、12本の光を放つ金色の太陽が描かれている",
+"note": "KEEP. Flag of Namibia (1990): golden sun with 12 triangular rays in the upper hoist (CIA Factbook, Flag Institute)."
+},
+{
+"a": "na",
+"k": "geo",
+"t": "ナミビアの国名は、世界最古の砂漠ともいわれるナミブ砂漠に由来する",
+"note": "KEEP. The Namib is widely cited as the world's oldest desert (55-80 million years), and the country is named after it. The hedge ともいわれる covers the dating debate."
+},
+{
+"a": "na",
+"k": "geo",
+"t": "ナミビア北部の大西洋岸は、クジラの骨や難破船の残骸が多いことから「スケルトン・コースト」と呼ばれる",
+"note": "TIGHTENED. Skeleton Coast is the northern part of Namibia's Atlantic coast. The name comes from whale and seal bones from the whaling era and from the remains of about 1,000 shipwrecks, and was popularised by John H. Marsh's 1944 book (Wikipedia 'Skeleton Coast')."
+},
+{
+"a": "na",
+"k": "culture",
+"t": "ナミビアのヒンバ族の女性は、赤土と脂を混ぜたものを肌や髪に塗って赤く彩る",
+"note": "KEEP. Himba otjize paste is butterfat mixed with red ochre, applied to skin and hair."
+},
+{
+"a": "ne",
+"k": "flag",
+"t": "ニジェールの国旗の中央にあるオレンジ色の丸は、太陽を表している",
+"note": "KEEP. Flag of Niger: the orange disc in the white stripe represents the sun (CIA Factbook)."
+},
+{
+"a": "ne",
+"k": "geo",
+"t": "ニジェールは海に面していない内陸国で、国土の大部分をサハラ砂漠が占める",
+"note": "KEEP. Niger is landlocked, and about 80% of its land lies in the Sahara."
+},
+{
+"a": "ne",
+"k": "geo",
+"t": "ニジェールのテネレ砂漠には、かつて「世界一孤独な木」と呼ばれたアカシアが立っていた",
+"note": "KEEP. The Tree of Ténéré was called the most isolated tree on Earth. A truck knocked it down in 1973, and its remains are in the National Museum in Niamey."
+},
+{
+"a": "ne",
+"k": "culture",
+"t": "ニジェールのウォダベ族の祭り「ゲレウォル」では、化粧をした男性たちが美しさを競う",
+"note": "KEEP. In the Gerewol courtship ritual of the Wodaabe Fula (e.g. at In-Gall, Niger), men wearing makeup dance and women judge them."
+},
+{
+"a": "ng",
+"k": "flag",
+"t": "ナイジェリアの緑・白・緑の国旗は、当時ロンドンで学ぶ学生だったアキンクンミがデザインした",
+"note": "KEEP. Michael Taiwo Akinkunmi designed the flag in 1959 while studying in London, and it was adopted in 1960 (BusinessDay interview, Al Jazeera)."
+},
+{
+"a": "ng",
+"k": "geo",
+"t": "ナイジェリアの国名は、国内を流れるニジェール川にちなんで付けられた",
+"note": "KEEP. Flora Shaw coined the name in 1897 from the Niger River."
+},
+{
+"a": "ng",
+"k": "culture",
+"t": "ナイジェリアの映画産業は、ハリウッドにならって「ノリウッド」と呼ばれる",
+"note": "KEEP. Nollywood is the common name for the Nigerian film industry."
+},
+{
+"a": "ng",
+"k": "culture",
+"t": "ナイジェリアの首都は1991年に、海沿いのラゴスから内陸のアブジャへ移された",
+"note": "KEEP. The capital officially moved from Lagos to Abuja on 12 December 1991."
+},
+{
+"a": "rw",
+"k": "flag",
+"t": "ルワンダの国旗の右上には、24本の光を放つ金色の太陽が輝いている",
+"note": "KEEP. Flag of Rwanda (2001): golden sun with 24 rays in the upper fly corner (FOTW, WorldAtlas)."
+},
+{
+"a": "rw",
+"k": "geo",
+"t": "ルワンダは丘が連なる地形から「千の丘の国」と呼ばれている",
+"note": "KEEP. The nickname is 'Pays des Mille Collines' (Land of a Thousand Hills)."
+},
+{
+"a": "rw",
+"k": "geo",
+"t": "ルワンダの火山国立公園は、マウンテンゴリラが暮らす森として知られる",
+"note": "KEEP. Volcanoes National Park in the Virunga Mountains is a mountain gorilla habitat."
+},
+{
+"a": "rw",
+"k": "culture",
+"t": "ルワンダでは毎月最終土曜日に「ウムガンダ」という全国一斉の奉仕活動がある",
+"note": "KEEP. Umuganda is the national community work day, held on the morning of the last Saturday of each month and institutionalised since 2007-2009 (Wikipedia 'Umuganda', KT Press)."
+},
+{
+"a": "st",
+"k": "flag",
+"t": "サントメ・プリンシペの国旗の2つの黒い星は、サントメ島とプリンシペ島を表す",
+"note": "KEEP. The two black stars represent the two main islands."
+},
+{
+"a": "st",
+"k": "geo",
+"t": "サントメ・プリンシペの南端にあるロラス島には、赤道がちょうど通っている",
+"note": "KEEP. The Equator passes through Ilhéu das Rolas, the country's southernmost island, where a monument marks it."
+},
+{
+"a": "st",
+"k": "geo",
+"t": "サントメ島には、針のようにそびえ立つ火山岩の塔「ピコ・カン・グランデ」がある",
+"note": "KEEP. Pico Cão Grande is a needle-shaped volcanic plug in southern São Tomé."
+},
+{
+"a": "st",
+"k": "culture",
+"t": "サントメ・プリンシペは20世紀初め、世界有数のカカオの産地として栄えた",
+"note": "KEEP. Around 1908-1913 the islands were among the world's largest cocoa producers, and for a time the largest."
+},
+{
+"a": "sn",
+"k": "flag",
+"t": "セネガルの国旗は緑・黄・赤の縦三色で、真ん中に緑の星がひとつ入っている",
+"note": "KEEP. Green-yellow-red vertical tricolour with a green five-pointed star in the centre."
+},
+{
+"a": "sn",
+"k": "geo",
+"t": "アフリカ大陸の最西端は、セネガルの首都ダカールがあるヴェール岬半島にある",
+"note": "KEEP. Pointe des Almadies on the Cap-Vert peninsula (Dakar) is the westernmost point of mainland Africa."
+},
+{
+"a": "sn",
+"k": "geo",
+"t": "セネガルのレトバ湖は、藻の働きで湖面がピンク色に染まることから「ラック・ローズ（バラ色の湖）」と呼ばれる",
+"note": "TIGHTENED. Lake Retba (Lac Rose) turns pink because of Dunaliella salina algae. It lost its colour after floods in 2022 and recovered it in 2026 (AFP via Engineering News / Asharq Al-Awsat, July 2026), so the wording gives the naming reason, not a permanent state."
+},
+{
+"a": "sn",
+"k": "culture",
+"t": "「ダカール・ラリー」の名前は、かつてのゴール地点だったセネガルの首都ダカールに由来する",
+"note": "KEEP. It began as the Paris-Dakar Rally ending in Dakar. It later moved to South America and Saudi Arabia but kept the name."
+},
+{
+"a": "sc",
+"k": "flag",
+"t": "セーシェルの国旗は、左下の角から5色の帯が放射状に広がるデザイン",
+"note": "KEEP. Flag of Seychelles (1996): five oblique bands (blue, yellow, red, white, green) radiating from the bottom hoist corner."
+},
+{
+"a": "sc",
+"k": "geo",
+"t": "セーシェルは、インド洋に浮かぶ100を超える島々からなる島国",
+"note": "FIXED. The island count differs by source: 115 (government/tourism figures) and 155 (Wikipedia 'Geography of Seychelles'). '100を超える' is true under either count."
+},
+{
+"a": "sc",
+"k": "geo",
+"t": "セーシェルのヤシ「ココ・デ・メール」は、植物界で最も大きな種子をつける",
+"note": "KEEP. Coco de mer (Lodoicea maldivica), native to Praslin and Curieuse, has the largest seed in the plant kingdom."
+},
+{
+"a": "sc",
+"k": "culture",
+"t": "セーシェルでは、フランス語をもとにしたセーシェル・クレオール語が公用語のひとつ",
+"note": "KEEP. Seychellois Creole (French-based), English and French are the national/official languages (Constitution Art. 4)."
+},
+{
+"a": "sl",
+"k": "flag",
+"t": "シエラレオネの国旗の青は、首都フリータウンの天然の良港を表している",
+"note": "KEEP. Blue represents the natural harbour of Freetown (Wikipedia 'Flag of Sierra Leone', CIA Factbook)."
+},
+{
+"a": "sl",
+"k": "culture",
+"t": "シエラレオネという国名は、ポルトガル語の「ライオンの山」に由来する",
+"note": "KEEP. From Portuguese 'Serra Leoa' (Lion Mountains), the name Pedro de Sintra gave in 1462."
+},
+{
+"a": "sl",
+"k": "culture",
+"t": "シエラレオネの首都フリータウンは、解放された元奴隷たちの入植地として18世紀に築かれた",
+"note": "KEEP. The Province of Freedom settlement began in 1787. Freetown was founded in 1792 by freed, formerly enslaved Black Loyalists from Nova Scotia."
+},
+{
+"a": "sl",
+"k": "geo",
+"t": "シエラレオネの沖合には「バナナ諸島」という名前の島々がある",
+"note": "KEEP. The Banana Islands lie off the Freetown Peninsula."
+},
+{
+"a": "so",
+"k": "flag",
+"t": "ソマリアの国旗は、水色の地の真ん中に白い星がひとつだけのシンプルなデザイン",
+"note": "KEEP. Light blue field with a single white five-pointed star."
+},
+{
+"a": "so",
+"k": "geo",
+"t": "ソマリアの海岸線は、アフリカ大陸本土の国の中で最も長い",
+"note": "KEEP. Somalia has the longest coastline of any mainland African country, about 3,000+ km (CIA Factbook; Wikipedia 'Coastline of Somalia'). Madagascar is excluded as an island."
+},
+{
+"a": "so",
+"k": "geo",
+"t": "アフリカ大陸の最東端は、ソマリアのハフーン岬にある",
+"note": "KEEP. Ras Hafun in Somalia is the easternmost point of mainland Africa (Wikipedia 'Extreme points of Africa', 'Ras Hafun')."
+},
+{
+"a": "so",
+"k": "culture",
+"t": "ソマリアは世界有数のラクダ大国で、ラクダのミルクも日常的に飲まれている",
+"note": "KEEP. Somalia has one of the largest camel populations in the world (FAO), and camel milk is a staple. '世界有数' avoids a ranking that changes."
+},
+{
+"a": "za",
+"k": "flag",
+"t": "南アフリカの国旗は6色を使い、Y字の形は多様な人々がひとつになることを表すとされる",
+"note": "KEEP. Six colours. There is no official symbolism, but the government says the Y shape 'can be interpreted as the convergence of diverse elements... taking the road ahead in unity', hence とされる."
+},
+{
+"a": "za",
+"k": "geo",
+"t": "アフリカ大陸の最南端は喜望峰ではなく、南アフリカのアガラス岬である",
+"note": "KEEP. Cape Agulhas, not the Cape of Good Hope, is the southernmost point of Africa."
+},
+{
+"a": "za",
+"k": "geo",
+"t": "南アフリカは、レソトという国をまるごと国土の内側に囲んでいる",
+"note": "REWORDED (previous wording was unnatural). Lesotho is an enclave entirely surrounded by South Africa. Eswatini is not mentioned because it also borders Mozambique."
+},
+{
+"a": "za",
+"k": "culture",
+"t": "南アフリカは、行政・立法・司法の首都がプレトリア、ケープタウン、ブルームフォンテーンに分かれている",
+"note": "KEEP. Executive capital Pretoria, legislative capital Cape Town (seat of Parliament), judicial capital Bloemfontein (seat of the Supreme Court of Appeal)."
+},
+{
+"a": "ss",
+"k": "flag",
+"t": "南スーダンの国旗は、黒・白・赤・緑・青・黄の6色を使っている",
+"note": "KEEP. The flag of South Sudan uses black, white, red, green, blue and yellow."
+},
+{
+"a": "ss",
+"k": "geo",
+"t": "南スーダンには、白ナイル川がつくる世界最大級の湿地「スッド」が広がる",
+"note": "KEEP. The Sudd, formed by the White Nile (Bahr al Jabal), is one of the world's largest wetlands."
+},
+{
+"a": "ss",
+"k": "culture",
+"t": "南スーダンは2011年に独立し、193番目の国連加盟国となった",
+"note": "KEEP. Independence on 9 July 2011, admitted to the UN on 14 July 2011 as the 193rd member."
+},
+{
+"a": "ss",
+"k": "culture",
+"t": "南スーダンの牧畜民にとって、牛は大切な財産であり誇りの象徴でもある",
+"note": "KEEP. Cattle are central to wealth and identity among pastoralist peoples such as the Dinka and Nuer."
+},
+{
+"a": "sd",
+"k": "flag",
+"t": "スーダンの国旗は、赤・白・黒の横じまに、旗ざお側の緑の三角形を組み合わせたもの",
+"note": "KEEP. Flag of Sudan (1970): red-white-black horizontal stripes with a green hoist triangle."
+},
+{
+"a": "sd",
+"k": "geo",
+"t": "スーダンの首都ハルツームは、青ナイル川と白ナイル川が合流する地点にある",
+"note": "KEEP. Khartoum lies at the confluence of the Blue Nile and the White Nile (al-Mogran)."
+},
+{
+"a": "sd",
+"k": "culture",
+"t": "スーダンには古代ヌビアのピラミッドが200基以上あり、その数はエジプトより多い",
+"note": "KEEP. Sudan has about 200-255 Nubian pyramids (Meroë, Nuri, el-Kurru), more than Egypt's roughly 120-138 (Wikipedia 'Nubian pyramids', History UK, ScienceAlert)."
+},
+{
+"a": "sd",
+"k": "geo",
+"t": "スーダンは南スーダンが独立する2011年まで、アフリカで最も面積の大きい国だった",
+"note": "KEEP. Sudan was Africa's largest country until South Sudan became independent in July 2011. Algeria has been the largest since."
+},
+{
+"a": "tz",
+"k": "flag",
+"t": "タンザニアの国旗は、黄色で縁取られた黒い帯が緑と青を斜めに分けている",
+"note": "KEEP. A diagonal black band edged in yellow divides the green and blue triangles."
+},
+{
+"a": "tz",
+"k": "geo",
+"t": "アフリカ最高峰のキリマンジャロ山は、タンザニアの北東部にそびえる",
+"note": "KEEP. Mount Kilimanjaro, the highest mountain in Africa, is in northeastern Tanzania."
+},
+{
+"a": "tz",
+"k": "culture",
+"t": "タンザニアの国名は、合併したタンガニーカとザンジバルの名前を組み合わせたもの",
+"note": "KEEP. The country was formed in 1964 by the union of Tanganyika and Zanzibar, and the name blends Tan + Zan."
+},
+{
+"a": "tz",
+"k": "culture",
+"t": "ロックバンド「クイーン」のフレディ・マーキュリーは、現在のタンザニアにあるザンジバル島生まれ",
+"note": "KEEP. Freddie Mercury was born in Stone Town, Zanzibar (Unguja), in 1946, when it was a British protectorate, hence 現在の."
+},
+{
+"a": "tg",
+"k": "flag",
+"t": "トーゴの国旗の5本の横じまは、国内の5つの地方を表すとも、手の5本の指を表すともいわれる",
+"note": "FIXED. The 'five regions' meaning is widely quoted (e.g. CIA Factbook) but is not in the explanation attributed to designer Paul Ahyi, who says the stripes are like the five fingers of one hand and stand for action through unity (FOTW 'Togo'). The new wording states both readings."
+},
+{
+"a": "tg",
+"k": "geo",
+"t": "トーゴは南北に細長い国で、海岸線は約56kmしかない",
+"note": "KEEP. Togo's coastline is 56 km (CIA World Factbook)."
+},
+{
+"a": "tg",
+"k": "geo",
+"t": "トーゴの首都ロメは、隣国ガーナとの国境のすぐそばにある",
+"note": "KEEP. Lomé lies on the coast right at the Ghana border, opposite Aflao."
+},
+{
+"a": "tg",
+"k": "culture",
+"t": "トーゴ北東部の世界遺産「クタマク」は、土でできた塔のような家々で知られる",
+"note": "KEEP. UNESCO lists Koutammakou, Land of the Batammariba (2004), as being in northeastern Togo and extending into Benin. It is known for its mud tower-houses (takienta)."
+},
+{
+"a": "tn",
+"k": "flag",
+"t": "チュニジアの国旗は、赤地の中央の白い円に赤い三日月と星が描かれている",
+"note": "KEEP. Red field with a white disc containing a red crescent and star."
+},
+{
+"a": "tn",
+"k": "geo",
+"t": "アフリカ大陸の最北端は、チュニジア北部のビゼルト近くにある",
+"note": "KEEP. Ras ben Sakka near Bizerte is the northernmost point of Africa."
+},
+{
+"a": "tn",
+"k": "culture",
+"t": "『スター・ウォーズ』の砂漠の惑星タトゥイーンはチュニジアで撮影され、名前も同国の町タタウィーンに由来する",
+"note": "KEEP. Tatooine scenes in the 1977 film and the prequels were shot in Tunisia (Matmata, Tozeur), and the name comes from the town of Tataouine."
+},
+{
+"a": "tn",
+"k": "culture",
+"t": "チュニジアの首都チュニスの近くには、古代都市カルタゴの遺跡が残っている",
+"note": "KEEP. The Archaeological Site of Carthage near Tunis is a UNESCO World Heritage Site."
+},
+{
+"a": "ug",
+"k": "flag",
+"t": "ウガンダの国旗の中央には、国鳥のカンムリヅルが描かれている",
+"note": "KEEP. A grey crowned crane, the national bird, sits in a white disc."
+},
+{
+"a": "ug",
+"k": "geo",
+"t": "ウガンダのジンジャは、ヴィクトリア湖からナイル川が流れ出す場所として知られる",
+"note": "KEEP. Jinja is where the White (Victoria) Nile leaves Lake Victoria, known as the source of the Nile."
+},
+{
+"a": "ug",
+"k": "geo",
+"t": "ウガンダとコンゴ民主共和国の国境にあるルウェンゾリ山地は「月の山」とも呼ばれる",
+"note": "KEEP. The Rwenzori Mountains are often identified with Ptolemy's 'Mountains of the Moon'. The wording とも presents it as a nickname."
+},
+{
+"a": "ug",
+"k": "culture",
+"t": "ウガンダは、かつてチャーチルに「アフリカの真珠」とたたえられた",
+"note": "KEEP. Winston Churchill called Uganda 'the Pearl of Africa' in My African Journey (1908). The fact does not claim he coined the phrase."
+},
+{
+"a": "zm",
+"k": "flag",
+"t": "ザンビアの国旗は、ワシと3色の帯が旗の右側に寄った珍しいデザイン",
+"note": "KEEP. The African fish eagle and the red-black-orange stripes are placed on the fly side."
+},
+{
+"a": "zm",
+"k": "geo",
+"t": "ザンビアの国名は、国を流れるザンベジ川に由来する",
+"note": "KEEP. Zambia is named after the Zambezi River."
+},
+{
+"a": "zm",
+"k": "geo",
+"t": "ザンビアとジンバブエの国境にあるヴィクトリアの滝は、現地で「雷鳴とどろく水煙」と呼ばれる",
+"note": "KEEP. The local name Mosi-oa-Tunya means 'The Smoke that Thunders'."
+},
+{
+"a": "zm",
+"k": "culture",
+"t": "ザンビアの主食「シマ」は、トウモロコシの粉を練って作る",
+"note": "KEEP. Nshima, a stiff maize-meal porridge, is Zambia's staple food."
+},
+{
+"a": "zw",
+"k": "flag",
+"t": "ジンバブエの国旗には、遺跡から見つかった石の彫刻「ジンバブエ鳥」が描かれている",
+"note": "KEEP. The flag shows the Zimbabwe Bird, based on soapstone carvings found at Great Zimbabwe."
+},
+{
+"a": "zw",
+"k": "culture",
+"t": "ジンバブエという国名は、ショナ語で「石の家」を意味する言葉に由来するとされる",
+"note": "KEEP. The main etymology is Shona 'dzimba dza mabwe' (houses of stone), referring to Great Zimbabwe. A rival etymology ('dzimba woye') exists, hence とされる."
+},
+{
+"a": "zw",
+"k": "geo",
+"t": "ジンバブエとザンビアの国境にあるカリバ湖は、世界最大級の人造湖である",
+"note": "KEEP. Lake Kariba on the Zambezi is the world's largest man-made reservoir by volume. 最大級 keeps the claim safe."
+},
+{
+"a": "zw",
+"k": "culture",
+"t": "ジンバブエの憲法では、16もの言語が公用語として定められている",
+"note": "KEEP. Section 6 of the 2013 Constitution of Zimbabwe lists 16 officially recognised languages."
+},
+{
+"a": "ag",
+"k": "flag",
+"t": "アンティグア・バーブーダの国旗に描かれた昇る太陽は、新しい時代の夜明けを表している",
+"note": "KEEP. Official symbolism of the 1967 flag (designer Reginald Samuel): the rising sun = dawn of a new era."
+},
+{
+"a": "ag",
+"k": "geo",
+"t": "アンティグア・バーブーダは、アンティグア島・バーブーダ島・無人島のレドンダ島などからなる",
+"note": "KEEP. The state is Antigua, Barbuda, uninhabited Redonda and small islets."
+},
+{
+"a": "ag",
+"k": "culture",
+"t": "アンティグア島の名は、コロンブスがスペイン・セビリアの「サンタ・マリア・ラ・アンティグア」にちなんで付けた",
+"note": "FIX. Etymonline says the name comes from the church of Santa Maria la Antigua in Seville; Wikipedia says an icon in Seville Cathedral. The new wording names the dedication only, so it is true under both readings."
+},
+{
+"a": "ag",
+"k": "culture",
+"t": "アンティグア島にある、イギリス海軍の拠点だった「ネルソンズ・ドックヤード」は世界遺産",
+"note": "KEEP (added the location). UNESCO 2016: Antigua Naval Dockyard and Related Archaeological Sites."
+},
+{
+"a": "bs",
+"k": "flag",
+"t": "バハマの国旗の黒い三角形は国民の団結と力強さ、アクアマリンは美しい海を表す",
+"note": "KEEP. Official symbolism: black = vigour and force of a united people, aquamarine = sea, gold = sun and sand."
+},
+{
+"a": "bs",
+"k": "geo",
+"t": "バハマは約700の島と、2000を超える小島や岩礁からなる島国",
+"note": "KEEP. About 700 islands plus about 2,000-2,400 cays (Britannica: nearly 2,400 cays)."
+},
+{
+"a": "bs",
+"k": "culture",
+"t": "バハマの国名は、スペイン語の「baja mar（浅い海）」に由来するという説がある",
+"note": "KEEP. A widely cited etymology. It is worded as one theory because a Lucayan origin is also proposed."
+},
+{
+"a": "bs",
+"k": "culture",
+"t": "1492年にコロンブスが新大陸で最初に上陸したのは、バハマの島だったとされる",
+"note": "KEEP. Columbus's first landfall was Guanahani (renamed San Salvador) in the Bahamas. Which island it was exactly is debated, so the wording is hedged."
+},
+{
+"a": "bb",
+"k": "flag",
+"t": "バルバドスの国旗の折れた三叉の矛は、植民地時代との決別を表している",
+"note": "KEEP. Official 1966 symbolism: the broken shaft of Neptune's trident = the break from the colonial past."
+},
+{
+"a": "bb",
+"k": "geo",
+"t": "バルバドスはカリブの島々で最も東にあり、ほかの島々の連なりから東に約160km離れている",
+"note": "FIX. Not literally in the Caribbean Sea, so it now says 'Caribbean islands'. Wikipedia (Geography of Barbados): 'easternmost isle of the Lesser Antilles' and 'lies 160 kilometres (100 mi) east of the Windward Islands'."
+},
+{
+"a": "bb",
+"k": "culture",
+"t": "グレープフルーツは、18世紀のバルバドスで偶然生まれた果物だとされる",
+"note": "KEEP. First documented in Barbados in 1750 (Griffith Hughes) as an accidental pomelo x sweet orange hybrid."
+},
+{
+"a": "bb",
+"k": "culture",
+"t": "バルバドスの国民食は、トウモロコシ粉の料理「クークー」とトビウオの組み合わせ",
+"note": "KEEP. The national dish is cou-cou and flying fish."
+},
+{
+"a": "bz",
+"k": "flag",
+"t": "ベリーズの国旗の紋章には2人の木こりが描かれ、人物が登場する珍しい国旗だ",
+"note": "KEEP. The coat of arms shows two woodcutters (mahogany heritage). It says 'rare', not 'only', so it holds."
+},
+{
+"a": "bz",
+"k": "geo",
+"t": "ベリーズ沖には、直径約300mの巨大な海の縦穴「グレートブルーホール」がある",
+"note": "KEEP. Great Blue Hole, Lighthouse Reef: about 300 m across and about 125 m deep."
+},
+{
+"a": "bz",
+"k": "culture",
+"t": "ベリーズは中央アメリカで唯一、英語を公用語とする国",
+"note": "KEEP. Formerly British Honduras. All other Central American states have Spanish as the official language."
+},
+{
+"a": "bz",
+"k": "culture",
+"t": "ベリーズの首都ベルモパンは、ハリケーン被害をきっかけに内陸に造られた計画都市",
+"note": "KEEP (added the country name). Built after Hurricane Hattie (1961) devastated Belize City; capital since 1970."
+},
+{
+"a": "ca",
+"k": "flag",
+"t": "カナダの国旗のカエデの葉には、11個のとがった先端がある",
+"note": "KEEP. The stylised maple leaf on the 1965 flag has 11 points."
+},
+{
+"a": "ca",
+"k": "geo",
+"t": "カナダは世界で最も長い海岸線を持つ国",
+"note": "KEEP. About 202,000 km including islands, the longest of any country."
+},
+{
+"a": "ca",
+"k": "culture",
+"t": "フライドポテトにチーズとグレイビーをかけたカナダの「プーティン」はケベック州生まれ",
+"note": "KEEP (added the country name). Poutine originated in rural Quebec in the 1950s."
+},
+{
+"a": "ca",
+"k": "culture",
+"t": "1921年、カナダのトロント大学で糖尿病の治療に使うインスリンが発見された",
+"note": "KEEP. Banting and Best isolated insulin at the University of Toronto in 1921 (Nobel Prize 1923)."
+},
+{
+"a": "cr",
+"k": "flag",
+"t": "コスタリカの国旗は5本の横縞で、中央の赤い帯は他の帯の2倍の太さがある",
+"note": "KEEP. Stripes blue-white-red-white-blue in the ratio 1:1:2:1:1."
+},
+{
+"a": "cr",
+"k": "geo",
+"t": "コスタリカは世界の陸地の約0.03%の広さに、地球の生物種の約6%がすむとされる",
+"note": "KEEP. Embassy of Costa Rica: '0.03 percent of the earth's surface' and 'nearly 6 percent of the world's biodiversity'. 51,100 km2 / about 149M km2 of land = 0.03%, so the 'land' wording is right."
+},
+{
+"a": "cr",
+"k": "culture",
+"t": "コスタリカは1948年に軍隊を廃止し、憲法で常備軍を持たないと定めている",
+"note": "KEEP. Army abolished in 1948; Article 12 of the 1949 Constitution abolishes the army as a permanent institution."
+},
+{
+"a": "cr",
+"k": "culture",
+"t": "「プーラ・ビダ（直訳で純粋な人生）」は、あいさつにも使われるコスタリカの合言葉",
+"note": "KEEP (added 'literally'). Pura vida is a common Costa Rican greeting and motto."
+},
+{
+"a": "cu",
+"k": "flag",
+"t": "キューバの国旗の3本の青い帯は、独立運動当時の島の3つの地域を表す",
+"note": "KEEP. The three blue stripes = the island's three departments at the time of the independence movement."
+},
+{
+"a": "cu",
+"k": "geo",
+"t": "キューバ島は、カリブ海で最も大きな島",
+"note": "KEEP. Cuba (about 105,000 km2) is the largest island in the Caribbean."
+},
+{
+"a": "cu",
+"k": "geo",
+"t": "世界最小の鳥マメハチドリは、キューバだけにすむ固有種",
+"note": "KEEP. The bee hummingbird (Mellisuga helenae), the smallest bird, is endemic to Cuba."
+},
+{
+"a": "cu",
+"k": "culture",
+"t": "マンボやチャチャチャといった音楽は、キューバで生まれた",
+"note": "KEEP. Mambo developed from Cuban danzon; cha-cha-cha was created by Cuban violinist Enrique Jorrin."
+},
+{
+"a": "dm",
+"k": "flag",
+"t": "ドミニカ国の国旗には国鳥ミカドボウシインコが描かれ、珍しい紫色が使われている",
+"note": "KEEP. The Sisserou parrot (Amazona imperialis) is on the flag; it is one of very few national flags with purple."
+},
+{
+"a": "dm",
+"k": "geo",
+"t": "ドミニカ国には、湯がぐらぐらと沸き立つ「ボイリング・レイク」という湖がある",
+"note": "KEEP. Boiling Lake is a flooded fumarole in Morne Trois Pitons National Park (UNESCO)."
+},
+{
+"a": "dm",
+"k": "culture",
+"t": "ドミニカ国の名は、コロンブスが日曜日（ラテン語でドミニカ）に島を見つけたことに由来する",
+"note": "KEEP. Columbus sighted the island on Sunday 3 Nov 1493; Latin (dies) Dominica = Sunday."
+},
+{
+"a": "dm",
+"k": "culture",
+"t": "ドミニカ国には、先住民カリナゴの人々が暮らす「カリナゴ・テリトリー」がある",
+"note": "KEEP. Kalinago Territory on the east coast, established in 1903."
+},
+{
+"a": "do",
+"k": "flag",
+"t": "ドミニカ共和国の国旗は、中央の紋章に開いた聖書が描かれた珍しい国旗",
+"note": "FIX ('only' changed to 'rare'). Wikipedia confirms the arms show a Bible open to John 8:31-32 but does not support 'only flag with a Bible'."
+},
+{
+"a": "do",
+"k": "geo",
+"t": "ドミニカ共和国のピコ・ドゥアルテは、カリブ海の島々で最も高い山",
+"note": "KEEP. Pico Duarte (about 3,098 m) is the highest point in the Caribbean."
+},
+{
+"a": "do",
+"k": "culture",
+"t": "ドミニカ共和国の首都サントドミンゴには、アメリカ大陸で最も古い大聖堂がある",
+"note": "KEEP (added the country name). Catedral Primada de America (1512-1540) is the oldest cathedral in the Americas."
+},
+{
+"a": "do",
+"k": "culture",
+"t": "陽気な音楽とダンス「メレンゲ」は、ドミニカ共和国で生まれた",
+"note": "KEEP. Merengue originated in the Dominican Republic; UNESCO intangible heritage 2016."
+},
+{
+"a": "sv",
+"k": "flag",
+"t": "エルサルバドルの国旗の紋章には、中米連邦の5か国を表す5つの火山が描かれている",
+"note": "KEEP. The five volcanoes represent the five members of the Federal Republic of Central America."
+},
+{
+"a": "sv",
+"k": "geo",
+"t": "エルサルバドルは中央アメリカで唯一、カリブ海に面していない国",
+"note": "KEEP. El Salvador has only a Pacific coast; Belize, Guatemala, Honduras, Nicaragua, Costa Rica and Panama all touch the Caribbean."
+},
+{
+"a": "sv",
+"k": "culture",
+"t": "エルサルバドルの国名は、スペイン語で「救世主」という意味",
+"note": "KEEP. El Salvador = The Savior."
+},
+{
+"a": "sv",
+"k": "culture",
+"t": "トウモロコシの生地に具を包んで焼く「ププサ」は、エルサルバドルの国民食",
+"note": "KEEP. Pupusa is the declared national dish, with a National Pupusa Day set by decree in 2005."
+},
+{
+"a": "gd",
+"k": "flag",
+"t": "グレナダの国旗の左側の緑の部分には、特産品のナツメグの実が描かれている",
+"note": "KEEP. A nutmeg is shown in the hoist-side green triangle."
+},
+{
+"a": "gd",
+"k": "geo",
+"t": "グレナダは、グレナダ島のほかカリアク島やプティット・マルティニーク島などからなる",
+"note": "KEEP. Grenada includes Carriacou and Petite Martinique."
+},
+{
+"a": "gd",
+"k": "culture",
+"t": "グレナダはナツメグなどの香辛料の産地で、「スパイスの島」と呼ばれる",
+"note": "KEEP. Known as the Island of Spice / Spice Isle (nutmeg, mace, cinnamon)."
+},
+{
+"a": "gd",
+"k": "culture",
+"t": "グレナダの海には、彫刻が沈められた「水中彫刻公園」がある",
+"note": "KEEP. Molinere Underwater Sculpture Park, created in 2006 by Jason deCaires Taylor."
+},
+{
+"a": "gt",
+"k": "flag",
+"t": "グアテマラの国旗に描かれた国鳥ケツァールは、通貨の名前にもなっている",
+"note": "KEEP. The resplendent quetzal is on the coat of arms; the currency is the quetzal."
+},
+{
+"a": "gt",
+"k": "geo",
+"t": "グアテマラのタフムルコ山は標高約4200mで、中央アメリカの最高峰",
+"note": "KEEP. Volcan Tajumulco is about 4,200-4,220 m, the highest point in Central America."
+},
+{
+"a": "gt",
+"k": "geo",
+"t": "グアテマラのアティトラン湖は、3つの火山に囲まれた美しい湖",
+"note": "KEEP. Lake Atitlan is ringed by the volcanoes Atitlan, Toliman and San Pedro."
+},
+{
+"a": "gt",
+"k": "culture",
+"t": "グアテマラのマヤ遺跡ティカルは、密林の中にピラミッドがそびえる世界遺産",
+"note": "KEEP (added the country name). Tikal National Park, UNESCO 1979."
+},
+{
+"a": "ht",
+"k": "flag",
+"t": "ハイチの国旗は、フランス国旗から白を引き裂いて作られたと伝えられる",
+"note": "KEEP. Traditional account: in 1803 Dessalines tore the white out of the French tricolour. Worded as a legend."
+},
+{
+"a": "ht",
+"k": "geo",
+"t": "ハイチは、ドミニカ共和国と分け合うイスパニョーラ島の西側約3分の1を占める",
+"note": "KEEP. 27,750 of about 76,000 km2 is roughly the western third of Hispaniola."
+},
+{
+"a": "ht",
+"k": "culture",
+"t": "ハイチの国名は、先住民タイノの言葉で「山の多い土地」を意味するとされる",
+"note": "KEEP. From Taino Ayiti, usually glossed as land of high mountains."
+},
+{
+"a": "ht",
+"k": "culture",
+"t": "ハイチは1804年に独立し、中南米で最初の独立国となった",
+"note": "KEEP. Independence on 1 Jan 1804, the first independent state in Latin America and the Caribbean."
+},
+{
+"a": "hn",
+"k": "flag",
+"t": "ホンジュラスの国旗の5つの星は、かつての中米連邦の5か国を表している",
+"note": "KEEP. The five stars = the five members of the former Federal Republic of Central America."
+},
+{
+"a": "hn",
+"k": "geo",
+"t": "ホンジュラスのカリブ海に浮かぶバイア諸島は、サンゴ礁が美しいダイビングの名所",
+"note": "KEEP. The Bay Islands (Roatan, Utila, Guanaja) sit on the Mesoamerican Barrier Reef."
+},
+{
+"a": "hn",
+"k": "culture",
+"t": "ホンジュラスの国名は、スペイン語で「深み」という意味",
+"note": "KEEP. Spanish hondura(s) = depth(s), linked to Columbus's remark about deep waters."
+},
+{
+"a": "hn",
+"k": "culture",
+"t": "ホンジュラスのコパン遺跡には、マヤ文字がびっしり刻まれた「神聖文字の階段」がある",
+"note": "KEEP (added the country name). The Hieroglyphic Stairway at Copan (UNESCO 1980) is the longest known Maya inscription."
+},
+{
+"a": "jm",
+"k": "flag",
+"t": "ジャマイカの国旗は黒・緑・金の3色で、赤・白・青をまったく使っていない",
+"note": "KEEP. The flag uses only black, green and gold. It makes no 'only' claim, so it stays true."
+},
+{
+"a": "jm",
+"k": "geo",
+"t": "ジャマイカは、キューバとイスパニョーラ島に次ぐカリブ海で3番目に大きな島",
+"note": "KEEP. By area: Cuba, Hispaniola, then Jamaica (about 10,991 km2), which is larger than Puerto Rico (about 9,100 km2)."
+},
+{
+"a": "jm",
+"k": "culture",
+"t": "レゲエはジャマイカで生まれた音楽で、ユネスコの無形文化遺産にも登録されている",
+"note": "KEEP. 'Reggae music of Jamaica' was inscribed by UNESCO in 2018."
+},
+{
+"a": "jm",
+"k": "culture",
+"t": "高級コーヒー「ブルーマウンテン」は、ジャマイカのブルーマウンテン山脈で育つ",
+"note": "KEEP. Jamaica Blue Mountain coffee is grown in the Blue Mountains."
+},
+{
+"a": "mx",
+"k": "flag",
+"t": "メキシコの国旗に描かれた、サボテンの上でヘビをくわえるワシは、アステカの建国伝説に由来する",
+"note": "KEEP. The emblem depicts the Aztec legend of the founding of Tenochtitlan."
+},
+{
+"a": "mx",
+"k": "geo",
+"t": "恐竜絶滅の原因とされる巨大隕石は、メキシコのユカタン半島付近に落ちた",
+"note": "KEEP. The Chicxulub crater on the Yucatan Peninsula is linked to the K-Pg extinction."
+},
+{
+"a": "mx",
+"k": "culture",
+"t": "トウモロコシは、約9000年前にメキシコで栽培が始まったとされる",
+"note": "KEEP. Maize was domesticated from teosinte in southern Mexico (Balsas valley) about 9,000 years ago."
+},
+{
+"a": "mx",
+"k": "culture",
+"t": "亡くなった家族の魂を迎えるメキシコの「死者の日」は、ユネスコの無形文化遺産",
+"note": "KEEP. The indigenous festivity dedicated to the dead is UNESCO intangible heritage (proclaimed 2003, inscribed 2008)."
+},
+{
+"a": "ni",
+"k": "flag",
+"t": "ニカラグアの国旗の紋章には虹が描かれ、珍しい紫色が使われている",
+"note": "KEEP. The rainbow in the coat of arms includes purple; one of very few flags with purple."
+},
+{
+"a": "ni",
+"k": "geo",
+"t": "ニカラグアは、中央アメリカで最も面積が大きい国",
+"note": "KEEP. About 130,373 km2 vs Honduras at about 112,492 km2 (countries.js)."
+},
+{
+"a": "ni",
+"k": "geo",
+"t": "ニカラグア湖に浮かぶオメテペ島は、2つの火山がつながってできた島",
+"note": "KEEP. Ometepe is formed by the volcanoes Concepcion and Maderas joined by an isthmus."
+},
+{
+"a": "ni",
+"k": "culture",
+"t": "ニカラグア出身の詩人ルベン・ダリオは、スペイン語文学「モデルニスモ」の父と呼ばれる",
+"note": "KEEP. Ruben Dario is regarded as the father of literary modernismo."
+},
+{
+"a": "pa",
+"k": "flag",
+"t": "パナマの国旗の青と赤はかつての二大政党を、白は両者の間の平和を表している",
+"note": "KEEP. Blue = Conservatives, red = Liberals, white = peace between them."
+},
+{
+"a": "pa",
+"k": "geo",
+"t": "パナマ運河は、太平洋とカリブ海（大西洋）を結ぶ全長約80kmの運河",
+"note": "KEEP. The Panama Canal is about 82 km long and opened in 1914."
+},
+{
+"a": "pa",
+"k": "geo",
+"t": "パナマは国土がS字に曲がっているため、太平洋から朝日が昇って見える場所がある",
+"note": "KEEP. The isthmus runs east-west in an S shape, so from places like Panama City the sun rises over the Pacific (Gulf of Panama). It avoids the contested 'only place in the world' claim."
+},
+{
+"a": "pa",
+"k": "culture",
+"t": "「パナマ帽」は実はエクアドル生まれで、パナマ経由で広まったため名が付いた",
+"note": "KEEP. Toquilla straw hats originate in Ecuador and took their name from being shipped and sold through Panama."
+},
+{
+"a": "kn",
+"k": "flag",
+"t": "セントクリストファー・ネービスの国旗の2つの白い星は、希望と自由を表す",
+"note": "KEEP. Official symbolism: the two stars represent hope and liberty."
+},
+{
+"a": "kn",
+"k": "geo",
+"t": "セントクリストファー・ネービスは、南北アメリカで最も面積が小さい国",
+"note": "KEEP. At 261 km2 it is the smallest sovereign state in the Americas (Grenada 344, Barbados 430)."
+},
+{
+"a": "kn",
+"k": "culture",
+"t": "アメリカ建国の父の一人アレクサンダー・ハミルトンは、ネービス島の生まれ",
+"note": "KEEP. Hamilton was born in Charlestown, Nevis."
+},
+{
+"a": "kn",
+"k": "culture",
+"t": "セントクリストファー島のブリムストーン・ヒル要塞は、世界遺産に登録されている",
+"note": "KEEP. Brimstone Hill Fortress National Park, UNESCO 1999."
+},
+{
+"a": "lc",
+"k": "flag",
+"t": "セントルシアの国旗の三角形は、島のシンボルである双子の山「ピトン」を表している",
+"note": "KEEP. Government symbolism (via FOTW): the triangles represent the Pitons, twin volcanic peaks at Soufriere."
+},
+{
+"a": "lc",
+"k": "geo",
+"t": "セントルシアには、火口近くまで車で行ける「ドライブイン火山」と呼ばれる硫黄泉がある",
+"note": "KEEP. Sulphur Springs at Soufriere is marketed as the drive-in volcano."
+},
+{
+"a": "lc",
+"k": "culture",
+"t": "セントルシアの国名は、シチリア島の聖人・聖ルチアにちなむ",
+"note": "KEEP. Named after Saint Lucy of Syracuse (Sicily); National Day, 13 December, is her feast day."
+},
+{
+"a": "lc",
+"k": "culture",
+"t": "ノーベル文学賞を受賞した詩人デレク・ウォルコットは、セントルシアの出身",
+"note": "KEEP. Derek Walcott, born in Castries, won the Nobel Prize in Literature in 1992."
+},
+{
+"a": "vc",
+"k": "flag",
+"t": "セントビンセント及びグレナディーン諸島の国旗の3つのひし形は、頭文字「V」の形に並んでいる",
+"note": "KEEP. Three green diamonds arranged in a V for Vincent."
+},
+{
+"a": "vc",
+"k": "geo",
+"t": "セントビンセント島の北部には、活火山スフリエール山がそびえる",
+"note": "KEEP. La Soufriere is an active stratovolcano in the north (eruptions include 1979 and 2021)."
+},
+{
+"a": "vc",
+"k": "culture",
+"t": "セントビンセント島のワリラボー湾は、映画『パイレーツ・オブ・カリビアン』のロケ地",
+"note": "KEEP. Wallilabou Bay was a filming location (Port Royal set) for Pirates of the Caribbean: The Curse of the Black Pearl."
+},
+{
+"a": "vc",
+"k": "culture",
+"t": "セントビンセント島の植物園は1765年の創設で、西半球で最も古い植物園の一つ",
+"note": "KEEP (added the location). St. Vincent Botanical Gardens in Kingstown, founded in 1765, is among the oldest in the Western Hemisphere."
+},
+{
+"a": "tt",
+"k": "flag",
+"t": "トリニダード・トバゴの国旗の赤は活力、黒は国民の結束の強さ、白は海を表す",
+"note": "KEEP. Official symbolism: red = vitality of land and people, black = dedication and a strong bond, white = the sea."
+},
+{
+"a": "tt",
+"k": "geo",
+"t": "トリニダード島には、天然のアスファルトがたまった世界最大級の「ピッチ湖」がある",
+"note": "KEEP. Pitch Lake at La Brea is the largest natural asphalt deposit."
+},
+{
+"a": "tt",
+"k": "geo",
+"t": "トリニダード島は、最も近い所で南アメリカのベネズエラからわずか十数kmしか離れていない",
+"note": "FIX (11 km changed to 'just over ten km'). Wikipedia sources disagree: Icacos Point page says '11 kilometers away', Columbus Channel page says '14 km wide at its narrowest'. Both fit 'just over ten km'."
+},
+{
+"a": "tt",
+"k": "culture",
+"t": "ドラム缶から作られる楽器スティールパンは、トリニダード・トバゴで生まれた",
+"note": "KEEP. The steelpan was developed in Trinidad in the 1930s-40s and is the national instrument."
+},
+{
+"a": "us",
+"k": "flag",
+"t": "アメリカ合衆国の国旗の50の星は州の数、13本の縞は独立当時の13州を表す",
+"note": "KEEP. Stars = the 50 states; stripes = the original 13 colonies/states."
+},
+{
+"a": "us",
+"k": "geo",
+"t": "アメリカ合衆国のデスバレーにあるバッドウォーター盆地は、海抜約マイナス86mで北アメリカで最も低い地点",
+"note": "KEEP (added the country name). Badwater Basin, -86 m, is the lowest point in North America."
+},
+{
+"a": "us",
+"k": "geo",
+"t": "アメリカ合衆国のイエローストーンは、1872年に指定された世界初の国立公園とされる",
+"note": "FIX (added 'とされる'). Established 1 March 1872 and generally recognised as the first national park. Earlier protected areas (e.g. Bogd Khan Mountain) are sometimes cited, hence the hedge."
+},
+{
+"a": "us",
+"k": "culture",
+"t": "1903年、ライト兄弟がノースカロライナ州で、世界初とされる有人動力飛行に成功した",
+"note": "FIX (added 'とされる'). Wright Flyer at Kill Devil Hills near Kitty Hawk, 17 Dec 1903, is mainstream recognised. Rival claims (Santos-Dumont, Whitehead) exist, hence the hedge."
+},
+{
+"a": "ar",
+"k": "flag",
+"t": "アルゼンチンの国旗の中央の太陽は「5月の太陽」と呼ばれ、1810年の五月革命にちなむ",
+"note": "KEEP. The Sol de Mayo is the national emblem of the May Revolution (25 May 1810), modelled on the Inca sun god Inti (FOTW, Wikipedia 'Sun of May')."
+},
+{
+"a": "ar",
+"k": "geo",
+"t": "アルゼンチンのアコンカグア山（約6961m）は、アジア以外で最も高い山だ",
+"note": "KEEP. Aconcagua is 6,961 m, the highest peak in the Americas and the highest outside Asia (one of the Seven Summits)."
+},
+{
+"a": "ar",
+"k": "culture",
+"t": "アルゼンチンの国名は、ラテン語で「銀」を意味する「アルゲントゥム」が由来だ",
+"note": "KEEP. The name comes from Latin argentum (silver) through Spanish argentino, linked to the Rio de la Plata myth of silver."
+},
+{
+"a": "ar",
+"k": "culture",
+"t": "情熱的な踊りタンゴは、19世紀後半にアルゼンチンのブエノスアイレスなどラプラタ川沿いの港町で生まれた",
+"note": "KEEP. UNESCO ICH 00258 (2009, nominated by Argentina and Uruguay together) says tango was born among the urban lower classes of Buenos Aires and Montevideo in the late 19th century. 'など' keeps it fair to Uruguay."
+},
+{
+"a": "bo",
+"k": "flag",
+"t": "ボリビアの国旗は赤・黄・緑の三色で、黄色は国の豊かな資源を表す",
+"note": "FIXED. Supreme Decree 27630 (2004), Art. 1 (lexivox), says yellow represents 'nuestras riquezas y recursos naturales', meaning natural wealth and resources, not specifically minerals. Changed '鉱物資源' to '豊かな資源'."
+},
+{
+"a": "bo",
+"k": "geo",
+"t": "ボリビアのウユニ塩湖は世界最大の塩原で、雨季には空を映す「天空の鏡」になる",
+"note": "KEEP. Salar de Uyuni (about 10,500 km2) is the world's largest salt flat, and rain in the wet season turns it into a mirror. '天空の鏡' is the usual Japanese nickname."
+},
+{
+"a": "bo",
+"k": "geo",
+"t": "ボリビアのラパスは標高約3600mにあり、政府が置かれる都市としては世界一高い",
+"note": "KEEP. La Paz (about 3,640 m) is the world's highest seat of government. The wording avoids the question of Sucre as constitutional capital."
+},
+{
+"a": "bo",
+"k": "culture",
+"t": "ボリビアの国名は、南米独立の英雄シモン・ボリバルの名前にちなむ",
+"note": "KEEP. The republic was named after Simon Bolivar in 1825."
+},
+{
+"a": "br",
+"k": "flag",
+"t": "ブラジルの国旗の星空は、共和制が始まった1889年11月15日朝のリオデジャネイロの空を描いている",
+"note": "KEEP. Brazilian flag law says the celestial globe shows the sky over Rio de Janeiro at about 8:30 am on 15 Nov 1889, the day the Republic was proclaimed."
+},
+{
+"a": "br",
+"k": "geo",
+"t": "ブラジルは赤道と南回帰線の両方が国土を通る、世界で唯一の国だ",
+"note": "KEEP. Checked both lists. The Equator crosses Ecuador, Colombia, Brazil, Sao Tome and Principe, Gabon, Congo, DRC, Uganda, Kenya, Somalia, Indonesia and Kiribati. The Tropic of Capricorn crosses Chile, Argentina, Paraguay, Brazil, Namibia, Botswana, South Africa, Mozambique, Madagascar and Australia. Only Brazil is on both."
+},
+{
+"a": "br",
+"k": "culture",
+"t": "ブラジルの国名は、赤い染料がとれる木「パウ・ブラジル」に由来する",
+"note": "KEEP. The country is named after pau-brasil (brazilwood), a source of red dye exported in the 16th century."
+},
+{
+"a": "br",
+"k": "culture",
+"t": "ブラジルの首都ブラジリアは1960年に誕生した計画都市で、街の形が飛行機に例えられる",
+"note": "KEEP. Brasilia was inaugurated on 21 April 1960. Lucio Costa's Plano Piloto is often compared to an airplane or bird, and '例えられる' keeps that hedged."
+},
+{
+"a": "cl",
+"k": "flag",
+"t": "チリの国旗の白はアンデス山脈の雪、青は空、赤は独立のために流された血を表す",
+"note": "KEEP. Wikipedia 'Flag of Chile': blue is 'the sky and the Pacific Ocean', white is 'the snow-covered Andes', and red is 'the blood spilled to achieve independence'."
+},
+{
+"a": "cl",
+"k": "geo",
+"t": "チリは南北に約4300kmもあるのに、東西の幅は平均200km弱という細長い国だ",
+"note": "KEEP. Continental Chile is about 4,270 to 4,300 km long, with an average width of about 177 km (Geography of Chile)."
+},
+{
+"a": "cl",
+"k": "geo",
+"t": "チリのアタカマ砂漠は、極地を除けば世界で最も乾燥した場所といわれる",
+"note": "KEEP. The Atacama is the driest non-polar desert, and 'といわれる' hedges the claim."
+},
+{
+"a": "cl",
+"k": "culture",
+"t": "モアイ像で有名なイースター島（ラパ・ヌイ）は、チリの島だ",
+"note": "KEEP. Easter Island (Rapa Nui) has been part of Chile since it was annexed in 1888."
+},
+{
+"a": "co",
+"k": "flag",
+"t": "コロンビアの国旗は黄色が上半分を占め、青と赤が残りを半分ずつ分け合う",
+"note": "KEEP. The official proportions are yellow 1/2, blue 1/4 and red 1/4."
+},
+{
+"a": "co",
+"k": "geo",
+"t": "コロンビアは南アメリカで唯一、太平洋とカリブ海の両方に面する国だ",
+"note": "KEEP. Colombia is the only South American country with coasts on both the Pacific and the Caribbean. Venezuela has only Caribbean and Atlantic coasts, and Panama is in Central America."
+},
+{
+"a": "co",
+"k": "culture",
+"t": "コロンビアの国名は、探検家クリストファー・コロンブスにちなんで付けられた",
+"note": "KEEP. The country is named after Christopher Columbus (Cristobal Colon)."
+},
+{
+"a": "co",
+"k": "culture",
+"t": "『百年の孤独』で知られるノーベル文学賞作家ガルシア＝マルケスはコロンビア出身",
+"note": "KEEP. Gabriel Garcia Marquez was born in Aracataca, Colombia, and won the Nobel Prize in Literature in 1982."
+},
+{
+"a": "ec",
+"k": "flag",
+"t": "エクアドルの国旗の紋章には、翼を広げたコンドルとチンボラソ山が描かれている",
+"note": "KEEP. The coat of arms on the flag shows an Andean condor with spread wings above Mount Chimborazo, the Guayas River and a steamship (FOTW ec.html)."
+},
+{
+"a": "ec",
+"k": "geo",
+"t": "エクアドルのチンボラソ山の山頂は、地球の中心から最も遠い地点だ",
+"note": "KEEP. Because the Earth bulges at the equator, Chimborazo's summit (about 6,384 km from the centre) is the farthest point on the surface from Earth's centre."
+},
+{
+"a": "ec",
+"k": "culture",
+"t": "エクアドルの国名は、スペイン語でそのまま「赤道」という意味だ",
+"note": "KEEP. 'Ecuador' is the Spanish word for equator."
+},
+{
+"a": "ec",
+"k": "culture",
+"t": "パナマ帽は実はエクアドル生まれで、パナマ経由で世界に広まったためこの名になった",
+"note": "KEEP. Toquilla straw hats are Ecuadorian (UNESCO intangible heritage, 2012). The name comes from trade through Panama and their use by canal workers."
+},
+{
+"a": "gy",
+"k": "flag",
+"t": "ガイアナの国旗は「黄金の矢じり」と呼ばれ、金色は鉱物資源を表す",
+"note": "KEEP. The flag is officially nicknamed 'The Golden Arrowhead', and the gold arrowhead stands for mineral wealth."
+},
+{
+"a": "gy",
+"k": "geo",
+"t": "ガイアナのカイエトゥール滝は、約226mの高さを一気に流れ落ちる大迫力の滝だ",
+"note": "KEEP. Wikipedia gives Kaieteur Falls on the Potaro River a single drop of 226 m (741 ft) to the first break."
+},
+{
+"a": "gy",
+"k": "culture",
+"t": "ガイアナは南アメリカで唯一、英語を公用語とする国だ",
+"note": "KEEP. Guyana is the only sovereign South American state with English as its official language. The Falklands are a territory, not a country."
+},
+{
+"a": "gy",
+"k": "culture",
+"t": "ガイアナの国名は、先住民の言葉で「水の多い土地」を意味するといわれる",
+"note": "KEEP. 'Land of many waters' is the commonly cited Amerindian origin, and 'といわれる' hedges it."
+},
+{
+"a": "py",
+"k": "flag",
+"t": "パラグアイの国旗は、表と裏で中央の紋章が違う珍しい国旗だ",
+"note": "KEEP. The front shows the national coat of arms and the back shows the Treasury seal (a lion with 'Paz y Justicia')."
+},
+{
+"a": "py",
+"k": "geo",
+"t": "パラグアイはボリビアと並んで、南アメリカに2つしかない内陸国の1つだ",
+"note": "KEEP. Paraguay and Bolivia are the only landlocked countries in South America."
+},
+{
+"a": "py",
+"k": "culture",
+"t": "パラグアイでは先住民の言葉グアラニー語が、スペイン語と並ぶ公用語だ",
+"note": "KEEP. The 1992 constitution makes both Guarani and Spanish official languages."
+},
+{
+"a": "py",
+"k": "culture",
+"t": "パラグアイでは、冷たい水でいれるマテ茶「テレレ」が定番の飲み物だ",
+"note": "KEEP. Terere is yerba mate made with cold water, listed as UNESCO intangible heritage in 2020."
+},
+{
+"a": "pe",
+"k": "flag",
+"t": "ペルーの国旗の赤と白は、英雄サン・マルティンが見たフラミンゴの色が由来という伝説がある",
+"note": "KEEP. This is a popular legend about Jose de San Martin seeing red-and-white flamingos, and the sentence clearly calls it a legend."
+},
+{
+"a": "pe",
+"k": "geo",
+"t": "大河アマゾン川の源流は、太平洋に近いペルーのアンデス山中にある",
+"note": "KEEP. Wikipedia 'Source of the Amazon River' places every candidate source in the Peruvian Andes: Marañón/Lauricocha, Apurimac/Mismi and Mantaro/Rumi Cruz. Each is roughly 100 to 200 km from the Pacific coast."
+},
+{
+"a": "pe",
+"k": "culture",
+"t": "ペルーの「空中都市」マチュ・ピチュは、15世紀ごろに築かれたインカ帝国の遺跡だ",
+"note": "KEEP. Machu Picchu was built around 1450 under the Inca ruler Pachacuti."
+},
+{
+"a": "pe",
+"k": "culture",
+"t": "ジャガイモのふるさとはペルーなどのアンデス地方で、数千もの品種がある",
+"note": "KEEP. The potato was domesticated in the Andes of southern Peru and northwest Bolivia, and the International Potato Center (CIP) counts over 4,000 native varieties."
+},
+{
+"a": "sr",
+"k": "flag",
+"t": "スリナムの国旗の中央にある黄色い星は、国民の団結と明るい未来を表す",
+"note": "KEEP. Wikipedia 'Flag of Suriname': 'The yellow star represents unity and a golden future.'"
+},
+{
+"a": "sr",
+"k": "geo",
+"t": "スリナムは南アメリカで最も面積の小さい独立国だ",
+"note": "KEEP. Suriname is about 163,820 km2 and Uruguay about 176,000 km2, so Suriname is the smallest sovereign state in South America."
+},
+{
+"a": "sr",
+"k": "culture",
+"t": "スリナムは南アメリカで唯一、オランダ語を公用語とする国だ",
+"note": "KEEP. Dutch is Suriname's sole official language, and no other sovereign South American state uses it."
+},
+{
+"a": "sr",
+"k": "culture",
+"t": "スリナムの首都パラマリボには、オランダ時代の木造建築が並ぶ世界遺産の街並みがある",
+"note": "KEEP. The Historic Inner City of Paramaribo became a UNESCO World Heritage Site in 2002 for its Dutch colonial wooden architecture."
+},
+{
+"a": "uy",
+"k": "flag",
+"t": "ウルグアイの国旗の9本の縞は、独立当時の9つの県を表している",
+"note": "KEEP. The nine stripes stand for the nine original departments at the time of the 1830 constitution."
+},
+{
+"a": "uy",
+"k": "geo",
+"t": "ウルグアイはなだらかな国で、最高地点でも標高500mほどしかない",
+"note": "KEEP. The highest point is Cerro Catedral, about 514 m."
+},
+{
+"a": "uy",
+"k": "culture",
+"t": "ウルグアイの正式名称は「ウルグアイ東方共和国」で、「東方」はウルグアイ川の東側という意味だ",
+"note": "KEEP. The official name is Republica Oriental del Uruguay. 'Oriental' means the land east of the Uruguay River (the Banda Oriental)."
+},
+{
+"a": "uy",
+"k": "culture",
+"t": "1930年の第1回サッカーワールドカップはウルグアイで開かれ、地元ウルグアイが優勝した",
+"note": "KEEP. The first FIFA World Cup was held in Montevideo in 1930, and Uruguay beat Argentina 4-2 in the final."
+},
+{
+"a": "ve",
+"k": "flag",
+"t": "ベネズエラ・コロンビア・エクアドルの国旗が似ているのは、どれもかつての大コロンビアの旗がもとだから",
+"note": "KEEP. All three yellow-blue-red flags come from Miranda's tricolour, which Gran Colombia used."
+},
+{
+"a": "ve",
+"k": "geo",
+"t": "ベネズエラのエンジェルフォールは、途切れずに落ちる部分だけで約807mもあり、これは世界一の高さだ",
+"note": "FIXED. Wikipedia 'Angel Falls' says there is 'still uncertainty' whether the 979 m total or Tugela Falls is taller, so a flat 'tallest overall' claim is contested. The same article says the main plunge of 807 m makes it the 'world's tallest uninterrupted waterfall', which is not disputed. Tugela's longest single drop is about 411 m."
+},
+{
+"a": "ve",
+"k": "culture",
+"t": "ベネズエラの国名は、水上の家々を見た探検家が「小さなベネチア」と呼んだのが由来とされる",
+"note": "FIXED (hedged). The most popular account is that stilt houses on Lake Maracaibo reminded Vespucci or Ojeda's 1499 expedition of Venice, giving 'Veneziola'. Enciso's Summa de Geografia offers another theory, a native group called 'Veneciuela', so 'とされる' replaces the flat assertion."
+},
+{
+"a": "ve",
+"k": "culture",
+"t": "ベネズエラの定番料理「アレパ」は、トウモロコシ粉で作る丸い平焼きパンだ",
+"note": "KEEP. The arepa is a staple round flatbread made from maize flour in Venezuela, and also in Colombia."
+},
+{
+"a": "au",
+"k": "flag",
+"t": "オーストラリアの国旗の7本の光をもつ大きな星は「連邦の星」で、6本が6つの州、1本が準州を表す",
+"note": "KEPT: Commonwealth Star has 7 points, 6 for the original states and the 7th for the territories (Australian Govt flag symbolism)"
+},
+{
+"a": "au",
+"k": "geo",
+"t": "オーストラリアは、ひとつの大陸を丸ごと一国で占める世界で唯一の国",
+"note": "KEPT: standard textbook framing (オーストラリア大陸 = the mainland in the conventional six-continent model); it is the only continent occupied entirely by a single country"
+},
+{
+"a": "au",
+"k": "geo",
+"t": "オーストラリア北東沖のグレートバリアリーフは全長2000km以上、世界最大のサンゴ礁地帯",
+"note": "KEPT: about 2,300 km long, world's largest coral reef system (UNESCO)"
+},
+{
+"a": "au",
+"k": "culture",
+"t": "オーストラリアの首都キャンベラは、シドニーとメルボルンが首都の座を争った末に新しく造られた計画都市",
+"note": "KEPT: site chosen as a compromise in the Sydney-Melbourne rivalry; planned city designed by Walter Burley Griffin"
+},
+{
+"a": "fj",
+"k": "flag",
+"t": "フィジーの国旗の盾には、サトウキビ・ヤシの木・バナナと、平和を表すハトが描かれている",
+"note": "KEPT: shield quarters show sugarcane, coconut palm, dove of peace and bananas (lion holding a cocoa pod above)"
+},
+{
+"a": "fj",
+"k": "geo",
+"t": "180度の経線がフィジーのタベウニ島を通っているが、日付変更線は国内で日付が変わらないよう迂回している",
+"note": "KEPT: the 180th meridian crosses Taveuni (marker at Waiyevo); the International Date Line bends east around Fiji"
+},
+{
+"a": "fj",
+"k": "culture",
+"t": "フィジーでは、コショウ科の植物の根から作る飲み物「カバ」を歓迎の儀式で回し飲みする",
+"note": "KEPT: kava (yaqona) from Piper methysticum (Piperaceae) root, shared in sevusevu welcome ceremonies"
+},
+{
+"a": "fj",
+"k": "culture",
+"t": "フィジー初のオリンピックメダルは、2016年リオ大会の7人制ラグビーの金メダル",
+"note": "KEPT: men's rugby sevens gold at Rio 2016 was Fiji's first-ever Olympic medal"
+},
+{
+"a": "ki",
+"k": "flag",
+"t": "キリバスの国旗には、海から昇る太陽とその上を飛ぶグンカンドリが描かれている",
+"note": "KEPT: frigatebird flying over a rising sun above blue and white waves"
+},
+{
+"a": "ki",
+"k": "geo",
+"t": "キリバスは赤道と180度経線の両方にまたがり、北・南・東・西の4つの半球すべてに国土がある",
+"note": "KEPT: Kiribati straddles both the equator and the 180th meridian, lying in all four hemispheres"
+},
+{
+"a": "ki",
+"k": "geo",
+"t": "キリバスのライン諸島はUTC+14で、世界で一番早く新しい日を迎える場所",
+"note": "KEPT: Line Islands (Kiritimati) on UTC+14 since 1995; UTC+14 is the most advanced time zone in the world"
+},
+{
+"a": "ki",
+"k": "culture",
+"t": "国名「キリバス」は、旧名ギルバート諸島の「ギルバート」を現地語の発音で表したもの",
+"note": "KEPT: Kiribati is the Gilbertese rendering of 'Gilberts' (ti pronounced s)"
+},
+{
+"a": "mh",
+"k": "flag",
+"t": "マーシャル諸島の国旗の星にある24本の光は、国内の24の自治体を表している",
+"note": "KEPT: Flag of the Marshall Islands: the star's 24 points represent the 24 municipalities (electoral districts)"
+},
+{
+"a": "mh",
+"k": "geo",
+"t": "マーシャル諸島は29の環礁と5つの島からなり、国土のほとんどが海抜数メートルの低い土地",
+"note": "KEPT: CIA Factbook: 29 atolls and 5 single islands; average elevation about 2 m"
+},
+{
+"a": "mh",
+"k": "culture",
+"t": "マーシャル諸島では、ヤシの葉の芯と貝殻で波のうねりを表す「スティックチャート」を航海に使った",
+"note": "KEPT: stick charts made from coconut frond midribs showing ocean swells, with shells marking islands"
+},
+{
+"a": "mh",
+"k": "culture",
+"t": "水着の「ビキニ」の名前は、マーシャル諸島のビキニ環礁に由来する",
+"note": "KEPT: Louis Reard named his 1946 swimsuit after Bikini Atoll"
+},
+{
+"a": "fm",
+"k": "flag",
+"t": "ミクロネシア連邦の国旗の4つの白い星は、ヤップ・チューク・ポンペイ・コスラエの4州を表す",
+"note": "KEPT: the four stars stand for the four federated states"
+},
+{
+"a": "fm",
+"k": "geo",
+"t": "ミクロネシア連邦は600を超える島々からなり、東西3000km近くの広い海に散らばっている",
+"note": "TIGHTENED: sources give 2,700 km or 2,900 km (Wikipedia: '607 islands extending 2,900 kilometers across the Caroline Islands'), so the wording now covers both figures"
+},
+{
+"a": "fm",
+"k": "culture",
+"t": "ミクロネシア連邦のヤップ島には、直径数メートルにもなる巨大な石のお金「石貨」が今も残っている",
+"note": "KEPT: rai stones of Yap, up to about 3.6 m across, still used in ceremonial exchange"
+},
+{
+"a": "fm",
+"k": "culture",
+"t": "ミクロネシア連邦のポンペイ島にあるナンマトル遺跡は、玄武岩を積み上げて造った100以上の人工島からなる世界遺産",
+"note": "KEPT: UNESCO 1503: 'more than 100 islets off the south-east coast of Pohnpei constructed with walls of basalt and coral boulders'; inscribed 2016"
+},
+{
+"a": "nr",
+"k": "flag",
+"t": "ナウルの国旗の黄色い線は赤道、その下の白い星は赤道のすぐ南にあるナウルの位置を表す",
+"note": "KEPT: yellow stripe = equator; the 12-pointed star below it = Nauru's position just south of the equator"
+},
+{
+"a": "nr",
+"k": "geo",
+"t": "ナウルは面積約21km²で、世界で最も小さい共和国",
+"note": "KEPT: about 21 km2; the smaller Vatican and Monaco are not republics, and San Marino is about 61 km2"
+},
+{
+"a": "nr",
+"k": "geo",
+"t": "ナウルには法律で定められた首都がなく、議会のあるヤレン地区が事実上の首都",
+"note": "KEPT: no official capital; Yaren district, where parliament sits, is the de facto capital"
+},
+{
+"a": "nr",
+"k": "culture",
+"t": "ナウルは島でとれるリン鉱石の輸出で大きく栄えた歴史がある",
+"note": "KEPT: phosphate mining made Nauru very wealthy in the 1960s-70s"
+},
+{
+"a": "nz",
+"k": "flag",
+"t": "ニュージーランドの国旗の南十字星は赤い4つの星で、白い星を使うオーストラリア国旗と見分けるポイント",
+"note": "KEPT: NZ flag has four red stars with white borders; the Australian flag's stars are white"
+},
+{
+"a": "nz",
+"k": "geo",
+"t": "ニュージーランドの首都ウェリントンは、世界で最も南にある首都",
+"note": "KEPT: Wellington (about 41 S) is the southernmost capital of a sovereign state"
+},
+{
+"a": "nz",
+"k": "geo",
+"t": "ニュージーランドにもともといた陸の哺乳類はコウモリだけで、代わりにキーウィなど飛べない鳥が独自に進化した",
+"note": "KEPT: DOC: bats are NZ's only native land mammals; flightless birds such as kiwi and moa evolved there"
+},
+{
+"a": "nz",
+"k": "culture",
+"t": "ニュージーランドは1893年、自治を行う国として世界で初めて、すべての成人女性に国政選挙の投票権を認めた",
+"note": "TIGHTENED: earlier partial cases exist (e.g. Isle of Man 1881, property-owners only, not a country). NZHistory: 'first self-governing country in the world in which all women had the right to vote in parliamentary elections' (1893)"
+},
+{
+"a": "pw",
+"k": "flag",
+"t": "パラオの国旗の黄色い丸は青い海に浮かぶ満月で、中心より少し旗竿側に寄っている",
+"note": "KEPT: the yellow disc (full moon) sits slightly toward the hoist on a blue (ocean) field"
+},
+{
+"a": "pw",
+"k": "geo",
+"t": "パラオのロックアイランド群は、キノコのような形の小島が点在する世界遺産",
+"note": "KEPT: Rock Islands Southern Lagoon, UNESCO mixed site (2012), known for mushroom-shaped limestone islets"
+},
+{
+"a": "pw",
+"k": "culture",
+"t": "パラオ語には「ダイジョウブ」「デンキ」など、日本語から入った言葉がたくさんある",
+"note": "VERIFIED: Skritter blog list of Palauan loanwords includes daiziob (大丈夫) and dengki (電気), plus dengua, benzio and others; a dictionary of Japanese loanwords in Palauan has also been published (Japanese Embassy in Palau)"
+},
+{
+"a": "pw",
+"k": "culture",
+"t": "パラオは2009年、世界で初めて自国の海をサメの保護区にすると宣言した",
+"note": "KEPT: Palau declared the world's first national shark sanctuary in September 2009"
+},
+{
+"a": "pg",
+"k": "flag",
+"t": "パプアニューギニアの国旗は、1971年に当時15歳の女子学生がデザインしたもの",
+"note": "KEPT: Susan Karike, a 15-year-old schoolgirl, designed it in 1971"
+},
+{
+"a": "pg",
+"k": "flag",
+"t": "パプアニューギニアの国旗には、赤と黒の地に金色の極楽鳥と南十字星が描かれている",
+"note": "KEPT: diagonally divided red and black field with a golden bird of paradise and the Southern Cross"
+},
+{
+"a": "pg",
+"k": "geo",
+"t": "ニューギニア島は世界で2番目に大きな島で、パプアニューギニアはその東半分を占める",
+"note": "KEPT: New Guinea is second only to Greenland; PNG occupies the eastern half"
+},
+{
+"a": "pg",
+"k": "culture",
+"t": "パプアニューギニアでは800を超える言語が話され、世界で最も言語の多い国とされる",
+"note": "KEPT: Ethnologue counts about 840 living languages, the most of any country"
+},
+{
+"a": "ws",
+"k": "flag",
+"t": "サモアの国旗は赤地で、左上の青い部分に南十字星を表す5つの白い星がある",
+"note": "KEPT: red field with a blue canton bearing five white stars of the Southern Cross"
+},
+{
+"a": "ws",
+"k": "geo",
+"t": "サモアは2011年に日付変更線の西側へ移り、その年の12月30日がまるごと消えた",
+"note": "KEPT: Samoa skipped 30 December 2011 when it moved to the west side of the date line"
+},
+{
+"a": "ws",
+"k": "culture",
+"t": "サモアの伝統家屋「ファレ」には壁がなく、柱と屋根だけで風通しがよい",
+"note": "KEPT: the traditional Samoan fale is open-sided, with posts and a thatched roof"
+},
+{
+"a": "ws",
+"k": "culture",
+"t": "『宝島』の作者スティーブンソンは晩年をサモアで過ごし、バエア山の頂上に眠っている",
+"note": "KEPT: Robert Louis Stevenson lived at Vailima from 1890 to 1894 and is buried on the summit of Mount Vaea"
+},
+{
+"a": "sb",
+"k": "flag",
+"t": "ソロモン諸島の国旗は黄色の斜線で青と緑に分かれ、左上に5つの白い星が並ぶ",
+"note": "KEPT: a diagonal yellow stripe divides blue and green triangles; five white stars in the upper hoist"
+},
+{
+"a": "sb",
+"k": "geo",
+"t": "ソロモン諸島のレンネル島は世界最大の隆起サンゴ環礁で、東部が世界遺産になっている",
+"note": "KEPT: UNESCO: Rennell is the largest raised coral atoll in the world; East Rennell inscribed 1998"
+},
+{
+"a": "sb",
+"k": "culture",
+"t": "国名「ソロモン諸島」は、16世紀のスペイン人探検家がソロモン王の財宝伝説にちなんで名付けたもの",
+"note": "KEPT: Mendana's 1568 expedition named them Islas Salomon after King Solomon's legendary riches"
+},
+{
+"a": "sb",
+"k": "culture",
+"t": "ソロモン諸島のマライタ島では、貝殻を糸に通した「貝貨」が今も伝統的な儀式で使われている",
+"note": "KEPT: Langa Langa shell money from Malaita is still used for bride price and ceremonies"
+},
+{
+"a": "to",
+"k": "flag",
+"t": "トンガの国旗は、憲法で「決して変えてはならない」と定められている",
+"note": "KEPT: Constitution clause 47: the flag 'shall never be altered but shall always be the flag of the Kingdom'"
+},
+{
+"a": "to",
+"k": "geo",
+"t": "トンガは約170の島からなるが、人が住んでいるのはそのうち3分の1にも満たない",
+"note": "TIGHTENED: island counts vary by source (169, 171, 176) and inhabited counts too (36, 45, 52). The worst case, 52/169, is about 31%, so the old 3割 claim could fail; under one third holds for every pairing"
+},
+{
+"a": "to",
+"k": "culture",
+"t": "トンガは太平洋の島国で唯一、昔からの王制を一度も手放さずに守ってきた王国",
+"note": "REWRITTEN: 'never colonised' is hedged by sources (RNZ uses scare quotes; Tonga was a British protected state 1900-1970 with a British agent holding near-veto). Wikipedia (Tonga): 'the only Pacific nation never to have given up its monarchical government'"
+},
+{
+"a": "to",
+"k": "culture",
+"t": "ラグビーのトンガ代表は、試合前に「シピタウ」という伝統の踊りを披露する",
+"note": "KEPT: the Sipi Tau is the Tongan team's pre-match war dance"
+},
+{
+"a": "tv",
+"k": "flag",
+"t": "ツバルの国旗の9つの黄色い星は、国を構成する9つの島の配置を地図のように表している",
+"note": "KEPT: the nine stars are laid out like the nine islands on a map"
+},
+{
+"a": "tv",
+"k": "geo",
+"t": "ツバルは面積約26km²の小さな国で、最も高い地点でも海抜5mほどしかない",
+"note": "TIGHTENED: Wikipedia gives a 4.6 m high point (Niulakita) but the CIA Factbook lists 5 m, so 5mに届かない was changed to 5mほど. Area about 26 km2"
+},
+{
+"a": "tv",
+"k": "culture",
+"t": "国名「ツバル」は現地の言葉で「8つの島が並び立つ」という意味",
+"note": "KEPT: Tuvalu means 'eight standing together', referring to the eight traditionally inhabited islands"
+},
+{
+"a": "tv",
+"k": "culture",
+"t": "ツバルの国別ドメイン「.tv」はテレビを連想させるため、世界中の動画サイトなどで使われている",
+"note": "KEPT: the .tv ccTLD is widely licensed to streaming and media sites (e.g. twitch.tv)"
+},
+{
+"a": "vu",
+"k": "flag",
+"t": "バヌアツの国旗には、富の象徴である丸く曲がったブタの牙と、2枚のシダの葉が描かれている",
+"note": "KEPT: a curled boar's tusk (symbol of prosperity) with two crossed namele fern leaves"
+},
+{
+"a": "vu",
+"k": "geo",
+"t": "バヌアツのタンナ島にあるヤスール火山は、火口のふちまで近づいて噴火を見られることで知られる活火山",
+"note": "TIGHTENED: access to Mount Yasur closes at higher alert levels, so the wording now says it is known for this rather than always open. It erupts almost constantly and visitors can walk to the crater rim"
+},
+{
+"a": "vu",
+"k": "culture",
+"t": "バヌアツのペンテコスト島に伝わる儀式「ナゴール」は、バンジージャンプの起源とされる",
+"note": "KEPT: Naghol land diving on Pentecost Island inspired modern bungee jumping"
+},
+{
+"a": "vu",
+"k": "culture",
+"t": "バヌアツでは100を超える言語が話され、人口あたりの言語の数は世界有数",
+"note": "KEPT: over 100 local languages for about 300,000 people, among the highest language densities in the world"
+}
+]
