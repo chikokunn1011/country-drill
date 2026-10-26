@@ -414,3 +414,245 @@ test('migrate_rules', () => {
   assert.equal(K.migrate({ v: -1e9, s: { right: 5 } }, X).d.s.right, 5);
   for (const bad of [null, [], 7, 'x', undefined]) assert.deepEqual(plain(K.migrate(bad, X)), { d: plain(K.fresh()), ro: false });
 });
+
+// ---------- カタログと判定（Task 2） ----------
+const MODES4 = ['f2n', 'n2f', 'm2f', 'f2m'];
+const stepCount = list => list.reduce((n, b) => n + b.tiers.length, 0);
+const keysOf = list => plain(list.flatMap(b => b.tiers.map((_, i) => `${b.id}@${i + 1}`)));
+// DAY から n 日あとの 'YYYY-MM-DD'
+const dayAfter = n => new Date(Date.UTC(2026, 9, 25 + n)).toISOString().slice(0, 10);
+// カタログと、冒険なし（x0）・冒険あり記録なし（xr）の x
+function cat0() {
+  const { K, C, X } = core();
+  return { K, X, cat: K.makeCatalog(C), x0: K.makeCtx(X, null), xr: K.makeCtx(X, { snapshot: () => null }) };
+}
+const badge = (cat, id) => cat.find(b => b.id === id);
+const IDS = ['first-clear', 'answers', 'streak', 'overcome', 'micro', 'prac-perfect', 'chal-flawless', 'chal-grit', 'ta-clear', 'ta-speed',
+  'mode-f2n', 'mode-n2f', 'mode-m2f', 'mode-f2m', 'reg-samerica', 'reg-oceania', 'reg-namerica', 'reg-europe', 'reg-asia', 'reg-africa', 'reg-world',
+  'book', 'days', 'comeback', 'dopa-on', 'dopa-fever', 'rpg-start', 'rpg-first-win', 'rpg-lv', 'rpg-boss', 'rpg-final', 'rpg-nodmg', 'rpg-underdog',
+  'rpg-phoenix', 'rpg-friend', 'rpg-master', 'rpg-cards', 'rpg-bounty'];
+
+test('catalog_counts', () => {
+  const { K, cat, x0, xr } = cat0();
+  assert.equal(K.visible(cat, x0).length, 26);
+  assert.equal(stepCount(K.visible(cat, x0)), 66);
+  assert.equal(K.visible(cat, xr).length, 38);
+  assert.equal(stepCount(K.visible(cat, xr)), 86);
+  const byColor = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  for (const b of K.visible(cat, xr)) for (const t of b.tiers) byColor[t.color]++;
+  assert.deepEqual(byColor, { 1: 30, 2: 30, 3: 24, 4: 2 });
+});
+
+test('catalog_shape', () => {
+  const { K, cat } = cat0();
+  assert.deepEqual(plain(cat.map(b => b.id)), IDS);   // 設計書 §2.1→§2.7 の表の順
+  assert.deepEqual([...new Set(cat.map(b => b.cat))], ['quiz', 'kind', 'mode', 'region', 'daily', 'dopa', 'rpg']);
+  assert.deepEqual(plain(K.CAT_LABEL), { quiz: 'クイズ', kind: 'あそび方', mode: 'モード', region: '地域', daily: '図鑑・毎日', dopa: 'ドパガキ', rpg: '冒険' });
+  for (const b of cat) assert.match(b.id, /^[a-z0-9-]{1,32}$/);
+  assert.equal(new Set(cat.map(b => b.id)).size, cat.length);
+  for (const k of keysOf(cat)) assert.ok(K.KEY_RE.test(k), k);
+  const titles = cat.flatMap(b => b.tiers.map(t => t.title));
+  assert.equal(titles.length, 86);
+  assert.equal(new Set(titles).size, 86);
+  for (const t of titles) assert.ok(typeof t === 'string' && t && [...t].length <= 10, t);
+  for (const b of cat) for (const t of b.tiers) {
+    assert.ok(typeof t.desc === 'string' && t.desc.length > 0, b.id);
+    assert.ok(Number.isFinite(t.goal) && t.goal > 0, b.id);
+    assert.equal(typeof (t.v || b.v), 'function', b.id);
+  }
+  assert.deepEqual(Object.fromEntries(cat.filter(b => b.secret).map(b => [b.id, b.hint])), {
+    'chal-grit': '挑戦でつまずいた条件に、もう一度いどむと…',
+    comeback: 'しばらく旅に出て、また戻ってくると…',
+    'dopa-fever': 'ドパガキ向けで、王冠が見えるまで…',
+  });
+  assert.deepEqual(plain(cat.filter(b => b.rpg).map(b => b.id)), IDS.filter(id => id.startsWith('rpg-')));
+  assert.equal(cat.filter(b => b.rpg).length, 12);
+  // 印と単位
+  assert.deepEqual(plain(cat.filter(b => b.lower).map(b => b.id)), ['ta-speed']);
+  assert.deepEqual(plain(cat.filter(b => b.skill).map(b => b.id)), ['streak', 'overcome', 'micro', 'prac-perfect', 'chal-flawless', 'chal-grit',
+    'mode-f2n', 'mode-n2f', 'mode-m2f', 'mode-f2m', 'reg-samerica', 'reg-oceania', 'reg-namerica', 'reg-europe', 'reg-asia', 'reg-africa', 'reg-world', 'dopa-fever']);
+  assert.deepEqual(Object.fromEntries(cat.filter(b => b.unit).map(b => [b.id, b.unit])), {
+    answers: '問', streak: '問', overcome: 'か国', micro: 'か国', 'prac-perfect': '問', 'chal-flawless': '問', 'ta-clear': '問',
+    'mode-f2n': 'か国', 'mode-n2f': 'か国', 'mode-m2f': 'か国', 'mode-f2m': 'か国', book: 'か国', days: '日', 'rpg-boss': '地域', 'rpg-cards': 'か国', 'rpg-bounty': '日',
+  });
+  assert.deepEqual(plain(cat.filter(b => b.cat === 'mode').map(b => [b.mode, b.sub])),
+    [['f2n', '国旗→国名'], ['n2f', '国名→国旗'], ['m2f', '場所→国旗'], ['f2m', '国旗→場所']]);
+  assert.deepEqual(plain(cat.filter(b => b.cat === 'region').map(b => b.rk)), ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world']);
+  // 1段だけのバッジの色
+  assert.deepEqual(Object.fromEntries(cat.filter(b => b.tiers.length === 1).map(b => [b.id, b.tiers[0].color])), {
+    'first-clear': 1, micro: 2, 'chal-grit': 2, comeback: 1, 'dopa-on': 1, 'dopa-fever': 2, 'rpg-start': 1, 'rpg-first-win': 1, 'rpg-final': 4,
+    'rpg-nodmg': 2, 'rpg-underdog': 3, 'rpg-phoenix': 2, 'rpg-friend': 1, 'rpg-master': 2,
+  });
+});
+
+test('catalog_from_countries', () => {
+  const { K, cat } = cat0();
+  assert.equal(K.stepInfo(cat, 'micro@1').t.goal, 25);
+  assert.equal(K.stepInfo(cat, 'micro@1').color, 2);
+  assert.equal(K.stepInfo(cat, 'reg-asia@3').t.goal, 184);
+  assert.equal(K.stepInfo(cat, 'reg-world@3').t.goal, 780);
+  assert.equal(K.stepInfo(cat, 'reg-world@3').color, 4);
+  assert.equal(K.stepInfo(cat, 'rpg-final@1').color, 4);
+  assert.equal(badge(cat, 'reg-asia').tiers[0].desc, 'アジアで10問以上のゲームをクリア');
+  assert.equal(badge(cat, 'reg-asia').tiers[1].desc, 'アジアの「全部」をヒントなしでクリア');
+  assert.equal(badge(cat, 'reg-asia').tiers[2].desc, 'アジアの国すべてを4モードで正解');
+  assert.equal(badge(cat, 'reg-world').tiers[2].desc, '全世界の国すべてを4モードで正解');
+  assert.equal(K.stepInfo(cat, 'ta-speed@2').t.desc, 'タイムアタック10問以上を1問 2.0秒以内でクリア');
+  assert.equal(K.stepInfo(cat, 'answers@2').t.desc, '正解の合計が 1,000問');
+});
+
+test('step_info_and_labels', () => {
+  const { K, cat } = cat0();
+  const si = K.stepInfo(cat, 'reg-world@3');
+  assert.equal(si.b.id, 'reg-world');
+  assert.equal(si.t.title, '世界博士');
+  assert.equal(si.tier, 3);
+  assert.equal(K.stepInfo(cat, 'first-clear@1').t.title, 'ドリルの新人');
+  for (const k of ['answers@4', 'nope@1', 'answers', '', null, 5, 'constructor@1']) assert.equal(K.stepInfo(cat, k), null, String(k));
+  assert.deepEqual([1, 2, 3, 4].map(K.tierLabel), ['銅', '銀', '金', '虹']);
+  assert.equal(K.bestKey(cat, ['answers@1', 'reg-world@3', 'micro@1']), 'reg-world@3');
+  assert.equal(K.bestKey(cat, ['answers@2', 'micro@1']), 'micro@1');   // 同じ色なら後ろ
+  assert.equal(K.bestKey(cat, ['rpg-final@1', 'reg-world@3']), 'reg-world@3');
+});
+
+test('thresholds', () => {
+  const { K, cat, x0 } = cat0();
+  const ev = stats => { const d = K.fresh(); Object.assign(d.s, stats); return plain(K.evaluate(cat, d, x0)); };
+  assert.deepEqual(ev({ right: 99 }), []);
+  assert.deepEqual(ev({ right: 100 }), ['answers@1']);
+  assert.deepEqual(ev({ taAvg: 2001 }), ['ta-speed@1']);
+  assert.deepEqual(ev({ taAvg: 2000 }), ['ta-speed@1', 'ta-speed@2']);
+  assert.deepEqual(ev({ taAvg: 1401 }), ['ta-speed@1', 'ta-speed@2']);
+  assert.deepEqual(ev({ taAvg: 1400 }), ['ta-speed@1', 'ta-speed@2', 'ta-speed@3']);
+  assert.deepEqual(ev({ taAvg: 3500 }), []);
+  assert.deepEqual(ev({ taAvg: 0 }), []);
+  // 取ったステップは返さない（時刻が 0 でも）
+  const d = K.fresh(); d.s.right = 1000; d.got['answers@1'] = 0;
+  assert.deepEqual(plain(K.evaluate(cat, d, x0)), ['answers@2']);
+});
+
+test('reach_every_step', () => {
+  const { K, X, cat, xr } = cat0();
+  const rp = (t, detail) => ['rpg', t, K.pickRpg(t, detail, 'home'), DAY];
+  const ops = [];
+  for (const a of X.codes) for (const mode of MODES4) ops.push(ans(a, false, true, { mode }), ans(a, true, true, { mode }));
+  for (let i = 0; i < 4300; i++) ops.push(ans('jp', true, false));
+  ops.push(res({ outcome: 'quit', best: 100 }), res({ n: 40 }), res({ kind: 'challenge', n: 40 }),
+    res({ kind: 'challenge', region: 'アジア', n: 20, outcome: 'quit', wrongs: 1 }), res({ kind: 'challenge', region: 'アジア', n: 20 }),
+    res({ kind: 'ta', n: 40, timeMs: 40 * 1400 }));
+  for (const rk of X.REGION_IDS) ops.push(res({ region: X.regionOf(rk), n: X.poolSize(rk) }));
+  for (const a of X.codes) ops.push(['book', a]);
+  for (let i = 0; i < 30; i++) ops.push(res({ outcome: 'fail' }, { day: dayAfter(14 + i) }));   // DAY のあと14日あけて30日
+  ops.push(res({ best: 20 }, { dopa: true }));
+  ops.push(rp('coins', { reason: 'start' }),
+    rp('battle', { boss: true, win: true, mistakes: 0, revived: true, maxCombo: 3, lv: 1, recLv: 10 }), rp('levelup', { lv: 50 }));
+  for (const dungeon of X.DUNGEONS) ops.push(rp('clear', { dungeon }));
+  ops.push(rp('join', { via: 'learn', owned: 195 }), rp('promote', { via: 'learn', star: 2 }), rp('bounty', { totalDays: 30 }));
+  const d = run(K, X, ops);
+  const all = keysOf(cat);
+  assert.equal(all.length, 86);
+  assert.deepEqual(plain(K.evaluate(cat, d, xr)), all);
+});
+
+test('hint_does_not_count', () => {
+  const { K, X, cat, x0 } = cat0();
+  const ops = [];
+  for (const a of X.codes) for (const mode of MODES4) ops.push(ans(a, false, true, { mode, hint: true }), ans(a, true, true, { mode, hint: true }));
+  ops.push(res({ hint: true, kind: 'challenge', region: 'アジア', n: 46, best: 120 }), res({ hint: true, n: 46, region: 'アジア', best: 25 }, { dopa: true }),
+    res({ hint: true, kind: 'challenge', region: 'アジア', n: 20, outcome: 'quit', wrongs: 1 }), res({ hint: true, kind: 'challenge', region: 'アジア', n: 20 }));
+  const got = plain(K.evaluate(cat, run(K, X, ops), x0));
+  const skill = /^(prac-perfect|chal-flawless|chal-grit|mode-[a-z0-9]+|streak|overcome|micro|dopa-fever)@|^reg-[a-z]+@[23]$/;
+  assert.deepEqual(got.filter(k => skill.test(k)), []);
+  for (const k of ['answers@1', 'first-clear@1', 'reg-asia@1', 'dopa-on@1']) assert.ok(got.includes(k), k);
+});
+
+test('snapshot_robust', () => {
+  const { K, X, cat } = cat0();
+  const d = run(K, X, [ans('jp', true, true), res({ n: 10 })]);
+  const rpgs = [{ snapshot() { throw new Error('x'); } }, { snapshot: () => null }, { snapshot: () => ({}) }, { snapshot: () => ({ floors: null, st: 5 }) },
+    {}, { snapshot: () => 5 }, { snapshot: () => [1] }, { snapshot: () => ({ lv: 'x', owned: NaN, floors: 'asia', overcome: null, intro: undefined }) }];
+  for (const r of rpgs) {
+    const x = K.makeCtx(X, r);
+    assert.ok(x.snap === null || (typeof x.snap === 'object' && !Array.isArray(x.snap)));
+    assert.equal(x.rpg, true);
+    assert.doesNotThrow(() => K.evaluate(cat, d, x));
+    assert.doesNotThrow(() => K.listView(cat, d, x));
+    for (const b of K.visible(cat, x)) assert.ok(Number.isFinite(K.progressOf(b, d, x).ratio), b.id);
+  }
+  assert.equal(K.makeCtx(X, { snapshot() { throw new Error('x'); } }).snap, null);
+  assert.equal(K.makeCtx(X, {}).snap, null);
+  const x0 = K.makeCtx(X, null);
+  assert.equal(x0.rpg, false);
+  assert.equal(x0.snap, null);
+  assert.equal(x0.pools, X.pools);
+  assert.equal(x0.micro, X.micro);
+  assert.equal(K.snapOvercome(null), 0);
+  assert.equal(K.snapOvercome({ overcome: 5 }), 5);
+  assert.equal(K.snapOvercome({ overcome: { a: 1, b: 1 } }), 2);
+  assert.equal(K.snapOvercome({ st: { overcome: 7 } }), 7);
+  assert.equal(K.snapOvercome({ overcome: 3, st: { overcome: 9 } }), 9);
+  assert.equal(K.snapOvercome({ overcome: 'x', st: 5 }), 0);
+  // overcome は s.ov と snapshot の大きいほう
+  const ov = K.makeCtx(X, { snapshot: () => ({ overcome: { jp: 1, fr: 1, de: 1, it: 1, es: 1, pt: 1, gb: 1, us: 1, ca: 1, mx: 1 } }) });
+  assert.deepEqual(plain(K.evaluate(cat, K.fresh(), ov)), ['overcome@1', 'overcome@2']);
+});
+
+test('rpg_from_snapshot', () => {
+  const { K, X, cat } = cat0();
+  const ev = (snap, d = K.fresh()) => plain(K.evaluate(cat, d, K.makeCtx(X, { snapshot: () => snap })));
+  assert.deepEqual(ev({ lv: 30, owned: 100, floors: { asia: 5, europe: 5, africa: 5, world: 5, oceania: 4 }, st: { win: 1 }, bountyDays: 10 }),
+    ['rpg-start@1', 'rpg-first-win@1', 'rpg-lv@1', 'rpg-lv@2', 'rpg-boss@1', 'rpg-boss@2', 'rpg-final@1', 'rpg-cards@1', 'rpg-cards@2',
+      'rpg-bounty@1', 'rpg-bounty@2']);
+  assert.deepEqual(ev({ intro: false, lv: 1, st: { win: 0, lose: 0, flee: 0 } }), []);
+  assert.deepEqual(ev({ lv: 1, st: { lose: 1 } }), ['rpg-start@1']);
+  assert.deepEqual(ev({ intro: true }), ['rpg-start@1']);
+  assert.deepEqual(ev({ intro: false, lv: 5 }), []);   // intro があればそれだけで決める
+  // s.rpg.boss と floors は和集合（同じダンジョンは1つ）
+  const d = run(K, X, [['rpg', 'clear', { dungeon: 'asia' }, DAY], ['rpg', 'clear', { dungeon: 'samerica' }, DAY]]);
+  assert.deepEqual(ev({ intro: false, floors: { asia: 5, europe: 5 } }, d), ['rpg-boss@1', 'rpg-boss@2']);
+  // 冒険なしでは冒険のバッジを判定しない
+  assert.deepEqual(plain(K.evaluate(cat, d, K.makeCtx(X, null))), []);
+});
+
+test('progress_and_summary', () => {
+  const { K, cat, x0, xr } = cat0();
+  const d = K.fresh();
+  d.s.right = 150; d.got['answers@1'] = 1700000000000;
+  assert.deepEqual(plain(K.progressOf(badge(cat, 'answers'), d, x0)), { next: 1, v: 150, goal: 1000, ratio: 0.15 });
+  d.s.taAvg = 2430; d.got['ta-speed@1'] = 5;
+  const sp = K.progressOf(badge(cat, 'ta-speed'), d, x0);
+  assert.equal(sp.next, 1);
+  assert.equal(sp.ratio, 2000 / 2430);
+  assert.equal(K.progressOf(badge(cat, 'ta-speed'), K.fresh(), x0).ratio, 0);   // 記録なし
+  const e = K.fresh();
+  e.s.right = 6000; for (const k of ['answers@1', 'answers@2', 'answers@3']) e.got[k] = 1;
+  const full = K.progressOf(badge(cat, 'answers'), e, x0);
+  assert.equal(full.next, -1);
+  assert.equal(full.ratio, 1);
+  e.s.right = 100; e.got = { 'answers@1': 1 };
+  assert.equal(K.progressOf(badge(cat, 'answers'), e, x0).ratio, 0.1);
+  // 地域は段ごとの値
+  e.got = { 'reg-asia@1': 1, 'reg-asia@2': 1 };
+  assert.deepEqual(plain(K.progressOf(badge(cat, 'reg-asia'), e, x0)), { next: 2, v: 0, goal: 184, ratio: 0 });
+
+  const s = K.fresh();
+  s.s.right = 150;
+  s.got = { 'answers@1': 1700000000000, 'rpg-lv@1': 2, 'future@1': 3 };
+  assert.deepEqual(plain(K.summarize(cat, s, x0)), { got: 1, total: 26, byColor: { 1: 1, 2: 0, 3: 0, 4: 0 } });
+  assert.deepEqual(plain(K.summarize(cat, s, xr)), { got: 2, total: 38, byColor: { 1: 2, 2: 0, 3: 0, 4: 0 } });
+  // 色はそのバッジで取った一番上の段の色。バッジは1つと数える
+  s.got = { 'reg-world@1': 1, 'reg-world@3': 2, 'answers@2': 3 };
+  assert.deepEqual(plain(K.summarize(cat, s, x0)), { got: 2, total: 26, byColor: { 1: 0, 2: 1, 3: 0, 4: 1 } });
+
+  s.got = { 'answers@1': 1700000000000 };
+  const lv = K.listView(cat, s, x0);
+  assert.equal(lv.length, 26);
+  assert.equal(K.listView(cat, s, xr).length, 38);
+  const a = lv.find(b => b.id === 'answers');
+  assert.deepEqual(plain(a.tiers[0]), { key: 'answers@1', got: 1700000000000, title: 'こつこつ派', goal: 100, val: 150 });
+  assert.deepEqual(plain(a.tiers[1]), { key: 'answers@2', got: 0, title: '努力の人', goal: 1000, val: 150 });
+  assert.deepEqual(plain(Object.keys(a).sort()), ['cat', 'icon', 'id', 'name', 'tiers']);
+  assert.equal(a.name, 'こつこつ正解');
+  assert.equal(a.icon, '📚');
+  assert.equal(a.cat, 'quiz');
+});

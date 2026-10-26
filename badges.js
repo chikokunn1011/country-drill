@@ -243,7 +243,196 @@
     };
   }
 
-  const CORE = { VERSION, KEY_RE, MODE_BIT, makeX, fresh, sanitize, migrate, today, dayNum, addDay, applyResult, apply, pickResult, pickRpg, sidGate };
+  // ---------- カタログ（設計書 §2、§3.1） ----------
+  const CAT_LABEL = { quiz: 'クイズ', kind: 'あそび方', mode: 'モード', region: '地域', daily: '図鑑・毎日', dopa: 'ドパガキ', rpg: '冒険' };
+  const TIER_LABEL = ['', '銅', '銀', '金', '虹'];
+  const n0 = v => typeof v === 'number' && Number.isFinite(v) ? v : 0;      // snapshot の数（数でなければ 0）
+  const pop4 = m => (m & 1) + (m >> 1 & 1) + (m >> 2 & 1) + (m >> 3 & 1);  // 立っているモードのビットの数
+  const nKeys = o => Object.keys(o).length;
+
+  // snapshot の克服の数。overcome が数ならその値、オブジェクトならキーの数。st.overcome も同じに読み、大きいほう
+  function snapOvercome(snap) {
+    const one = v => v && typeof v === 'object' ? nKeys(v) : Math.max(0, n0(v));
+    return Math.max(one(snap?.overcome), one(snap?.st?.overcome));
+  }
+  // 冒険をはじめたか。intro が無い古い rpg.js では Lv かバトルの記録で決める
+  const snapStarted = snap => !!snap && (snap.intro !== undefined ? !!snap.intro
+    : n0(snap.lv) > 1 || n0(snap.st?.win) + n0(snap.st?.lose) + n0(snap.st?.flee) > 0);
+  // 倒したボスのダンジョン（s.rpg.boss と snapshot の floors[id] >= 5 の和）
+  const bossesOf = (s, x) => new Set([...s.rpg.boss, ...DUNGEONS.filter(id => n0(x.snap?.floors?.[id]) >= 5)]);
+
+  // 国の一覧（countries.js の COUNTRIES）からカタログを作る。並びは設計書 §2.1→§2.7 の表の順
+  function makeCatalog(list) {
+    const xt = makeX(list);
+    const T = (goal, title, desc, more) => ({ goal, title, desc, ...more });
+    // 3段のバッジ。titles は設計書の表の「銅 / 銀 / 金」をそのまま
+    const T3 = (goals, titles, desc) => { const ts = titles.split(' / '); return goals.map((g, i) => T(g, ts[i], desc(g))); };
+    const num = n => n.toLocaleString('ja-JP');
+    const modeBadge = (mode, icon, name, sub, titles) => ({
+      id: 'mode-' + mode, cat: 'mode', icon, name, sub, mode, unit: 'か国', skill: true,
+      v: (s, x) => x.pools.world.filter(a => s.m[a] & MODE_BIT[mode]).length,
+      tiers: T3([30, 100, 195], titles, g => `「${sub}」で ${g}か国にヒントなしで正解`),
+    });
+    const regionBadge = (rk, icon, name, titles) => {
+      const ts = titles.split(' / '), label = xt.label(rk);
+      return { id: 'reg-' + rk, cat: 'region', icon, name, rk, skill: true, tiers: [   // 地域は段ごとに v がちがう
+        T(1, ts[0], `${label}で10問以上のゲームをクリア`, { v: s => s.rc[rk] & 1 ? 1 : 0 }),
+        T(1, ts[1], `${label}の「全部」をヒントなしでクリア`, { v: s => s.rc[rk] & 2 ? 1 : 0 }),
+        T(xt.pools[rk].length * 4, ts[2], `${label}の国すべてを4モードで正解`,
+          { v: (s, x) => x.pools[rk].reduce((t, a) => t + pop4(s.m[a]), 0), color: rk === 'world' ? 4 : 3 }),
+      ] };
+    };
+    const one = (title, desc, color = 1) => [T(1, title, desc, { color })];   // 1段だけのバッジ
+    const badges = [
+      // 2.1 クイズ
+      { id: 'first-clear', cat: 'quiz', icon: '🌱', name: 'はじめの一歩', v: s => s.clears,
+        tiers: one('ドリルの新人', 'ゲームを1回クリアする（ヒントありでもOK）') },
+      { id: 'answers', cat: 'quiz', icon: '📚', name: 'こつこつ正解', unit: '問', v: s => s.right,
+        tiers: T3([100, 1000, 5000], 'こつこつ派 / 努力の人 / ドリルの鬼', g => `正解の合計が ${num(g)}問`) },
+      { id: 'streak', cat: 'quiz', icon: '🔗', name: 'れんぞく正解', unit: '問', skill: true, v: s => s.streak,
+        tiers: T3([10, 30, 100], '波に乗る人 / 止まらない人 / 百連の達人', g => `1回のゲームかバトルで ${g}問続けて正解（ヒントなし）`) },
+      { id: 'overcome', cat: 'quiz', icon: '💪', name: '苦手克服', unit: 'か国', skill: true,
+        v: (s, x) => Math.max(nKeys(s.ov), snapOvercome(x.snap)),
+        tiers: T3([1, 10, 50], 'リベンジャー / 苦手つぶし / にがて知らず', g => `苦手な国を ${g}か国克服（別のゲームでヒントなしの一発正解）`) },
+      { id: 'micro', cat: 'quiz', icon: '🔬', name: 'ちっちゃい国探検隊', unit: 'か国', skill: true,
+        v: (s, x) => x.micro.filter(a => s.m[a] > 0).length,
+        tiers: [T(xt.micro.length, 'ミクロの探検家', `面積 1,000km² 未満の国（${xt.micro.length}か国）すべてに、どれかのモードでヒントなしで正解`, { color: 2 })] },
+      // 2.2 あそび方
+      { id: 'prac-perfect', cat: 'kind', icon: '✨', name: 'ノーミス練習', unit: '問', skill: true, v: s => s.perf,
+        tiers: T3([10, 20, 40], 'ていねい派 / ノーミス職人 / 完璧主義者', g => `${g}問以上の練習を、まちがえ0でクリア（ヒントなし）`) },
+      { id: 'chal-flawless', cat: 'kind', icon: '🎯', name: '一発クリア', unit: '問', skill: true, v: s => s.flaw,
+        tiers: T3([10, 20, 40], '集中モード / 鉄の集中力 / ミスを知らない人', g => `${g}問以上の挑戦を、1回目でクリア（ヒントなし）`) },
+      { id: 'chal-grit', cat: 'kind', icon: '🧗', name: '七転び八起き', skill: true, secret: true, hint: '挑戦でつまずいた条件に、もう一度いどむと…', v: s => s.grit,
+        tiers: one('不屈の人', '挑戦（ヒントなし・10問以上）でまちがえたことのある条件（モード・地域・問題数が同じ）を、あとの別のゲームで1回目にクリア', 2) },
+      { id: 'ta-clear', cat: 'kind', icon: '⏱️', name: 'タイムアタッカー', unit: '問', v: s => s.ta,
+        tiers: T3([5, 20, 40], 'スピード見習い / タイムアタッカー / 秒速の旅人', g => `${g}問以上のタイムアタックをクリア`) },
+      { id: 'ta-speed', cat: 'kind', icon: '⚡', name: 'スピードスター', lower: true, v: s => s.taAvg,   // 小さいほどよい（これだけ）
+        tiers: T3([3000, 2000, 1400], 'せっかち名人 / スピードスター / 光速の目', g => `タイムアタック10問以上を1問 ${(g / 1000).toFixed(1)}秒以内でクリア`) },
+      // 2.3 モード
+      modeBadge('f2n', '🚩', '旗ソムリエ', '国旗→国名', '旗見習い / 旗ソムリエ / 国旗の達人'),
+      modeBadge('n2f', '🔍', '旗さがし名人', '国名→国旗', '旗さがし屋 / 旗えらび名人 / 旗の目きき'),
+      modeBadge('m2f', '🗺️', '地図よみ', '場所→国旗', '地図好き / 地図よみ名人 / 歩く地図帳'),
+      modeBadge('f2m', '📍', 'ピンポイント', '国旗→場所', '方向音痴卒業 / ピンポイント職人 / 人間GPS'),
+      // 2.4 地域
+      regionBadge('samerica', '🦙', '南米アドベンチャー', '南米の旅人 / 南米通 / 南米博士'),
+      regionBadge('oceania', '🐚', '南の島めぐり', '南の島の旅人 / オセアニア通 / オセアニア博士'),
+      regionBadge('namerica', '🌵', '北中米ロードトリップ', '北中米の旅人 / 北中米通 / 北中米博士'),
+      regionBadge('europe', '🏰', 'ヨーロッパ周遊', 'ヨーロッパの旅人 / ヨーロッパ通 / ヨーロッパ博士'),
+      regionBadge('asia', '🐼', 'アジア大陸横断', 'アジアの旅人 / アジア通 / アジア博士'),
+      regionBadge('africa', '🦁', 'アフリカ大冒険', 'アフリカの旅人 / アフリカ通 / アフリカ博士'),
+      regionBadge('world', '🌏', '世界一周', '世界の旅人 / 世界通 / 世界博士'),
+      // 2.5 図鑑・毎日
+      { id: 'book', cat: 'daily', icon: '📖', name: '図鑑めくり', unit: 'か国', v: s => nKeys(s.bk),
+        tiers: T3([10, 50, 195], '図鑑好き / 図鑑マニア / 歩く図鑑', g => `図鑑で ${g}か国を開く`) },
+      { id: 'days', cat: 'daily', icon: '📅', name: '通いなれた道', unit: '日', v: s => s.days,
+        tiers: T3([3, 10, 30], '常連さん / おなじみさん / ドリルが日課', g => `ゲームかバトルを終えた日が通算 ${g}日（連続でなくていい）`) },
+      { id: 'comeback', cat: 'daily', icon: '👋', name: 'おかえり！', secret: true, hint: 'しばらく旅に出て、また戻ってくると…', v: s => s.back,
+        tiers: one('帰ってきた旅人', '前に遊んだ日から14日以上あけて、また遊ぶ') },
+      // 2.6 ドパガキ
+      { id: 'dopa-on', cat: 'dopa', icon: '🎉', name: 'ドパミン解放', v: s => s.dopa,
+        tiers: one('お祭り好き', '「ドパガキ向け」ONでゲームをクリア') },
+      { id: 'dopa-fever', cat: 'dopa', icon: '🌈', name: 'フィーバータイム', skill: true, secret: true, hint: 'ドパガキ向けで、王冠が見えるまで…', v: s => s.fever,
+        tiers: one('フィーバー王', 'ドパガキ ON のヒントなしのゲームで、20問続けて正解（👑 COMBO が出る数）', 2) },
+      // 2.7 冒険（s.rpg と snapshot の大きいほう）
+      { id: 'rpg-start', cat: 'rpg', icon: '🎒', name: '旅立ち', rpg: true, v: (s, x) => s.rpg.start || snapStarted(x.snap) ? 1 : 0,
+        tiers: one('見習い旅人', '冒険をはじめる') },
+      { id: 'rpg-first-win', cat: 'rpg', icon: '⚔️', name: '初勝利', rpg: true, v: (s, x) => s.rpg.win || n0(x.snap?.st?.win) > 0 ? 1 : 0,
+        tiers: one('かけだし勇者', 'バトルにはじめて勝つ') },
+      { id: 'rpg-lv', cat: 'rpg', icon: '🧙', name: '旅人のレベル', rpg: true, v: (s, x) => Math.max(s.rpg.lv, n0(x.snap?.lv)),
+        tiers: T3([10, 30, 50], '一人前の旅人 / ベテラン旅人 / 伝説の旅人', g => `旅人のレベルが Lv ${g}`) },
+      { id: 'rpg-boss', cat: 'rpg', icon: '👑', name: '旗を取りもどせ', unit: '地域', rpg: true,
+        v: (s, x) => [...bossesOf(s, x)].filter(id => id !== 'world').length,
+        tiers: T3([1, 3, 6], '旗の守り手 / 三地域の勇者 / 六地域の勇者', g => `地域ボスを倒した数が ${g}地域`) },
+      { id: 'rpg-final', cat: 'rpg', icon: '👾', name: '世界を取りもどした', rpg: true, v: (s, x) => bossesOf(s, x).has('world') ? 1 : 0,
+        tiers: one('世界を取りもどした者', '地図喰いを倒す', 4) },
+      { id: 'rpg-nodmg', cat: 'rpg', icon: '🛡️', name: '無傷の勝利', rpg: true, v: s => s.rpg.nodmg,
+        tiers: one('無傷の旅人', 'ボスをミス0で倒す', 2) },
+      { id: 'rpg-underdog', cat: 'rpg', icon: '📜', name: '知識こそ力', rpg: true, v: s => s.rpg.under,
+        tiers: one('知識の勇者', '推奨 Lv より5以上低い Lv でボスに勝つ', 3) },
+      { id: 'rpg-phoenix', cat: 'rpg', icon: '💫', name: '不死鳥', rpg: true, v: s => s.rpg.phoenix,
+        tiers: one('不死鳥', '思い出して復活し、そのバトルに勝つ', 2) },
+      { id: 'rpg-friend', cat: 'rpg', icon: '🤝', name: '覚えて仲間に', rpg: true, v: s => s.rpg.friend,
+        tiers: one('国の友だち', 'なかよし度で、はじめて仲間ができる') },
+      { id: 'rpg-master', cat: 'rpg', icon: '🏅', name: 'マスター昇格', rpg: true, v: s => s.rpg.master,
+        tiers: one('4モードの達人', '覚えてシルバーに上がる', 2) },
+      { id: 'rpg-cards', cat: 'rpg', icon: '🗂️', name: '仲間あつめ', unit: 'か国', rpg: true, v: (s, x) => Math.max(s.rpg.owned, n0(x.snap?.owned)),
+        tiers: T3([50, 100, 195], '50か国の友 / 100か国の友 / 世界の友', g => `仲間の数が ${g}か国`) },
+      { id: 'rpg-bounty', cat: 'rpg', icon: '🔎', name: '手配書ハンター', unit: '日', rpg: true, v: (s, x) => Math.max(s.rpg.bounty, n0(x.snap?.bountyDays)),
+        tiers: T3([1, 10, 30], '新米探偵 / 敏腕探偵 / 名探偵', g => `手配書を全部達成した日が通算 ${g}日`) },
+    ];
+    // 段の色はふつう段の順（1 銅・2 銀・3 金）。1段だけのバッジと reg-world の金は color で決めてある
+    return badges.map(b => ({ ...b, tiers: b.tiers.map((t, i) => ({ ...t, color: t.color || i + 1 })) }));
+  }
+
+  // 判定に使う x。snapshot は例外・オブジェクトでないものを null にする
+  function makeCtx(X, rpg) {
+    let snap = null;
+    try { snap = rpg?.snapshot?.() ?? null; } catch { snap = null; }
+    if (!snap || typeof snap !== 'object' || Array.isArray(snap)) snap = null;
+    return { pools: X.pools, micro: X.micro, snap, rpg: !!rpg };
+  }
+
+  // ---------- 判定（設計書 §3.2） ----------
+  const stepKey = (b, i) => `${b.id}@${i + 1}`;
+  const valOf = (b, t, s, x) => (t.v || b.v)(s, x);
+  const reached = (b, t, v) => b.lower ? v > 0 && v <= t.goal : v >= t.goal;   // lower はバッジから読む
+  const visible = (cat, x) => cat.filter(b => !b.rpg || x.rpg);
+  // d.got にまだないステップのうち、条件に届いたもの（カタログの順・段の順。下の段が無くても上の段は取れる）
+  function evaluate(cat, d, x) {
+    const out = [];
+    for (const b of visible(cat, x)) b.tiers.forEach((t, i) => {
+      const key = stepKey(b, i);
+      if (!own(d.got, key) && reached(b, t, valOf(b, t, d.s, x))) out.push(key);
+    });
+    return out;
+  }
+
+  // ステップのキー → { b, t, tier(1始まり), color }。カタログに無ければ null
+  function stepInfo(cat, key) {
+    if (!isKey(key)) return null;
+    const at = key.lastIndexOf('@'), id = key.slice(0, at), tier = Number(key.slice(at + 1));
+    const b = cat.find(e => e.id === id), t = b?.tiers[tier - 1];
+    return t ? { b, t, tier, color: t.color } : null;
+  }
+  const tierLabel = color => TIER_LABEL[color] ?? '';
+  // color がいちばん大きいキー。同じなら後ろのもの。keys が空なら null
+  function bestKey(cat, keys) {
+    let best = null, top = -1;
+    for (const k of keys) { const c = stepInfo(cat, k)?.color ?? 0; if (c >= top) { best = k; top = c; } }
+    return best;
+  }
+
+  // 次の段への進み具合。next はまだ取っていない最初の段の添字（全部取ったら -1 で、値は最後の段）
+  function progressOf(b, d, x) {
+    const next = b.tiers.findIndex((_, i) => !own(d.got, stepKey(b, i)));
+    const t = b.tiers[next < 0 ? b.tiers.length - 1 : next], v = valOf(b, t, d.s, x), goal = t.goal;
+    const ratio = next < 0 ? 1 : b.lower ? (v > 0 ? Math.min(1, goal / v) : 0) : Math.min(1, v / goal);
+    return { next, v, goal, ratio };
+  }
+  // 見えているバッジの数。1段でも取ったバッジを数え、色はそのバッジで取った一番上の段の色
+  function summarize(cat, d, x) {
+    const list = visible(cat, x), byColor = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    let got = 0;
+    for (const b of list) {
+      let top = b.tiers.length - 1;
+      while (top >= 0 && !own(d.got, stepKey(b, top))) top--;
+      if (top >= 0) { got++; byColor[b.tiers[top].color]++; }
+    }
+    return { got, total: list.length, byColor };
+  }
+  // 表示用の一覧（window.BADGES.list()）。got は取った時刻か 0
+  function listView(cat, d, x) {
+    return visible(cat, x).map(b => ({
+      id: b.id, name: b.name, icon: b.icon, cat: b.cat,
+      tiers: b.tiers.map((t, i) => {
+        const key = stepKey(b, i);
+        return { key, got: own(d.got, key) ? d.got[key] : 0, title: t.title, goal: t.goal, val: valOf(b, t, d.s, x) };
+      }),
+    }));
+  }
+
+  const CORE = { VERSION, KEY_RE, MODE_BIT, makeX, fresh, sanitize, migrate, today, dayNum, addDay, applyResult, apply, pickResult, pickRpg, sidGate,
+    CAT_LABEL, makeCatalog, makeCtx, snapOvercome, reached, valOf, visible, evaluate, stepInfo, tierLabel, bestKey, progressOf, summarize, listView };
   globalThis.BADGES_CORE = CORE;
   if (typeof document === 'undefined') return;   // node の vm ではここで終わる
   // ---------- ブラウザ（Task 4 から） ----------
