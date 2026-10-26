@@ -425,6 +425,9 @@
     }
     if (r.hasM && confirm('まちがえた記録も入れかえる？')) { misses = r.m; store.set('misses', misses); }
     introAv = null;
+    const inp = $('rpg-code-in');   // ホームのまま描き直すと持ち越されるので、はりつけたコードと前のメッセージを消しておく
+    if (inp) inp.value = '';
+    sayData('');
     refresh();
     window.scrollTo({ top: 0 });
     toast('引き継ぎコードで復元したよ');

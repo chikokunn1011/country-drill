@@ -437,6 +437,29 @@ t('code_invalid', async page => {
   assert.equal(await text(page, '#rpg-code-msg'), 'コードが正しくないみたい');
 });
 
+t('code_restore_clears_msg', async page => {
+  // ホームのまま、まちがったコード → 正しいコードで復元できたら、前のメッセージとはりつけたコードは消える
+  await home(page, saveWith({ lv: 4 }));
+  await page.evaluate(() => { misses = { jp: 5 }; store.set('misses', misses); });
+  await page.click('#rpg-data summary');
+  await page.waitForFunction(() => $('rpg-code-out').value.startsWith('CQ1.'));
+  const code = await page.inputValue('#rpg-code-out');
+  await home(page, saveWith({ lv: 9 }));
+  const dlg = answerDialogs(page);
+  await page.click('#rpg-data summary');
+  await page.fill('#rpg-code-in', 'hello');
+  await page.click('#rpg-code-load');
+  assert.equal(await text(page, '#rpg-code-msg'), 'コードが正しくないみたい');
+  await page.fill('#rpg-code-in', code);
+  dlg.answers.push(true, true);
+  await page.click('#rpg-code-load');
+  assert.deepEqual(dlg.msgs, ['今のデータを上書きする？（Lv9・仲間0 → Lv4・仲間0）', 'まちがえた記録も入れかえる？']);
+  assert.equal((await readSave(page)).lv, 4);
+  assert.ok((await toastTexts(page)).includes('引き継ぎコードで復元したよ'));
+  assert.equal(await visible(page, '#rpg-hero'), true);   // ホームのまま描き直した
+  assert.deepEqual(await page.evaluate(() => [$('rpg-code-msg').textContent, $('rpg-code-in').value]), ['', '']);
+});
+
 t('code_copy', async page => {
   await home(page, saveWith({ lv: 3 }));
   // コピーできた
