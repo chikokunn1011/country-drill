@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, settleResult, PC, PHONE, QUIET_BADGES } from './helpers.mjs';
 import { measureFit, settleLayout, rectOf } from './layout.mjs';
-import { RPG_FILES } from './rpg_helpers.mjs';
+import { RPG_FILES, saveWith } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -188,8 +188,8 @@ test('missing_global_is_safe', { timeout: 60_000 }, async () => {
 const text = (page, sel) => page.locator(sel).innerText();
 const count = (page, sel) => page.locator(sel).count();
 const json = o => JSON.stringify(o);
-// 称号〈ドリルの新人〉をつけてあるセーブ（ホームに札が出る）
-const TITLED = { v: 1, got: { 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'first-clear': 2 } };
+// 称号〈ドリルの新人〉をつけてあるセーブ（ホームに札が出る）。sent 済みなので、本物の rpg.js と組ませてもさかのぼりの払い（●+50 のトースト）は出ない
+const TITLED = { v: 1, got: { 'first-clear@1': 1 }, eq: 'first-clear@1', sn: { 'first-clear': 2 }, sent: ['first-clear@1'] };
 // 最初の .bdg-tiles の、先頭から n 個のタイルの top
 const tileTops = (page, n) => page.evaluate(n => [...document.querySelector('.bdg-tiles').children].slice(0, n).map(e => Math.round(e.getBoundingClientRect().top)), n);
 const listenTitle = page => page.evaluate(() => document.addEventListener('badge:title', e => (window.__bt ||= []).push(e.detail)));
@@ -506,7 +506,8 @@ t('home_short_pc_fits', async page => {
 }, { viewport: { width: 1280, height: 577 }, blockScripts: [], storage: { badges: TITLED } });
 
 // 本物の rpg.js と badges.js: ホームのボタン5つ（プレイ・冒険・ランキング・バッジ・設定）と称号の札が、PC の5サイズで
-// 横にも縦にもスクロールせず、たがいに重ならず、画面の中にあり、ボタンの文字は1行（NEW とコインの小さい字もふくめて）
+// 横にも縦にもスクロールせず、たがいに重ならず、画面の中にあり、ボタンの文字は1行（NEW とコインの小さい字もふくめて）。
+// セーブはコイン 9,999 で旅立ち前（「冒険 ●9,999 NEW」= いちばん長い現実的な文字。1.2万 の形より 4桁のほうが長い）
 t('home_five_buttons_pc', async page => {
   const hit = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
   for (const [width, height] of [[900, 700], [1024, 768], [1280, 577], [1366, 657], [1920, 1080]]) {
@@ -537,7 +538,7 @@ t('home_five_buttons_pc', async page => {
       for (const q of m.boxes) if (p !== q) assert.ok(!hit(p, q), `${key}: ${p.id} と ${q.id} が重なる ${json({ p, q })}`);
     }
   }
-}, { viewport: { width: 900, height: 700 }, blockScripts: [], storage: { badges: TITLED } });
+}, { viewport: { width: 900, height: 700 }, blockScripts: [], storage: { badges: TITLED, rpg: saveWith({ coins: 9999, intro: false }) } });
 
 // いちばん長い称号でも 320px のホームからはみ出さない。[data-bdg-equip] は document のクリックで受ける（どこに置いたボタンでも）
 t('home_long_title_320', async page => {

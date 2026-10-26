@@ -1,7 +1,7 @@
 // 国旗クエストの入口（ホームの［冒険］・トップバーのコインのチップ・設定のスイッチ・直リンク #rpg）と冒険ホーム
 // （はじめての画面・旅人カード・レベルアップ・つぎにやること・ダンジョンの図版・今日の手配書・コインのかせぎ方・PC の列）、
 // 引き継ぎコード・冒険データを消す・開発用パネル・バッジとの連携（さかのぼりのトースト・称号・入れ子の tx）・RPG.snapshot()・タブ2つ
-// どのテストも badges.js を止めて開く（openRpg）。本物の badges.js とつなぐのは badges_real_integration だけ
+// どのテストも badges.js を止めて開く（openRpg）。本物の badges.js とつなぐのは badges_real_integration（旅立ちの払い）と badges_real_gacha_hold（ガチャの演出中の保留）の2つ
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -619,6 +619,33 @@ t('badges_real_integration', async page => {
   assert.equal(s.badgesPaid.filter(id => id === 'rpg-start@1').length, 1);
   assert.equal((await events(page, 'rpg:coins')).filter(e => e.reason === 'badge').length, 0);
 }, { blockScripts: [] });
+
+// 本物の badges.js と rpg.js: 10連で50か国目が仲間になると「仲間あつめ」(rpg-cards@1) が取れ、ガチャの演出中（reduced motion なら最後の rpg:pull から1秒）は
+// トーストを保留し、過ぎたら ●+50 のトーストを出す。払いは1回（badgesPaid と rpg:coins {reason:'badge'}）。ガチャで仲間になっても「覚えて仲間に」は取れない
+t('badges_real_gacha_hold', async page => {
+  // 南アメリカ以外の49か国を仲間にしておく → 南アメリカの10連で最初の NEW が50か国目
+  const codes = await page.evaluate(() => C.filter(c => c.r !== '南アメリカ').slice(0, 49).map(c => c.a));
+  await writeSave(page, saveWith({ coins: 1000, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  assert.deepEqual(await toastTexts(page), []);
+  await page.evaluate(() => RPG.open('gacha'));
+  await page.click('#ga-regions .chip[data-r="南アメリカ"]');
+  await page.click('#ga-10');
+  await page.waitForFunction(() => window.__ev.some(e => e.type === 'rpg:join' && e.via === 'gacha'));
+  assert.deepEqual((await events(page, 'badge:earned')).map(e => [e.id, e.retro]), [['rpg-cards@1', false]]);
+  await sleep(500);
+  assert.equal((await toastTexts(page)).filter(s => s.includes('仲間あつめ')).length, 0, '演出中なのにトーストが出ている');
+  const toast = page.locator('#toasts .toast', { hasText: '仲間あつめ' });
+  await toast.waitFor({ timeout: 2500 });
+  assert.match(await toast.innerText(), /●\+50/);
+  const s = await readSave(page);
+  assert.deepEqual(s.badgesPaid, ['rpg-cards@1']);
+  assert.deepEqual((await events(page, 'rpg:coins')).filter(e => e.reason === 'badge').map(e => e.delta), [50]);
+  // t の opts は before() より前に評価されるので ?bdgdebug=1 は付けられない → BADGES.debug ではなく localStorage を読む
+  const got = await page.evaluate(() => JSON.parse(localStorage.getItem('badges')).got);
+  assert.equal(typeof got['rpg-cards@1'], 'number');
+  assert.equal(got['rpg-friend@1'], undefined);
+}, { blockScripts: [], seed: 1, reducedMotion: 'reduce',
+  storage: { badges: { v: 1, got: { 'rpg-start@1': 1 }, eq: '', sn: { 'rpg-start': 2 }, sent: ['rpg-start@1'], tip: 3 } } });   // 旅立ちは取って払ってある（起動時のまとめのトーストを出さない）
 
 /* ---------- RPG.snapshot()・タブ2つ ---------- */
 t('snapshot_shape', async page => {

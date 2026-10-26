@@ -85,6 +85,13 @@
   body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) { width: min(100%, 1040px); }
   body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) > .btn { min-width: 0; flex: 1 1 0; }
 }
+/* ［冒険］と［バッジ］がそろって5つのとき（900〜1279 の1行と、badges.css の ≥1280 の2列。どちらも1つ 160〜167px）: 「冒険 ●9,999 NEW」（4〜5桁のコインと NEW）が
+   1行に入るように、左右の padding を 10px にして、コインと NEW のすき間を少し詰める（高さ・字の大きさは変えない。padding-inline だけなので badges.css / 上の padding-block はそのまま） */
+@media (min-width: 900px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) > .btn { padding-inline: 10px; }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) > #home-rpg .rpg-homecoin { margin-left: .25em; }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-badges) > #home-rpg .rpg-new { margin-left: .3em; padding-inline: 5px; }
+}
 /* 背の低い PC（1920×1080 を 150% など）のホームは縦1列のメニュー。［冒険］が増えても縦にスクロールしないように、ボタンを少し詰める */
 @media (min-width: 1280px) and (max-height: 760px) {
   body:not(.rpg-off) .home .menu:has(> #home-rpg) { gap: 6px; }
