@@ -261,7 +261,7 @@ t('next_action_rules', async page => {
   assert.ok(s.includes('全クリア！ 195か国を仲間にしよう（0/195）'), s);
   await page.click('#rpg-next');
   assert.deepEqual(await page.evaluate(() => RPG.opts), {});
-});
+}, { blockScripts: ['badges.js', 'rpg-battle.js'] });   // バトル画面が RPG.opts を受け取って空にするので、受け渡しの中身を見るためにバトルを止める
 
 t('dungeon_plates', async page => {
   await home(page, saveWith({ floors: { samerica: 2 } }));
@@ -289,7 +289,7 @@ t('dungeon_plates', async page => {
   await home(page, saveWith({ floors: ALL_CLEAR }));
   assert.equal(await page.evaluate(() => RPG.nextFloor(RPG.get())), null);
   assert.equal(await page.locator('.rpg-fl:disabled').count(), 0);
-});
+}, { blockScripts: ['badges.js', 'rpg-battle.js'] });   // next_action_rules と同じ理由
 
 t('hero_card', async page => {
   await home(page, saveWith({ lv: 12 }));

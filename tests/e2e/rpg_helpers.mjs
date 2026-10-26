@@ -1,4 +1,4 @@
-// 国旗クエスト（RPG）の e2e の共通部品。開くときは openRpg（badges.js を止めて、RPG のイベントとトーストを積む）
+// 国旗クエスト（RPG）の e2e の共通部品。開くときは openRpg（badges.js を止めて、RPG のイベントとトーストを積む）。バトルは startBattle・battleAnswer・winBattle
 import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './helpers.mjs';
 
 // RPG のファイル。既存のテストが「RPG がある」ことだけで落ちるときは、開くときに blockScripts: RPG_FILES を渡す
@@ -62,3 +62,31 @@ export async function playPractice(page, { mode = 'f2n', region = 'all', count =
 
 // 今の問題を国 a に置きかえる
 export const forceNext = (page, a) => page.evaluate(a => { G.queue.unshift(byA.get(a)); nextQuestion(); }, a);
+
+// ---- バトル（rpg-battle.js） ----
+// 出題から TUNING.battle.guardMs たつまで待つ（その間の選択肢のクリックは無視される）
+export const battleGuard = page => page.waitForFunction(() => performance.now() - RPG_BATTLE.state().shownAt >= RPG_CORE.TUNING.battle.guardMs);
+// RPG_BATTLE.start → 登場画面の［たたかう］→ 最初の問題が出るまで
+export async function startBattle(page, id, floor) {
+  await page.evaluate(([id, floor]) => RPG_BATTLE.start(id, floor), [id, floor]);
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+}
+// いまの問題に正解／不正解で答える。不正解なら答え合わせの［つぎへ］まで押す。
+// 正解なら次の問題が出る（shownAt が変わる）か、バトルが終わる・思い出して復活に入るまで待つ
+export async function battleAnswer(page, right) {
+  await battleGuard(page);
+  const { a, shownAt, phase } = await page.evaluate(() => ({ a: RPG_BATTLE.cur(), ...RPG_BATTLE.state() }));
+  await page.locator(right ? `#scr-battle .choice[data-a="${a}"]` : `#scr-battle .choice:not([data-a="${a}"])`).first().click();
+  if (!right) { await page.click('#bt-next'); return; }
+  await page.waitForFunction(([t0, p0]) => {
+    const s = RPG_BATTLE.state();
+    return s.shownAt !== t0 || s.phase === 'end' || (s.phase === 'revive' && p0 !== 'revive');
+  }, [shownAt, phase]);
+}
+// 終わるまで正解し続ける。正解した数を返す
+export async function winBattle(page) {
+  let n = 0;
+  while (await page.evaluate(() => RPG_BATTLE.state().phase) !== 'end') { await battleAnswer(page, true); n++; }
+  return n;
+}

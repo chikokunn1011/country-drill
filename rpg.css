@@ -188,3 +188,75 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
   #scr-rpg[data-view="home"] { grid-template-columns: 320px minmax(0, 1fr) 360px; grid-template-areas: "side main aside"; grid-template-rows: auto; }
   #scr-rpg .rpg-aside { position: sticky; top: 16px; }
 }
+
+/* ---- バトル（Task 9: rpg-battle.js の #scr-battle。最低限の見た目。スマホの上部固定・短い画面・PC のステージは Task 10） ---- */
+/* .rpg-stage の1つ目の子が上の列（.rpg-btop）、2つ目の子が問題の列（.rpg-bcol: 登場画面・.bq・答え合わせ・終わり） */
+.rpg-stage { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rpg-btop {
+  display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 10px 14px; border: 1px solid var(--line); border-radius: 16px;
+  background: color-mix(in srgb, var(--rpg-c, var(--line)) 10%, var(--surface));
+}
+.rpg-bhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#bt-flee { padding-inline: 0; }
+.rpg-bwhere { font: 700 .9rem var(--font-display); color: var(--muted); }
+/* モンスター（絵文字）。ボスは丸い「地図帳のスタンプ」の枠と BOSS の札 */
+.rpg-mon { position: relative; align-self: center; display: flex; flex-direction: column; align-items: center; }
+.rpg-mon-e { font-size: clamp(64px, 18vw, 96px); line-height: 1.1; filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--ink) 20%, transparent)); }
+.rpg-mon.rpg-boss { padding: 6px 20px 4px; border: 3px double var(--rpg-c, var(--line)); border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--rpg-c, var(--hl)) 30%, transparent), transparent); }
+.rpg-bosstag { margin-top: -6px; padding: 0 6px; border-radius: 4px; background: var(--ink); color: var(--surface); font: 700 .7rem var(--font-mono); letter-spacing: .14em; }
+.rpg-dmg { position: absolute; top: 0; left: 50%; transform: translateX(-50%); pointer-events: none; font: 900 1.3rem var(--font-mono); color: var(--ng); }
+/* HP バー（50% 未満で黄、25% 未満で赤）と数字・のこりミス */
+.rpg-hpl { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: .85rem; }
+.rpg-hpname { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rpg-hp { flex: 1 1 auto; min-width: 48px; height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.rpg-hp > i { display: block; height: 100%; background: var(--ok); }
+.rpg-hp.is-mid > i { background: var(--hl); }
+.rpg-hp.is-low > i { background: var(--ng); }
+.rpg-hpnum { font: 500 .8rem var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rpg-left { font: 700 .8rem var(--font-display); color: var(--muted); white-space: nowrap; }
+/* 仲間3枚（国旗は欠けさせない: contain） */
+.rpg-party { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; }
+.rpg-pc { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .75rem; }
+.rpg-pc img { width: 44px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
+.rpg-stars { color: var(--hl); letter-spacing: -.05em; }
+/* 取りもどした旗: 布（?）→ 本物の国旗。「旗 n/N」の文字は普段は隠す（Task 10 の短い画面で使う） */
+.rpg-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.rpg-got, .rpg-cloth { width: 32px; aspect-ratio: 4 / 3; border-radius: 3px; }
+.rpg-got { object-fit: contain; border: 1px solid var(--line); background: var(--bg); }
+.rpg-cloth { display: grid; place-items: center; border: 1px dashed var(--muted); color: var(--muted); font: 700 .7rem var(--font-mono);
+  background: repeating-linear-gradient(45deg, var(--line) 0 3px, var(--surface) 3px 6px); }
+.rpg-flagtext { display: none; }
+.rpg-log { min-height: 1.5em; font-size: .85rem; line-height: 1.5; }
+.rpg-log p { margin: 0; }
+.rpg-log p:not(:last-child) { color: var(--muted); }
+/* 問題の列。外枠は .bq（.qcard と #qcard はクイズのもの）。中は index.html の .qlabel .qflag .qbig .choices .choice .flagc を使う */
+.rpg-bcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.bq { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
+.rpg-rvh { margin: 0; font: 900 1.1rem var(--font-display); color: var(--ng); text-align: center; text-wrap: balance; }
+.rpg-rvh small { margin-left: .4em; font: 500 .8rem var(--font-mono); color: var(--muted); }
+.rpg-tags { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.rpg-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--hl); background: color-mix(in srgb, var(--hl) 16%, var(--surface)); font: 700 .75rem var(--font-display); white-space: nowrap; }
+#scr-battle .choice { touch-action: manipulation; }
+/* 登場画面と終わりの画面 */
+.rpg-bintro, .rpg-bend { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.rpg-bintro p, .rpg-bend p { margin: 0; }
+.rpg-bmeet { font: 700 1.15rem var(--font-display); text-wrap: balance; word-break: auto-phrase; }
+.rpg-bmeet-e { margin-right: .2em; font-size: 1.6em; vertical-align: middle; }
+.rpg-bline { font-size: .92rem; text-wrap: balance; word-break: auto-phrase; }
+#bt-fight { min-width: 200px; }
+.rpg-bend-h { font: 900 1.4rem/1.35 var(--font-display); text-wrap: balance; word-break: auto-phrase; }
+.rpg-bend-h small { font-size: .65em; white-space: nowrap; }
+.rpg-bend-x { font: 900 1.15rem var(--font-display); color: var(--accent); }
+.rpg-bend .misslist { text-align: left; }
+.rpg-bend .row { margin-top: 6px; }
+/* PC の並べ方（2列のステージ）は Task 10。それまでは1列のまま、読みやすい幅にとどめる */
+@media (min-width: 900px) { .rpg-stage { width: 100%; max-width: 760px; margin-inline: auto; } }
+/* 動き（当たるとモンスターが横に揺れて白く光る・ダメージの数字が浮かぶ・HP バーが縮む）。reduced motion では止める */
+@media (prefers-reduced-motion: no-preference) {
+  .rpg-hp > i { transition: width .3s; }
+  .rpg-mon.rpg-hit .rpg-mon-e { animation: rpg-hit .4s; }
+  .rpg-dmg { animation: rpg-dmg .9s ease-out forwards; }
+  @keyframes rpg-hit { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); filter: brightness(1.8); } 50% { transform: translateX(7px); } 80% { transform: translateX(-3px); } }
+  @keyframes rpg-dmg { 0% { opacity: 0; transform: translate(-50%, 0) scale(.7); } 20% { opacity: 1; transform: translate(-50%, -8px) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -48px); } }
+}
