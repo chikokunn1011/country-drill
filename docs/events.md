@@ -1,6 +1,6 @@
 # イベントの約束（index.html ⇄ 機能ファイル）
 
-index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `rpg-battle.js` `badges.js`）は、`document` に出す CustomEvent と、6章の共通の部品だけでつながる。機能ファイルどうしは CustomEvent と `window.RPG` `window.BADGES` でつながる。RPG とバッジの実装はこの文書に従う。
+index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `rpg-battle.js` `badges.js`）は、主に `document` に出す CustomEvent と6章の共通の部品でつながる（ほかに、9章の起動時チェックに挙げる index.html のグローバルを読む）。機能ファイルどうしは CustomEvent と `window.RPG` `window.BADGES` でつながる。RPG とバッジの実装はこの文書に従う。
 
 - 元にした設計書: RPG 設計（`docs/superpowers/specs/2026-10-26-rpg-design.md`）§10.2・§10.3、バッジ設計（`docs/superpowers/specs/2026-10-26-badges-design.md`）§5.3・§8・§9.2
 - 2つが食い違う所は、共通フック＋豆知識の設計書（`docs/superpowers/specs/2026-10-26-platform-hooks-trivia-design.md`）§2 の決め方に合わせてある
@@ -89,11 +89,13 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `toast(html, ms)` | お知らせを出す（`ms` の既定は 2800）。`html` は innerHTML になるので、文字は `esc()` を通す。`#toasts`（初めて呼ばれたときに `body` の最後に作る。`aria-live="polite"`）に足し、`ms` ミリ秒で消える。位置はスマホは画面の上のまん中、PC（900px〜）は右上（トップバーの［図鑑］［設定］の下）。CSS はバッジ設計 §5.3 |
 | `endGame(outcome)` | `drill:result` を出してゲームを閉じる（`G.ended = true`）。2回目からは何もしない。index.html の中で使う。機能ファイルが別の画面に移れば `show()` が `'quit'` で閉じるので、ふつうは呼ばない |
 | `#topbar-extra` | トップバーの差し込み口（`<div id="topbar-extra" class="row">`。ロゴと［図鑑］［設定］の間）。コイン・称号などのチップを入れる。空なら見えない（`:empty`）。トップバーはホームでは隠れる |
-| `#r-ext` | 結果画面の差し込み口（`<div class="r-ext" id="r-ext">`）。結果カードの `#r-side` の中の最後（ランキングの欄・まちがえた国の下）。空なら見えない。PC は `#r-side` に何か入ったときだけ右の列が出る |
+| `#r-ext` | 結果画面の差し込み口（`<div class="r-ext" id="r-ext">`）。中身は rpg.js のもの（表の下を見る）。結果カードの `#r-side` の中の最後（ランキングの欄・まちがえた国の下）。空なら見えない。PC は `#r-side` に何か入ったときだけ右の列が出る |
 | `document.body.dataset.screen` | 今の画面の名前（`show()` が毎回入れる）。起動時に今の画面を知るのに使う |
 | `window.TRIVIA` | 豆知識（`trivia.js`）。`{ [a]: [{k, t}] }`。`k` は `'flag'｜'geo'｜'culture'`、`t` は文。読めないこともあるので `window.TRIVIA?.[a]` で読み、`Array.isArray` で配列か確かめる。中の項目も壊れているかもしれない前提で読み、文字は `esc()` を通す |
 
 `#r-ext` に書きこんでよいのは、`outcome === 'clear'` の `drill:result` のリスナーの中だけ。`#r-ext` が新しく作られているのはこのときだけ（`showResult()` が `#rcard` を作り直した直後）。`'fail'` と `'quit'` のときの `#rcard` には、前のゲームの `#r-ext` が残っているか、まだ1つも無いので、書きこまない。
+
+`#r-ext` の中身は rpg.js のもの（`innerHTML` で書きかえる）。バッジなどほかの機能は `#r-ext` の中に入れず、`#r-side` の中で `#r-ext` の直前に自分の要素を差し込む（同じく `outcome === 'clear'` のときだけ）。
 
 ## 7. rpg.js / rpg-battle.js → ほかの機能（バッジなど）
 
@@ -130,15 +132,15 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - `badge:earned` の `id` はステップのキー（`'reg-asia@2'`）。`badge`（`'reg-asia'`）・`tier`（`2`）・`color`（`1`〜`4`）・`title`（称号）は足したキー。rpg.js は `id` で二重払いを防ぐ。
 - RPG 設計 §10.3 の `badge:earned {id, tier?, title?}` は、この detail の一部（キーを足しただけ）。ずれはバッジ設計 §8.4 で決めたとおり。
 - `retro: true` は、起動時のさかのぼりと、rpg.js があとから入ったときの払い残しのとき。
-- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）か `false`（払えなかった）を書く。`undefined`（書いていない）は古い rpg.js。
+- badges.js は `emit()` ではなく `const ev = new CustomEvent('badge:earned', { detail }); document.dispatchEvent(ev);` で出し、そのあと `ev.detail.paid` を読む。rpg.js はリスナーの中で同期で `e.detail.paid` に `50`（払った額）・`0`（もう払ってある）・`false`（払えなかった）のどれかを書く。`undefined`（書いていない）は古い rpg.js。badges.js は `0` を「払った」とみなし（送り直さない）、●+ は出さない（●+ を出すのは `paid` が1以上の数のときだけ）。
 - rpg.js は `badge:earned` ではトーストを出さずに払う（コインのチップだけ更新する）。●+50 はバッジ側のパネルとトーストに出す。ただし `retro: true` で新しく払った分は、まとめて1回だけ「バッジのごほうび ●+合計」のトーストを出してよい（バッジ設計 §8.4 #1）。
 - 称号は `window.BADGES?.title?.()`（かっこなしの文字列。なければ `''`）があれば、旅人カードに〈〉を付けて出す。`badge:title` が来たら描き直す。
 
 ## 9. 読み込みの順番
 
 - 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-battle.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
-- CSS は head の style のあとに `rpg.css` → `badges.css`。
+- CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
 - 起動時に使うグローバルを `typeof` で確かめ、足りなければ `console.error('[rpg] …')` のように出して何もしない（ボタンも画面も作らない）。クイズはそのまま動く。
-- index.html のフックと機能ファイルは同じコミットで公開し、`?v=` を付けて（上げて）キャッシュの食い違いを防ぐ。
+- 機能ファイルと、それを読みこむ index.html の行は同じコミットで公開し、`?v=` を上げる（キャッシュの食い違いを防ぐ）。
