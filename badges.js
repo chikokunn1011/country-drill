@@ -871,7 +871,12 @@
     deliver(bs.commit());          // ホームの札とバッジ画面も、ここで描き直す
     emitTitle(key || null);
     redrawDialog();
-    if (key && key !== was && S.dopa && !reduced()) FX.pop('称号チェンジ！', 'small');   // つけた称号が変わった（外したときは出さない）
+    if (key && key !== was && S.dopa && !reduced()) {   // つけた称号が変わった（外したときは出さない）
+      FX.pop('称号チェンジ！', 'small');
+      // FX.pop は body に足すが、showModal の #detail は top layer で z-index に関係なく上に来る。開いたままなら中へ移す
+      const popEl = $('detail').open && document.querySelector('body > .fx-pop');
+      if (popEl) $('detail').append(popEl);
+    }
   }
   // 地域・モードのバッジの条件でモード選択へ（P.name は変えない。詳細の注意書きで知らせる）
   function practice(id) {
@@ -904,7 +909,7 @@
     if (el) {
       const v = el.dataset;
       if ('bdgEquip' in v) equip(v.bdgEquip);
-      else if ('bdgPick' in v) { equip(v.bdgPick); $('detail').close(); }
+      else if ('bdgPick' in v) { $('detail').close(); equip(v.bdgPick); }   // 先に閉じる（ポップを body に残して見えるように）
       else if ('bdgOpen' in v) open(v.bdgOpen || undefined);
       else if ('bdgDetail' in v) openDetail(v.bdgDetail);
       else if ('bdgPractice' in v) practice(v.bdgPractice);
@@ -958,6 +963,7 @@
   };
   // 詳細を閉じたら、開いていたバッジのタイルにフォーカスを戻す（開いたときにタイルを描き直したので、元のタイルはもう無い）
   $('detail').addEventListener('close', () => {
+    $('detail').querySelector(':scope > .fx-pop')?.remove();   // 中へ移したポップが次に開いたときに出直さないように
     const id = $('detail-inner').querySelector(':scope > .bdg-detail')?.dataset.id;
     if (id && document.activeElement === document.body) $('bdg-list').querySelector(`[data-bdg-detail="${id}"]`)?.focus();
   });

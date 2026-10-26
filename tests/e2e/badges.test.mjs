@@ -498,6 +498,7 @@ t('book_toast_after_dialog', async page => {
   await toast.waitFor();
   const s = await toast.innerText();
   for (const w of ['銅', '称号〈図鑑好き〉']) assert.ok(s.includes(w), `${w} が無い: ${s}`);
+  await toast.evaluate(e => Promise.all(e.getAnimations({ subtree: true }).map(a => a.finished)));   // 出るときの動き（translateY）の途中だと高さが 43.99… になる
   const h = await toast.locator('[data-bdg-equip="book@1"]').evaluate(e => e.getBoundingClientRect().height);
   assert.ok(h >= 44, `［つける］の高さ ${h}`);
 }, { storage: { badges: { v: 1, eq: '' } } });
@@ -874,8 +875,15 @@ t('dopa_effects', async page => {
   await page.evaluate(() => BADGES.open('answers'));
   await page.click('#detail [data-bdg-equip="answers@1"]');
   assert.ok((await fxCalls(page)).some(c => json(c) === json(['pop', '称号チェンジ！', 'small'])), json(await fxCalls(page)));
+  // #detail は showModal の top layer。ポップはその中に移っていないと下に隠れる
+  assert.ok(await page.evaluate(() => document.querySelector('.fx-pop')?.parentElement === $('detail')));
   await page.evaluate(() => { $('detail').close(); show('badges'); });
   assert.ok(await badgeAnims(page) > 0);
+  await page.waitForFunction(() => !document.querySelector('#detail > .fx-pop'));   // 次に開いたとき出直さない
+  // 称号えらび（つけてすぐ閉じる）では body に出たまま
+  await page.click('#bdg-change');
+  await page.click('#detail [data-bdg-pick="answers@2"]');
+  assert.ok(await page.evaluate(() => !$('detail').open && document.querySelector('.fx-pop')?.parentElement === document.body));
 }, { viewport: PC, reducedMotion: 'no-preference', storage: { settings: DOPA } });
 
 t('dopa_off_quiet', async page => {
