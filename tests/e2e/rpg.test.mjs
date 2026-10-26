@@ -341,6 +341,19 @@ t('works_without_rpg', async (page, app) => {
     assert.deepEqual(bare.errors.map(String), []);
     assert.deepEqual(bare.consoleErrors.filter(s => s.startsWith('[rpg]')), []);
   } finally { await bare.close(); }
+  // rpg.js だけが無い → rpg-battle.js も [rpg] の console.error を出して何もしない（バトルの画面を作らない）
+  const noRpg = await openRpg(browser, { blockScripts: ['badges.js', 'rpg.js'] });
+  try {
+    const p = noRpg.page;
+    for (let i = 0; i < 100 && !noRpg.consoleErrors.some(s => s.startsWith('[rpg]')); i++) await new Promise(ok => setTimeout(ok, 20));
+    const errs = noRpg.consoleErrors.filter(s => s.startsWith('[rpg]'));
+    assert.equal(errs.length, 1, JSON.stringify(noRpg.consoleErrors));
+    assert.match(errs[0], /バトル/);
+    assert.deepEqual(await p.evaluate(() => [typeof RPG, typeof RPG_BATTLE, !!$('scr-battle'), SCREENS.includes('battle')]), ['undefined', 'undefined', false, false]);
+    await playPractice(p);
+    assert.equal(await p.locator('#pcoin').count(), 0);
+    assert.deepEqual(noRpg.errors.map(String), []);
+  } finally { await noRpg.close(); }
 }, { blockScripts: ['rpg-core.js'], rpgErrorOk: true });
 
 t('rpg_off_hides', async page => {
