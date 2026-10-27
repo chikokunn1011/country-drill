@@ -141,7 +141,7 @@ t('pack_thumbnail', async page => {
 });
 
 t('pull_stage', async page => {
-  // 引くとパックの演出が出る（いちばんいい★の色。★3 は is-promo）。押すとスキップしてめくり始める
+  // 引くとパックの演出が出る（いちばんいい★の色。★3 は is-promo）。押すと1枚目のカードへ、［スキップ］で全部とばす
   await gacha(page, saveWith({ coins: 1200 }));
   await page.click('#ga-10');
   assert.equal(await page.isVisible('#ga-stage'), true);
@@ -152,18 +152,26 @@ t('pull_stage', async page => {
   assert.equal(await page.evaluate(() => document.activeElement.id), 'ga-skip');
   // 演出のあいだはまだ全部裏向き
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 10);
-  await page.click('#ga-stage');
+  await page.click('#ga-stage', { position: { x: 20, y: 20 } });
+  assert.equal(await page.isVisible('#ga-stage .rpg-gst-card'), true);
+  assert.equal(await page.innerText('#ga-stage .rpg-gst-count'), '1 / 10');
+  await page.click('#ga-skip');
   assert.equal(await page.isVisible('#ga-stage'), false);
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'ga-flipall');
-  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
-  // 何もしなくても showMs で終わる。Esc でもスキップ
+  // 一覧は全部表で、フォーカスは最初のカード。［ぜんぶめくる］は出ない
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
+  assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('#ga-res .rpg-card')), true);
+  assert.equal(await page.isVisible('#ga-flipall'), false);
+  // Esc でも全部とばす。何もしなければ、パック → カード → 終わり まで自分で進む
   await page.click('#ga-1');
   assert.equal(await page.isVisible('#ga-stage'), true);
   await page.keyboard.press('Escape');
   assert.equal(await page.isVisible('#ga-stage'), false);
-  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
   await page.click('#ga-1');
-  await page.waitForFunction(() => $('ga-stage').hidden, null, { timeout: 4000 });
+  await page.waitForSelector('#ga-stage .rpg-gst-card .rpg-card:not(.is-back)', { timeout: 4000 });
+  assert.equal(await page.innerText('#ga-stage .rpg-gst-count'), '');   // 1回なら何枚目かは出さない
+  await page.waitForFunction(() => $('ga-stage').hidden, null, { timeout: 5000 });
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
 }, { seed: 1 });
 
 t('pull_stage_reduced_motion', async page => {
@@ -220,23 +228,25 @@ t('intro_ten_pull_cards', async page => {
   assert.equal(await text(page, '#cd-count'), `仲間 ${Object.keys(s.cards).length} / 195`);
 });
 
-t('flip_in_order', async page => {
+t('reveal_one_by_one', async page => {
+  // パックのあと、カードが1枚ずつ（裏 → turnMs でめくれる）。押すと、めくる前ならめくり、めくってあれば次へ。下に出たカードの国旗が並ぶ
   await gacha(page, saveWith({ coins: 1000 }));
   await page.click('#ga-10');
-  await page.click('#ga-stage');   // 演出は飛ばす
-  // flipMs ずつ順に表になる（表になったカードはいつも前から順）
-  const seen = new Set();
-  for (let i = 0; i < 60; i++) {
-    const backs = await page.$$eval('#ga-res .rpg-card', bs => bs.map(b => b.classList.contains('is-back')));
-    const k = backs.indexOf(true);
-    assert.ok(k === -1 || backs.slice(k).every(Boolean), JSON.stringify(backs));
-    seen.add(backs.filter(Boolean).length);
-    if (k === -1) break;
-    await page.waitForTimeout(40);
+  const [p] = await events(page, 'rpg:pull');
+  const tap = () => page.click('#ga-stage', { position: { x: 20, y: 20 } });
+  await tap();   // パック → 1枚目
+  for (let i = 0; i < 10; i++) {
+    assert.equal(await page.innerText('#ga-stage .rpg-gst-count'), `${i + 1} / 10`);
+    assert.equal(await page.locator('#ga-stage .rpg-gst-got li').count(), i);
+    assert.equal(await page.getAttribute('#ga-stage .rpg-gst-card .rpg-card', 'data-a'), p.results[i].a);
+    if (await page.locator('#ga-stage .rpg-gst-card .rpg-card.is-back').count()) await tap();   // めくる
+    assert.equal(await page.locator('#ga-stage .rpg-gst-card .rpg-card.is-back').count(), 0);
+    assert.match(await page.innerText('#ga-stage .rpg-gst-say'), /★/);
+    await tap();   // 次へ（最後なら終わり）
   }
+  assert.equal(await page.isVisible('#ga-stage'), false);
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
-  assert.ok(seen.size >= 3, [...seen].join());   // 一度に全部ではない
-  // めくり終わったらボタンがまた押せる（1,000 は使ったので 1回も押せない）。全部表になったら［ぜんぶめくる］は隠れる
+  // 終わったらボタンがまた押せる（1,000 は使ったので 1回も押せない）。［ぜんぶめくる］は隠れる
   assert.equal(await page.isDisabled('#ga-1'), true);
   assert.equal(await page.isVisible('#ga-flipall'), false);
 });
@@ -268,6 +278,7 @@ t('back_card_tap_flips_only', async page => {
     return { back, nowBack: b.classList.contains('is-back'), open: $('detail').open, flipall: $('ga-flipall').hidden };
   });
   assert.deepEqual(r, { back: true, nowBack: false, open: false, flipall: false });
+  await page.keyboard.press('Escape');   // 演出をとばす
   await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
   assert.equal(await page.isVisible('#ga-flipall'), false);
   await page.click('#ga-res .rpg-card:nth-child(10)');   // 表になったら詳細

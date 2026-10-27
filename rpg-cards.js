@@ -111,7 +111,7 @@
     + '<div class="rpg-ga-main" id="ga-main"><p class="rpg-lbl">結果</p><p class="hint" id="ga-empty">引いたカードがここに並ぶよ</p>'
     + '<div class="rpg-ga-res" id="ga-res"></div><div class="rpg-shares" id="ga-share" hidden></div><button class="btn ghost" id="ga-flipall" hidden>ぜんぶめくる</button></div>'
     + '<div class="rpg-gstage" id="ga-stage" hidden><div class="rpg-gstage-in" id="ga-stage-in"></div>'
-    + '<button type="button" class="rpg-gstage-skip" id="ga-skip">タップでスキップ</button></div>';
+    + '<button type="button" class="rpg-gstage-skip" id="ga-skip">スキップ</button></div>';
   // 提供割合。表示する値も抽選と同じ TUNING.gacha から（gachaRates）
   const ratesHTML = r => {
     const R = K.gachaRates(), n = AREA_N[r];
@@ -154,7 +154,7 @@
     $('ga-pack').innerHTML = packHTML(gaRegion, d);
   };
   // gaBusy: 引いてから全部めくれるまで（そのあいだはどのボタンも押せない）。gaShares: 全部めくれたら結果の下に出すシェア
-  let gaRegion = 'all', gaBusy = false, gaTimer = null, gaShares = [];
+  let gaRegion = 'all', gaBusy = false, gaShares = [];
   // 最初に選んでおく地域: RPG.open で渡したもの、無ければ全世界（地域をしぼると高くなるので、知らないうちに高いほうを選んでいないように）
   const firstRegion = () => {
     const want = RPG.opts?.region;
@@ -180,44 +180,29 @@
     $('ga-pity').textContent = `★3確定まで あと${pity - d.pity}回`;
     $('ga-rates').innerHTML = ratesHTML(gaRegion);
   };
-  // 表にする。★3 は表になったところで金色の演出
-  const flipCard = el => {
-    if (el.classList.contains('is-back')) SND.play('flip');
+  // 表にする。★3 は表になったところで金色の演出（quiet なら音も演出もなし。引く演出で1枚ずつ見せたあと）
+  const flipCard = (el, quiet) => {
+    if (!quiet && el.classList.contains('is-back')) SND.play('flip');
     el.classList.remove('is-back');
     el.removeAttribute('aria-label');
-    if (el.classList.contains('is-gold')) fx('gold', el);
+    if (!quiet && el.classList.contains('is-gold')) fx('gold', el);
   };
   // 残りを全部表にして、［ぜんぶめくる］を隠し、ボタンを戻し、シェアを出す（［ぜんぶめくる］もここ）。
   // ［ぜんぶめくる］にフォーカスがあれば（引くボタンから移してある）、消えるので最初のカードへ
   const endFlip = () => {
     stageDone = null;   // めくり始める約束は捨てて、ここで全部めくる
     closeStage();
-    clearInterval(gaTimer);
-    gaTimer = null;
     const box = $('ga-res'), all = $('ga-flipall');
-    box.querySelectorAll('.rpg-card.is-back').forEach(flipCard);
+    box.querySelectorAll('.rpg-card.is-back').forEach(el => flipCard(el, true));
     gaBusy = false;
     if (document.activeElement === all) box.firstElementChild?.focus({ preventScroll: true });
     all.hidden = true;
     drawShares($('ga-share'), gaShares);
     drawGacha();
   };
-  // 1枚目はすぐ（演出のあと待たせない）、残りは flipMs ずつ
-  const startFlip = () => {
-    clearInterval(gaTimer);
-    const step = () => {
-      const el = $('ga-res').querySelector('.rpg-card.is-back');
-      if (el) flipCard(el);
-      if (!$('ga-res').querySelector('.rpg-card.is-back')) { endFlip(); return false; }
-      return true;
-    };
-    if (step()) gaTimer = setInterval(step, T.gacha.flipMs);
-  };
   const clearResults = () => {
     stageDone = null;
     closeStage();
-    clearInterval(gaTimer);
-    gaTimer = null;
     gaBusy = false;
     gaShares = [];
     $('ga-res').innerHTML = '';
@@ -226,12 +211,15 @@
     $('ga-empty').hidden = false;
   };
   // ---- 引く演出（#ga-stage）: パックが落ちてきて揺れ、いちばんいい★の色に光ってはじける（★3 は銀から金に変わる）。
-  // 結果のカードはうしろに裏向きで並べておき、演出が終わる（showMs たつ・押す・Esc）とめくり始める。
+  // そのあと出た国旗のカードが1枚ずつ飛び出し、turnMs でめくれて holdMs[★] 見せる（下に出たカードの小さい国旗が並ぶ）。
+  // 押すと次へ（パックの途中なら1枚目へ、めくる前ならすぐめくる）、［スキップ］と Esc は全部とばす。
+  // 結果のカードはうしろに裏向きで並べておき、演出が終わると全部表にする。
   // reduced motion（PC の「アニメーション効果」オフなど）でも出す。そのときは動かさず、ふわっと出て光るだけ（rpg.css）
-  let stageTimer = null, stageDone = null;
+  let stageTimer = null, stageDone = null, stage = null;   // stage: { cards: [{ a, star, out, html }], i }（i は今見せているカード。パックのあいだは -1）
   const closeStage = () => {
     clearTimeout(stageTimer);
     stageTimer = null;
+    stage = null;
     const st = $('ga-stage');
     if (!st || st.hidden) return;
     st.hidden = true;
@@ -241,9 +229,45 @@
     stageDone = null;
     done?.();
   };
-  const playStage = (region, before, d, best, count, done) => {
+  // カードを1枚ずつ。i 枚目を裏向きで出し、turnMs でめくって holdMs[★] 待ってから次へ
+  const thumbsHTML = n => stage.cards.slice(0, n).map(c => `<li class="rpg-s${c.star}"><img src="${flag(c.a)}" alt=""></li>`).join('');
+  const showCard = i => {
+    const c = stage.cards[i], n = stage.cards.length;
+    stage.i = i;
+    $('ga-stage').classList.add('is-reveal');
+    $('ga-stage-in').innerHTML = `<p class="rpg-gst-count">${n > 1 ? `${i + 1} / ${n}` : ''}</p>`
+      + `<div class="rpg-gst-card is-s${c.star}">${c.html}</div>`
+      + `<ol class="rpg-gst-got" aria-hidden="true">${n > 1 ? thumbsHTML(i) : ''}</ol>`;
+    $('ga-stage-in').querySelector('.rpg-card').dataset.out = c.out;   // NEW などのラベルの色（一覧と同じ）
+    clearTimeout(stageTimer);
+    stageTimer = setTimeout(turnCard, T.gacha.turnMs);
+  };
+  const turnCard = () => {
+    const el = $('ga-stage-in').querySelector('.rpg-card');
+    if (!stage || !el) return;
+    el.classList.remove('is-back');
+    el.removeAttribute('aria-label');
+    const star = stage.cards[stage.i].star;
+    $('ga-stage-in').querySelector('.rpg-gst-say')?.remove();
+    el.parentElement.insertAdjacentHTML('beforeend', `<p class="rpg-gst-say" aria-live="polite">${esc(byA.get(stage.cards[stage.i].a)?.n ?? '')} ${'★'.repeat(star)}</p>`);
+    SND.play('flip');
+    if (star === 3) fx('gold', el);
+    clearTimeout(stageTimer);
+    stageTimer = setTimeout(nextCard, T.gacha.holdMs[star] ?? T.gacha.holdMs[1]);
+  };
+  // 押したとき・時間がたったとき。パックなら1枚目、めくる前ならめくる、めくってあれば次（最後なら終わり）
+  const nextCard = () => {
+    if (!stage) return;
+    clearTimeout(stageTimer);
+    const back = $('ga-stage-in').querySelector('.rpg-gst-card .rpg-card.is-back');
+    if (stage.i >= 0 && back) turnCard();
+    else if (stage.i + 1 < stage.cards.length) showCard(stage.i + 1);
+    else closeStage();
+  };
+  const playStage = (region, before, d, best, count, done, cards) => {
     const st = $('ga-stage');
     stageDone = done;
+    stage = { cards, i: -1 };
     st.className = `rpg-gstage is-s${best}${best === 3 ? ' is-promo' : ''}${count === 10 ? ' is-ten' : ''}`;
     st.style.setProperty('--show', `${T.gacha.showMs}ms`);
     $('ga-stage-in').innerHTML = packHTML(region, { cards: before }, { big: true })
@@ -253,14 +277,16 @@
     $('ga-skip').focus({ preventScroll: true });
     if (best === 3 && S.dopa) FX.sfx('fanfare');
     else SND.play(best === 3 ? 'promo' : 'pull');
-    stageTimer = setTimeout(closeStage, T.gacha.showMs + (best === 3 ? 500 : 0));
+    stageTimer = setTimeout(nextCard, T.gacha.showMs + (best === 3 ? 500 : 0));
   };
-  // 結果を裏向きで並べて flipMs ずつめくる（reduced motion でも。そのときは回さずに表になる）。カードは1枚ずつ足していったときの★とかさね
+  // 結果を裏向きで並べ、演出（1枚ずつ見せる）が終わったら全部表にする（reduced motion でも。そのときは回さずに表になる）。カードは1枚ずつ足していったときの★とかさね
   const drawResults = (res, before, d, region) => {
-    const box = $('ga-res'), back = true, now = { cards: { ...before }, coins: 0, earned: 0 };
+    const box = $('ga-res'), back = true, now = { cards: { ...before }, coins: 0, earned: 0 }, cards = [];
     box.innerHTML = res.map(r => {
       K.addCard(now, r.a, r.star);
-      return cardHTML(r.a, { cards: { [r.a]: now.cards[r.a] }, fr: d.fr }, { face: back ? 'back' : 'up', label: GA_LABEL[r.out](r.star) });
+      const opt = { cards: { [r.a]: now.cards[r.a] }, fr: d.fr }, label = GA_LABEL[r.out](r.star);
+      cards.push({ a: r.a, star: r.star, out: r.out, html: cardHTML(r.a, opt, { face: 'back', label }) });
+      return cardHTML(r.a, opt, { face: back ? 'back' : 'up', label });
     }).join('');
     res.forEach((r, i) => {
       const el = box.children[i];
@@ -277,10 +303,12 @@
       const fromBtn = ['ga-free', 'ga-1', 'ga-10'].includes(document.activeElement?.id);
       playStage(region, before, d, Math.max(...res.map(r => r.star)), res.length, () => {
         if (!gaBusy) return;   // ［ぜんぶめくる］など、もうめくり終わっている
-        if (fromBtn || document.activeElement === $('ga-skip') || document.activeElement === document.body) $('ga-flipall').focus({ preventScroll: true });
+        // 演出で1枚ずつ見せたので、一覧は全部表で出す（フォーカスは最初のカードへ）
+        const focus = fromBtn || document.activeElement === $('ga-skip') || document.activeElement === document.body;
+        endFlip();
+        if (focus) $('ga-res').firstElementChild?.focus({ preventScroll: true });
         toResults();
-        startFlip();
-      });
+      }, cards);
     } else { endFlip(); toResults(); }
   };
   // 引けなかったときの1行（#ga-msg）。引けたら消す
@@ -344,8 +372,12 @@
     $('ga-1').onclick = onPull(1, false);
     $('ga-10').onclick = onPull(10, false);
     $('ga-flipall').onclick = endFlip;
-    $('ga-stage').onclick = closeStage;   // どこを押してもスキップ
-    $('ga-stage').onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); closeStage(); } };
+    // ［スキップ］は全部とばす。ほかのところを押すと次へ。Esc は全部とばし、→ は次へ
+    $('ga-stage').onclick = e => { if (e.target.closest('#ga-skip')) closeStage(); else nextCard(); };
+    $('ga-stage').onkeydown = e => {
+      if (e.key === 'Escape') { e.preventDefault(); closeStage(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); nextCard(); }
+    };
     // 裏向きのカードはめくるだけ（最後の1枚なら全部めくれたことにする）。詳細は表になってから
     $('ga-res').onclick = e => {
       const b = e.target.closest('.rpg-card');
