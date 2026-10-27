@@ -53,7 +53,7 @@ t('home_button_order_with_rpg', async page => {
 
 t('home_button_hidden_when_disabled', async page => {
   // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じやり方）
-  await page.route('**/ranking.js', async route => {
+  await page.route('**/ranking.js*', async route => {
     const res = await route.fetch();
     await route.fulfill({ response: res, body: (await res.text()) + '\nRANKING.enabled = false;\n' });
   });

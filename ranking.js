@@ -21,12 +21,13 @@
     name_taken: 'そのニックネームはもうほかの人が使っているみたい',
     already: 'この端末はもう登録ずみだよ',
     not_found: '登録が見つからなかった。もう一回載せてね',
+    bad_deco: 'かざりの国が正しくないみたい',
     bad_token: '登録の合言葉がおかしいみたい',
     network: 'ランキングに接続できなかった',
   };
 
   // RPC を1回呼ぶ。8秒で打ち切り。通信失敗・HTTP エラー・壊れた応答はぜんぶ例外になる
-  // HTTP エラーのときは状態と応答本文（PostgREST が原因を書いてくる）をエラーに入れる
+  // HTTP エラーのときは状態と応答本文（PostgREST が原因を書いてくる）をエラーに入れる。状態の数字は e.status にも入れる（404 = 関数がまだ無い）
   async function rpc(name, args) {
     const ac = new AbortController(), timer = setTimeout(() => ac.abort(), TIMEOUT);
     try {
@@ -37,11 +38,11 @@
         body: JSON.stringify(args),
         signal: ac.signal,
       });
-      if (!res.ok) throw new Error(`${name}: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}`);
+      if (!res.ok) throw Object.assign(new Error(`${name}: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}`), { status: res.status });
       return await res.json();
     } finally { clearTimeout(timer); }
   }
-  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename / rpg_unregister）。返事の rank_lv などは rankLv などにする
+  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco）。返事の rank_lv などは rankLv などにする
   async function rpgCall(name, args) {
     try {
       const r = await rpc(name, args);
@@ -103,10 +104,21 @@
     async rpgUnregister({ token }) {
       return rpgCall('rpg_unregister', { p_token: token });
     },
-    // 冒険の上位50件。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
+    // かざり（仲間の国コード3つまで）を変える。記録の rpg_update とは別に送る（10秒の連投よけも別）
+    async rpgSetDeco({ token, deco }) {
+      const r = await rpgCall('rpg_set_deco', { p_token: token, p_deco: deco });
+      return r.ok ? { ok: true } : r;
+    },
+    // 冒険の上位50件（かざりつき）。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject。
+    // DB にまだ top_rpg2 が無い（404）ときは、かざりの無い top_rpg にもどす（deco は空）
     async rpgTop({ sort }) {
-      const rows = await rpc('top_rpg', { p_sort: sort });
-      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors, at: new Date(r.created_at) }));
+      let rows;
+      try { rows = await rpc('top_rpg2', { p_sort: sort }); } catch (e) {
+        if (e?.status !== 404) throw e;
+        rows = await rpc('top_rpg', { p_sort: sort });
+      }
+      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors,
+        deco: Array.isArray(r.deco) ? r.deco : [], at: new Date(r.created_at) }));
     },
     // この記録なら何位相当か（レベル順・ダンジョン順）。失敗したら reject
     async rpgRankOf({ lv, dungeons, floors }) {

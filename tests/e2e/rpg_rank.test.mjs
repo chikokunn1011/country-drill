@@ -225,3 +225,82 @@ t('wipe_offline_retries_on_startup', async (page, app) => {
   await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
   assert.equal(app.db.rpgRows.length, 0);
 });
+
+// ---- かざり（rpg_set_deco・top_rpg2） ----
+// 登録ずみ（送った記録 = いまの記録）で、仲間 jp・br を持っているセーブ
+const DT = '00000000-0000-4000-8000-0000000000de';
+const registered = async (page, app, fields = {}) => {
+  app.db.rpgRows.push({ token: DT, nickname: 'チコ', lv: 5, dungeons: 0, floors: 0, deco: [], created_at: ago(60), at: ago(60) });
+  await page.evaluate(T => store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 5, dungeons: 0, floors: 0 } }), DT);
+  await writeSave(page, saveWith({ lv: 5, coins: 100000, cards: { jp: [1, 0], br: [2, 0] }, ...fields }));
+};
+const pickDeco = async (page, as) => {
+  await page.evaluate(() => show('rpg'));
+  await page.click('#rpg-deco');
+  for (const a of as) await page.click(`#rpg-deco-dlg .rpg-card[data-a="${a}"]`);
+  await page.click('#rpg-deco-ok');
+};
+const callsOf = (app, name) => app.db.calls.filter(c => c.name === name);
+const until = async (fn, ms = 20000) => {
+  for (const end = Date.now() + ms; !fn(); await new Promise(r => setTimeout(r, 100))) if (Date.now() > end) throw new Error('until: timeout');
+};
+
+t('rows_show_deco_flags', async (page, app) => {
+  app.db.rpgRows.push(
+    { token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, deco: ['jp', 'zz', 'br'], created_at: ago(60), at: ago(60) },
+    { token: 't-taro', nickname: 'タロウ', lv: 8, dungeons: 3, floors: 16, created_at: ago(50), at: ago(50) },
+  );
+  await writeSave(page, saveWith({ lv: 3 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
+  const li = page.locator('#rr-list li').first();
+  assert.equal(await li.locator('.nick').innerText(), 'ミケ');
+  assert.deepEqual(await li.locator('.rr-deco img').evaluateAll(els => els.map(e => e.alt)), ['日本', 'ブラジル']);   // 知らない 'zz' は出ない
+  assert.equal(await page.locator('#rr-list li').nth(1).locator('.rr-deco img').count(), 0);
+  assert.ok((await rows(page))[0].startsWith('1 ミケ Lv 30'), (await rows(page))[0]);
+  assert.deepEqual(callsOf(app, 'top_rpg').length, 0);
+});
+
+t('falls_back_to_top_rpg', async (page, app) => {
+  // DB にまだ top_rpg2 が無い（本番に適用する前）: top_rpg にもどして、かざり無しで今どおり出る
+  delete app.db.rpc.top_rpg2;
+  app.db.rpgRows.push({ token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, deco: ['jp'], created_at: ago(60), at: ago(60) });
+  await writeSave(page, saveWith({ lv: 3 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 1);
+  assert.ok((await rows(page))[0].startsWith('1 ミケ Lv 30'), (await rows(page))[0]);
+  assert.equal(await page.locator('#rr-list .rr-deco img').count(), 0);
+  assert.equal(await page.isVisible('#rr-error'), false);
+  assert.ok(callsOf(app, 'top_rpg2').length >= 1 && callsOf(app, 'top_rpg').length >= 1);
+});
+
+t('deco_change_sends_set_deco', async (page, app) => {
+  // 登録ずみでかざりだけ変えたら rpg_set_deco だけ送る（記録は同じなので rpg_update は送らない）
+  await registered(page, app);
+  await page.waitForTimeout(2000);
+  assert.deepEqual(callsOf(app, 'rpg_set_deco'), []);   // 起動時: かざりは空のままなので送らない
+  await pickDeco(page, ['jp']);
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 1, null, { timeout: 15000 });
+  assert.deepEqual(callsOf(app, 'rpg_set_deco').map(c => c.args), [{ p_token: DT, p_deco: ['jp'] }]);
+  assert.deepEqual(callsOf(app, 'rpg_update'), []);
+  assert.deepEqual(app.db.rpgRows[0].deco, ['jp']);
+  assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 5, dungeons: 0, floors: 0, deco: ['jp'] });
+  // 一覧の自分の行にも出る
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li .rr-deco img').length === 1);
+});
+
+t('record_and_deco_both_sent', async (page, app) => {
+  // かざりを変えてからレベルアップ: 記録（rpg_update）を先に、GAP をあけてかざり（rpg_set_deco）を1回ずつ
+  await registered(page, app);
+  await pickDeco(page, ['br', 'jp']);
+  await page.click('#rpg-lvup');
+  await until(() => callsOf(app, 'rpg_set_deco').length > 0, 30000);
+  await page.waitForTimeout(1500);
+  const up = callsOf(app, 'rpg_update'), dc = callsOf(app, 'rpg_set_deco');
+  assert.deepEqual(up.map(c => c.args.p_lv), [6]);
+  assert.deepEqual(dc.map(c => c.args.p_deco), [['br', 'jp']]);
+  assert.ok(dc[0].at - up[0].at >= 10000, String(dc[0].at - up[0].at));
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 2);
+  assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 6, dungeons: 0, floors: 0, deco: ['br', 'jp'] });
+});

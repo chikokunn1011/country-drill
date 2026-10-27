@@ -846,7 +846,10 @@ body.rpg-staging { overflow: hidden; }
 .rpg-rr-h { font: 700 .85rem var(--font-display); color: var(--muted); }
 .rpg-rr-rec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font: 700 1rem var(--font-display); }
 .rpg-rr-rec b { font: 900 1.6rem var(--font-display); }
-.rpg-rr-list li { grid-template-columns: 2.2em minmax(0, 1fr) auto auto auto; }
+.rpg-rr-list li { grid-template-columns: 2.2em minmax(0, 1fr) auto auto auto auto; }
+/* 名前の後ろのかざり（仲間の国旗3つまで。旗は動かさない） */
+.rr-deco { display: inline-flex; gap: 3px; align-self: center; }
+.rr-deco img { height: 1em; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
 .rpg-rr-list .rpg-rr-dg small { font-size: .78em; color: var(--muted); }
 #rr-tabs { align-self: flex-start; }
 .rpg-rr-auto { padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); font-size: .9rem; word-break: auto-phrase; }

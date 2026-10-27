@@ -178,7 +178,7 @@ t('open_button_passes_board', async (page, { db }) => {
 
 t('disabled_when_not_configured', async (page, { db }) => {
   // 接続先が未設定の状態にする。ranking.js の末尾に1行足す（addInitScript だと ranking.js より先に動いて上書きされる）
-  await page.route('**/ranking.js', async route => {
+  await page.route('**/ranking.js*', async route => {
     const res = await route.fetch();
     await route.fulfill({ response: res, body: (await res.text()) + '\nRANKING.enabled = false;\n' });
   });

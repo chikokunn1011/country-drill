@@ -189,7 +189,7 @@ t('practice_unchanged', async page => {
 
 // ranking.js が配信されていない・読めないときも、ランキングなしで練習もタイムアタックも遊べる
 t('works_without_ranking_js', async page => {
-  await page.route('**/ranking.js', route => route.abort());
+  await page.route('**/ranking.js*', route => route.abort());
   await page.reload();
   assert.equal(await page.evaluate(() => RANKING.enabled), false);
   // 代わりの formatTime も ranking.js と同じ形で出す
