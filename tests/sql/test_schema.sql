@@ -311,7 +311,7 @@ do $$ begin assert (select count(*) from top_rpg('lv')) = 50, '50件まで'; end
 reset role;
 do $$ begin
   assert (select relrowsecurity from pg_class where oid = 'public.rpg_players'::regclass), 'RLS が有効';
-  assert to_regclass('public.rpg_scores') is null, '前の rpg_scores は無い';
+  assert to_regprocedure('public.submit_rpg(text, int, int, int)') is null, '前の submit_rpg は無い';
 end $$;
 set role anon;
 do $$ begin

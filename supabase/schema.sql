@@ -115,10 +115,9 @@ grant execute on function top_scores(text, text) to anon;
 -- ニックネームは全角半角・大文字小文字をそろえて、ほかの人と同じものは使えない。記録はそれぞれ今までの最高を残す。
 -- 並べ方は 'lv'（レベル → ダンジョン → フロア → 先に載せた順）と 'dg'（ダンジョン → フロア → レベル → 先に載せた順）
 -- 変な記録は Table Editor の rpg_players から行を消せばランキングからも消える
--- 前の形（同じ名前を何行も入れる rpg_scores と submit_rpg）は使わないので消す（2026-10-27 に記録ごと消した）
+-- 前の形（同じ名前を何行も入れる rpg_scores と submit_rpg）は使わない。submit_rpg は消すが、本番の rpg_scores は記録を残すため消さない（2026-10-27）
 drop function if exists submit_rpg(text, int, int, int);
 drop function if exists top_rpg(text);
-drop table if exists rpg_scores;
 create table if not exists rpg_players (
   id bigint generated always as identity primary key,
   token_hash bytea not null unique,      -- sha256(合言葉)
