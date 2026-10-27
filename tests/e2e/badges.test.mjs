@@ -402,7 +402,7 @@ t('share_copies', async (page, app) => {
   }));
   assert.ok(shown.ms >= 1900 && shown.ms < 2600, json(shown));
   assert.deepEqual([shown.back, shown.toasts], ['シェア', 0], json(shown));
-  assert.equal(await page.evaluate(() => window.__clip), '195か国ドリルでバッジ『アジア大陸横断（銀）』を取ったよ！ 称号〈アジア通〉 https://chikokunn1011.github.io/country-drill/');
+  assert.equal(await page.evaluate(() => window.__clip), '国旗マスターでバッジ『アジア大陸横断（銀）』を取ったよ！ 称号〈アジア通〉 https://chikokunn1011.github.io/country-drill/');
   await page.evaluate(() => { window.__hold = true; });
   await page.click('#detail-inner [data-bdg-share]');
   await page.evaluate(() => { $('detail').close(); window.__done(); });

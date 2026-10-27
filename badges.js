@@ -943,7 +943,7 @@
   function share(id, btn) {
     const b = CAT.find(e => e.id === id), top = b ? topOf(b, bs.st) : -1;
     if (top < 0) return;
-    const t = b.tiers[top], text = `195か国ドリルでバッジ『${b.name}（${tierLabel(t.color)}）』を取ったよ！ 称号〈${t.title}〉 ${SITE}`;
+    const t = b.tiers[top], text = `国旗マスターでバッジ『${b.name}（${tierLabel(t.color)}）』を取ったよ！ 称号〈${t.title}〉 ${SITE}`;
     try {
       if (navigator.share) navigator.share({ text }).catch(() => {});
       else navigator.clipboard?.writeText(text).then(() => copied(btn), () => {});
