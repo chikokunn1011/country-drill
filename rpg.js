@@ -515,7 +515,7 @@
   const nextAction = (d, nf) => {
     const gacha = hasCards();   // ガチャの画面が無ければ（rpg-cards.js が読み込めなかった）ガチャはすすめない
     if (gacha && d.pulls === 0 && d.coins >= T.gacha.ten)
-      return { text: 'まずは国旗ガチャ10連で仲間をさがそう（南アメリカがおすすめ）', go: () => open('gacha', { region: DG[0].r }) };
+      return { text: 'まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）', go: () => open('gacha', { region: 'all' }) };
     if (gacha && d.day.first && !d.day.free) return { text: '今日の無料ガチャが引けるよ', go: () => open('gacha') };
     const en = nf && K.enemy(nf.id, nf.floor);
     if (en && d.coins >= K.levelCost(d.lv) && d.lv < en.recLv) return { text: 'レベルアップできるよ', go: () => $('rpg-lvup')?.focus() };
@@ -576,7 +576,8 @@
       + `<button type="button" class="rpg-next" id="rpg-next"><span class="rpg-next-k" aria-hidden="true">▸</span>`
       + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
       + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
-        + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div>' : '') + '</div>'
+        + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div>' : '')
+      + (SCREENS.includes('rpgrank') ? '<button class="btn ghost rpg-to-rank" id="rpg-to-rank">🏆 冒険ランキング</button>' : '') + '</div>'
       + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
   };
@@ -605,6 +606,7 @@
     $('rpg-next').onclick = nx.go;
     if ($('rpg-to-gacha')) $('rpg-to-gacha').onclick = () => open('gacha');
     if ($('rpg-to-cards')) $('rpg-to-cards').onclick = () => open('cards');
+    if ($('rpg-to-rank')) $('rpg-to-rank').onclick = () => open('rpgrank');
     $('rpg-dgs').onclick = e => {
       const b = e.target.closest('button.rpg-fl');
       if (b && !b.disabled) open('battle', { id: b.dataset.d, floor: +b.dataset.f });

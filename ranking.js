@@ -1,4 +1,4 @@
-// タイムアタックのランキング（Supabase）とのやりとりと、送る前の入力チェックだけを持つ小さいモジュール。
+// タイムアタックと冒険のランキング（Supabase）とのやりとりと、送る前の入力チェックだけを持つ小さいモジュール。
 // ブラウザでは <script src="ranking.js"> で window.RANKING になる（テストでは vm で読み込む）
 (() => {
   // 接続先。publishable キーはブラウザに載せる前提の鍵なので公開してOK（書き込みは DB 側の関数でしか通らない）
@@ -17,6 +17,7 @@
     too_slow: 'タイムが長すぎて受け付けられなかった',
     too_soon: '少し待ってからもう一回送ってね',
     bad_board: 'この条件はランキングに載せられない',
+    bad_record: 'この記録はランキングに載せられない',
     network: 'ランキングに接続できなかった',
   };
 
@@ -72,6 +73,26 @@
     async rankOf({ board, timeMs }) {
       const r = await rpc('rank_of', { p_board: board, p_time_ms: wholeMs(timeMs) });
       return { rankAll: r.rank_all, rankWeek: r.rank_week };
+    },
+    // 冒険（国旗クエスト）の記録を送る。lv・dungeons（ボスを倒したダンジョンの数）・floors（クリアしたフロアの合計）
+    async rpgSubmit({ nickname, lv, dungeons, floors }) {
+      try {
+        const r = await rpc('submit_rpg', { p_nickname: nickname, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
+        return r.ok ? { ok: true, rankLv: r.rank_lv, rankDg: r.rank_dg } : { ok: false, reason: r.reason };
+      } catch (e) {
+        console.warn('ranking rpgSubmit', e);
+        return { ok: false, reason: 'network' };
+      }
+    },
+    // 冒険の上位50件。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
+    async rpgTop({ sort }) {
+      const rows = await rpc('top_rpg', { p_sort: sort });
+      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors, at: new Date(r.created_at) }));
+    },
+    // この記録なら何位相当か（レベル順・ダンジョン順）。失敗したら reject
+    async rpgRankOf({ lv, dungeons, floors }) {
+      const r = await rpc('rpg_rank_of', { p_lv: lv, p_dungeons: dungeons, p_floors: floors });
+      return { rankLv: r.rank_lv, rankDg: r.rank_dg };
     },
     message: reason => MESSAGES[reason] ?? MESSAGES.network,
     // 0.01秒単位で切り捨て。12345 → '12.34秒'、61234 → '1分01.23秒'

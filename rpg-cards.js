@@ -103,12 +103,15 @@
   const GACHA_HTML = `<div class="rpg-head">${backBtn}<h2 class="rpg-h2">国旗ガチャ</h2><span class="rpg-hcoin" id="ga-coins"></span></div>`
     + '<div class="rpg-ga-side"><p class="rpg-warn" id="ga-warn" role="status" hidden></p><p class="rpg-lbl" id="ga-q">どこの国と出会う？</p>'
     + `<div class="chips" id="ga-regions" role="group" aria-labelledby="ga-q">${chipsHTML('全世界')}</div>`
-    + `<p class="hint" id="ga-hint">選んだ地域のダンジョンでは、その地域の仲間が ×${T.card.regionMul} で強い</p>`
+    + `<p class="hint" id="ga-hint">地域をしぼると値段が ×${T.gacha.regionMul}。そのかわり、その地域のダンジョンでは仲間が ×${T.card.regionMul} で強い</p>`
+    + '<div class="rpg-pack-slot" id="ga-pack"></div>'
     + '<div class="rpg-ga-btns"><button class="btn ghost" id="ga-free"></button><button class="btn" id="ga-1"></button><button class="btn" id="ga-10"></button></div>'
     + '<p class="rpg-ga-need" id="ga-need" hidden></p><p class="rpg-ga-msg" id="ga-msg" role="status"></p><p class="rpg-ga-pity" id="ga-pity"></p>'
     + `<div class="rpg-ga-rates" id="ga-rates"></div><p class="rpg-ga-note" id="ga-note">${GA_NOTE}</p></div>`
     + '<div class="rpg-ga-main" id="ga-main"><p class="rpg-lbl">結果</p><p class="hint" id="ga-empty">引いたカードがここに並ぶよ</p>'
-    + '<div class="rpg-ga-res" id="ga-res"></div><div class="rpg-shares" id="ga-share" hidden></div><button class="btn ghost" id="ga-flipall" hidden>ぜんぶめくる</button></div>';
+    + '<div class="rpg-ga-res" id="ga-res"></div><div class="rpg-shares" id="ga-share" hidden></div><button class="btn ghost" id="ga-flipall" hidden>ぜんぶめくる</button></div>'
+    + '<div class="rpg-gstage" id="ga-stage" hidden><div class="rpg-gstage-in" id="ga-stage-in"></div>'
+    + '<button type="button" class="rpg-gstage-skip" id="ga-skip">タップでスキップ</button></div>';
   // 提供割合。表示する値も抽選と同じ TUNING.gacha から（gachaRates）
   const ratesHTML = r => {
     const R = K.gachaRates(), n = AREA_N[r];
@@ -119,22 +122,53 @@
       + `<li>国は選んだ地域から同じ確率（${r === 'all' ? '全世界' : r}なら 各 1/${n} = ${(100 / n).toFixed(1)}%）</li>`
       + `<li>天井込みの★3の目安: 約${R.eff3.toFixed(1)}%</li></ul>`;
   };
+  // ---- 国旗パック（ボタンの上のサムネイルと、引くときの演出で同じ絵） ----
+  // 色は地域のダンジョンの色（全世界は青い海の色 --rpg-pack-world）。国旗3枚は、まだ仲間でない国を日ごとに入れかえて見せる（全部仲間なら持っている国から）
+  const DG_ALL = K.DUNGEONS;
+  const packColor = r => { const g = DG_ALL.find(g => g.r === r && r !== 'all'); return g ? `var(--rpg-r-${g.id}, ${g.color})` : 'var(--rpg-pack-world)'; };
+  const hash = str => { let h = 2166136261; for (const ch of str) h = Math.imul(h ^ ch.codePointAt(0), 16777619); return h >>> 0; };
+  const packFlags = (r, d) => {
+    const day = new Date().toDateString(), all = C.filter(c => r === 'all' || c.r === r).map(c => c.a);
+    const none = all.filter(a => !d.cards[a]), pool = none.length >= 3 ? none : all;
+    return pool.map(a => [hash(day + a), a]).sort((x, y) => x[0] - y[0]).slice(0, 3).map(x => x[1]);
+  };
+  const packHTML = (r, d, { big = false } = {}) => {
+    const as = Object.keys(d.cards), have = as.filter(a => inArea(a, r)).length, n = AREA_N[r], rest = n - have;
+    const [f1, f2, f3] = packFlags(r, d), img = (a, k) => a ? `<img class="rpg-pack-f ${k}" src="${flag(a)}" alt="">` : '';
+    const name = r === 'all' ? '全世界' : r;
+    return `<div class="rpg-pack${big ? ' is-big' : ''}${r === 'all' ? '' : ' is-area'}" style="--pk: ${packColor(r)}" role="img" aria-label="${esc(name)}の国旗パック">`
+      + '<span class="rpg-pack-rays" aria-hidden="true"></span><span class="rpg-pack-shine" aria-hidden="true"></span>'
+      + '<span class="rpg-pack-body" aria-hidden="true"><span class="rpg-pack-top">FLAG QUEST · 国旗パック</span>'
+      + `<span class="rpg-pack-fan">${img(f1, 'f1')}${img(f3, 'f3')}${img(f2, 'f2')}</span>`
+      + `<span class="rpg-pack-name">${esc(name)}</span>`
+      + `<span class="rpg-pack-sub">${rest > 0 ? `まだ会っていない国 ${rest}/${n}` : `${n}か国コンプリート！`}</span></span>`
+      + `<span class="rpg-pack-tag" aria-hidden="true">★3 ${K.gachaRates().r3}%</span>`
+      + (r === 'all' ? '' : `<span class="rpg-pack-tag is-mul" aria-hidden="true">地域しぼり ×${T.gacha.regionMul}</span>`)
+      + '<i class="rpg-spark s1"></i><i class="rpg-spark s2"></i><i class="rpg-spark s3"></i><i class="rpg-spark s4"></i></div>';
+  };
+  let packKey = '';
+  const drawPack = d => {
+    const key = `${gaRegion}|${Object.keys(d.cards).sort().join(',')}|${new Date().toDateString()}`;
+    if (key === packKey && $('ga-pack').firstElementChild) return;   // 同じ絵なら描き直さない（きらきらが止まらない）
+    packKey = key;
+    $('ga-pack').innerHTML = packHTML(gaRegion, d);
+  };
   // gaBusy: 引いてから全部めくれるまで（そのあいだはどのボタンも押せない）。gaShares: 全部めくれたら結果の下に出すシェア
   let gaRegion = 'all', gaBusy = false, gaTimer = null, gaShares = [];
-  // 最初に選んでおく地域: RPG.open で渡したもの → 次に挑むダンジョンの地域 → 全部クリアなら前回の地域、それも無ければ全世界
-  const firstRegion = d => {
-    const want = RPG.opts?.region, nf = RPG.nextFloor(d);
-    if (AREAS.includes(want)) return want;
-    return nf ? K.dungeonOf(nf.id).r : AREAS.includes(d.gr) ? d.gr : 'all';
+  // 最初に選んでおく地域: RPG.open で渡したもの、無ければ全世界（地域をしぼると高くなるので、知らないうちに高いほうを選んでいないように）
+  const firstRegion = () => {
+    const want = RPG.opts?.region;
+    return AREAS.includes(want) ? want : 'all';
   };
   // ボタン・チップ・天井・提供割合・コイン（結果はそのまま）。新しい版のデータのあいだは引けない（書けないので）
   const drawGacha = (d = RPG.get()) => {
     if (!$('ga-regions')) return;
-    const { one, ten, pity } = T.gacha, free = $('ga-free'), need = $('ga-need'), warn = $('ga-warn'), stop = gaBusy || RPG.status === 'readOnly';
+    const { pity } = T.gacha, one = K.gachaCost(gaRegion, 1), ten = K.gachaCost(gaRegion, 10), free = $('ga-free'), need = $('ga-need'), warn = $('ga-warn'), stop = gaBusy || RPG.status === 'readOnly';
     warn.textContent = RPG.warn;
     warn.hidden = !RPG.warn;
     $('ga-coins').innerHTML = RPG.coinHTML(d.coins);
     drawChips($('ga-regions'), d, gaRegion);
+    drawPack(d);
     free.textContent = d.day.free ? 'また明日' : d.day.first ? '無料1回' : '今日クイズを1回クリアすると無料1回';
     free.disabled = stop || !d.day.first || d.day.free;
     $('ga-1').innerHTML = `1回 ${COIN}${fmt(one)}`;
@@ -155,6 +189,8 @@
   // 残りを全部表にして、［ぜんぶめくる］を隠し、ボタンを戻し、シェアを出す（［ぜんぶめくる］もここ）。
   // ［ぜんぶめくる］にフォーカスがあれば（引くボタンから移してある）、消えるので最初のカードへ
   const endFlip = () => {
+    stageDone = null;   // めくり始める約束は捨てて、ここで全部めくる
+    closeStage();
     clearInterval(gaTimer);
     gaTimer = null;
     const box = $('ga-res'), all = $('ga-flipall');
@@ -165,15 +201,20 @@
     drawShares($('ga-share'), gaShares);
     drawGacha();
   };
+  // 1枚目はすぐ（演出のあと待たせない）、残りは flipMs ずつ
   const startFlip = () => {
     clearInterval(gaTimer);
-    gaTimer = setInterval(() => {
+    const step = () => {
       const el = $('ga-res').querySelector('.rpg-card.is-back');
       if (el) flipCard(el);
-      if (!$('ga-res').querySelector('.rpg-card.is-back')) endFlip();
-    }, T.gacha.flipMs);
+      if (!$('ga-res').querySelector('.rpg-card.is-back')) { endFlip(); return false; }
+      return true;
+    };
+    if (step()) gaTimer = setInterval(step, T.gacha.flipMs);
   };
   const clearResults = () => {
+    stageDone = null;
+    closeStage();
     clearInterval(gaTimer);
     gaTimer = null;
     gaBusy = false;
@@ -183,8 +224,36 @@
     $('ga-flipall').hidden = true;
     $('ga-empty').hidden = false;
   };
+  // ---- 引く演出（#ga-stage）: パックが落ちてきて揺れ、いちばんいい★の色に光ってはじける（★3 は銀から金に変わる）。
+  // 結果のカードはうしろに裏向きで並べておき、演出が終わる（showMs たつ・押す・Esc）とめくり始める。reduced motion では出さない
+  let stageTimer = null, stageDone = null;
+  const closeStage = () => {
+    clearTimeout(stageTimer);
+    stageTimer = null;
+    const st = $('ga-stage');
+    if (!st || st.hidden) return;
+    st.hidden = true;
+    $('ga-stage-in').innerHTML = '';
+    document.body.classList.remove('rpg-staging');
+    const done = stageDone;
+    stageDone = null;
+    done?.();
+  };
+  const playStage = (region, before, d, best, count, done) => {
+    const st = $('ga-stage');
+    stageDone = done;
+    st.className = `rpg-gstage is-s${best}${best === 3 ? ' is-promo' : ''}${count === 10 ? ' is-ten' : ''}`;
+    st.style.setProperty('--show', `${T.gacha.showMs}ms`);
+    $('ga-stage-in').innerHTML = packHTML(region, { cards: before }, { big: true })
+      + `<p class="rpg-gstage-say" aria-live="polite">${best === 3 ? '…金色に光った！' : best === 2 ? 'きらっ！' : 'どの国かな？'}</p>`;
+    st.hidden = false;
+    document.body.classList.add('rpg-staging');
+    $('ga-skip').focus({ preventScroll: true });
+    if (best === 3 && S.dopa) FX.sfx('fanfare');
+    stageTimer = setTimeout(closeStage, T.gacha.showMs + (best === 3 ? 500 : 0));
+  };
   // 結果を裏向きで並べて flipMs ずつめくる（reduced motion なら最初から表）。カードは1枚ずつ足していったときの★とかさね
-  const drawResults = (res, before, d) => {
+  const drawResults = (res, before, d, region) => {
     const box = $('ga-res'), back = !reduced(), now = { cards: { ...before }, coins: 0, earned: 0 };
     box.innerHTML = res.map(r => {
       K.addCard(now, r.a, r.star);
@@ -199,12 +268,17 @@
     drawShares($('ga-share'), []);   // シェアは全部めくれてから
     $('ga-flipall').hidden = !back;   // めくるものが無ければ出さない
     $('ga-empty').hidden = true;
-    if (back) {
-      if (['ga-free', 'ga-1', 'ga-10'].includes(document.activeElement?.id)) $('ga-flipall').focus({ preventScroll: true });
-      startFlip();
-    } else endFlip();
     // スマホは結果がボタンと確率の下なので、結果まで送る
-    if (innerWidth < 900) $('ga-main').scrollIntoView({ block: 'nearest', behavior: back ? 'smooth' : 'auto' });
+    const toResults = () => { if (innerWidth < 900) $('ga-main').scrollIntoView({ block: 'nearest', behavior: back ? 'smooth' : 'auto' }); };
+    if (back) {
+      const fromBtn = ['ga-free', 'ga-1', 'ga-10'].includes(document.activeElement?.id);
+      playStage(region, before, d, Math.max(...res.map(r => r.star)), res.length, () => {
+        if (!gaBusy) return;   // ［ぜんぶめくる］など、もうめくり終わっている
+        if (fromBtn || document.activeElement === $('ga-skip') || document.activeElement === document.body) $('ga-flipall').focus({ preventScroll: true });
+        toResults();
+        startFlip();
+      });
+    } else { endFlip(); toResults(); }
   };
   // 引けなかったときの1行（#ga-msg）。引けたら消す
   const GA_MSG = {
@@ -218,7 +292,7 @@
     if (gaBusy) return;
     gaBusy = true;
     for (const id of ['ga-free', 'ga-1', 'ga-10']) $(id).disabled = true;   // 連打で二重に引かない
-    const region = gaRegion, cost = free ? 0 : count === 10 ? T.gacha.ten : T.gacha.one;
+    const region = gaRegion, cost = free ? 0 : K.gachaCost(region, count);
     let d = null, res = null, before = null;
     RPG.tx(x => {
       if (free ? !x.day.first || x.day.free : x.coins < cost) return;
@@ -242,13 +316,13 @@
     }
     RPG.emitCoins(d, -cost, 'gacha');
     RPG.emitCoins(d, res.reduce((s, r) => s + (r.out === 'refund' ? T.gacha.refund[r.star] : 0), 0), 'refund');
-    drawResults(res, before, d);
+    drawResults(res, before, d, region);
     drawGacha();
   };
   // screenRender.gacha: 開くたびに地域を選び直し、前の結果を消す
   const renderGacha = () => {
     const d = RPG.get();
-    gaRegion = firstRegion(d);
+    gaRegion = firstRegion();
     sayGacha('');
     clearResults();
     drawGacha(d);
@@ -267,6 +341,8 @@
     $('ga-1').onclick = onPull(1, false);
     $('ga-10').onclick = onPull(10, false);
     $('ga-flipall').onclick = endFlip;
+    $('ga-stage').onclick = closeStage;   // どこを押してもスキップ
+    $('ga-stage').onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); closeStage(); } };
     // 裏向きのカードはめくるだけ（最後の1枚なら全部めくれたことにする）。詳細は表になってから
     $('ga-res').onclick = e => {
       const b = e.target.closest('.rpg-card');

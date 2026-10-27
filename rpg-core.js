@@ -17,7 +17,7 @@
               critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7, reviveMax: 3 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
-    gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, refund: [0, 10, 30, 100], flipMs: 120 },
+    gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], flipMs: 120, showMs: 1700 },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#195か国ドリル', cards: [50, 100, 195] },
   };
   const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
@@ -517,6 +517,11 @@
     }
     return out;
   };
+  // ガチャの値段。地域をしぼると regionMul 倍（全世界はそのまま）。count は 1 か 10
+  const gachaCost = (region, count) => {
+    const T = TUNING.gacha, base = count === 10 ? T.ten : T.one;
+    return region === 'all' ? base : Math.round(base * T.regionMul);
+  };
   // 画面に出す確率（%の数）。eff3 は天井込みの★3の率 = 100 / ★3 1枚あたりの平均回数（Σ_{k<天井} (1−r3)^k）
   const pct = x => Math.round(x * 1e4) / 100;
   const gachaRates = () => {
@@ -613,7 +618,7 @@
     isWeak, answerCoins, clearBonus, addCard, settleDelta,
     newRun, runAnswer, settleRun,
     ensureDay, bountyFor, resetWeak,
-    pull, gachaRates,
+    pull, gachaRates, gachaCost,
     modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, reviveSet,
   };
 })();

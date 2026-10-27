@@ -108,7 +108,7 @@
   body:not(.rpg-off) .home .menu:has(> #home-rpg) .btn { padding-block: 5px; }
 }
 /* 設定の「冒険（コイン・RPG）を表示する」が OFF: ボタン・チップ・クイズ中のコインを出さない（コインは裏で貯まる） */
-body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
+body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !important; }
 
 /* ---------- はじめての画面（#rpg-intro） ---------- */
 .rpg-intro { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
@@ -512,6 +512,116 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 .rpg-ga-res:empty { display: none; }
 #ga-flipall { align-self: center; padding: 8px 22px; font-size: .95rem; }
 
+/* 国旗パック（#ga-pack のサムネイルと、引く演出 #ga-stage の大きいもの）。色 --pk は地域のダンジョンの色。
+   ダークモードでも同じ見た目（紙ではなく「光るパック」なので、テーマの色は使わない） */
+:root { --rpg-pack-world: #2f6fd0; --rpg-gl1: #c98a4b; --rpg-gl2: #dfe7ee; --rpg-gl3: #ffc83d; }
+.rpg-pack {
+  --pk: var(--rpg-pack-world);
+  position: relative; isolation: isolate; overflow: hidden; display: grid; place-items: center; min-height: 180px; padding: 34px 12px 12px;
+  border-radius: 16px; color: #fff; text-align: center;
+  background: radial-gradient(120% 90% at 50% 28%, color-mix(in srgb, var(--pk) 55%, #fff) 0%, var(--pk) 42%, color-mix(in srgb, var(--pk) 45%, #0a1024) 100%);
+  border: 2px solid #f2cf6b; box-shadow: inset 0 0 0 3px rgb(255 255 255 / .18), 0 6px 18px -6px color-mix(in srgb, var(--pk) 70%, #000);
+}
+.rpg-pack-rays {
+  position: absolute; inset: -60%; z-index: -1; opacity: .35;
+  background: repeating-conic-gradient(from 0deg, rgb(255 255 255 / .55) 0 6deg, transparent 6deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 15%, transparent 60%); mask: radial-gradient(circle, #000 15%, transparent 60%);
+}
+.rpg-pack-shine { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(115deg, transparent 35%, rgb(255 255 255 / .45) 47%, transparent 58%) 0 0 / 260% 100% no-repeat; background-position: 120% 0; }
+.rpg-pack-body { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.rpg-pack-top { font: 700 .66rem/1 var(--font-mono); letter-spacing: .16em; opacity: .9; text-shadow: 0 1px 2px rgb(0 0 0 / .4); }
+.rpg-pack-fan { position: relative; width: 190px; height: 82px; margin: 4px 0 2px; }
+.rpg-pack-f {
+  position: absolute; bottom: 0; left: 50%; width: 84px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 6px;
+  border: 3px solid #fff; background: #fff; box-shadow: 0 4px 10px rgb(0 0 0 / .35);
+}
+.rpg-pack-f.f1 { transform: translateX(-112%) rotate(-14deg) scale(.86); transform-origin: bottom right; }
+.rpg-pack-f.f3 { transform: translateX(12%) rotate(14deg) scale(.86); transform-origin: bottom left; }
+.rpg-pack-f.f2 { z-index: 1; width: 100px; transform: translateX(-50%) translateY(-4px); border-color: #ffe28a; box-shadow: 0 0 0 2px #e2a913, 0 0 18px 4px rgb(255 214 90 / .75); }
+.rpg-pack-name { font: 900 1.45rem/1.15 var(--font-display); letter-spacing: .04em; text-shadow: 0 2px 0 color-mix(in srgb, var(--pk) 40%, #000), 0 0 12px rgb(255 255 255 / .35); }
+.rpg-pack-sub { font: 700 .78rem/1.3 var(--font-display); padding: 2px 10px; border-radius: 999px; background: rgb(0 0 0 / .28); }
+.rpg-pack-tag {
+  position: absolute; top: 8px; left: 8px; z-index: 3; padding: 2px 8px; border-radius: 999px;
+  font: 800 .7rem/1.4 var(--font-mono); color: #4a3200; background: linear-gradient(#ffe7a0, #f2b922); box-shadow: 0 1px 3px rgb(0 0 0 / .3);
+}
+.rpg-pack-tag.is-mul { left: auto; right: 8px; color: #fff; background: rgb(0 0 0 / .4); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .5); }
+.rpg-spark { position: absolute; z-index: 1; width: 12px; height: 12px; background: #fff; opacity: 0; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.rpg-spark.s1 { top: 22%; left: 14%; } .rpg-spark.s2 { top: 16%; right: 18%; width: 9px; height: 9px; }
+.rpg-spark.s3 { bottom: 24%; left: 22%; width: 8px; height: 8px; } .rpg-spark.s4 { bottom: 30%; right: 12%; }
+
+/* 引く演出のステージ（画面いっぱい。押すとスキップ）。いちばんいい★の色 --gl で光る */
+.rpg-gstage {
+  --gl: var(--rpg-gl1);
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; align-content: center; gap: 18px; padding: 16px;
+  background: radial-gradient(circle at 50% 45%, rgb(20 28 60 / .88), rgb(4 6 16 / .96) 70%); cursor: pointer; overflow: hidden;
+}
+.rpg-gstage[hidden] { display: none; }
+.rpg-gstage.is-s2 { --gl: var(--rpg-gl2); }
+.rpg-gstage.is-s3 { --gl: var(--rpg-gl3); }
+.rpg-gstage.is-promo { --gl: var(--rpg-gl2); }
+.rpg-gstage::before {
+  content: ""; position: absolute; inset: -50%; opacity: 0; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--gl) 70%, transparent) 0 7deg, transparent 7deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 10%, transparent 55%); mask: radial-gradient(circle, #000 10%, transparent 55%);
+}
+.rpg-gstage-in { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.rpg-pack.is-big { width: min(82vw, 340px, 56vh); min-height: 0; aspect-ratio: 3 / 4; box-shadow: 0 0 0 2px #f2cf6b, 0 0 36px 6px var(--gl); }
+.rpg-pack.is-big .rpg-pack-name { font-size: 2rem; }
+.rpg-pack.is-big .rpg-pack-fan { width: 230px; height: 104px; }
+.rpg-pack.is-big .rpg-pack-f { width: 104px; }
+.rpg-pack.is-big .rpg-pack-f.f2 { width: 124px; }
+.rpg-gstage-say { margin: 0; min-height: 1.4em; font: 900 1.25rem var(--font-display); color: var(--gl); text-shadow: 0 0 12px var(--gl); }
+.rpg-gstage-skip { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); padding: 8px 18px; border: 1px solid rgb(255 255 255 / .35); border-radius: 999px; background: rgb(255 255 255 / .08); color: #fff; font: 700 .85rem var(--font-display); cursor: pointer; }
+body.rpg-staging { overflow: hidden; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rpg-pack-rays { animation: rpg-spin 18s linear infinite; }
+  .rpg-pack-shine { animation: rpg-pack-sheen 3.2s ease-in-out infinite; }
+  .rpg-spark { animation: rpg-twinkle 2.4s ease-in-out infinite; }
+  .rpg-spark.s2 { animation-delay: .6s; } .rpg-spark.s3 { animation-delay: 1.2s; } .rpg-spark.s4 { animation-delay: 1.8s; }
+  .rpg-pack-f.f2 { animation: rpg-bob 2.6s ease-in-out infinite; }
+  .rpg-pack-slot:hover .rpg-pack { transform: translateY(-2px); transition: transform .2s; }
+  @keyframes rpg-spin { to { transform: rotate(1turn); } }
+  @keyframes rpg-pack-sheen { 0%, 55% { background-position: 120% 0; } 85%, 100% { background-position: -20% 0; } }
+  @keyframes rpg-twinkle { 0%, 100% { opacity: 0; transform: scale(.4) rotate(0); } 50% { opacity: 1; transform: scale(1.1) rotate(45deg); } }
+  @keyframes rpg-bob { 0%, 100% { transform: translateX(-50%) translateY(-4px); } 50% { transform: translateX(-50%) translateY(-9px); } }
+
+  /* 演出: 落ちてくる（〜20%）→ 揺れがだんだん強く（〜75%）→ 光ってはじける（〜100%）。★3 は 55% で銀から金に */
+  .rpg-gstage .rpg-pack.is-big { animation: rpg-st-pack var(--show, 1700ms) cubic-bezier(.3, .7, .4, 1) forwards, rpg-st-glow var(--show, 1700ms) ease-in forwards; }
+  .rpg-gstage.is-promo .rpg-pack.is-big { animation-duration: calc(var(--show, 1700ms) + 500ms); animation-name: rpg-st-pack, rpg-st-promo; }
+  .rpg-gstage::before { animation: rpg-st-rays var(--show, 1700ms) ease-in forwards, rpg-spin 6s linear infinite; }
+  .rpg-gstage.is-promo::before { animation-duration: calc(var(--show, 1700ms) + 500ms), 6s; }
+  .rpg-gstage-say { animation: rpg-st-say var(--show, 1700ms) ease-out forwards; }
+  .rpg-gstage.is-promo .rpg-gstage-say { animation-duration: calc(var(--show, 1700ms) + 500ms); }
+  .rpg-gstage.is-promo { animation: rpg-st-promo-bg calc(var(--show, 1700ms) + 500ms) steps(1) forwards; }
+  @keyframes rpg-st-pack {
+    0% { transform: translateY(-75vh) rotate(-8deg); }
+    18% { transform: translateY(0) rotate(2deg); }
+    24% { transform: translateY(-14px) rotate(-1deg); }
+    30% { transform: none; }
+    40% { transform: rotate(-3deg); } 46% { transform: rotate(3deg); }
+    52% { transform: rotate(-5deg) scale(1.02); } 57% { transform: rotate(5deg) scale(1.03); }
+    62% { transform: rotate(-7deg) scale(1.04); } 66% { transform: rotate(7deg) scale(1.05); }
+    70% { transform: rotate(-8deg) scale(1.06); } 74% { transform: rotate(8deg) scale(1.07); }
+    80% { transform: scale(1.1); filter: brightness(1.4); opacity: 1; }
+    100% { transform: scale(1.5); filter: brightness(3); opacity: 0; }
+  }
+  @keyframes rpg-st-glow {
+    0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
+    75% { box-shadow: 0 0 0 3px var(--gl), 0 0 60px 18px var(--gl); }
+    100% { box-shadow: 0 0 0 4px var(--gl), 0 0 120px 60px var(--gl); }
+  }
+  @keyframes rpg-st-promo {
+    0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
+    52% { box-shadow: 0 0 0 3px var(--rpg-gl2), 0 0 50px 14px var(--rpg-gl2); }
+    60% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 80px 26px var(--rpg-gl3); }
+    100% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 140px 70px var(--rpg-gl3); }
+  }
+  @keyframes rpg-st-promo-bg { 0% { --gl: var(--rpg-gl2); } 58% { --gl: var(--rpg-gl3); } }
+  @keyframes rpg-st-rays { 0%, 35% { opacity: 0; } 80% { opacity: .55; } 100% { opacity: 1; } }
+  @keyframes rpg-st-say { 0%, 45% { opacity: 0; transform: scale(.8); } 60% { opacity: 1; transform: scale(1.12); } 70%, 100% { opacity: 1; transform: none; } }
+}
+
 /* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は rpg-cards.js の RPG.worldMap が描く。描く前の空のあいだは出さない） */
 .rpg-cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 #cd-map:empty { display: none; }
@@ -598,4 +708,26 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin) { display: none !important; }
 @media (prefers-reduced-motion: no-preference) {
   .rpg-hp.rpg-ouch { animation: rpg-ouch .9s ease-out forwards; }
   @keyframes rpg-ouch { 0%, 35% { box-shadow: 0 0 0 2px var(--ng), 0 0 14px 4px color-mix(in srgb, var(--ng) 70%, transparent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+}
+
+/* ---- 冒険ランキング（rpg-rank.js の #scr-rpgrank。表の形はタイムアタックのランキング .rklist と同じ） ---- */
+.rpg-to-rank { padding: 10px; font-size: .98rem; }
+#rk-to-rpg { align-self: flex-start; margin: -4px 0 6px; padding-inline: 0; }
+.rpg-rr-cols { display: flex; flex-direction: column; gap: 16px; }
+.rpg-rr-side, .rpg-rr-main { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+:is(.rpg-rr-side, .rpg-rr-main) p { margin: 0; }
+.rpg-rr-me { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.rpg-rr-h { font: 700 .85rem var(--font-display); color: var(--muted); }
+.rpg-rr-rec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font: 700 1rem var(--font-display); }
+.rpg-rr-rec b { font: 900 1.6rem var(--font-display); }
+.rpg-rr-list li { grid-template-columns: 2.2em minmax(0, 1fr) auto auto auto; }
+.rpg-rr-list .rpg-rr-dg small { font-size: .78em; color: var(--muted); }
+#rr-tabs { align-self: flex-start; }
+#rr-form[hidden] { display: none; }
+#rr-form .row { display: flex; flex-wrap: nowrap; gap: 8px; }
+#rr-name { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
+#rr-name::placeholder { font-size: .85rem; }
+#rr-submit { padding-inline: 16px; white-space: nowrap; }
+@media (min-width: 900px) {
+  .rpg-rr-cols { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; gap: var(--col-gap, 24px); }
 }

@@ -43,8 +43,8 @@ const evs = async (page, type, want) => (await events(page, type)).map(e => pick
 const southAmerica = page => page.evaluate(() => C.filter(c => c.r === '南アメリカ').map(c => c.a));
 
 t('rates_always_visible', async page => {
-  await writeSave(page, saveWith({ coins: 100 }));
-  await page.evaluate(() => RPG.open('gacha'));
+  await writeSave(page, saveWith({ coins: 150 }));
+  await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
   assert.equal(await page.isVisible('#scr-gacha'), true);
   assert.equal(await pressedRegion(page), '南アメリカ');
   const want = ['出る確率', '★3 ゴールド 3% / ★2 シルバー 17%', '★1 ブロンズ 80%', '10回引くと10枚目は★2以上（★3 3% / ★2 97%）',
@@ -75,28 +75,104 @@ t('rates_always_visible', async page => {
 });
 
 t('default_region', async page => {
-  // 次に挑むダンジョンの地域
+  // ふつうは全世界（地域をしぼると高くなるので、次のダンジョンの地域や前回の地域は選んでおかない）
   await gacha(page, saveWith({ pulls: 1, cards: { br: [1, 0], jp: [2, 1] } }));
-  assert.equal(await pressedRegion(page), '南アメリカ');
+  assert.equal(await pressedRegion(page), 'all');
   assert.equal(await text(page, '#ga-regions .chip[data-r="all"]'), '全世界 2/195');
   assert.equal(await text(page, '#ga-regions .chip[data-r="南アメリカ"]'), '南アメリカ 1/12');
   assert.equal(await text(page, '#ga-regions .chip[data-r="アジア"]'), 'アジア 1/46');
   assert.equal(await page.locator('#ga-regions .chip').count(), 7);
-  assert.equal(await text(page, '#ga-hint'), '選んだ地域のダンジョンでは、その地域の仲間が ×1.5 で強い');
+  assert.equal(await text(page, '#ga-hint'), '地域をしぼると値段が ×1.5。そのかわり、その地域のダンジョンでは仲間が ×1.5 で強い');
   await gacha(page, saveWith({ pulls: 1, floors: { samerica: 5 } }));
-  assert.equal(await pressedRegion(page), 'オセアニア');
-  // 全部クリアしたら前回の地域、それも無ければ全世界
+  assert.equal(await pressedRegion(page), 'all');
   await gacha(page, saveWith({ pulls: 1, floors: ALL_CLEAR, gr: 'アジア' }));
-  assert.equal(await pressedRegion(page), 'アジア');
-  await gacha(page, saveWith({ pulls: 1, floors: ALL_CLEAR }));
   assert.equal(await pressedRegion(page), 'all');
   // RPG.open で渡した地域がいちばん先
-  await gacha(page, saveWith({ pulls: 1 }), { region: 'all' });
-  assert.equal(await pressedRegion(page), 'all');
+  await gacha(page, saveWith({ pulls: 1 }), { region: 'アジア' });
+  assert.equal(await pressedRegion(page), 'アジア');
   // 知らない地域は無視する
   await gacha(page, null, { region: 'どこか' });
-  assert.equal(await pressedRegion(page), '南アメリカ');
+  assert.equal(await pressedRegion(page), 'all');
 });
+
+t('region_price_x1_5', async page => {
+  // 全世界は 1回 ●100・10回 ●1,000、地域をしぼると 1.5倍（●150・●1,500）。足りなければ押せない
+  await gacha(page, saveWith({ coins: 1200 }));
+  assert.equal(await text(page, '#ga-1'), '1回 100');   // ● はコインの絵（文字なし）
+  assert.equal(await text(page, '#ga-10'), '10回 1,000');
+  assert.equal(await page.isEnabled('#ga-10'), true);
+  await page.click('#ga-regions .chip[data-r="アジア"]');
+  assert.equal(await text(page, '#ga-1'), '1回 150');
+  assert.equal(await text(page, '#ga-10'), '10回 1,500');
+  assert.equal(await page.isEnabled('#ga-10'), false);
+  assert.equal(await text(page, '#ga-need'), 'あと300');
+  // 地域で1回引くと 150 減る。出るのはその地域の国だけ
+  await page.click('#ga-1');
+  const s = await readSave(page);
+  assert.equal(s.coins, 1050);
+  const [p] = await events(page, 'rpg:pull');
+  assert.equal(p.region, 'アジア');
+  assert.equal(await page.evaluate(a => byA.get(a).r, p.results[0].a), 'アジア');
+  assert.deepEqual(await evs(page, 'rpg:coins', { delta: 0, reason: 0 }), [{ delta: -150, reason: 'gacha' }]);
+  // サムネイルはしぼると「地域しぼり ×1.5」が付く
+  assert.ok((await text(page, '#ga-pack')).includes('地域しぼり ×1.5'));
+  await page.click('#ga-regions .chip[data-r="all"]');
+  assert.ok(!(await text(page, '#ga-pack')).includes('地域しぼり'));
+});
+
+t('pack_thumbnail', async page => {
+  // ボタンの上に、選んだ地域の国旗パック（国旗3枚・地域名・まだ会っていない国の数・★3の確率）
+  await gacha(page, saveWith({ coins: 0, cards: { br: [1, 0] } }));
+  const r = await page.evaluate(() => {
+    const box = id => $(id).getBoundingClientRect();
+    return { pack: box('ga-pack'), btn: box('ga-1'), flags: document.querySelectorAll('#ga-pack .rpg-pack-f').length, label: $('ga-pack').firstElementChild.getAttribute('aria-label') };
+  });
+  assert.ok(r.pack.bottom <= r.btn.top && r.pack.height > 100, JSON.stringify(r));
+  assert.equal(r.flags, 3);
+  assert.equal(r.label, '全世界の国旗パック');
+  const s = await text(page, '#ga-pack');
+  assert.ok(s.includes('全世界') && s.includes('まだ会っていない国 194/195') && s.includes('★3 3%'), s);
+  // 国旗はまだ仲間でない国から
+  await page.click('#ga-regions .chip[data-r="南アメリカ"]');
+  const as = await page.$$eval('#ga-pack .rpg-pack-f', es => es.map(e => [...byA.values()].find(c => flag(c.a) === e.getAttribute('src')).a));
+  assert.equal(as.length, 3);
+  for (const a of as) assert.notEqual(a, 'br');
+  assert.ok((await text(page, '#ga-pack')).includes('まだ会っていない国 11/12'));
+});
+
+t('pull_stage', async page => {
+  // 引くとパックの演出が出る（いちばんいい★の色。★3 は is-promo）。押すとスキップしてめくり始める
+  await gacha(page, saveWith({ coins: 1200 }));
+  await page.click('#ga-10');
+  assert.equal(await page.isVisible('#ga-stage'), true);
+  const [p] = await events(page, 'rpg:pull');
+  const best = Math.max(...p.results.map(r => r.star));
+  const cls = await page.getAttribute('#ga-stage', 'class');
+  assert.ok(cls.includes(`is-s${best}`) && cls.includes('is-promo') === (best === 3), cls);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'ga-skip');
+  // 演出のあいだはまだ全部裏向き
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 10);
+  await page.click('#ga-stage');
+  assert.equal(await page.isVisible('#ga-stage'), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'ga-flipall');
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  // 何もしなくても showMs で終わる。Esc でもスキップ
+  await page.click('#ga-1');
+  assert.equal(await page.isVisible('#ga-stage'), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isVisible('#ga-stage'), false);
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
+  await page.click('#ga-1');
+  await page.waitForFunction(() => $('ga-stage').hidden, null, { timeout: 4000 });
+}, { seed: 1 });
+
+t('pull_stage_reduced_motion', async page => {
+  // reduced motion では演出なしで、最初から表
+  await gacha(page, saveWith({ coins: 100 }));
+  await page.click('#ga-1');
+  assert.equal(await page.isVisible('#ga-stage'), false);
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
+}, { reducedMotion: 'reduce' });
 
 t('intro_ten_pull_cards', async page => {
   await page.click('#home-rpg');
@@ -104,19 +180,19 @@ t('intro_ten_pull_cards', async page => {
   assert.ok((await text(page, '#rpg-next')).includes('まずは国旗ガチャ10連で'));
   await page.click('#rpg-next');
   assert.equal(await page.isVisible('#scr-gacha'), true);
-  assert.equal(await pressedRegion(page), '南アメリカ');
+  assert.equal(await pressedRegion(page), 'all');   // 旅立ちの●1,000で引ける全世界
   await page.click('#ga-10');
   const backs = await page.locator('#ga-res .rpg-card.is-back').count();   // めくる前は裏向き
   assert.ok(backs > 0, String(backs));
   const s = await readSave(page);
   assert.equal(s.coins, 0);
   assert.equal(s.pulls, 10);
-  assert.equal(s.gr, '南アメリカ');
+  assert.equal(s.gr, 'all');
   assert.equal(await page.locator('#ga-res .rpg-card').count(), 10);
   const pulls = await events(page, 'rpg:pull');
   assert.equal(pulls.length, 1);
   const p = pulls[0];
-  assert.deepEqual(pick(p, { region: 0, count: 0, free: 0, pity: 0, pulls: 0 }), { region: '南アメリカ', count: 10, free: false, pity: s.pity, pulls: 10 });
+  assert.deepEqual(pick(p, { region: 0, count: 0, free: 0, pity: 0, pulls: 0 }), { region: 'all', count: 10, free: false, pity: s.pity, pulls: 10 });
   assert.ok(p.results[9].star >= 2, JSON.stringify(p.results));
   assert.ok(+(await page.getAttribute('#ga-res .rpg-card:nth-child(10)', 'data-star')) >= 2);
   assert.deepEqual(await page.$$eval('#ga-res .rpg-card', bs => bs.map(b => b.dataset.a)), p.results.map(r => r.a));
@@ -143,6 +219,7 @@ t('intro_ten_pull_cards', async page => {
 t('flip_in_order', async page => {
   await gacha(page, saveWith({ coins: 1000 }));
   await page.click('#ga-10');
+  await page.click('#ga-stage');   // 演出は飛ばす
   // flipMs ずつ順に表になる（表になったカードはいつも前から順）
   const seen = new Set();
   for (let i = 0; i < 60; i++) {
@@ -291,7 +368,7 @@ t('labels', async page => {
   const SA = await southAmerica(page);
   assert.equal(SA.length, 12);
   // かさねがもう4 → おかえし（引いた★の額）
-  await gacha(page, saveWith({ coins: 100, cards: Object.fromEntries(SA.map(a => [a, [3, 4]])) }), { region: '南アメリカ' });
+  await gacha(page, saveWith({ coins: 150, cards: Object.fromEntries(SA.map(a => [a, [3, 4]])) }), { region: '南アメリカ' });
   await page.click('#ga-1');
   const [p] = await events(page, 'rpg:pull');
   assert.equal(p.results[0].out, 'refund');
@@ -299,9 +376,9 @@ t('labels', async page => {
   const [l] = await labels(page);
   assert.ok(l.startsWith('おかえし') && l.includes(String(refund)), l);
   assert.equal((await readSave(page)).coins, refund);
-  assert.deepEqual(await evs(page, 'rpg:coins', { delta: 0, reason: 0 }), [{ delta: -100, reason: 'gacha' }, { delta: refund, reason: 'refund' }]);
+  assert.deepEqual(await evs(page, 'rpg:coins', { delta: 0, reason: 0 }), [{ delta: -150, reason: 'gacha' }, { delta: refund, reason: 'refund' }]);
   // 全部 ★1 → 10枚目は★2以上なので、最初の★2以上はランクアップ
-  await gacha(page, saveWith({ coins: 1000, cards: Object.fromEntries(SA.map(a => [a, [1, 0]])) }), { region: '南アメリカ' });
+  await gacha(page, saveWith({ coins: 1500, cards: Object.fromEntries(SA.map(a => [a, [1, 0]])) }), { region: '南アメリカ' });
   await page.click('#ga-10');
   const ls = await labels(page);
   assert.equal(ls.length, 10);

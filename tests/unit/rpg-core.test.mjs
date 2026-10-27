@@ -20,7 +20,7 @@ test('tuning_and_tables', () => {
   const K = loadCore();
   const { TUNING, DUNGEONS, MONSTERS, AVATARS } = K;
   assert.equal(TUNING.levelStep, 30);
-  assert.deepEqual(plain(TUNING.gacha), { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, refund: [0, 10, 30, 100], flipMs: 120 });
+  assert.deepEqual(plain(TUNING.gacha), { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], flipMs: 120, showMs: 1700 });
   // 形と値をまるごと固定する（キーの名前は以後のタスクが使う）。JSON にすると Infinity は null になるので別に見る
   assert.deepEqual(plain(TUNING), plain({
     hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 50 },
@@ -33,7 +33,7 @@ test('tuning_and_tables', () => {
               critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7, reviveMax: 3 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
-    gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, refund: [0, 10, 30, 100], flipMs: 120 },
+    gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], flipMs: 120, showMs: 1700 },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#195か国ドリル', cards: [50, 100, 195] },
   }));
   assert.equal(TUNING.quiz.decay[2][0], Infinity);
@@ -1280,4 +1280,13 @@ test('revive_set', () => {
   assert.deepEqual(plain(ms[0]), { a: 'br', mode: 'f2n' }, '渡した配列は変えない');
   assert.deepEqual(plain(K.reviveSet([{ a: 'uy', mode: 'cap' }, { a: 'uy', mode: 'm2f' }])), [{ a: 'uy', mode: 'f2n' }]);
   assert.deepEqual(plain(K.reviveSet([])), []);
+});
+
+test('gacha_cost_region_mul', () => {
+  const K = loadCore();
+  // 全世界はそのまま、地域をしぼると 1.5 倍
+  assert.equal(K.gachaCost('all', 1), 100);
+  assert.equal(K.gachaCost('all', 10), 1000);
+  assert.equal(K.gachaCost('南アメリカ', 1), 150);
+  assert.equal(K.gachaCost('アジア', 10), 1500);
 });
