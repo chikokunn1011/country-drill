@@ -116,6 +116,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `rpg:clear` | `{dungeon}` | ボスを初めて倒した |
 | `rpg:overcome` | `{a, total}` | |
 | `rpg:bounty` | `{a, doneAll, totalDays}` | |
+| `rpg:deco` | `{deco}` | 冒険ホームの旅人カードのかざりを［決定］で変えて保存できたとき（rpg.js）。`deco` は保存した国コードの配列（0..3、持っている仲間だけ、選んだ順）。変わらなかった・保存できなかったときは出さない。冒険ランキングのかざりの送信（rpg-rank.js）が受け取る |
 | `rpg:share` | `{kind}` | シェアボタンを押した。`kind` は `boss-{id}`（ボスを倒した。`id` はダンジョン id）・`final`（地図喰いを倒した）・`cards-{n}`（仲間の節目。`n` は `50`・`100`・`195`）・`region-{id}`（その地域の国を全部仲間にした）・`test`（テストだけ） |
 
 足すこと（バッジ設計 §8.2・§8.4）:

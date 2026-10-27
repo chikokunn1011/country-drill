@@ -630,6 +630,69 @@
     + '<thead><tr><th scope="col">ゲーム</th><th scope="col">コイン</th></tr></thead>'
     + `<tbody>${EARN.map(([g, c]) => `<tr><td>${g}</td><td>${c}</td></tr>`).join('')}</tbody></table>`
     + '<button class="btn ghost" id="rpg-earn-go">クイズで稼ぐ</button></details>';
+  // ---- かざり（旅人カードの名前の横に、好きな仲間の国旗を3つまで。冒険ランキングにも出る: rpg-rank.js） ----
+  // 仲間が0枚・rpg-cards.js が無いときは出さない。出すのは deco のうち持っている仲間（cards）の国だけ。空きは点線の四角
+  const DECO_MAX = 3;
+  const decoOwned = d => d.deco.filter(a => byA.has(a) && d.cards[a]);
+  const canDeco = d => hasCards() && typeof RPG.cardHTML === 'function' && owned(d) > 0;
+  const decoHTML = d => {
+    if (!canDeco(d)) return '';
+    const as = decoOwned(d), slots = as.map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; });
+    while (slots.length < DECO_MAX) slots.push('<span class="rpg-deco-empty"></span>');
+    return `<button type="button" class="rpg-deco" id="rpg-deco" aria-label="かざりを変える">${slots.join('')}</button>`;
+  };
+  // 選ぶ画面（<dialog id="rpg-deco-dlg">。冒険ホームの描き直しで消えないよう body に1つ）。押すたびに入れる／外す（3つ埋まっていたら入らない）。
+  // ［決定］で保存して rpg:deco。Esc・閉じる・外を押したときは保存しない
+  const openDeco = () => {
+    const d = get();
+    if (!canDeco(d)) return;
+    let dlg = $('rpg-deco-dlg');
+    if (!dlg) {
+      dlg = document.createElement('dialog');
+      dlg.id = 'rpg-deco-dlg';
+      dlg.className = 'rpg-deco-dlg';
+      dlg.setAttribute('aria-labelledby', 'rpg-deco-h');
+      dlg.onclick = e => { if (e.target === dlg) dlg.close(); };
+      document.body.append(dlg);
+    }
+    let pick = decoOwned(d);
+    const star = a => d.cards[a][0];
+    const list = Object.keys(d.cards).filter(a => byA.has(a))
+      .sort((x, y) => star(y) - star(x) || byA.get(x).n.localeCompare(byA.get(y).n, 'ja'));
+    const ro = status === 'readOnly';
+    dlg.innerHTML = '<div class="inner"><button type="button" class="close">閉じる</button>'
+      + `<h2 id="rpg-deco-h" class="rpg-deco-h">かざりを選ぶ <small id="rpg-deco-n"></small></h2>`
+      + `<p class="hint">旅人カードと冒険ランキングに出る仲間の国旗（${DECO_MAX}つまで）。もう一度押すと外れる</p>`
+      + `<div class="rpg-cd-grid rpg-deco-grid" id="rpg-deco-grid">${list.map(a => RPG.cardHTML(a, d, { lazy: true })).join('')}</div>`
+      + `<button type="button" class="btn" id="rpg-deco-ok"${ro ? ' disabled' : ''}>決定</button></div>`;
+    const mark = () => {
+      for (const b of dlg.querySelectorAll('.rpg-card[data-a]')) {
+        const i = pick.indexOf(b.dataset.a), lab = b.querySelector('.rpg-lab');
+        b.classList.toggle('is-in', i >= 0);
+        b.setAttribute('aria-pressed', String(i >= 0));
+        if (i >= 0 && !lab) b.querySelector('.rpg-card-face')?.insertAdjacentHTML('afterbegin', '<span class="rpg-lab"></span>');
+        if (i >= 0) b.querySelector('.rpg-lab').textContent = `✓ かざり${i + 1}`;
+        else lab?.remove();
+      }
+      $('rpg-deco-n').textContent = `${pick.length}/${DECO_MAX}`;
+    };
+    $('rpg-deco-grid').onclick = e => {
+      const a = e.target.closest('.rpg-card[data-a]')?.dataset.a;
+      if (!a) return;
+      if (pick.includes(a)) pick = pick.filter(x => x !== a);
+      else if (pick.length < DECO_MAX) pick = [...pick, a];
+      mark();
+    };
+    dlg.querySelector('.close').onclick = () => dlg.close();
+    $('rpg-deco-ok').onclick = () => {
+      const deco = [...pick], from = JSON.stringify(get().deco);
+      const ok = tx(x => { x.deco = deco; return true; });
+      dlg.close();
+      if (ok && wrote && JSON.stringify(deco) !== from) emit('rpg:deco', { deco });
+    };
+    mark();
+    if (!dlg.open) dlg.showModal();
+  };
   // スマホは上から 旅人・レベルアップ・つぎにやること・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
   const homeHTML = (d, nf, nx) => {
@@ -641,7 +704,7 @@
     return `<div class="rpg-side">${warnHTML()}`
       + '<div class="rpg-hero" id="rpg-hero">'
       + `<button type="button" class="rpg-av" id="rpg-av" aria-label="旅人のすがたを変える">${AV[d.av] ?? AV[0]}</button>`
-      + `<p class="rpg-who"><b id="rpg-name">${name}</b><span class="rpg-ttl" id="rpg-title">${title ? `〈${esc(title)}〉` : ''}</span></p>`
+      + `<p class="rpg-who"><b id="rpg-name">${name}</b><span class="rpg-ttl" id="rpg-title">${title ? `〈${esc(title)}〉` : ''}</span>${decoHTML(d)}</p>`
       + `<p class="rpg-stats" id="rpg-stats"><span class="rpg-lvnum">Lv ${d.lv}</span><span>❤️ ${fmt(st.hp)}</span><span>⚔️ ${fmt(st.atk)}</span><span>仲間 ${owned(d)}/${TOTAL}</span></p></div>`
       + `<div class="rpg-lv"><button class="btn" id="rpg-lvup"${max || !can ? ' disabled' : ''}>${lvup}</button>`
       + `<button class="linkbtn" id="rpg-lvmax"${upTo > d.lv ? '' : ' disabled'}>上げられるだけ上げる</button></div>`
@@ -677,6 +740,7 @@
     $('rpg-lvup').onclick = levelUp;
     $('rpg-lvmax').onclick = levelMax;
     $('rpg-next').onclick = nx.go;
+    if ($('rpg-deco')) $('rpg-deco').onclick = openDeco;
     if ($('rpg-to-gacha')) $('rpg-to-gacha').onclick = () => open('gacha');
     if ($('rpg-to-cards')) $('rpg-to-cards').onclick = () => open('cards');
     if ($('rpg-to-team')) $('rpg-to-team').onclick = () => open('team');

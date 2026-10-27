@@ -238,3 +238,114 @@ t('phone_no_overflow', async page => {
   await team(page, saveWith({ ...CARDS, teams: [{ n: 'あいうえおかきく', c: null }, { n: '編成2', c: [] }] }));
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 }, { viewport: { width: 360, height: 640 } });
+
+// ---- 冒険ホームの旅人カードのかざり（#rpg-deco と #rpg-deco-dlg） ----
+const DECO = { coins: 0, cards: { jp: [1, 0], br: [2, 0], cl: [1, 0], fr: [3, 0] } };
+const dcard = a => `#rpg-deco-dlg .rpg-card[data-a="${a}"]`;
+const decoIn = page => page.$$eval('#rpg-deco-dlg .rpg-card.is-in', els => els.map(e => e.dataset.a).sort());
+const home = async (page, save) => {
+  await writeSave(page, save);
+  await page.evaluate(() => show('rpg'));
+};
+
+t('deco_toggle_and_show', async page => {
+  await home(page, saveWith(DECO));
+  assert.equal(await page.locator('#rpg-deco img').count(), 0);
+  assert.equal(await page.locator('#rpg-deco .rpg-deco-empty').count(), 3);
+  await page.click('#rpg-deco');
+  assert.equal(await page.isVisible('#rpg-deco-dlg'), true);
+  assert.equal(await page.locator('#rpg-deco-dlg .rpg-card[data-a]').count(), 4);
+  for (const a of ['jp', 'br', 'cl', 'fr']) await page.click(dcard(a));
+  assert.deepEqual(await decoIn(page), ['br', 'cl', 'jp']);   // 3つ埋まっていたら4つ目は入らない
+  // もう一度押すと外れる → また入れられる
+  await page.click(dcard('br'));
+  assert.deepEqual(await decoIn(page), ['cl', 'jp']);
+  await page.click(dcard('br'));
+  assert.deepEqual(await decoIn(page), ['br', 'cl', 'jp']);
+  assert.deepEqual((await readSave(page)).deco, []);   // 決定までは保存しない
+  await page.click('#rpg-deco-ok');
+  assert.equal(await page.isVisible('#rpg-deco-dlg'), false);
+  assert.deepEqual((await readSave(page)).deco, ['jp', 'cl', 'br']);
+  await page.waitForFunction(() => document.querySelectorAll('#rpg-deco img').length === 3);
+  assert.deepEqual(await page.$$eval('#rpg-deco img', els => els.map(e => e.alt)), ['日本', 'チリ', 'ブラジル']);
+  assert.equal(await page.locator('#rpg-deco .rpg-deco-empty').count(), 0);
+  assert.deepEqual((await events(page, 'rpg:deco')).map(e => e.deco), [['jp', 'cl', 'br']]);
+});
+
+t('deco_pick_and_show', async page => {
+  await home(page, saveWith(DECO));
+  await page.click('#rpg-deco');
+  for (const a of ['jp', 'br', 'cl', 'fr']) await page.click(dcard(a));
+  await page.click('#rpg-deco-ok');
+  assert.deepEqual((await readSave(page)).deco, ['jp', 'br', 'cl']);
+  assert.deepEqual((await events(page, 'rpg:deco')).map(e => e.deco), [['jp', 'br', 'cl']]);
+  await page.waitForFunction(() => document.querySelectorAll('#rpg-deco img').length === 3);
+  // 開き直すと、いまのかざりが選ばれている
+  await page.click('#rpg-deco');
+  assert.deepEqual(await decoIn(page), ['br', 'cl', 'jp']);
+});
+
+t('deco_cancel_keeps', async page => {
+  await home(page, saveWith({ ...DECO, deco: ['jp'] }));
+  assert.equal(await page.locator('#rpg-deco img').count(), 1);
+  assert.equal(await page.locator('#rpg-deco .rpg-deco-empty').count(), 2);
+  await page.click('#rpg-deco');
+  await page.click(dcard('br'));
+  await page.click(dcard('jp'));
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isVisible('#rpg-deco-dlg'), false);
+  assert.deepEqual((await readSave(page)).deco, ['jp']);
+  // 閉じるでも保存しない
+  await page.click('#rpg-deco');
+  assert.deepEqual(await decoIn(page), ['jp']);
+  await page.click(dcard('fr'));
+  await page.click('#rpg-deco-dlg .close');
+  assert.equal(await page.isVisible('#rpg-deco-dlg'), false);
+  assert.deepEqual((await readSave(page)).deco, ['jp']);
+  assert.deepEqual(await events(page, 'rpg:deco'), []);
+});
+
+t('deco_hidden_without_cards', async page => {
+  await home(page, saveWith({ coins: 0, deco: ['jp'] }));
+  assert.equal(await page.isVisible('#rpg-hero'), true);
+  assert.equal(await page.locator('#rpg-deco').count(), 0);
+});
+
+t('deco_skips_unowned', async page => {
+  await home(page, saveWith({ coins: 0, cards: { br: [1, 0] }, deco: ['jp', 'zz'] }));
+  assert.equal(await page.locator('#rpg-deco img').count(), 0);
+  assert.equal(await page.locator('#rpg-deco .rpg-deco-empty').count(), 3);
+  // 持っていない国は選ぶ画面でも入っていない。決定で外れる
+  await page.click('#rpg-deco');
+  assert.deepEqual(await decoIn(page), []);
+  await page.click(dcard('br'));
+  await page.click('#rpg-deco-ok');
+  assert.deepEqual((await readSave(page)).deco, ['br']);
+});
+
+t('deco_readonly_no_write', async page => {
+  await writeSave(page, { ...saveWith({ ...DECO, deco: ['jp'] }), v: 99 });
+  const before = await raw(page);
+  await page.evaluate(() => show('rpg'));
+  await page.click('#rpg-deco');
+  await page.click(dcard('br'));
+  await page.evaluate(() => { $('rpg-deco-ok').disabled = false; $('rpg-deco-ok').click(); });
+  assert.equal(await raw(page), before);
+  assert.deepEqual(await events(page, 'rpg:deco'), []);
+});
+
+// rpg-cards.js が無いときは、かざりの欄を出さない
+t('deco_needs_cards_js', async page => {
+  await home(page, saveWith(DECO));
+  assert.equal(await page.isVisible('#rpg-hero'), true);
+  assert.equal(await page.locator('#rpg-deco').count(), 0);
+}, { blockScripts: ['badges.js', 'rpg-cards.js'] });
+
+// スマホで横にはみ出さない
+t('deco_phone_no_overflow', async page => {
+  await writeSave(page, saveWith({ ...DECO, deco: ['jp', 'br', 'fr'] }));
+  await page.evaluate(() => store.set('nickname', 'あいうえおかきくけこさしすせそ'));
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await page.locator('#rpg-deco img').count(), 3);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+}, { viewport: { width: 360, height: 640 } });
