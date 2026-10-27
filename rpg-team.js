@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  // 国旗クエストの編成画面（#scr-team）と RPG.openTeam。枠のタブ（買い足し）・名前・3枠・おまかせ・強さとチームボーナス・仲間の一覧
+  // 国旗クエストの編成画面（#scr-team）と RPG.openTeam。枠のタブ（買い足し）・名前・3枠・［おまかせ］・強さとチームボーナス・仲間の一覧
   // rpg-battle.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）。
   // セーブ・コイン・画面の切りかえなど rpg.js の部品と、仲間のカード（rpg-cards.js の RPG.cardHTML）は window.RPG を通して使う
 
@@ -19,12 +19,12 @@
     + '<div class="tm-tabs" id="tm-tabs" role="group" aria-label="編成の枠"></div>'
     + '<div class="tm-namerow"><b class="tm-title" id="tm-title"></b>'
     + `<input type="text" class="tm-name" id="tm-name" maxlength="${TM.nameMax}" autocomplete="off" aria-label="編成の名前" hidden>`
-    + '<button type="button" class="linkbtn tm-rename" id="tm-rename" aria-label="名前を変える">✏️</button><span class="tm-mode" id="tm-mode"></span></div>'
+    + '<button type="button" class="linkbtn tm-rename" id="tm-rename" aria-label="名前を変える">✏️</button><span class="tm-note" id="tm-note" hidden>まだ組んでないよ（強い順の3枚で戦う）</span></div>'
     + '<div class="tm-slots" id="tm-slots"></div>'
     + '<p class="tm-dgrow"><label for="tm-dg">ダンジョン:</label> <select id="tm-dg"></select></p>'
     + '<p class="tm-stats" id="tm-stats" aria-live="polite"></p>'
-    + '<div class="tm-btns"><button type="button" class="btn ghost" id="tm-auto">おまかせで埋める</button><button type="button" class="btn ghost" id="tm-reset">おまかせに戻す</button></div>'
-    + '<p class="hint">同じグループの仲間が2枚で＋10%、3枚で＋25%（こうげき・HP）。おまかせはチームを考えないよ</p></div>'
+    + '<div class="tm-btns"><button type="button" class="btn ghost" id="tm-auto">おまかせ</button></div>'
+    + '<p class="hint">同じグループの仲間が2枚で＋10%、3枚で＋25%（こうげき・HP）</p></div>'
     + '<div class="tm-main" id="tm-main"><p class="rpg-lbl" id="tm-count"></p>'
     + `<div class="chips" id="tm-regions" role="group" aria-label="地域でしぼりこむ">${AREAS.map(r => `<button type="button" class="chip" aria-pressed="false" data-r="${r}">${r === 'all' ? 'すべて' : r}</button>`).join('')}</div>`
     + `<div class="tm-none" id="tm-none" hidden><p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p><button type="button" class="btn" id="tm-gacha">国旗ガチャへ</button></div>`
@@ -39,7 +39,7 @@
   const floorOf = (d, id) => Math.min(BOSS, ((d.floors || {})[id] || 0) + 1);
   const stop = () => RPG.status === 'readOnly';
   const slotOf = d => { const ts = Array.isArray(d.teams) && d.teams.length ? d.teams : [{ n: '編成1', c: null }]; const t = Math.min(Math.max(0, d.tsel | 0), ts.length - 1); return { ts, t, tm: ts[t] }; };
-  // 枠の中身（持っている国だけ）。おまかせなら、いまのダンジョンのおまかせ3枚
+  // 枠の中身（持っている国だけ）。まだ組んでいない枠（c === null）なら、いまのダンジョンで強い順の3枚
   const members = (d, t) => K.teamParty(d, dg, t).map(p => p.a);
 
   const tabsHTML = (d, ts, t) => {
@@ -90,7 +90,7 @@
   const draw = (d = RPG.get()) => {
     const sec = $('scr-team');
     if (!sec) return;
-    const { ts, t, tm } = slotOf(d), ro = stop(), auto = !Array.isArray(tm.c), as = members(d, t), n = K.owned(d);
+    const { ts, t, tm } = slotOf(d), ro = stop(), untouched = !Array.isArray(tm.c), as = members(d, t), n = K.owned(d);
     const focus = sec.contains(document.activeElement) ? document.activeElement : null;
     const fsel = focus?.dataset.a ? `${focus.closest('#tm-grid') ? '#tm-grid .rpg-card' : '#tm-slots .rpg-pc'}[data-a="${focus.dataset.a}"]`
       : focus?.dataset.t ? `#tm-tabs [data-t="${focus.dataset.t}"]` : '';
@@ -101,15 +101,13 @@
     $('tm-tabs').innerHTML = tabsHTML(d, ts, t);
     if (!renaming) { $('tm-title').textContent = tm.n; $('tm-title').hidden = false; $('tm-name').hidden = true; $('tm-rename').hidden = false; }
     $('tm-rename').disabled = ro;
-    $('tm-mode').textContent = auto ? 'おまかせ中' : '自分で組んだ';
-    $('tm-mode').classList.toggle('is-auto', auto);
+    $('tm-note').hidden = !untouched;
     $('tm-slots').innerHTML = slotsHTML(d, as);
     const sel = $('tm-dg');
     if (!sel.options.length) sel.innerHTML = DG.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
     sel.value = dg;
     $('tm-stats').innerHTML = statsHTML(d, t);
     $('tm-auto').disabled = ro || !n;
-    $('tm-reset').disabled = ro || auto;
     $('tm-count').textContent = `仲間 ${n}/${TOTAL}`;
     for (const b of $('tm-regions').children) b.setAttribute('aria-pressed', String(b.dataset.r === region));
     $('tm-none').hidden = n > 0;
@@ -120,7 +118,7 @@
   };
 
   // ---- 書く（どれも RPG.tx の中で。新しい版のデータのあいだは何もしない） ----
-  // 枠 t の中身を f(いまの中身) で書きかえる。おまかせなら、いまのおまかせ3枚を自分で組んだことにしてから。持っていない国はここで外す
+  // 枠 t の中身を f(いまの中身) で書きかえる。まだ組んでいない枠なら、強い順の3枚を入れたことにしてから。持っていない国はここで外す
   const edit = f => {
     if (stop()) return;
     let full = false;
@@ -137,12 +135,8 @@
   };
   const toggle = a => edit(cur => cur.includes(a) ? cur.filter(x => x !== a) : cur.length >= 3 ? null : [...cur, a]);
   const remove = a => edit(cur => cur.filter(x => x !== a));
+  // ［おまかせ］: 選んでいるダンジョンで強い順の3枚（K.party と同じ並び。チームは考えない）を、ふつうの編成として入れる。null には戻さない
   const autoFill = () => edit((_, x) => K.party(x, dg).map(p => p.a));
-  const reset = () => {
-    if (stop()) return;
-    RPG.tx(x => { const { t } = slotOf(x); if (x.teams?.[t]) x.teams[t].c = null; });
-    draw();
-  };
   const pick = i => {
     if (stop()) return;
     RPG.tx(x => { if (Array.isArray(x.teams) && i >= 0 && i < x.teams.length) x.tsel = i; });
@@ -190,7 +184,6 @@
     $('tm-grid').onclick = e => { const b = e.target.closest('.rpg-card[data-a]'); if (b && !b.disabled) toggle(b.dataset.a); };
     $('tm-dg').onchange = e => { if (K.dungeonOf(e.target.value)) { dg = e.target.value; draw(); } };
     $('tm-auto').onclick = autoFill;
-    $('tm-reset').onclick = reset;
     $('tm-rename').onclick = startRename;
     $('tm-name').onkeydown = e => {
       if (e.isComposing) return;

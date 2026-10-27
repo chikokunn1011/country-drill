@@ -892,8 +892,8 @@ body.rpg-staging { overflow: hidden; }
 .tm-title[hidden], .tm-name[hidden], .tm-rename[hidden] { display: none; }
 .tm-name { flex: 0 1 12em; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--accent); border-radius: 8px; padding: 6px 8px; }
 .tm-rename { padding-inline: 4px; }
-.tm-mode { margin-left: auto; font: 700 .8rem var(--font-display); color: var(--muted); }
-.tm-mode.is-auto { color: var(--accent); }
+.tm-note { margin-left: auto; font: 700 .8rem var(--font-display); color: var(--accent); }
+.tm-note[hidden] { display: none; }
 /* 3枠（空きは点線）。押すと外れる。国旗は欠けさせない（contain）・動かさない */
 .tm-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .tm-slots .rpg-pc, .tm-empty { min-width: 0; min-height: 92px; padding: 8px 4px; border-radius: 10px; }
@@ -905,7 +905,7 @@ body.rpg-staging { overflow: hidden; }
 .tm-stats { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font: 700 1rem var(--font-display); font-variant-numeric: tabular-nums; }
 .tm-bonus { color: var(--ok); }
 .tm-nobonus { color: var(--muted); font-size: .85rem; }
-.tm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tm-btns { display: grid; gap: 8px; }
 .tm-btns .btn { padding: 10px 8px; font-size: .9rem; }
 .tm-none[hidden], .tm-main .chips[hidden] { display: none; }
 .tm-none { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
