@@ -15,15 +15,46 @@
     return { lv: d.lv, dungeons: fl.filter(n => n >= BOSS).length, floors: fl.reduce((s, n) => s + n, 0) };
   };
   const SORTS = { lv: 'レベル', dg: 'ダンジョン' };
+  // 自動更新: 1回載せたら、ニックネームと最後に送った記録を localStorage（キー rpgRank）に覚えておき、
+  // レベルアップ・バトルの勝ち（新しいフロア・ボス）・起動時に記録が変わっていれば送り直す。
+  // DB は同じ名前の10秒以内の連投を断る（too_soon）ので、前に送ってから GAP ミリ秒あける。通信の失敗は次のきっかけで送り直す
+  const KEY = 'rpgRank', GAP = 11000, WAIT = 1500;
+  const reg = () => { const r = store.get(KEY, null); return r && typeof r.name === 'string' && r.name ? r : null; };
   const same = (x, y) => x.lv === y.lv && x.dungeons === y.dungeons && x.floors === y.floors;
   const ranks = r => `レベル順 ${r.rankLv}位・ダンジョン順 ${r.rankDg}位`;
+  let autoTimer = null, lastSent = 0, sending = false;
+  // 登録していて、送った記録といまの記録がちがえば、少し待ってから送る（続けて上がったら1回にまとめる）
+  const scheduleAuto = () => {
+    const r = reg(), d = RPG.get();
+    if (!r || !d.intro || (r.sent && same(r.sent, recordOf(d)))) return;
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(sendAuto, Math.max(WAIT, lastSent + GAP - Date.now()));
+  };
+  const sendAuto = async () => {
+    autoTimer = null;
+    const r = reg(), d = RPG.get();
+    if (!r || !d.intro || sending) return;
+    const rec = recordOf(d);
+    if (r.sent && same(r.sent, rec)) return;
+    sending = true; lastSent = Date.now();
+    const res = await RANKING.rpgSubmit({ nickname: r.name, ...rec });
+    sending = false;
+    if (res.ok) {
+      if (reg()?.name === r.name) store.set(KEY, { name: r.name, sent: rec });
+      if (document.body.dataset.screen === 'rpgrank') { drawMe(); load(); }
+      scheduleAuto();   // 送っているあいだにまた上がっていたら
+    } else if (res.reason === 'too_soon') scheduleAuto();
+    else console.warn('ranking auto', res.reason);   // つながらない・断られたら、次のきっかけまで待つ
+  };
 
   const HTML = '<div class="rpg-head"><button type="button" class="linkbtn rpg-back">← 冒険</button><h2 class="rpg-h2">冒険ランキング</h2></div>'
     + '<div class="rpg-rr-cols"><div class="rpg-rr-side">'
     + '<div class="rpg-rr-me" id="rr-me"></div><p class="tarank" id="rr-rank"></p>'
     + '<form class="taform" id="rr-form" novalidate><div class="row"><input id="rr-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）">'
     + '<button class="btn" id="rr-submit">載せる</button></div></form><p class="tamsg" id="rr-msg" role="status"></p>'
-    + '<p class="hint">強くなったら、もう一回載せると記録が新しくなるよ（同じニックネームは自己ベストだけ出る）</p></div>'
+    + '<div class="rpg-rr-auto" id="rr-auto" hidden><p>✅ <b id="rr-auto-name"></b> で登録ずみ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなるよ</p>'
+    + '<button type="button" class="linkbtn" id="rr-stop">自動で更新するのをやめる</button></div>'
+    + '<p class="hint">1回載せると、そのあとは自動で記録が新しくなる（同じニックネームは自己ベストだけ出る）</p></div>'
     + '<div class="rpg-rr-main"><div class="seg" id="rr-tabs" role="group" aria-label="並べ方">'
     + Object.entries(SORTS).map(([k, v]) => `<button type="button" data-s="${k}">${v}</button>`).join('') + '</div>'
     + '<p class="hint" id="rr-how"></p>'
@@ -43,6 +74,10 @@
       ? `<p class="rpg-rr-h">きみの記録</p><p class="rpg-rr-rec"><b>Lv ${r.lv}</b><span>${recText(r)}</span></p>`
       : '<p class="rpg-rr-h">まだ旅に出ていないよ</p><p class="hint">冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる</p>';
     form.hidden = !d.intro;
+    const g = reg();
+    $('rr-auto').hidden = !d.intro || !g;
+    if (g) $('rr-auto-name').textContent = g.name;
+    $('rr-submit').textContent = g ? '名前を変えて載せる' : '載せる';
     $('rr-rank').textContent = '';
     if (!d.intro) return;
     // 何位相当か（失敗したら何も出さない。原因はコンソール）
@@ -76,7 +111,6 @@
     $('rr-how').textContent = HOW[R.sort];
     $('rr-name').value = store.get('nickname', '') || '';
     $('rr-msg').textContent = ''; $('rr-msg').className = 'tamsg';
-    $('rr-submit').textContent = '載せる';
     drawMe();
     load();
   };
@@ -99,6 +133,17 @@
     load();
   };
   $('rr-retry').onclick = () => load();
+  $('rr-stop').onclick = () => {
+    try { localStorage.removeItem(KEY); } catch {}
+    clearTimeout(autoTimer); autoTimer = null;
+    drawMe();
+    $('rr-msg').textContent = '自動で更新するのをやめたよ（載っている記録はそのまま）'; $('rr-msg').className = 'tamsg';
+  };
+  // きっかけ: レベルアップ・バトルに勝った（新しいフロアやボス）・別のタブがセーブを書いた・起動時
+  document.addEventListener('rpg:levelup', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
+  document.addEventListener('rpg:battle', e => { try { if (e.detail?.win) scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
+  window.addEventListener('storage', e => { if (e.key === 'rpg') try { scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
+  scheduleAuto();
   $('rr-form').onsubmit = async e => {
     e.preventDefault();
     const btn = $('rr-submit'), msg = $('rr-msg');
@@ -113,8 +158,10 @@
     btn.disabled = false;
     if (!r.ok) return fail(r.reason);
     store.set('nickname', chk.name);
-    btn.textContent = '載せる';
-    say(`載せたよ！ ${ranks(r)}`, 'ok');
+    store.set(KEY, { name: chk.name, sent: recordOf(d) });
+    lastSent = Date.now();
+    drawMe();
+    say(`載せたよ！ ${ranks(r)}　これからは自動で更新するね`, 'ok');
     $('rr-rank').textContent = '';
     load();
   };

@@ -52,7 +52,7 @@ t('submit_and_sorts', async (page, app) => {
   await page.fill('#rr-name', 'チコ');
   await page.click('#rr-submit');
   await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
-  assert.equal(await text(page, '#rr-msg'), '載せたよ！ レベル順 2位・ダンジョン順 2位');
+  assert.equal(await text(page, '#rr-msg'), '載せたよ！ レベル順 2位・ダンジョン順 2位　これからは自動で更新するね');
   const call = app.db.calls.find(c => c.name === 'submit_rpg');
   assert.deepEqual(call.args, { p_nickname: 'チコ', p_lv: 12, p_dungeons: 2, p_floors: 10 });
   assert.equal(await page.evaluate(() => store.get('nickname')), 'チコ');
@@ -80,4 +80,41 @@ t('link_from_timeattack_ranking', async page => {
   assert.equal(await page.isVisible('#rk-to-rpg'), true);
   await page.click('#rk-to-rpg');
   assert.equal(await page.isVisible('#scr-rpgrank'), true);
+});
+
+t('auto_update_after_register', async (page, app) => {
+  // 1回載せたら登録（rpgRank）。レベルアップすると、前に送ってから11秒あけて自動で送り直す
+  await writeSave(page, saveWith({ lv: 3, coins: 100000 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.fill('#rr-name', 'チコ');
+  await page.click('#rr-submit');
+  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
+  assert.equal(await page.isVisible('#rr-auto'), true);
+  assert.equal(await text(page, '#rr-auto-name'), 'チコ');
+  assert.deepEqual(await page.evaluate(() => store.get('rpgRank')), { name: 'チコ', sent: { lv: 3, dungeons: 0, floors: 0 } });
+  await page.evaluate(() => RPG.open('rpg'));
+  await page.click('#rpg-lvup');
+  const sent = () => app.db.calls.filter(c => c.name === 'submit_rpg').map(c => c.args.p_lv);
+  await page.waitForTimeout(3000);
+  assert.deepEqual(sent(), [3]);   // まだ11秒たっていない
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.lv === 4, null, { timeout: 15000 });
+  assert.deepEqual(sent(), [3, 4]);
+  // やめると送らない
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.click('#rr-stop');
+  assert.equal(await page.evaluate(() => store.get('rpgRank', null)), null);
+  assert.equal(await page.isVisible('#rr-auto'), false);
+});
+
+t('auto_update_on_startup', async (page, app) => {
+  // 登録していて、前に送った記録より進んでいたら、開いたときに送る
+  await page.evaluate(() => store.set('rpgRank', { name: 'ミケ', sent: { lv: 2, dungeons: 0, floors: 0 } }));
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 5 } }));
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.lv === 9, null, { timeout: 8000 });
+  const call = app.db.calls.find(c => c.name === 'submit_rpg');
+  assert.deepEqual(call.args, { p_nickname: 'ミケ', p_lv: 9, p_dungeons: 1, p_floors: 5 });
+  // 同じ記録なら送り直さない
+  await page.reload();
+  await page.waitForTimeout(2500);
+  assert.equal(app.db.calls.filter(c => c.name === 'submit_rpg').length, 1);
 });
