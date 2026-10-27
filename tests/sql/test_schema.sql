@@ -286,6 +286,22 @@ do $$ begin
   assert (select count(*) from rpg_players) = 3, '3人';
 end $$;
 
+\echo '- rpg_unregister'
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_unregister('00000000-0000-4000-8000-000000000003');
+  assert r = '{"ok":true}'::jsonb, format('unregister: %s', r);
+  assert rpg_unregister('00000000-0000-4000-8000-000000000003')->>'reason' = 'not_found', '2回目はもう無い';
+  assert rpg_unregister('00000000-0000-4000-8000-0000000000ff')->>'reason' = 'not_found', '登録していない';
+  assert rpg_unregister('abc')->>'reason' = 'bad_token', '短い合言葉';
+  assert rpg_unregister(null)->>'reason' = 'bad_token', 'null の合言葉';
+  assert rpg_register('00000000-0000-4000-8000-000000000004', 'チコ', 1, 0, 0)->>'ok' = 'true', '消した人の名前はあく';
+end $$;
+reset role;
+do $$ begin
+  assert (select array_agg(nickname order by nickname) from rpg_players) = array['チコ', 'チコ2', 'ミケ'], format('ほかの人は残る: %s', (select array_agg(nickname) from rpg_players));
+end $$;
+
 \echo '- rpg_top_and_rank'
 reset role; truncate rpg_players;
 insert into rpg_players (token_hash, nickname, lv, dungeons, floors, created_at) values
@@ -319,6 +335,8 @@ do $$ begin
   begin insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x09', 'x', 1, 0, 0); raise exception 'anon が insert できた';
   exception when insufficient_privilege then null; end;
   begin perform rpg_hash('00000000-0000-4000-8000-000000000001'); raise exception 'anon が rpg_hash を呼べた';
+  exception when insufficient_privilege then null; end;
+  begin delete from rpg_players; raise exception 'anon が delete できた';
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;

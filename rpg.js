@@ -447,6 +447,7 @@
     if (status === 'readOnly') { sayData(MSG.readOnly); return; }
     if (!confirm('冒険データを消す？（コイン・Lv・仲間が全部なくなる）') || !confirm('ほんとうに消す？ もとにもどせないよ')) return;
     wipeSave();
+    if (wrote) emit('rpg:wipe', {});   // 冒険ランキングの記録も消してもらう（rpg-rank.js）
     introAv = null;
     refresh();
   };
