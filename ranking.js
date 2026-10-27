@@ -18,6 +18,10 @@
     too_soon: '少し待ってからもう一回送ってね',
     bad_board: 'この条件はランキングに載せられない',
     bad_record: 'この記録はランキングに載せられない',
+    name_taken: 'そのニックネームはもうほかの人が使っているみたい',
+    already: 'この端末はもう登録ずみだよ',
+    not_found: '登録が見つからなかった。もう一回載せてね',
+    bad_token: '登録の合言葉がおかしいみたい',
     network: 'ランキングに接続できなかった',
   };
 
@@ -36,6 +40,16 @@
       if (!res.ok) throw new Error(`${name}: HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 300)}`);
       return await res.json();
     } finally { clearTimeout(timer); }
+  }
+  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename）。返事の rank_lv などは rankLv などにする
+  async function rpgCall(name, args) {
+    try {
+      const r = await rpc(name, args);
+      return r.ok ? { ok: true, rankLv: r.rank_lv, rankDg: r.rank_dg, nickname: r.nickname } : { ok: false, reason: r.reason };
+    } catch (e) {
+      console.warn(`ranking ${name}`, e);
+      return { ok: false, reason: 'network' };
+    }
   }
   // DB 側は int。performance.now() の端数があると受け付けてもらえないので切り捨てる（formatTime の表示ともそろう）
   const wholeMs = ms => Math.floor(ms);
@@ -74,15 +88,16 @@
       const r = await rpc('rank_of', { p_board: board, p_time_ms: wholeMs(timeMs) });
       return { rankAll: r.rank_all, rankWeek: r.rank_week };
     },
-    // 冒険（国旗クエスト）の記録を送る。lv・dungeons（ボスを倒したダンジョンの数）・floors（クリアしたフロアの合計）
-    async rpgSubmit({ nickname, lv, dungeons, floors }) {
-      try {
-        const r = await rpc('submit_rpg', { p_nickname: nickname, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
-        return r.ok ? { ok: true, rankLv: r.rank_lv, rankDg: r.rank_dg } : { ok: false, reason: r.reason };
-      } catch (e) {
-        console.warn('ranking rpgSubmit', e);
-        return { ok: false, reason: 'network' };
-      }
+    // 冒険（国旗クエスト）: はじめて載せる（token は端末が作った合言葉）・記録を新しくする・名前だけ変える。
+    // lv・dungeons（ボスを倒したダンジョンの数）・floors（クリアしたフロアの合計）。失敗しても例外は投げず { ok:false, reason }
+    async rpgRegister({ token, nickname, lv, dungeons, floors }) {
+      return rpgCall('rpg_register', { p_token: token, p_nickname: nickname, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
+    },
+    async rpgUpdate({ token, lv, dungeons, floors }) {
+      return rpgCall('rpg_update', { p_token: token, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
+    },
+    async rpgRename({ token, nickname }) {
+      return rpgCall('rpg_rename', { p_token: token, p_nickname: nickname });
     },
     // 冒険の上位50件。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
     async rpgTop({ sort }) {

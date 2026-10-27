@@ -67,9 +67,8 @@ export function fakeDb() {
   const RPG_KEYS = { lv: r => [r.lv, r.dungeons, r.floors], dg: r => [r.dungeons, r.floors, r.lv] };
   const cmpKeys = (x, y) => { for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return y[i] - x[i]; return 0; };
   const rpgBests = sort => {
-    const key = RPG_KEYS[sort], m = new Map();
-    for (const r of rpgRows) { const b = m.get(r.nickname); if (!b || cmpKeys(key(r), key(b)) < 0) m.set(r.nickname, r); }
-    return [...m.values()].sort((a, b) => cmpKeys(key(a), key(b)) || Date.parse(a.created_at) - Date.parse(b.created_at));
+    const key = RPG_KEYS[sort];
+    return [...rpgRows].sort((a, b) => cmpKeys(key(a), key(b)) || Date.parse(a.created_at) - Date.parse(b.created_at));
   };
   const rpgRank = (lv, dungeons, floors) => {
     const me = { lv, dungeons, floors }, above = sort => rpgBests(sort).filter(r => cmpKeys(RPG_KEYS[sort](r), RPG_KEYS[sort](me)) < 0).length + 1;
@@ -92,14 +91,32 @@ export function fakeDb() {
         .map(({ nickname, time_ms, created_at }) => ({ nickname, time_ms, created_at }));
     },
     rank_of: ({ p_board, p_time_ms }) => rankOf(p_board, p_time_ms),
-    // 冒険のランキング（submit_rpg / top_rpg / rpg_rank_of と同じ形。名前は文字数だけ見る）
-    submit_rpg({ p_nickname, p_lv, p_dungeons, p_floors }) {
+    // 冒険のランキング（rpg_register / rpg_update / rpg_rename / top_rpg / rpg_rank_of と同じ形。名前は文字数と重なりだけ見る。
+    // 10秒の連投よけはしない）。rpgRows の行は { token, nickname, lv, dungeons, floors, created_at, at }
+    rpg_register({ p_token, p_nickname, p_lv, p_dungeons, p_floors }) {
       const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
+      if (rpgRows.some(r => r.token === p_token)) return { ok: false, reason: 'already' };
       if (len < 1 || len > 12) return { ok: false, reason: 'bad_name' };
-      rpgRows.push({ nickname, lv: p_lv, dungeons: p_dungeons, floors: p_floors, created_at: new Date().toISOString() });
+      if (rpgRows.some(r => r.nickname === nickname)) return { ok: false, reason: 'name_taken' };
+      const at = new Date().toISOString();
+      rpgRows.push({ token: p_token, nickname, lv: p_lv, dungeons: p_dungeons, floors: p_floors, created_at: at, at });
       return { ok: true, ...rpgRank(p_lv, p_dungeons, p_floors) };
     },
-    top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50) : [],
+    rpg_update({ p_token, p_lv, p_dungeons, p_floors }) {
+      const r = rpgRows.find(r => r.token === p_token);
+      if (!r) return { ok: false, reason: 'not_found' };
+      Object.assign(r, { lv: Math.max(r.lv, p_lv), dungeons: Math.max(r.dungeons, p_dungeons), floors: Math.max(r.floors, p_floors), at: new Date().toISOString() });
+      return { ok: true, ...rpgRank(r.lv, r.dungeons, r.floors) };
+    },
+    rpg_rename({ p_token, p_nickname }) {
+      const r = rpgRows.find(r => r.token === p_token), nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
+      if (!r) return { ok: false, reason: 'not_found' };
+      if (len < 1 || len > 12) return { ok: false, reason: 'bad_name' };
+      if (rpgRows.some(x => x !== r && x.nickname === nickname)) return { ok: false, reason: 'name_taken' };
+      r.nickname = nickname;
+      return { ok: true, nickname };
+    },
+    top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
   };
   // calls: 届いた RPC の記録 { name, args }。down を true にすると通信失敗になる

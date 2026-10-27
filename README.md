@@ -12,7 +12,7 @@
 
 - 準備: Supabase の SQL Editor に `supabase/schema.sql` を貼って実行する（何度流しても大丈夫）
 - 記録の消し方: Table Editor で `scores` テーブルを開き、消したい行を削除する
-- 冒険ランキング（レベル順・クリアしたダンジョン順）は `rpg_scores` テーブル。1回載せるとニックネームを localStorage の `rpgRank` に覚え、レベルアップ・バトルの勝ち・起動時に自動で送り直す（11秒あける）。消し方は同じ（`rpg-rank.js`、冒険ホームの［🏆 冒険ランキング］）
+- 冒険ランキング（レベル順・クリアしたダンジョン順）は `rpg_players` テーブル（1人1行）。はじめて載せるときに端末で合言葉を作り（DB にはハッシュだけ）、localStorage の `rpgRank` に覚える。登録は1回だけで、あとは名前だけ変えられる。レベルアップ・バトルの勝ち・起動時に自動で送り直す（11秒あける）。ほかの人と同じニックネームは使えない。消し方は Table Editor で `rpg_players` の行を削除（`rpg-rank.js`、冒険ホームの［🏆 冒険ランキング］）
 - テスト: 初回だけ `cd tests/e2e && npm install`。そのあとリポジトリ直下で `node --test 'tests/unit/*.test.mjs' 'tests/e2e/*.test.mjs'`（Playwright と Chromium が必要）と `bash tests/sql/run.sh`（PostgreSQL 16 が必要）
 - PC の見た目: `pc.css`（900px 以上でだけ読み込む）。スマホ幅の見た目は index.html のインライン CSS
 - PC レイアウトのテスト: `node --test tests/e2e/pc_layout.test.mjs` で PC の大きさ（1024×768・1366×657・1366×768・1920×1080）の収まりを見る

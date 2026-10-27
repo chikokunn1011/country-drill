@@ -223,70 +223,102 @@ do $$ begin
 end $$;
 reset role;
 
--- ---- 冒険のランキング ----
-\echo '- rpg_accepts_valid'
-reset role; truncate rpg_scores; set role anon;
-do $$ declare r jsonb := submit_rpg('チコ', 12, 2, 13); begin
-  assert r = '{"ok":true,"rank_lv":1,"rank_dg":1}'::jsonb, format('rpg_accepts_valid: %s', r);
+-- ---- 冒険のランキング（1人1行・合言葉で更新と名前の変更） ----
+-- 10秒の連投よけを飛ばすため、テストでは superuser で updated_at を昔にする
+\echo '- rpg_register'
+reset role; truncate rpg_players; set role anon;
+do $$ declare r jsonb := rpg_register('00000000-0000-4000-8000-000000000001', 'チコ', 12, 2, 13); begin
+  assert r = '{"ok":true,"rank_lv":1,"rank_dg":1}'::jsonb, format('register: %s', r);
+  assert rpg_register('00000000-0000-4000-8000-000000000001', 'ミケ', 12, 2, 13)->>'reason' = 'already', '同じ合言葉で別の名前はだめ';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'チコ', 1, 0, 0)->>'reason' = 'name_taken', 'ほかの人と同じ名前はだめ';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ﾁｺ', 1, 0, 0)->>'reason' = 'name_taken', '全角半角をそろえても同じ';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', ' チコ ', 1, 0, 0)->>'reason' = 'name_taken', '前後空白を除くと同じ';
+  assert rpg_register('abc', 'ミケ', 1, 0, 0)->>'reason' = 'bad_token', '短い合言葉';
+  assert rpg_register(null, 'ミケ', 1, 0, 0)->>'reason' = 'bad_token', 'null の合言葉';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', '', 1, 0, 0)->>'reason' = 'bad_name', '空の名前';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'あいうえおかきくけこさしす', 1, 0, 0)->>'reason' = 'bad_name', '13文字';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ＦＵＣＫ', 1, 0, 0)->>'reason' = 'ng_name', 'NG';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 0, 0, 0)->>'reason' = 'bad_record', 'Lv0';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 51, 0, 0)->>'reason' = 'bad_record', 'Lv51';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 8, 35)->>'reason' = 'bad_record', 'ダンジョン8';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 0, 36)->>'reason' = 'bad_record', 'フロア36';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 2, 9)->>'reason' = 'bad_record', 'ダンジョン2なのにフロア9';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', null, 0, 0)->>'reason' = 'bad_record', 'null';
 end $$;
 reset role;
 do $$ begin
-  assert (select row(nickname, lv, dungeons, floors)::text from rpg_scores) = '(チコ,12,2,13)', 'rpg_accepts_valid: 保存値';
+  assert (select count(*) from rpg_players) = 1, '1行だけ';
+  assert (select row(nickname, lv, dungeons, floors)::text from rpg_players) = '(チコ,12,2,13)', '保存値';
+  assert (select token_hash from rpg_players) = sha256(convert_to('00000000-0000-4000-8000-000000000001', 'UTF8')), '合言葉はハッシュで残す';
 end $$;
 
-\echo '- rpg_rules'
-reset role; truncate rpg_scores; set role anon;
-do $$ begin
-  assert submit_rpg('', 5, 0, 0)->>'reason' = 'bad_name', '空の名前';
-  assert submit_rpg('あいうえおかきくけこさしす', 5, 0, 0)->>'reason' = 'bad_name', '13文字';
-  assert submit_rpg('ＦＵＣＫ', 5, 0, 0)->>'reason' = 'ng_name', 'NG';
-  assert submit_rpg('チコ', 0, 0, 0)->>'reason' = 'bad_record', 'Lv0';
-  assert submit_rpg('チコ', 51, 0, 0)->>'reason' = 'bad_record', 'Lv51';
-  assert submit_rpg('チコ', 5, 8, 35)->>'reason' = 'bad_record', 'ダンジョン8';
-  assert submit_rpg('チコ', 5, 0, 36)->>'reason' = 'bad_record', 'フロア36';
-  assert submit_rpg('チコ', 5, 2, 9)->>'reason' = 'bad_record', 'ダンジョン2なのにフロア9';
-  assert submit_rpg('チコ', 5, -1, 0)->>'reason' = 'bad_record', 'マイナス';
-  assert submit_rpg('チコ', null, 0, 0)->>'reason' = 'bad_record', 'null';
-  assert (submit_rpg('チコ', 50, 7, 35)->>'ok')::boolean, '最大';
-  assert submit_rpg('チコ', 50, 7, 35)->>'reason' = 'too_soon', '10秒以内はだめ';
-  assert (submit_rpg('ミケ', 1, 0, 0)->>'ok')::boolean, '最小';
+\echo '- rpg_update'
+reset role; update rpg_players set updated_at = now() - interval '1 minute'; set role anon;
+do $$ declare r jsonb; begin
+  assert rpg_update('00000000-0000-4000-8000-000000000002', 13, 2, 13)->>'reason' = 'not_found', '登録していない合言葉';
+  assert rpg_update('00000000-0000-4000-8000-000000000001', 13, 8, 13)->>'reason' = 'bad_record', 'おかしい記録';
+  r := rpg_update('00000000-0000-4000-8000-000000000001', 13, 1, 9);   -- レベルは上がって、ダンジョン・フロアは下がった（引き継ぎなど）→ それぞれ最高を残す
+  assert r = '{"ok":true,"rank_lv":1,"rank_dg":1}'::jsonb, format('update: %s', r);
+  assert rpg_update('00000000-0000-4000-8000-000000000001', 14, 2, 13)->>'reason' = 'too_soon', '10秒以内はだめ';
 end $$;
 reset role;
-do $$ begin assert (select count(*) from rpg_scores) = 2, 'rpg_rules: 通ったのは2行'; end $$;
+do $$ begin
+  assert (select row(nickname, lv, dungeons, floors)::text from rpg_players) = '(チコ,13,2,13)', format('最高を残す: %s', (select row(nickname, lv, dungeons, floors)::text from rpg_players));
+end $$;
+
+\echo '- rpg_rename'
+reset role; update rpg_players set updated_at = now() - interval '1 minute'; set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 3, 0, 0);
+  assert (r->>'ok')::boolean, format('2人目: %s', r);
+  assert rpg_rename('00000000-0000-4000-8000-000000000001', 'ミケ')->>'reason' = 'name_taken', 'ほかの人の名前にはできない';
+  assert rpg_rename('00000000-0000-4000-8000-000000000003', 'タマ')->>'reason' = 'not_found', '登録していない';
+  assert rpg_rename('00000000-0000-4000-8000-000000000001', 'ＦＵＣＫ')->>'reason' = 'ng_name', 'NG';
+  assert rpg_rename('00000000-0000-4000-8000-000000000001', '') ->>'reason' = 'bad_name', '空';
+  r := rpg_rename('00000000-0000-4000-8000-000000000001', 'チコ2');
+  assert r = '{"ok":true,"nickname":"チコ2"}'::jsonb, format('rename: %s', r);
+  assert rpg_rename('00000000-0000-4000-8000-000000000001', 'チコ3')->>'reason' = 'too_soon', '10秒以内はだめ';
+  assert rpg_register('00000000-0000-4000-8000-000000000003', 'チコ', 1, 0, 0)->>'ok' = 'true', '前の名前はあく';
+end $$;
+reset role;
+do $$ begin
+  assert (select row(lv, dungeons, floors)::text from rpg_players where nickname = 'チコ2') = '(13,2,13)', '名前を変えても記録はそのまま';
+  assert (select count(*) from rpg_players) = 3, '3人';
+end $$;
 
 \echo '- rpg_top_and_rank'
-reset role; truncate rpg_scores;
-insert into rpg_scores (nickname, lv, dungeons, floors, created_at) values
-  ('A', 20, 1, 7, now() - interval '5 min'),
-  ('A', 18, 3, 16, now() - interval '4 min'),   -- A のダンジョンの自己ベストはこっち、レベルの自己ベストは上
-  ('B', 25, 0, 4, now() - interval '3 min'),
-  ('C', 20, 1, 7, now() - interval '2 min'),    -- A と同じ記録なら先に載せた A が上
-  ('D', 10, 3, 16, now() - interval '1 min');
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, created_at) values
+  ('\x01', 'A', 20, 1, 7, now() - interval '5 min'),
+  ('\x02', 'B', 25, 0, 4, now() - interval '3 min'),
+  ('\x03', 'C', 20, 1, 7, now() - interval '2 min'),   -- A と同じ記録なら先に載せた A が上
+  ('\x04', 'D', 10, 3, 16, now() - interval '1 min');
 set role anon;
 do $$ begin
-  assert (select array_agg(nickname || ':' || lv) from top_rpg('lv')) = array['B:25', 'A:20', 'C:20', 'D:10'], format('lv: %s', (select array_agg(nickname || ':' || lv) from top_rpg('lv')));
-  assert (select array_agg(nickname || ':' || dungeons || ':' || floors) from top_rpg('dg')) = array['A:3:16', 'D:3:16', 'C:1:7', 'B:0:4'],
-    format('dg: %s', (select array_agg(nickname || ':' || dungeons || ':' || floors) from top_rpg('dg')));
+  assert (select array_agg(nickname) from top_rpg('lv')) = array['B', 'A', 'C', 'D'], format('lv: %s', (select array_agg(nickname) from top_rpg('lv')));
+  assert (select array_agg(nickname) from top_rpg('dg')) = array['D', 'A', 'C', 'B'], format('dg: %s', (select array_agg(nickname) from top_rpg('dg')));
   assert (select count(*) from top_rpg('x')) = 0, '知らない並べ方は空';
   assert (select count(*) from top_rpg(null)) = 0, 'null は空';
   assert rpg_rank_of(21, 0, 0) = '{"rank_lv":2,"rank_dg":5}'::jsonb, format('rank: %s', rpg_rank_of(21, 0, 0));
   assert rpg_rank_of(20, 1, 7)->>'rank_lv' = '2', '同じ記録は数えない';
 end $$;
-reset role; truncate rpg_scores;
-insert into rpg_scores (nickname, lv, dungeons, floors) select 'p' || i, i % 50 + 1, 0, 0 from generate_series(1, 60) i;
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) select int4send(i), 'p' || i, i % 50 + 1, 0, 0 from generate_series(1, 60) i;
 set role anon;
 do $$ begin assert (select count(*) from top_rpg('lv')) = 50, '50件まで'; end $$;
 
 \echo '- rpg_anon_cannot_touch_table'
 reset role;
 do $$ begin
-  assert (select relrowsecurity from pg_class where oid = 'public.rpg_scores'::regclass), 'RLS が有効';
+  assert (select relrowsecurity from pg_class where oid = 'public.rpg_players'::regclass), 'RLS が有効';
 end $$;
 set role anon;
 do $$ begin
-  begin perform * from rpg_scores; raise exception 'anon が select できた';
+  begin perform * from rpg_players; raise exception 'anon が select できた';
   exception when insufficient_privilege then null; end;
-  begin insert into rpg_scores (nickname, lv, dungeons, floors) values ('x', 1, 0, 0); raise exception 'anon が insert できた';
+  begin insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x09', 'x', 1, 0, 0); raise exception 'anon が insert できた';
+  exception when insufficient_privilege then null; end;
+  begin perform rpg_hash('00000000-0000-4000-8000-000000000001'); raise exception 'anon が rpg_hash を呼べた';
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;
