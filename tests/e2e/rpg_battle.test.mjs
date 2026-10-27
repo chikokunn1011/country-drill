@@ -236,33 +236,19 @@ t('boss_two_hits_when_low_lv', async page => {
   assert.notEqual(await label(page), l0);
 });
 
-t('boss_cap_appears', async page => {
+t('boss_never_asks_capital', async page => {
   await writeSave(page, BOSS_SAVE);
-  await setMisses(page, { br: 9 });   // br だけが苦手 → 最初の旗。残りの5枚は首都を出せる国
+  await setMisses(page, { br: 9 });
   await startBattle(page, 'samerica', 5);
+  assert.equal(await page.evaluate(() => RPG_BATTLE.force('ws', 'cap')), false);
   const seen = [];
   while (await phase(page) !== 'end') {
-    seen.push(await page.evaluate(() => ({ label: document.querySelector('#bt-q .qlabel').textContent, left: document.querySelectorAll('#bt-flags .rpg-cloth').length, a: RPG_BATTLE.cur() })));
+    seen.push(await page.evaluate(() => ({ label: document.querySelector('#bt-q .qlabel').textContent, a: RPG_BATTLE.cur() })));
     await battleAnswer(page, true);
   }
-  const caps = seen.filter(x => /^首都が「.+」の国は？$/.test(x.label));
-  assert.ok(caps.length >= 1, JSON.stringify(seen));
-  for (const x of caps) assert.ok(x.left * 2 < 6, JSON.stringify(x));
-  assert.doesNotMatch(seen[0].label, /^首都が/);
-  assert.equal(seen[0].a, 'br');
-});
-
-t('cap_question_renders', async page => {
-  await writeSave(page, BOSS_SAVE);
-  await startBattle(page, 'samerica', 5);
-  await page.evaluate(() => RPG_BATTLE.force('ws', 'cap'));
-  assert.equal(await label(page), '首都が「アピア」の国は？');
-  const choices = await page.$$eval('#scr-battle .choice', bs => bs.map(b => b.textContent));
-  assert.equal(choices.length, 4);
-  assert.equal(choices.filter(s => s.includes('サモア')).length, 1);
-  await battleAnswer(page, true);
-  assert.deepEqual(pick((await events(page, 'rpg:answer')).at(-1), { a: 0, right: 0, mode: 0, boss: 0 }), { a: 'ws', right: true, mode: 'cap', boss: true });
-  assert.equal(await cloths(page), 5);
+  assert.ok(seen.length >= 6, JSON.stringify(seen));
+  assert.ok(seen.every(x => !/首都/.test(x.label)), JSON.stringify(seen));   // 出題は国旗・国名・場所だけ
+  assert.ok((await events(page, 'rpg:answer')).every(e => e.mode !== 'cap'));
 });
 
 t('weak_and_wanted_tags', async page => {

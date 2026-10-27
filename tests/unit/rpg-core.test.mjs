@@ -179,12 +179,6 @@ test('floors_split', () => {
   assert.deepEqual(plain(K.floorsOf('ヨーロッパ')[3].slice(-5)), ['mt', 'li', 'sm', 'mc', 'va']);
 });
 
-test('cap_ok', () => {
-  const { ctx } = loadCtx(), K = ctx.RPG_CORE, C = ctx.COUNTRIES;
-  assert.deepEqual(plain(C.filter(c => !K.capOK(c)).map(c => c.a).sort()),
-    ['ad', 'br', 'dj', 'dz', 'gt', 'gw', 'kw', 'lk', 'lu', 'mc', 'mx', 'pa', 'sg', 'sm', 'st', 'tn', 'va']);
-});
-
 test('card_and_party', () => {
   const K = loadCore();
   near(K.cardAtk([1, 0], 5, true), 1.725);
@@ -1263,14 +1257,9 @@ test('boss_flags', () => {
 
 test('boss_mode', () => {
   const K = loadCore();
-  assert.equal(K.bossMode(0, 6, 6, 'cl'), 'f2n');
-  assert.equal(K.bossMode(1, 6, 6, 'cl'), 'n2f');
-  assert.equal(K.bossMode(2, 3, 6, 'cl'), 'm2f');   // 半分を切っていない
-  assert.equal(K.bossMode(5, 2, 6, 'cl'), 'cap');
-  assert.equal(K.bossMode(5, 2, 6, 'br'), 'm2f');   // ブラジルは首都がヒントになる
-  assert.equal(K.bossMode(4, 2, 6, 'cl'), 'n2f');
-  assert.equal(K.bossMode(8, 1, 6, 'ws'), 'cap');
-  assert.equal(K.bossMode(5, 1, 6, 'zz'), 'm2f');   // 知らない国には cap を出さない
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 8].map(k => K.bossMode(k)), ['f2n', 'n2f', 'm2f', 'f2n', 'n2f', 'm2f', 'm2f']);
+  // 首都は問題に出さない（旗が残り少なくても）
+  for (let k = 0; k < 30; k++) assert.notEqual(K.bossMode(k, 1, 6, 'cl'), 'cap');
 });
 
 test('revive_set', () => {
