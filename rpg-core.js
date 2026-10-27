@@ -147,15 +147,17 @@
       .map(a => ({ a, atk: cardAtk(cards[a], fr[a], !!dg && (dg.r === 'all' || REGION.get(a) === dg.r)) }));
   };
   // (旅人 ＋ 仲間) ×（1 + 0.05 × がんばりゲージ）×（1 + チームボーナス）。ゲージはフロアごと（'samerica:1' の形）
+  // おまかせの枠にはチームボーナスをかけない（一度も編成を組んでいないセーブは今と同じ強さ）
   const battleStats = (d, id, floor, t = d.tsel) => {
     const h = heroStats(d.lv), p = teamParty(d, id, t), sum = p.reduce((s, c) => s + c.atk, 0);
-    const tm = (d.teams || [])[t], tb = teamBonus(p.map(c => c.a));
+    const tm = (d.teams || [])[t], auto = !tm || !Array.isArray(tm.c);
+    const tb = auto ? { bonus: 0, group: null, n: 0 } : teamBonus(p.map(c => c.a));
     const gauge = (d.gauge || {})[id + ':' + floor] || 0, mul = (1 + TUNING.battle.gaugeStep * gauge) * (1 + tb.bonus);
     return {
       atk: Math.round((h.atk + Math.round(sum)) * mul),
       hp: Math.round((h.hp + Math.round(TUNING.card.hpMul * sum)) * mul),
       party: p, gauge,
-      team: { bonus: tb.bonus, group: tb.group, n: tb.n, slot: t ?? 0, auto: !tm || !Array.isArray(tm.c) },
+      team: { bonus: tb.bonus, group: tb.group, n: tb.n, slot: t ?? 0, auto },
     };
   };
   // 次の枠の値段（もう最大なら null）

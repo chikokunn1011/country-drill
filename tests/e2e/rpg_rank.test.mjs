@@ -261,6 +261,27 @@ t('rows_show_deco_flags', async (page, app) => {
   assert.deepEqual(callsOf(app, 'top_rpg').length, 0);
 });
 
+// スマホ 360×640: かざり3つ・12文字の名前でも名前の列が細くならない（国旗は .nick の中。列は増やさない）
+t('deco_row_phone_width', async (page, app) => {
+  app.db.rpgRows.push(
+    { token: 't-long', nickname: 'あいうえおかきくけこさし', lv: 30, dungeons: 7, floors: 35, deco: ['jp', 'br', 'fr'], created_at: ago(60), at: ago(60) },
+    { token: 't-taro', nickname: 'タロウ', lv: 8, dungeons: 3, floors: 16, created_at: ago(50), at: ago(50) },
+  );
+  await writeSave(page, saveWith({ lv: 3 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
+  const m = await page.$$eval('#rr-list li', ls => ls.map(l => {
+    const nick = l.querySelector('.nick'), lh = parseFloat(getComputedStyle(nick).lineHeight) || parseFloat(getComputedStyle(nick).fontSize) * 1.5;
+    return { nick: nick.getBoundingClientRect().width, nickH: nick.getBoundingClientRect().height, lh, imgs: l.querySelectorAll('.nick .rr-deco img').length, deco: l.querySelectorAll('.rr-deco').length };
+  }));
+  assert.equal(m[0].imgs, 3); assert.equal(m[1].deco, 0);   // かざりが無ければ span も出さない
+  for (const r of m) {
+    assert.ok(r.nick >= 80, JSON.stringify(m));
+    assert.ok(r.nickH <= r.lh * 3 + 2, JSON.stringify(m));   // 3行まで
+  }
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+}, { viewport: { width: 360, height: 640 } });
+
 t('falls_back_to_top_rpg', async (page, app) => {
   // DB にまだ top_rpg2 が無い（本番に適用する前）: top_rpg にもどして、かざり無しで今どおり出る
   delete app.db.rpc.top_rpg2;

@@ -211,10 +211,13 @@ test('battle_stats', () => {
   // ゲージはフロアごと
   assert.equal(K.battleStats(dWith(K, { gauge: { 'samerica:1': 2 } }), 'samerica', 2).atk, 10);
   // ★1・なかよし5・地域ボーナスの3枚: Σ = 3×1.725 = 5.175 → こうげき 10+5、HP 36+round(15.525)
-  // おまかせでも3枚とも南アメリカなのでチームボーナス +25%（設計書 §1.2）: round(15×1.25)、round(52×1.25)
+  // おまかせの枠にはチームボーナスをかけない（3枚とも南アメリカでも今と同じ強さ）
   const c = K.battleStats(dWith(K, { cards: { br: [1, 0], ar: [1, 0], pe: [1, 0] }, fr: { br: 5, ar: 5, pe: 5 } }), 'samerica', 1);
-  assert.deepEqual(plain({ atk: c.atk, hp: c.hp }), { atk: 19, hp: 65 });
-  assert.deepEqual(plain(c.team), { bonus: 0.25, group: '南アメリカ', n: 3, slot: 0, auto: true });
+  assert.deepEqual(plain({ atk: c.atk, hp: c.hp }), { atk: 15, hp: 52 });
+  assert.deepEqual(plain(c.team), { bonus: 0, group: null, n: 0, slot: 0, auto: true });
+  // 同じ3枚を自分で組むと +25%: round(15×1.25)、round(52×1.25)
+  const cc = K.battleStats(dWith(K, { cards: { br: [1, 0], ar: [1, 0], pe: [1, 0] }, fr: { br: 5, ar: 5, pe: 5 }, teams: [{ n: 'A', c: ['ar', 'br', 'pe'] }] }), 'samerica', 1);
+  assert.deepEqual(plain({ atk: cc.atk, hp: cc.hp, bonus: cc.team.bonus }), { atk: 19, hp: 65, bonus: 0.25 });
   // グループがばらばらならボーナス無し（今と同じ強さ）: br 南アメリカ・jp 東アジア・fr 西ヨーロッパ
   const m = K.battleStats(dWith(K, { cards: { br: [1, 0], jp: [1, 0], fr: [1, 0] } }), 'samerica', 1);
   assert.deepEqual(plain({ atk: m.atk, hp: m.hp, bonus: m.team.bonus }), { atk: 14, hp: 47, bonus: 0 });
@@ -262,6 +265,22 @@ test('old_save_same_strength', () => {
   const d = K.sanitize(raw, T0), p = K.party(d, 'samerica');
   const s = K.battleStats(d, 'samerica', 1);
   assert.deepEqual(plain(s.party), plain(p)); assert.equal(s.team.auto, true); assert.equal(s.team.slot, 0);
+  // 強さは今までの式（チームボーナス無し）と同じ: (旅人 ＋ round(Σ)) × ゲージ
+  const old = (dd, id, floor) => {
+    const h = K.heroStats(dd.lv), sum = K.party(dd, id).reduce((a, c) => a + c.atk, 0);
+    const mul = 1 + K.TUNING.battle.gaugeStep * ((dd.gauge || {})[id + ':' + floor] || 0);
+    return { atk: Math.round((h.atk + Math.round(sum)) * mul), hp: Math.round((h.hp + Math.round(K.TUNING.card.hpMul * sum)) * mul) };
+  };
+  assert.deepEqual(plain({ atk: s.atk, hp: s.hp }), old(d, 'samerica', 1));
+  assert.equal(s.team.bonus, 0);
+  // 同じグループがそろう古いセーブ（br・ar・pe 南アメリカ、ゲージあり）でも今と同じ
+  const raw2 = { ...K.fresh(T0), lv: 4, cards: { br: [1, 0], ar: [2, 1], pe: [1, 0] }, gauge: { 'samerica:5': 3 } };
+  delete raw2.teams; delete raw2.tsel; delete raw2.deco;
+  const d2 = K.sanitize(raw2, T0);
+  for (const [id, f] of [['samerica', 5], ['samerica', 1], ['world', 2], ['asia', 1]]) {
+    const s2 = K.battleStats(d2, id, f);
+    assert.deepEqual(plain({ atk: s2.atk, hp: s2.hp }), old(d2, id, f), id + f); assert.equal(s2.team.bonus, 0);
+  }
 });
 test('buy_slot_edges', () => {
   const K = loadCore();

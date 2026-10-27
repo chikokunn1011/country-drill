@@ -182,7 +182,8 @@ const visibleParty = page => page.$$eval('.rpg-btop .rpg-party img', els => els.
 
 // スマホ: 旅人の HP の行の下に仲間3枚を1行で（国旗 28px 幅＋★）
 t('phone_shows_party', async page => {
-  await writeSave(page, PARTY);
+  // チームボーナスの札は自分で組んだ枠だけ（おまかせにはつかない）
+  await writeSave(page, { ...PARTY, teams: [{ n: '編成1', c: ['br', 'cl', 'jp'] }] });
   await startBattle(page, 'samerica', 1);
   assert.equal(await visibleParty(page), 3);
   const m = await page.evaluate(() => {

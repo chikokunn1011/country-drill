@@ -119,10 +119,10 @@
     list.innerHTML = (rows ?? []).map((r, i) => {
       if (!i || !same(r, rows[i - 1])) no = i + 1;
       const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>・F${r.floors}</small></span>`;
-      // かざり: 知っている国だけ3つまで（DB も3つまでしか受け付けないが、念のため）
+      // かざり: 知っている国だけ3つまで（DB も3つまでしか受け付けないが、念のため）。名前の中に入れて列を増やさない（スマホで名前が細くならない）
       const deco = (Array.isArray(r.deco) ? r.deco : []).filter((a, j, l) => byA.has(a) && l.indexOf(a) === j).slice(0, 3)
         .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
-      return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}</span><span class="rr-deco">${deco}</span>`
+      return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}${deco ? `<span class="rr-deco">${deco}</span>` : ''}</span>`
         + `${R.sort === 'lv' ? lv + dg : dg + lv}<span class="mono at">${jstDay(r.at)}</span></li>`;
     }).join('');
   };
