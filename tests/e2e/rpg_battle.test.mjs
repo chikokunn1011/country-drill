@@ -467,6 +467,91 @@ t('party_on_intro', async page => {
   assert.ok(!(await text(page, '#bt-intro')).includes('仲間がいると強くなるよ'));
 });
 
+// 登場画面の編成の切り替え（◀▶・←→、端で回る）。tsel が変わり、強さ・必要な正解の数・上の列の仲間がその場で描き直される
+t('intro_switch_team', async page => {
+  await writeSave(page, saveWith({ cards: { br: [1, 0], cl: [1, 0], ar: [1, 0] }, tsel: 0,
+    teams: [{ n: 'A', c: ['br'] }, { n: 'B', c: ['br', 'cl', 'ar'] }, { n: 'C<b>', c: [] }] }));
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 1));
+  const need = async () => +(await text(page, '#bt-intro')).match(/倒すのに必要な正解: 約(\d+)回/)[1];
+  const focused = () => page.evaluate(() => document.activeElement?.id);
+  assert.equal(await text(page, '#bt-tname'), 'A');
+  assert.equal(await page.locator('#bt-intro .rpg-party img').count(), 1);
+  assert.ok(!(await text(page, '#bt-intro')).includes('チーム '));
+  const n0 = await need(), hp0 = await page.getAttribute('#bt-hhp', 'aria-valuemax');
+  await page.click('#bt-tnext');
+  assert.equal(await text(page, '#bt-tname'), 'B');
+  assert.equal((await readSave(page)).tsel, 1);
+  assert.notEqual(await need(), n0);
+  assert.notEqual(await page.getAttribute('#bt-hhp', 'aria-valuemax'), hp0);
+  assert.ok((await text(page, '#bt-intro')).includes('チーム 南アメリカ×3 ＋25%'), await text(page, '#bt-intro'));
+  assert.equal(await page.locator('#bt-intro .rpg-party img').count(), 3);
+  assert.equal(await page.locator('.rpg-btop .rpg-party img').count(), 3);
+  assert.equal(await page.locator('.rpg-btop .rpg-team-tag').innerText(), '＋25%');
+  assert.equal(await focused(), 'bt-tnext');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await text(page, '#bt-tname'), 'A');
+  assert.equal(await need(), n0);
+  assert.equal(await focused(), 'bt-fight');
+  assert.equal(await page.locator('.rpg-btop .rpg-team-tag').count(), 0);
+  // 端で回る: A の ◀ → C（自分で組んだ0枚。名前は esc）
+  await page.click('#bt-tprev');
+  assert.equal(await text(page, '#bt-tname'), 'C<b>');
+  assert.equal((await readSave(page)).tsel, 2);
+  assert.ok((await text(page, '#bt-intro')).includes('この編成には仲間がいないよ'));
+  assert.equal(await page.locator('.rpg-btop .rpg-party').count(), 0);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await text(page, '#bt-tname'), 'A');
+  // 枠が1つなら ◀▶ は出さない。たたかうが始まったら ←→ は効かない
+  await writeSave(page, saveWith({ cards: { br: [1, 0] } }));
+  await startBattle(page, 'samerica', 1);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await phase(page), 'question');
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 1));
+  assert.equal(await text(page, '#bt-tname'), '編成1');
+  assert.equal(await page.locator('#bt-tprev, #bt-tnext').count(), 0);
+  assert.equal(await page.locator('#bt-team').count(), 1);
+});
+
+t('intro_team_button', async page => {
+  await writeSave(page, saveWith({ cards: { br: [1, 0] } }));
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 1));
+  await page.click('#bt-team');
+  await page.waitForFunction(() => document.body.dataset.screen === 'team');
+  await page.click('#tm-back');
+  await page.locator('#bt-intro').waitFor();
+  assert.equal(await phase(page), 'intro');
+  assert.ok((await text(page, '#bt-intro')).includes('おしゃべりオウム'));
+});
+
+// 正解したときの仲間の援護（ログと .rpg-assist）。ボスの旗でも
+t('assist_log', async page => {
+  await writeSave(page, saveWith({ cards: { br: [1, 0] } }));
+  await startBattle(page, 'samerica', 1);
+  await battleGuard(page);
+  await page.locator(`#scr-battle .choice[data-a="${await cur(page)}"]`).click();
+  const s = await text(page, '#bt-log');
+  assert.ok(s.includes('ブラジルの援護！'), s);
+  assert.match(s, /の援護！ (ヤドクガエル|おしゃべりオウム)に\d+ダメージ/);
+  assert.equal(await page.locator('.rpg-btop .rpg-party.rpg-assist').count(), 1);
+  await page.waitForTimeout(700);
+  assert.equal(await page.locator('.rpg-assist').count(), 0);
+  // ボス: 旗を取りもどした文
+  await writeSave(page, saveWith({ lv: 20, floors: { samerica: 4 }, cards: { br: [1, 0], cl: [1, 0] } }));
+  await startBattle(page, 'samerica', 5);
+  await battleAnswer(page, true);
+  assert.match(await text(page, '#bt-log'), /(ブラジル・チリ|チリ・ブラジル)の援護！ 旗を取りもどした/);
+});
+
+t('no_party_log_unchanged', async page => {
+  await writeSave(page, saveWith({}));
+  await startBattle(page, 'samerica', 1);
+  await battleAnswer(page, true);
+  const s = await text(page, '#bt-log');
+  assert.ok(!s.includes('援護'), s);
+  assert.match(s, /おしゃべりオウムに\d+ダメージ/);
+  assert.equal(await page.locator('.rpg-btop .rpg-party').count(), 0);
+});
+
 t('battle_learning', async page => {
   await writeSave(page, saveWith({ fr: { br: 4 } }));
   await startBattle(page, 'samerica', 1);

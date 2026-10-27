@@ -312,6 +312,16 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-pc { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .75rem; }
 .rpg-pc img { width: 44px; aspect-ratio: 4 / 3; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; background: var(--bg); }
 .rpg-stars { color: var(--hl); letter-spacing: -.05em; }
+/* チームボーナスの札（上の列の仲間の端。「＋25%」） */
+.rpg-team-tag { align-self: center; padding: 0 6px; border-radius: 999px; border: 1px solid var(--hl); background: color-mix(in srgb, var(--hl) 16%, var(--surface)); font: 700 .7rem var(--font-mono); white-space: nowrap; }
+/* 正解の援護: 仲間カードの枠が左から順に跳ねる（国旗の img には transform をかけない。枠と一緒に動くだけ）。動きを抑える設定では枠が光るだけ */
+@media (prefers-reduced-motion: no-preference) {
+  .rpg-assist .rpg-pc { animation: rpg-hop .3s ease-out both; animation-delay: calc(var(--i, 0) * 80ms); }
+  @keyframes rpg-hop { 50% { transform: translateY(-6px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rpg-assist .rpg-pc { border-radius: 4px; box-shadow: 0 0 0 2px var(--accent); }
+}
 /* 取りもどした旗: 布（?）→ 本物の国旗。「旗 n/N」の文字は普段は隠す（短いスマホの1行の帯で使う） */
 .rpg-flags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .rpg-got, .rpg-cloth { width: 32px; aspect-ratio: 4 / 3; border-radius: 3px; }
@@ -339,6 +349,12 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-bmeet-e { margin-right: .2em; font-size: 1.6em; vertical-align: middle; }
 .rpg-bline { font-size: .92rem; text-wrap: balance; word-break: auto-phrase; }
 #bt-fight { min-width: 200px; }
+/* 登場画面の編成の行: 編成 ◀ 名前 ▶ ［へんせい］ */
+.rpg-bteam { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; }
+.rpg-bteam-k { font-size: .85rem; color: var(--muted); }
+.rpg-tsw { min-width: 32px; min-height: 32px; padding: 0 6px; }
+.rpg-tname { font: 700 1rem var(--font-display); overflow-wrap: anywhere; }
+#bt-team { min-height: 32px; padding: 4px 14px; font-size: .85rem; }
 .rpg-bend-h { font: 900 1.4rem/1.35 var(--font-display); text-wrap: balance; word-break: auto-phrase; }
 .rpg-bend-h small { font-size: .65em; white-space: nowrap; }
 .rpg-bend-x { font: 900 1.15rem var(--font-display); color: var(--accent); }
@@ -348,7 +364,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 /* ---- バトルの並べ方（スマホは上の列を画面の上に固定・短いスマホは上の列を1行・PC は画面の高さいっぱいの2列のステージ） ---- */
 .rpg-flags::before { content: "取りもどした旗"; content: "取りもどした旗" / ""; margin-right: 4px; font-size: .75rem; color: var(--muted); }
 /* スマホ（〜899px）: 上の列は画面の上に固定する横いっぱいの帯（背景は --surface、下に線）。
-   中は［にげる］とダンジョン名・モンスター・敵の HP・旅人の HP とのこりミス・取りもどした旗・ログの最新1行（仲間は登場画面で見せる） */
+   中は［にげる］とダンジョン名・モンスター・敵の HP・旅人の HP とのこりミス・仲間（国旗 28px と★の1行）・取りもどした旗・ログの最新1行 */
 @media (max-width: 899.98px) {
   #scr-battle { width: 100%; }   /* .wrap の中で中身の幅に縮まない（問題ごとに横幅が変わらない） */
   .rpg-btop {
@@ -356,18 +372,24 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
     margin-inline: calc(50% - 50vw); padding: 8px calc(50vw - 50%);
     border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--surface);
   }
-  .rpg-btop .rpg-party { display: none; }
+  .rpg-btop .rpg-party { flex-wrap: nowrap; justify-content: flex-start; gap: 10px; min-width: 0; }
+  .rpg-btop .rpg-pc { gap: 0; line-height: 1.1; }
+  .rpg-btop .rpg-pc img { width: 28px; }
+  .rpg-btop .rpg-stars { font-size: .6rem; }
   .rpg-log p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* 1行のまま（帯の高さを変えない） */
   .rpg-log p:not(:last-child) { display: none; }
 }
-/* 短いスマホ（高さ 700px 以下。360×640 など）: 帯を約56px に。1段目に［にげる］・ダンジョン名・「旗 2/4」、
+/* 短いスマホ（高さ 700px 以下。360×640 など）: 帯を約56px に。1段目に［にげる］・ダンジョン名・仲間の国旗（20px、★と札は隠す）・「旗 2/4」、
    2段目に「🐸 ▓▓▓░ 42/60 ｜ 🧙 ▓▓▓▓ 54/54 のこりミス3」。ログは読み上げ（aria-live）だけ。問題の国旗と地図も小さく */
 @media (max-width: 899.98px) and (max-height: 700px) {
   .rpg-btop {
     display: grid; align-items: center; gap: 2px 6px; padding-block: 4px;
     grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1fr) auto auto;
-    grid-template-areas: "head head head head head flags flags" "mon ebar enum av hbar hnum left";
+    grid-template-areas: "head head head party party flags flags" "mon ebar enum av hbar hnum left";
   }
+  .rpg-btop .rpg-party { grid-area: party; justify-self: end; gap: 4px; overflow: hidden; }
+  .rpg-btop .rpg-pc img { width: 20px; }
+  .rpg-btop :is(.rpg-stars, .rpg-team-tag) { display: none; }
   .rpg-bhead { grid-area: head; min-width: 0; justify-content: flex-start; gap: 10px; }
   /* 押せる高さは 24px。上下 3.5px は余白に重ねて、行の高さ（17px）と帯（約56px）は変えない。
      重ねたぶんにすぐ下のモンスターがゆらゆら（translate・rotate）で入ってくるので、［にげる］を上に重ねる（押すとモンスターに当たらない） */
@@ -424,7 +446,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
   .rpg-hpl { gap: 10px; font-size: .95rem; }
   .rpg-hp { height: 12px; border-radius: 6px; }
   .rpg-hpnum, .rpg-left { font-size: .9rem; }
-  .rpg-pc img { width: 56px; }
+  .rpg-pc img { width: 64px; }
   .rpg-got, .rpg-cloth { width: 40px; }
   .rpg-log { min-height: 4.5em; font-size: .9rem; }
   /* 右の列。中の画面は列の高さいっぱいで、縦のまん中に置く */
