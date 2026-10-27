@@ -23,7 +23,7 @@
   const LOG_LINES = 3;        // ログは直近3行
   const COIN = RPG.COIN;
   const LABEL = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？' };
-  const MODES = new Set(['f2n', 'n2f', 'm2f', 'cap']);
+  const MODES = new Set(['f2n', 'n2f', 'm2f']);
   const ONGOING = new Set(['question', 'reveal', 'revive']);   // バトルが続いている（にげたら数える）
   const FLEE_ASK = 'にげる？（報酬はなし）';
   const todayStr = () => K.today(new Date());
@@ -192,7 +192,7 @@
     if (B.boss) {
       // 新しい旗（後ろに回した旗がもう一度来たときも）は bossMode、旗が残ったときの同じ国のもう1問は前の形式の次
       const f = B.flags[B.order[0]];
-      const mode = B.again ? K.nextMode(B.q.mode, BOSS) : K.bossMode(B.k, B.order.length, B.en.flags, f.a);
+      const mode = B.again ? K.nextMode(B.q.mode, BOSS) : K.bossMode(B.k);
       B.k++;
       B.q = { a: f.a, mode };
     } else {
@@ -215,11 +215,11 @@
     box.className = 'bq'; box.id = 'bt-q';
     box.innerHTML = (B.revive ? `<h2 class="rpg-rvh">思い出して復活！ まちがえた国をもう一度 <small>${B.revive.i + 1}/${B.revive.list.length}</small></h2>` : '')
       + (tags.length ? `<p class="rpg-tags">${tags.map(s => `<span class="rpg-tag">${s}</span>`).join('')}</p>` : '')
-      + `<p class="qlabel">${mode === 'cap' ? `首都が「${esc(c.c)}」の国は？` : LABEL[mode]}</p>`
+      + `<p class="qlabel">${LABEL[mode]}</p>`
       + (mode === 'f2n' ? `<img class="qflag" src="${flag(a)}" alt="国旗">` : '')
       + (mode === 'n2f' ? `<p class="qbig">${esc(c.n)}</p>` : '');
     if (mode === 'm2f') box.append(zoomableMap(c, '出題中の国の位置', { region: B.dg.r }));
-    const byName = mode === 'f2n' || mode === 'cap', ch = document.createElement('div');
+    const byName = mode === 'f2n', ch = document.createElement('div');
     ch.className = 'choices' + (byName ? ' textc' : '');
     makeQuestion(c).opts.forEach((o, k) => {
       const b = document.createElement('button');

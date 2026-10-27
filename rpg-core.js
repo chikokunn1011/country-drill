@@ -144,8 +144,6 @@
     const list = C.filter(c => region === 'all' || c.r === region).sort((x, y) => y.ar - x.ar), n = list.length;
     return [0, 1, 2, 3].map(i => list.slice(Math.round(n * i / 4), Math.round(n * (i + 1) / 4)).map(c => c.a));
   };
-  // 首都→国名（cap）を出してよい国。国名と首都が「同じ」「片方がもう片方をふくむ」「先頭2文字が同じ」なら答えのヒントになるので出さない
-  const capOK = c => !(c.n === c.c || c.n.includes(c.c) || c.c.includes(c.n) || c.n.slice(0, 2) === c.c.slice(0, 2));
 
   // ---- 日付とコインの表示 ----
   const pad = n => String(n).padStart(2, '0');
@@ -532,7 +530,6 @@
   };
 
   // ---- バトルの出題（設計書 §7.3・§7.4） ----
-  const BY_A = new Map(C.map(c => [c.a, c]));
   const codesOf = region => C.filter(c => region === 'all' || c.r === region).map(c => c.a);
   const missOf = (m, a) => Math.max(0, +(m || {})[a] || 0);
   // rng でシャッフルした新しい配列
@@ -586,12 +583,8 @@
     out.push(...weak.slice(cap, cap + n - out.length));
     return out;
   };
-  // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。旗の残り left が total の半分を切ったら、3問に1問を cap にする
-  // （首都がヒントになる国には出さない）
-  const bossMode = (k, left, total, a) => {
-    const cy = modeCycle(5), i = k % cy.length, c = BY_A.get(a);
-    return i === cy.length - 1 && left * 2 < total && c && capOK(c) ? 'cap' : cy[i];
-  };
+  // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。出題は国旗・国名・場所だけ（首都は問題に出さない）
+  const bossMode = k => { const cy = modeCycle(5); return cy[k % cy.length]; };
   // 思い出して復活の問題: 新しいまちがいから順に、重なりを除いて最大 reviveMax か国。形式はまちがえた形式の次（F3 の順）
   const reviveSet = mistakes => {
     const out = [], seen = new Set();
@@ -611,7 +604,7 @@
     battleReward, damage,
     cardAtk, party, battleStats,
     hitsNeeded, missesAllowed, judge,
-    floorsOf, capOK,
+    floorsOf,
     today, dayNum, shortCoins,
     VERSION, MIGRATE, fresh, sanitize, migrate,
     encodeCode, decodeCode, sanitizeMisses,
