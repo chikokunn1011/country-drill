@@ -223,4 +223,72 @@ do $$ begin
 end $$;
 reset role;
 
+-- ---- 冒険のランキング ----
+\echo '- rpg_accepts_valid'
+reset role; truncate rpg_scores; set role anon;
+do $$ declare r jsonb := submit_rpg('チコ', 12, 2, 13); begin
+  assert r = '{"ok":true,"rank_lv":1,"rank_dg":1}'::jsonb, format('rpg_accepts_valid: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select row(nickname, lv, dungeons, floors)::text from rpg_scores) = '(チコ,12,2,13)', 'rpg_accepts_valid: 保存値';
+end $$;
+
+\echo '- rpg_rules'
+reset role; truncate rpg_scores; set role anon;
+do $$ begin
+  assert submit_rpg('', 5, 0, 0)->>'reason' = 'bad_name', '空の名前';
+  assert submit_rpg('あいうえおかきくけこさしす', 5, 0, 0)->>'reason' = 'bad_name', '13文字';
+  assert submit_rpg('ＦＵＣＫ', 5, 0, 0)->>'reason' = 'ng_name', 'NG';
+  assert submit_rpg('チコ', 0, 0, 0)->>'reason' = 'bad_record', 'Lv0';
+  assert submit_rpg('チコ', 51, 0, 0)->>'reason' = 'bad_record', 'Lv51';
+  assert submit_rpg('チコ', 5, 8, 35)->>'reason' = 'bad_record', 'ダンジョン8';
+  assert submit_rpg('チコ', 5, 0, 36)->>'reason' = 'bad_record', 'フロア36';
+  assert submit_rpg('チコ', 5, 2, 9)->>'reason' = 'bad_record', 'ダンジョン2なのにフロア9';
+  assert submit_rpg('チコ', 5, -1, 0)->>'reason' = 'bad_record', 'マイナス';
+  assert submit_rpg('チコ', null, 0, 0)->>'reason' = 'bad_record', 'null';
+  assert (submit_rpg('チコ', 50, 7, 35)->>'ok')::boolean, '最大';
+  assert submit_rpg('チコ', 50, 7, 35)->>'reason' = 'too_soon', '10秒以内はだめ';
+  assert (submit_rpg('ミケ', 1, 0, 0)->>'ok')::boolean, '最小';
+end $$;
+reset role;
+do $$ begin assert (select count(*) from rpg_scores) = 2, 'rpg_rules: 通ったのは2行'; end $$;
+
+\echo '- rpg_top_and_rank'
+reset role; truncate rpg_scores;
+insert into rpg_scores (nickname, lv, dungeons, floors, created_at) values
+  ('A', 20, 1, 7, now() - interval '5 min'),
+  ('A', 18, 3, 16, now() - interval '4 min'),   -- A のダンジョンの自己ベストはこっち、レベルの自己ベストは上
+  ('B', 25, 0, 4, now() - interval '3 min'),
+  ('C', 20, 1, 7, now() - interval '2 min'),    -- A と同じ記録なら先に載せた A が上
+  ('D', 10, 3, 16, now() - interval '1 min');
+set role anon;
+do $$ begin
+  assert (select array_agg(nickname || ':' || lv) from top_rpg('lv')) = array['B:25', 'A:20', 'C:20', 'D:10'], format('lv: %s', (select array_agg(nickname || ':' || lv) from top_rpg('lv')));
+  assert (select array_agg(nickname || ':' || dungeons || ':' || floors) from top_rpg('dg')) = array['A:3:16', 'D:3:16', 'C:1:7', 'B:0:4'],
+    format('dg: %s', (select array_agg(nickname || ':' || dungeons || ':' || floors) from top_rpg('dg')));
+  assert (select count(*) from top_rpg('x')) = 0, '知らない並べ方は空';
+  assert (select count(*) from top_rpg(null)) = 0, 'null は空';
+  assert rpg_rank_of(21, 0, 0) = '{"rank_lv":2,"rank_dg":5}'::jsonb, format('rank: %s', rpg_rank_of(21, 0, 0));
+  assert rpg_rank_of(20, 1, 7)->>'rank_lv' = '2', '同じ記録は数えない';
+end $$;
+reset role; truncate rpg_scores;
+insert into rpg_scores (nickname, lv, dungeons, floors) select 'p' || i, i % 50 + 1, 0, 0 from generate_series(1, 60) i;
+set role anon;
+do $$ begin assert (select count(*) from top_rpg('lv')) = 50, '50件まで'; end $$;
+
+\echo '- rpg_anon_cannot_touch_table'
+reset role;
+do $$ begin
+  assert (select relrowsecurity from pg_class where oid = 'public.rpg_scores'::regclass), 'RLS が有効';
+end $$;
+set role anon;
+do $$ begin
+  begin perform * from rpg_scores; raise exception 'anon が select できた';
+  exception when insufficient_privilege then null; end;
+  begin insert into rpg_scores (nickname, lv, dungeons, floors) values ('x', 1, 0, 0); raise exception 'anon が insert できた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
 \echo 'ALL SQL TESTS PASSED'

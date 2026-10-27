@@ -431,7 +431,7 @@ t('home_no_hscroll', async page => {
 // 国旗ガチャと仲間の画面の並べ方（4つの大きさで横にはみ出さない・PC は左右2列）と、全画面を順に回る確認（設計書 §14）
 t('gacha_layout', async page => {
   // 名前の長い国が多い地域で10連（結果あり）
-  await writeSave(page, saveWith({ coins: 1000, cards: { jp: [3, 4], cf: [2, 2], vc: [1, 1] }, fr: { cf: 10, vc: 7 } }));
+  await writeSave(page, saveWith({ coins: 1500, cards: { jp: [3, 4], cf: [2, 2], vc: [1, 1] }, fr: { cf: 10, vc: 7 } }));
   await page.evaluate(() => RPG.open('gacha', { region: '北・中央アメリカ' }));
   await page.click('#ga-10');
   await flipAll(page);

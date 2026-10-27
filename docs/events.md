@@ -171,7 +171,7 @@ badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-cards.js / rpg-battle
 | `rpg:ready` `rpg:share` | | 使わない |
 
 - クイズ中（`drill:start` から `drill:result` まで）に来たものと `rpg:answer` は積むだけで、判定も保存もしない（クイズ中のものは `drill:result` でまとめて判定する）。クイズの外の `rpg:answer`（バトルの1問ごと）は、次に判定するイベント（ふつうはバトルの終わりの `rpg:battle`。ほかの `rpg:*` や `drill:result` などでもよい）でまとめて判定する。その前にページを閉じた・隠れた（`pagehide`・`visibilitychange`）ときは保存だけして、そのあとの判定（次に判定するイベントか、次の起動時）で判定する（隠れただけならページは残るので、戻ってきたあとの次のイベントで判定することもある）。ほかはすぐ判定して保存し、取れたステップは `badge:earned` で払う。
-- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から3秒。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
+- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から4秒（パックの演出＋めくる）。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
 - 起動時と判定のたびに `RPG.snapshot()` を同期で読む（7章）。使うキーは `intro` `lv` `owned` `floors` `st`（`st.win` `st.lose` `st.flee`）`overcome` `bountyDays`。ボスを倒したかは `floors` を見て、`floors[id] >= 5` なら倒したとみなす（`cleared` の形には頼らない）。冒険の値は、badges.js が覚えた値と snapshot の値の大きいほうで判定する。
 
 rpg.js へのお願い（バッジ設計 §8.4）と、rpg.js がやらなかったときのバッジ側の代わりの判定:
