@@ -102,7 +102,7 @@
     // 冒険の上位50件。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
     async rpgTop({ sort }) {
       const rows = await rpc('top_rpg', { p_sort: sort });
-      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors, at: new Date(r.at) }));
+      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors, at: new Date(r.created_at) }));
     },
     // この記録なら何位相当か（レベル順・ダンジョン順）。失敗したら reject
     async rpgRankOf({ lv, dungeons, floors }) {

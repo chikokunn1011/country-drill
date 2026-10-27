@@ -115,9 +115,7 @@ grant execute on function top_scores(text, text) to anon;
 -- ニックネームは全角半角・大文字小文字をそろえて、ほかの人と同じものは使えない。記録はそれぞれ今までの最高を残す。
 -- 並べ方は 'lv'（レベル → ダンジョン → フロア → 先に載せた順）と 'dg'（ダンジョン → フロア → レベル → 先に載せた順）
 -- 変な記録は Table Editor の rpg_players から行を消せばランキングからも消える
--- 前の形（同じ名前を何行も入れる rpg_scores と submit_rpg）は使わない。submit_rpg は消すが、本番の rpg_scores は記録を残すため消さない（2026-10-27）
-drop function if exists submit_rpg(text, int, int, int);
-drop function if exists top_rpg(text);
+-- 前の形（同じ名前を何行も入れる rpg_scores と submit_rpg）はもう使わないが、本番では記録を残すため消していない（2026-10-27）
 create table if not exists rpg_players (
   id bigint generated always as identity primary key,
   token_hash bytea not null unique,      -- sha256(合言葉)
@@ -233,9 +231,9 @@ end $$;
 revoke all on function rpg_rename(text, text) from public;
 grant execute on function rpg_rename(text, text) to anon;
 
--- 上位50人。p_sort は 'lv' か 'dg'。それ以外は空。at は最後に記録が変わった時刻
+-- 上位50人。p_sort は 'lv' か 'dg'。それ以外は空。created_at は最後に記録が変わった時刻（前の形と列をそろえて関数を作り直さずに済むようにしている）
 create or replace function top_rpg(p_sort text)
-returns table(nickname text, lv int, dungeons int, floors int, at timestamptz)
+returns table(nickname text, lv int, dungeons int, floors int, created_at timestamptz)
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 #variable_conflict use_column
 begin
