@@ -723,6 +723,9 @@ body.rpg-staging { overflow: hidden; }
 .rpg-rr-list li { grid-template-columns: 2.2em minmax(0, 1fr) auto auto auto; }
 .rpg-rr-list .rpg-rr-dg small { font-size: .78em; color: var(--muted); }
 #rr-tabs { align-self: flex-start; }
+.rpg-rr-auto { padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 40%, var(--line)); font-size: .9rem; word-break: auto-phrase; }
+.rpg-rr-auto[hidden] { display: none; }
+.rpg-rr-auto .linkbtn { padding-inline: 0; font-size: .85rem; }
 #rr-form[hidden] { display: none; }
 #rr-form .row { display: flex; flex-wrap: nowrap; gap: 8px; }
 #rr-name { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
