@@ -243,6 +243,18 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .seg { display: inline-flex; border: 1.5px solid var(--accent); border-radius: 999px; overflow: hidden; }
 .seg button { border: 0; background: transparent; color: var(--accent); font: 700 .88rem var(--font-display); padding: 6px 16px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+/* モード選択の地域：世界地図で、選んだ地域の国に色をつける。点線は出題の地図に映る範囲 */
+.rmap .map { aspect-ratio: 2/1; cursor: pointer; }
+.rmap .map path:not(.graticule):not(.frame):not(.in) { fill: color-mix(in srgb, var(--land) 55%, var(--ocean)); }
+.rmap .map path.in { fill: var(--hl); stroke: var(--ink); stroke-width: .6; }
+.rmap .map .dot { fill: var(--hl); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rmap .map .frame { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.rmap { margin-bottom: 4px; }
+.opts { display: flex; flex-direction: column; gap: 14px; }
+.rgroups { display: flex; flex-direction: column; gap: 8px; }
+.rgroups .subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--hl) 10%, var(--surface)); }
+.rgroups .subs .lbl2 { font-size: .8rem; color: var(--muted); margin-right: 2px; }
+.chip.sub { padding: 5px 11px; font-size: .84rem; }
 /* 図鑑の地図：国をタップすると右（スマホは下）に情報が出る */
 .bmap { display: flex; flex-direction: column; gap: 12px; }
 .bmap .map path.pick { cursor: pointer; }
@@ -390,14 +402,17 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       </div>
       </div>
       <div class="col">
+      <div class="rmap" id="rmap"></div>
+      <div class="opts">
       <div class="field">
         <span class="lbl">出題する地域</span>
-        <div class="chips" id="regions"></div>
-        <p class="hint">「場所」の地図も、この地域だけを映す。</p>
+        <div class="rgroups" id="regions"></div>
+        <p class="hint" id="regions-hint"></p>
       </div>
       <div class="field">
         <span class="lbl">問題数</span>
         <div class="chips" id="counts"></div>
+      </div>
       </div>
       </div>
       </div>
@@ -494,6 +509,9 @@ const feats = topojson.feature(WORLD, WORLD.objects.countries).features;
 const featById = new Map();
 for (const f of feats) { const k = String(f.id), prev = featById.get(k); if (!prev || d3.geoArea(f) > d3.geoArea(prev)) featById.set(k, f); } // 同じIDが複数ある国（豪州と周辺の島）は本土を代表にする
 const featOf = c => featById.get(c.a === 'xk' ? 'XK' : c.id);
+const cOfFeat = g => C.find(c => c.a === 'xk' ? String(g.id) === 'XK' : c.id === String(g.id));
+const featCountry = new Map(feats.map(g => [g, cOfFeat(g)]));
+const isSmall = c => c.ar < 25000 || !featOf(c);
 const flagCache = {};
 const flag = a => flagCache[a] ||= 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(FLAGS[a]);
 const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
@@ -502,6 +520,22 @@ const REGION_BOX = {
   'アジア': [25, -12, 150, 78], 'ヨーロッパ': [-25, 34, 60, 72], 'アフリカ': [-20, -36, 55, 38],
   '北・中央アメリカ': [-170, 5, -50, 84], '南アメリカ': [-85, -57, -33, 13], 'オセアニア': [110, -50, 190, 22],
 };
+// 細かい地域（モード選択のクイズだけで使う。ランキング・冒険・ガチャ・図鑑は上の6地域のまま）。
+// p は親の地域、box は地図の切り出し範囲、a は国コード。アジアとヨーロッパとアフリカは細かい地域で全部の国をわける
+const SUBREGIONS = {
+  '東アジア': { p: 'アジア', box: [72, 17, 148, 55], a: 'cn jp kp kr mn' },
+  '東南アジア': { p: 'アジア', box: [90, -13, 142, 30], a: 'bn kh id la my mm ph sg th tl vn' },
+  '南アジア': { p: 'アジア', box: [59, -2, 98, 39], a: 'af bd bt in mv np pk lk' },
+  '中央アジア': { p: 'アジア', box: [45, 34, 89, 56], a: 'kz kg tj tm uz' },
+  '西アジア': { p: 'アジア', box: [25, 10, 64, 46], a: 'am az bh ge ir iq il jo kw lb om qa sa sy tr ae ye' },
+  '東ヨーロッパ': { p: 'ヨーロッパ', box: [12, 38, 52, 68], a: 'al by ba bg hr cz ee hu xk lv lt md me mk pl ro ru rs sk si ua' },
+  '西ヨーロッパ': { p: 'ヨーロッパ', box: [-25, 34, 36, 71], a: 'ad at be cy dk fi fr de gr va is ie it li lu mt mc nl no pt sm es se ch gb' },
+  'カリブ海': { p: '北・中央アメリカ', box: [-86, 9, -59, 27.5], a: 'ag bs bb cu dm do gd ht jm kn lc vc tt' },
+  'アフリカ北側': { p: 'アフリカ', box: [-26, -6, 55, 38], a: 'dz bj bf cv cm cf td ci dj eg gq er et gm gh gn gw ke lr ly ml mr ma ne ng st sn sl so ss sd tg tn ug' },
+  'アフリカ南側': { p: 'アフリカ', box: [8, -36, 60, 6], a: 'ao bw bi km cg cd sz ga ls mg mw mu mz na rw sc za tz zm zw' },
+};
+for (const [r, o] of Object.entries(SUBREGIONS)) { o.set = new Set(o.a.split(' ')); REGION_BOX[r] = o.box; }
+const parentRegion = r => SUBREGIONS[r]?.p ?? r;   // ランキングなど6地域しか知らない所へ渡すとき
 const MODES = [
   { k: 'f2n', label: '国旗 → 国名', desc: '国旗を見て国名を選ぶ', q: 'flag', a: 'name' },
   { k: 'n2f', label: '国名 → 国旗', desc: '国名を見て国旗を選ぶ', q: 'name', a: 'flag' },
@@ -527,7 +561,7 @@ const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;'
 const fmt = n => n.toLocaleString('ja-JP');
 const $ = id => document.getElementById(id);
 const regionLabel = r => r === 'all' ? '全世界' : r;
-const poolFor = r => r === 'all' ? C : C.filter(c => c.r === r);
+const poolFor = r => r === 'all' ? C : SUBREGIONS[r] ? C.filter(c => SUBREGIONS[r].set.has(c.a)) : C.filter(c => c.r === r);
 const modeOf = k => MODES.find(m => m.k === k);
 
 /* ---------- 地図 ---------- */
@@ -587,7 +621,7 @@ function drawMap(svg, c, { region = 'all', highlight = true, w = W, h = H } = {}
   if (highlight) {
     // 小さい国、地域全体を映して小さく見える国には丸印をつける
     const onPath = f ? path(f) : null;
-    const small = c.ar < 25000 || !f || (REGION_BOX[region] && c.ar < 120000);
+    const small = c.ar < (SUBREGIONS[region] ? 30000 : REGION_BOX[region] ? 120000 : 25000) || !f; // 細かい地域は地図が大きく映るので丸印は小さい国だけ
     if (small || !onPath) { const q = proj([c.ll[1], c.ll[0]]); if (q) out += `<circle class="ring" cx="${q[0]}" cy="${q[1]}" r="12"></circle>`; }
   }
   svg.innerHTML = `<g class="layer">${out}</g>`;
@@ -755,19 +789,70 @@ function countChips(region, sel) {
   const n = poolFor(region).length;
   return COUNTS.map(c => `<button class="chip" aria-pressed="${c === sel}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
 }
+// モード選択の地域ボタン。6地域を選ぶと、その下に細かい地域が出る。タイムアタックはランキングの区分に合わせて6地域だけ
+function regionGroups(sel, ta) {
+  const chip = (r, cls = '') => `<button class="chip${cls}" aria-pressed="${r === sel}" data-r="${r}">${r === 'all' ? '全世界' : r}<span class="mono"> ${poolFor(r).length}</span></button>`;
+  const p = parentRegion(sel), subs = ta ? [] : Object.keys(SUBREGIONS).filter(k => SUBREGIONS[k].p === p);
+  return `<div class="chips">${['all', ...REGIONS].map(r => chip(r)).join('')}</div>`
+    + (subs.length ? `<div class="subs" role="group" aria-label="${p}を細かく"><span class="lbl2">細かく</span>${subs.map(k => chip(k, ' sub')).join('')}</div>` : '');
+}
+// 世界地図は最初に1回だけ描いて、地域が変わったら色と点線の範囲だけ変える
+let rmap = null;
+function renderRegionMap(region) {
+  const w = 640, h = 320;
+  if (!rmap) {
+    const proj = boxProjection(WORLD_BOX, w, h), path = d3.geoPath(proj);
+    let out = `<path class="graticule" d="${path(graticule)}"></path>`;
+    for (const g of feats) { const d = path(g), c = featCountry.get(g); if (d) out += `<path d="${d}"${c ? ` data-a="${c.a}"` : ''}></path>`; }
+    for (const c of C.filter(isSmall)) { const q = proj([c.ll[1], c.ll[0]]); if (q) out += `<circle class="dot" data-a="${c.a}" cx="${q[0]}" cy="${q[1]}" r="2.6"></circle>`; }
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.classList.add('map'); s.setAttribute('viewBox', `0 0 ${w} ${h}`); s.setAttribute('role', 'img');
+    s.innerHTML = `${out}<path class="frame"></path>`;
+    $('rmap').append(s);
+    rmap = { s, proj, path };
+  }
+  const pool = new Set(poolFor(region).map(c => c.a));
+  for (const el of rmap.s.querySelectorAll('[data-a]')) {
+    const on = pool.has(el.dataset.a);
+    if (el.tagName === 'circle') el.style.display = on ? '' : 'none'; else el.classList.toggle('in', on);
+  }
+  // 点線の範囲（出題の地図に映るところ）。経線は曲がるので辺を細かく区切って線にする
+  const b = REGION_BOX[region], frame = rmap.s.querySelector('.frame');
+  if (b) {
+    const [x0, y0, x1, y1] = b, pts = [], N = 24;
+    for (let i = 0; i <= N; i++) pts.push([x0 + (x1 - x0) * i / N, y1]);
+    for (let i = 0; i <= N; i++) pts.push([x1, y1 - (y1 - y0) * i / N]);
+    for (let i = 0; i <= N; i++) pts.push([x1 - (x1 - x0) * i / N, y0]);
+    for (let i = 0; i <= N; i++) pts.push([x0, y0 + (y1 - y0) * i / N]);
+    frame.setAttribute('d', 'M' + pts.map(p => rmap.proj(p.map(v => v > 180 ? v - 360 : v)).map(v => v.toFixed(1)).join(',')).join('L') + 'Z');
+  } else frame.setAttribute('d', '');
+  rmap.s.setAttribute('aria-label', `世界地図。${regionLabel(region)}（${pool.size}か国）に色がついている`);
+}
 function renderSetup() {
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
   // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
   $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || P.kind === 'ta';
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
-  $('regions').innerHTML = regionChips(S.region);
+  // タイムアタック中は細かい地域を選べない（ランキングの区分は6地域）。選んでいたら親の地域にする
+  if (P.kind === 'ta' && SUBREGIONS[S.region]) { S.region = parentRegion(S.region); store.set('settings', S); }
+  $('regions').innerHTML = regionGroups(S.region, P.kind === 'ta');
+  $('regions-hint').textContent = P.kind === 'ta' ? 'タイムアタックはランキングの区分に合わせて、大きい地域だけ。'
+    : '大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。';
+  renderRegionMap(S.region);
   P.count = fitCount(P.count, S.region);
   $('counts').innerHTML = countChips(S.region, P.count);
 }
 $('modes').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.mode = b.dataset.k; store.set('setup', P); renderSetup(); };
 $('kinds').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.kind = b.dataset.k; store.set('setup', P); renderSetup(); };
-$('regions').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; S.region = b.dataset.r; store.set('settings', S); renderSetup(); };
+$('regions').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; S.region = b.dataset.r; store.set('settings', S); renderSetup(); };
+// 地図の国をタップすると、その国の細かい地域（なければ6地域）を選ぶ。同じ地域をもう一度タップすると親の地域、その次は全世界
+$('rmap').onclick = e => {
+  const a = e.target.closest('[data-a]')?.dataset.a, c = a && C.find(x => x.a === a); if (!c) return;
+  const sub = P.kind === 'ta' ? null : Object.keys(SUBREGIONS).find(k => SUBREGIONS[k].set.has(a));
+  const steps = [sub, c.r, 'all'].filter(Boolean), i = steps.indexOf(S.region);
+  S.region = steps[i < 0 ? 0 : (i + 1) % steps.length]; store.set('settings', S); renderSetup();
+};
 $('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
@@ -793,17 +878,20 @@ function startGame() {
   show('quiz');
   nextQuestion();
 }
-function makeQuestion(c) {
-  const near = shuffle(C.filter(x => x !== c && x.r === c.r));
+// region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）
+function makeQuestion(c, region) {
+  const inSub = SUBREGIONS[region] ? poolFor(region) : [];
+  const sub = shuffle(inSub.filter(x => x !== c));
+  const near = shuffle(C.filter(x => x !== c && x.r === c.r && !inSub.includes(x)));
   const far = shuffle(C.filter(x => x !== c && x.r !== c.r));
   const opts = [c];
-  for (const x of [...near, ...far]) { if (opts.length >= 4) break; opts.push(x); }
+  for (const x of [...sub, ...near, ...far]) { if (opts.length >= 4) break; opts.push(x); }
   return { c, opts: shuffle(opts) };
 }
 function nextQuestion() {
   if (!G.queue.length) return showResult();
   const c = G.queue.shift();
-  G.cur = makeQuestion(c); G.answered = false;
+  G.cur = makeQuestion(c, S.region); G.answered = false;
   const m = G.mode, box = $('qcard');
   box.innerHTML = ''; box.className = `qcard q-${m.q} a-${m.a}`;
   const main = document.createElement('div'); main.className = 'qmain'; box.append(main);
@@ -1065,7 +1153,7 @@ function boardConds(board) {
 }
 // board を渡せばその条件、無ければ前回モード選択で選んだ条件で開く
 function openRanking(board) {
-  Object.assign(RK, (board && boardConds(board)) || { mode: P.mode, region: S.region, count: P.count });
+  Object.assign(RK, (board && boardConds(board)) || { mode: P.mode, region: parentRegion(S.region), count: P.count });
   show('ranking');
 }
 function renderRanking() {
@@ -1127,9 +1215,6 @@ $('bregion').onchange = e => { bregion = e.target.value; renderBook(); };
 $('bview').onclick = e => { const b = e.target.closest('button'); if (!b) return; bview = b.dataset.v; store.set('bview', bview); renderBook(); };
 
 /* 図鑑の地図。国の形をタップ、小さい国は丸印をタップすると情報が出る */
-const cOfFeat = g => C.find(c => c.a === 'xk' ? String(g.id) === 'XK' : c.id === String(g.id));
-const featCountry = new Map(feats.map(g => [g, cOfFeat(g)]));
-const isSmall = c => c.ar < 25000 || !featOf(c);
 function renderBookMap(matches) {
   const box = $('bmapbox'), w = W, h = H;
   if (bmapKey !== bregion) {
