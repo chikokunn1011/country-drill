@@ -531,19 +531,87 @@
       : { text: '全クリア！ クイズでコインを稼いで、レベルを上げよう', go: () => open('rpg') };
   };
   // ダンジョンの図版。開いていないものは 🔒 と押せないフロアだけ（ボスは見せない）
-  const plateHTML = (d, g) => {
+  // sel は冒険マップで選んでいるダンジョン。ほかの図版は隠す（DOM には7つとも置く）
+  const plateHTML = (d, g, sel) => {
     const n = cleared(d, g.id), on = unlocked(d, g.id), boss = K.MONSTERS[g.id][BOSS - 1];
     const fls = FLOOR_MARK.map((mark, i) => {
       const f = i + 1, cls = !on ? '' : f <= n ? ' is-done' : f === n + 1 ? ' is-next' : '';
       return `<button type="button" class="rpg-fl${cls}" data-d="${g.id}" data-f="${f}" aria-label="${f === BOSS ? 'ボス' : `F${f}`}${on && f <= n ? '（クリア済み）' : ''}"`
         + `${on && f <= n + 1 ? '' : ' disabled'}>${mark}</button>`;
     }).join('');
-    const head = `<div class="rpg-plate${on ? '' : ' rpg-locked'}" data-d="${g.id}" style="--rpg-c: var(--rpg-r-${g.id}, ${g.color})"><p class="rpg-plate-no">${g.plate}</p>`;
-    if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="まだ開いていない">🔒</span><b>${g.name}</b></p><div class="rpg-fls">${fls}</div></div>`;
+    const head = `<div class="rpg-plate${on ? '' : ' rpg-locked'}" data-d="${g.id}" style="--rpg-c: var(--rpg-r-${g.id}, ${g.color})"${g.id === sel ? '' : ' hidden'}><p class="rpg-plate-no">${g.plate}</p>`;
+    const prev = DG[DG.findIndex(x => x.id === g.id) - 1];
+    if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="まだ開いていない">🔒</span><b>${g.name}</b></p>`
+      + `<p class="rpg-plate-meta rpg-plate-lock">${prev ? `${esc(prev.name)}のボスをたおすと開く` : ''}</p><div class="rpg-fls">${fls}</div></div>`;
+    const left = restReward(g.id, n);
     const rec = f => K.recLv(K.stageOf(g.id, f)), [jt, jc] = JUDGE[judgeOf(d, g.id, Math.min(n + 1, BOSS))];
     return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" aria-hidden="true">${boss.e}</span><b>${g.name}</b><small>ボス ${boss.n}</small></p>`
       + `<p class="rpg-plate-meta"><span>推奨Lv${rec(1)}〜${rec(BOSS)}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? '<span>ぜんぶクリア</span>' : ''}</p>`
+      + (left ? `<p class="rpg-plate-meta rpg-plate-gain"><span>はじめてクリアでもらえる ${COIN}<b>${fmt(left)}</b></span><span>ボスまで あと${BOSS - n}フロア</span></p>` : '')
       + `<div class="rpg-fls">${fls}</div></div>`;
+  };
+  // まだはじめてクリアしていないフロア（n より先）のコインの合計
+  const restReward = (id, n) => {
+    let sum = 0;
+    for (let f = n + 1; f <= BOSS; f++) sum += K.battleReward(K.stageOf(id, f), { win: true, first: true, boss: f === BOSS });
+    return sum;
+  };
+
+  // ---- 冒険マップ（冒険ホームの図版の上）。世界地図にダンジョン7つと道。押したダンジョンの図版を下に出す ----
+  // SPOT は [経度, 緯度]。BEND は道の曲がり（+ は南へ、- は北へふくらむ。道の長さに対する割合）
+  const SPOT = { samerica: [-60, -12], oceania: [140, -26], namerica: [-102, 42], europe: [14, 50], asia: [92, 36], africa: [20, 2], world: [66, -30] };
+  const BEND = [0.18, -0.12, -0.18, -0.2, 0.18, 0.22];
+  const AMAP_BOX = [-122, -46, 166, 64];   // 北極・南極のほうと太平洋のはしを切って、ダンジョンを大きく見せる
+  let dgSel = '';    // マップで選んだダンジョン（冒険ホームを離れたら空にもどる＝次に挑むダンジョン）
+  let amapBase = null;
+  // 国の形を地域ごとに1本の path にまとめ、ダンジョンの場所の座標といっしょに1回だけ作る
+  const amapGeo = () => {
+    if (amapBase) return amapBase;
+    const proj = boxProjection(AMAP_BOX, W, H), path = d3.geoPath(proj), byR = new Map(), rest = [];
+    path.digits?.(1);
+    for (const g of feats) {
+      const p = path(g);
+      if (!p) continue;
+      const id = DG.find(x => x.r === featCountry.get(g)?.r)?.id;
+      if (id) byR.set(id, (byR.get(id) || '') + p); else rest.push(p);
+    }
+    const at = Object.fromEntries(DG.map(g => [g.id, proj(SPOT[g.id]).map(v => Math.round(v))]));
+    return amapBase = { byR, rest: rest.join(''), at };
+  };
+  const amapHTML = (d, sel, nf) => {
+    const { byR, rest, at } = amapGeo();
+    const done = DG.filter(g => cleared(d, g.id) >= BOSS).length, floors = DG.reduce((s, g) => s + Math.min(BOSS, cleared(d, g.id)), 0);
+    const st = g => cleared(d, g.id) >= BOSS ? 'is-done' : unlocked(d, g.id) ? 'is-open' : 'is-locked';
+    const c = g => `--rpg-c: var(--rpg-r-${g.id}, ${g.color})`;
+    let s = `<path class="rpg-am-land" d="${rest}"></path>`;
+    for (const g of DG) if (byR.has(g.id)) s += `<path class="rpg-am-r ${st(g)}" data-d="${g.id}" style="${c(g)}" d="${byR.get(g.id)}"></path>`;
+    DG.slice(1).forEach((g, i) => {
+      // 道に直角で南向きの向き (nx, ny) へ BEND × 長さだけ、まん中をずらした点を通る
+      const [x0, y0] = at[DG[i].id], [x1, y1] = at[g.id], len = Math.hypot(x1 - x0, y1 - y0) || 1, k = BEND[i] * len;
+      const sg = x1 >= x0 ? 1 : -1, nx = -(y1 - y0) / len * sg, ny = (x1 - x0) / len * sg;
+      const cx = (x0 + x1) / 2 + nx * k, cy = (y0 + y1) / 2 + ny * k;
+      s += `<path class="rpg-am-road${unlocked(d, g.id) ? ' is-open' : ''}" d="M${x0} ${y0}Q${Math.round(cx)} ${Math.round(cy)} ${x1} ${y1}"></path>`;
+    });
+    const R = 33, RING = 2 * Math.PI * (R + 5);
+    for (const g of DG) {
+      const [x, y] = at[g.id], n = Math.min(BOSS, cleared(d, g.id)), state = st(g), on = state !== 'is-locked';
+      const label = `${g.name}${on ? `（${n}/${BOSS}フロア${n >= BOSS ? '・クリア' : ''}）` : '（まだ開いていない）'}`;
+      s += `<g class="rpg-am-node ${state}${g.id === sel ? ' is-sel' : ''}${nf?.id === g.id ? ' is-here' : ''}" data-d="${g.id}" style="${c(g)}" transform="translate(${x} ${y})"`
+        + ` role="button" tabindex="0" aria-pressed="${g.id === sel}" aria-label="${label}">`
+        + `<circle class="rpg-am-hit" r="${R + 14}"></circle>`
+        + (on ? `<circle class="rpg-am-track" r="${R + 5}"></circle><circle class="rpg-am-ring" r="${R + 5}" transform="rotate(-90)" stroke-dasharray="${(RING * n / BOSS).toFixed(1)} ${RING.toFixed(1)}"></circle>` : '')
+        + `<circle class="rpg-am-dot" r="${R}"></circle><text class="rpg-am-e" dy=".35em">${on ? K.MONSTERS[g.id][BOSS - 1].e : '🔒'}</text>`
+        + `<text class="rpg-am-name" y="${R + 24}">${g.name}</text>`
+        + (state === 'is-done' ? `<g class="rpg-am-ok" transform="translate(${R - 3} ${-R + 3})"><circle r="13"></circle><path d="M-6 0l4 4 7-8"></path></g>` : '')
+        + '</g>';
+    }
+    if (nf) {
+      const [x, y] = at[nf.id];
+      s += `<g class="rpg-am-hero" transform="translate(${x} ${y - 72})" aria-hidden="true"><text dy=".35em">${AV[d.av] ?? AV[0]}</text></g>`;
+    }
+    return `<div class="rpg-amap-h"><b>冒険マップ</b><span>ダンジョン <b>${done}</b>/${DG.length}・フロア <b>${floors}</b>/${DG.length * BOSS}</span></div>`
+      + `<div class="rpg-amap-bar" aria-hidden="true"><i style="width: ${(100 * floors / (DG.length * BOSS)).toFixed(1)}%"></i></div>`
+      + `<svg class="map rpg-amap-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="冒険マップ（ダンジョンを押すと下にくわしく出る）">${s}</svg>`;
   };
   const bountyHTML = d => {
     const b = d.bounty, n = b.a.filter(a => b.done.includes(a)).length;
@@ -563,6 +631,7 @@
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
   const homeHTML = (d, nf, nx) => {
     const st = nf ? K.battleStats(d, nf.id, nf.floor) : K.battleStats(d, DG[DG.length - 1].id, BOSS);   // 全部クリアなら地図喰い
+    const sel = DG.some(g => g.id === dgSel) ? dgSel : nf?.id ?? DG[DG.length - 1].id;
     const nick = store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
     const max = d.lv >= T.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
     const lvup = max ? 'MAX' : `レベルアップ ${COIN}${fmt(cost)}${can ? '' : ` <small class="rpg-short">あと${COIN}${fmt(cost - d.coins)}</small>`}`;
@@ -578,7 +647,7 @@
       + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
         + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div>' : '')
       + (SCREENS.includes('rpgrank') ? '<button class="btn ghost rpg-to-rank" id="rpg-to-rank">🏆 冒険ランキング</button>' : '') + '</div>'
-      + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
+      + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-amap" id="rpg-amap">${amapHTML(d, sel, nf)}</div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g, sel)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
   };
   // 失格／にげたときの節目の［シェア］。押した行は消える（冒険ホームを離れたら全部消える: drill:screen）。
@@ -607,6 +676,20 @@
     if ($('rpg-to-gacha')) $('rpg-to-gacha').onclick = () => open('gacha');
     if ($('rpg-to-cards')) $('rpg-to-cards').onclick = () => open('cards');
     if ($('rpg-to-rank')) $('rpg-to-rank').onclick = () => open('rpgrank');
+    // マップのダンジョンを押すと、その図版だけを見せる（描き直さない。フォーカスはそのダンジョンに残る）
+    const pick = node => {
+      dgSel = node.dataset.d;
+      for (const n of $('rpg-amap').querySelectorAll('.rpg-am-node')) {
+        n.classList.toggle('is-sel', n === node);
+        n.setAttribute('aria-pressed', String(n === node));
+      }
+      for (const p of $('rpg-dgs').children) p.hidden = p.dataset.d !== dgSel;
+    };
+    $('rpg-amap').onclick = e => { const n = e.target.closest('.rpg-am-node'); if (n) pick(n); };
+    $('rpg-amap').onkeydown = e => {
+      const n = e.target.closest?.('.rpg-am-node');
+      if (n && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pick(n); }
+    };
     $('rpg-dgs').onclick = e => {
       const b = e.target.closest('button.rpg-fl');
       if (b && !b.disabled) open('battle', { id: b.dataset.d, floor: +b.dataset.f });
@@ -725,6 +808,7 @@
   };
   on('drill:screen', ({ name }) => {
     if (name !== 'rpg' && homeSharesShown) { homeShares = []; homeSharesShown = false; }   // 冒険ホームを離れたら、出していたシェアは消す
+    if (name !== 'rpg') dgSel = '';   // マップで選んだダンジョンも、離れたら次に挑むダンジョンにもどす
     if (name === 'home') drawEntrances();
     if (name === 'settings' && $('set-rpg')) $('set-rpg').checked = get().show !== false;
   });

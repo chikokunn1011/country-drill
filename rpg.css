@@ -185,6 +185,47 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-plate.rpg-locked { background: transparent; border-style: dashed; border-top-style: solid; }
 .rpg-plate.rpg-locked .rpg-plate-name b { color: var(--muted); }
 
+/* 冒険マップ（図版の上。世界地図にダンジョン7つと道。開いた地域は地域の色、まだの地域は霧。押したダンジョンの図版だけを下に出す） */
+.rpg-amap { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.rpg-amap-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
+.rpg-amap-h > b { font: 900 1.05rem var(--font-display); }
+.rpg-amap-h span { font-size: .85rem; color: var(--muted); }
+.rpg-amap-h span b { color: var(--ink); font-family: var(--font-mono); }
+.rpg-amap-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.rpg-amap-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ok); }
+.rpg-amap-svg { overflow: visible; }
+.rpg-amap-svg .rpg-am-land { fill: var(--rpg-fog); }
+.rpg-amap-svg .rpg-am-r { fill: var(--rpg-fog); }
+.rpg-amap-svg .rpg-am-r.is-open { fill: color-mix(in srgb, var(--rpg-c) 45%, var(--land)); }
+.rpg-amap-svg .rpg-am-r.is-done { fill: var(--rpg-c); }
+.rpg-amap-svg .rpg-am-road { fill: none; stroke: var(--muted); stroke-width: 4; stroke-dasharray: 2 9; stroke-linecap: round; opacity: .55; vector-effect: none; }
+.rpg-amap-svg .rpg-am-road.is-open { stroke: var(--ink); stroke-dasharray: none; opacity: .8; }
+.rpg-am-node { cursor: pointer; outline: none; }
+.rpg-am-hit { fill: transparent; }
+.rpg-am-dot { fill: var(--surface); stroke: var(--rpg-c); stroke-width: 3; }
+.rpg-am-track { fill: none; stroke: var(--line); stroke-width: 5; }
+.rpg-am-ring { fill: none; stroke: var(--rpg-c); stroke-width: 5; stroke-linecap: round; }
+.rpg-am-e { font-size: 38px; text-anchor: middle; }
+.rpg-am-node.is-done .rpg-am-dot { fill: var(--rpg-c); }
+.rpg-am-node.is-locked .rpg-am-dot { fill: var(--rpg-fog); stroke: var(--muted); stroke-dasharray: 3 3; }
+.rpg-am-node.is-locked .rpg-am-e { font-size: 28px; opacity: .7; }
+.rpg-am-ok circle { fill: var(--ok); stroke: var(--surface); stroke-width: 2; }
+.rpg-amap-svg .rpg-am-ok path { fill: none; stroke: var(--surface); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: none; }
+.rpg-am-node.is-sel .rpg-am-dot { stroke: var(--ink); stroke-width: 4; stroke-dasharray: none; }
+.rpg-am-node:focus-visible .rpg-am-hit { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 4 3; }
+.rpg-am-name { display: none; font: 700 14px var(--font-display); text-anchor: middle; fill: var(--ink); stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; paint-order: stroke; }
+.rpg-am-node.is-locked .rpg-am-name { fill: var(--muted); }
+@media (min-width: 900px) { .rpg-am-name { display: inline; } }   /* スマホでは字が小さすぎるので名前は下の図版だけ */
+.rpg-am-hero text { font-size: 40px; text-anchor: middle; }
+.rpg-plate-gain b { color: var(--ink); font-family: var(--font-mono); }
+.rpg-plate-gain .coin { vertical-align: -.1em; }
+@media (prefers-reduced-motion: no-preference) {
+  .rpg-am-hero { animation: rpg-am-bob 1.4s ease-in-out infinite; }
+  .rpg-am-node.is-here .rpg-am-dot { animation: rpg-am-glow 1.8s ease-in-out infinite; }
+}
+@keyframes rpg-am-bob { 50% { translate: 0 -5px; } }
+@keyframes rpg-am-glow { 50% { stroke-width: 7; } }
+
 /* コインのかせぎ方 */
 .rpg-earn { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
 .rpg-earn summary { cursor: pointer; font: 700 .95rem var(--font-display); }
@@ -226,7 +267,6 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
   #scr-rpg .rpg-side { grid-area: side; position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; }
   #scr-rpg .rpg-main { grid-area: main; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   #scr-rpg .rpg-aside { grid-area: aside; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-  .rpg-dgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
   .rpg-intro { width: 100%; max-width: 720px; margin-inline: auto; padding: var(--card-pad, 24px); }
   .rpg-intro ~ .rpg-debug { box-sizing: border-box; width: 100%; max-width: 720px; margin-inline: auto; }
 }
