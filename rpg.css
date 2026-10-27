@@ -139,8 +139,9 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 /* かざり（名前の横に仲間の国旗を3つまで。空きは点線の四角）。国旗は動かさない */
 .rpg-deco { display: inline-flex; align-items: center; gap: 4px; padding: 3px 5px; margin: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; cursor: pointer; align-self: center; }
 .rpg-deco:hover { border-color: var(--line); }
-.rpg-deco img, .rpg-deco-empty { width: 27px; height: 18px; border-radius: 3px; box-sizing: border-box; }
-.rpg-deco img { object-fit: cover; border: 1px solid var(--line); display: block; }
+/* 国旗は 4:3（24×18）のまま欠けさせない。枠線は外側に足す（中身は 24×18 のまま） */
+.rpg-deco img, .rpg-deco-empty { width: 26px; height: 20px; border-radius: 3px; box-sizing: border-box; }
+.rpg-deco img { width: 24px; height: 18px; box-sizing: content-box; object-fit: contain; border: 1px solid var(--line); display: block; }
 .rpg-deco-empty { display: block; border: 1.5px dashed var(--line); }
 .rpg-deco-dlg .inner { gap: 12px; }
 .rpg-deco-h { margin: 0; font: 900 1.1rem var(--font-display); }
@@ -366,6 +367,8 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-bteam-k { font-size: .85rem; color: var(--muted); }
 .rpg-tsw { min-width: 32px; min-height: 32px; padding: 0 6px; }
 .rpg-tname { font: 700 1rem var(--font-display); overflow-wrap: anywhere; }
+.rpg-bteam-b { font-size: .85rem; white-space: nowrap; }
+.rpg-bteam-b b { color: var(--accent); }
 #bt-team { min-height: 32px; padding: 4px 14px; font-size: .85rem; }
 .rpg-bend-h { font: 900 1.4rem/1.35 var(--font-display); text-wrap: balance; word-break: auto-phrase; }
 .rpg-bend-h small { font-size: .65em; white-space: nowrap; }
@@ -390,6 +393,13 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
   .rpg-btop .rpg-stars { font-size: .6rem; }
   .rpg-log p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* 1行のまま（帯の高さを変えない） */
   .rpg-log p:not(:last-child) { display: none; }
+  /* 登場画面を詰める（ボスで仲間3枚・枠2つでも 390×844 で［たたかう］が最初の画面に入る）。
+     編成の行は「◀ 編成1 ▶ 南アメリカ×3 ＋25% ［へんせい］」の1行（「編成」「チーム」の字は隠す） */
+  .rpg-bintro { padding: 12px; gap: 6px; }
+  .rpg-bteam { gap: 2px 6px; }
+  .rpg-bteam .rpg-tsw { min-width: 28px; padding: 0 4px; }
+  #bt-team { padding-inline: 10px; }
+  .rpg-bteam:has(.rpg-bteam-b) :is(.rpg-bteam-k, .rpg-bteam-bk) { display: none; }
 }
 /* 短いスマホ（高さ 700px 以下。360×640 など）: 帯を約56px に。1段目に［にげる］・ダンジョン名・仲間の国旗（20px、★と札は隠す）・「旗 2/4」、
    2段目に「🐸 ▓▓▓░ 42/60 ｜ 🧙 ▓▓▓▓ 54/54 のこりミス3」。ログは読み上げ（aria-live）だけ。問題の国旗と地図も小さく */

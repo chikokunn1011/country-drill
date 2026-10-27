@@ -244,6 +244,9 @@ test('team_bonus', () => {
   assert.deepEqual(plain(K.teamBonus(['th', 'jp', 'br'])), { bonus: 0, group: null, n: 1 });
   assert.deepEqual(plain(K.teamBonus(['th', 'vn', 'br'])), { bonus: 0.1, group: '東南アジア', n: 2 });
   assert.deepEqual(plain(K.teamBonus(['th', 'vn', 'id'])), { bonus: 0.25, group: '東南アジア', n: 3 });
+  // 同数（2-2）なら list で先に出たグループ
+  assert.deepEqual(plain(K.teamBonus(['th', 'br', 'vn', 'ar'])), { bonus: 0.1, group: '東南アジア', n: 2 });
+  assert.deepEqual(plain(K.teamBonus(['br', 'th', 'ar', 'vn'])), { bonus: 0.1, group: '南アメリカ', n: 2 });
 });
 test('team_party_skips_unowned', () => {
   const K = loadCore();

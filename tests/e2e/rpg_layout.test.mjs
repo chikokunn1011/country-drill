@@ -201,6 +201,26 @@ t('phone_shows_party', async page => {
   assert.ok(await noHScroll(page));
 }, { viewport: PHONE });
 
+// スマホ 390×844: ボス（説明の行が多い）で同じ地域の3枚・枠2つ（◀▶ とチームボーナス）でも、登場画面の［たたかう］は最初の画面に入る
+t('phone_boss_fight_visible', async page => {
+  await writeSave(page, { ...PARTY, cards: { br: [2, 1], cl: [1, 0], ar: [1, 0] }, tsel: 0,
+    teams: [{ n: '編成1', c: ['br', 'cl', 'ar'] }, { n: '編成2', c: ['br'] }] });
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 5));
+  await page.locator('#bt-intro').waitFor();
+  assert.equal(await page.locator('#bt-tprev, #bt-tnext').count(), 2);
+  assert.ok((await page.innerText('#bt-intro .rpg-bteam')).includes('＋25%'), await page.innerText('#bt-intro .rpg-bteam'));
+  const b = await rect(page, '#bt-fight');
+  assert.ok(b.bottom <= PHONE.height, `［たたかう］の下端 ${b.bottom} が画面（${PHONE.height}）の外`);
+  // チームボーナスは編成の行の中（別の行を足さない）
+  assert.equal(await page.locator('#bt-intro > .rpg-bteam-b').count(), 0);
+  assert.ok(await noHScroll(page));
+  // 短いスマホ 360×640 でも入る
+  await page.setViewportSize(SHORT);
+  const s = await rect(page, '#bt-fight');
+  assert.ok(s.bottom <= SHORT.height, `${size(SHORT)}: ［たたかう］の下端 ${s.bottom} が画面の外`);
+  assert.ok(await noHScroll(page));
+}, { viewport: PHONE });
+
 // 正解の援護: 動きを抑える設定では跳ねない（アニメーション 0）で枠が光るだけ。ふつうは .rpg-pc が跳ねる（国旗の img には transform をかけない）
 for (const reducedMotion of ['reduce', 'no-preference']) {
   t(`assist_motion_${reducedMotion}`, async page => {
@@ -229,6 +249,9 @@ t('short_phone_one_line', async page => {
   await startBattle(page, 'samerica', 1);
   const top = await rect(page, '.rpg-btop');
   assert.ok(top.height <= 58, `上の列の高さ ${top.height}`);   // 約56px
+  // ダンジョン名は … で切れても、フロア（F1）は見える（フロアが先）
+  assert.match(await page.innerText('.rpg-bwhere'), /^F1 /);
+  assert.equal(await page.evaluate(() => { const e = document.querySelector('.rpg-bwhere'), r = document.createRange(); r.setStart(e.firstChild, 0); r.setEnd(e.firstChild, 2); return r.getBoundingClientRect().right <= e.getBoundingClientRect().right; }), true);
   assert.ok((await rect(page, '#bt-flee')).height >= 24, `［にげる］の高さ ${(await rect(page, '#bt-flee')).height} が 24px より低い（押しにくい）`);
   assert.equal(await page.isVisible('.rpg-flagtext'), true);
   assert.match(await page.innerText('.rpg-flagtext'), /旗/);
@@ -253,6 +276,7 @@ t('short_phone_one_line', async page => {
   await startBattle(page, 'samerica', 5);
   const boss = await rect(page, '.rpg-btop');
   assert.ok(boss.height <= 58, `ボスの上の列の高さ ${boss.height}`);
+  assert.match(await page.innerText('.rpg-bwhere'), /^ボス /);
   assert.equal(await page.isVisible('#bt-mon .rpg-bosstag'), true);
   const tag = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.rpg-bosstag')).fontSize));
   assert.ok(tag >= 8.8, `BOSS の札の文字 ${tag}px が小さすぎる`);   // .55rem

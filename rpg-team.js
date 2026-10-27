@@ -66,7 +66,7 @@
     return out.join('');
   };
   const statsHTML = (d, t) => {
-    const st = K.battleStats(d, dg, floorOf(d, dg), t), tb = st.team;
+    const st = K.battleStats(d, dg, back && back.id === dg ? back.floor : floorOf(d, dg), t), tb = st.team;
     return `<span>⚔️ ${fmt(st.atk)}</span> <span>❤️ ${fmt(st.hp)}</span> `
       + (tb.bonus > 0 ? `<span class="tm-bonus">チーム ${esc(tb.group)}×${tb.n} ${pct(tb.bonus)}</span>` : '<span class="tm-nobonus">チームボーナスなし</span>');
   };

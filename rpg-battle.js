@@ -80,7 +80,7 @@
   const stageHTML = () => {
     const { dg, floor, mon, boss, d } = B;
     return `<div class="rpg-stage" data-phase="${B.phase}" style="--rpg-c: var(--rpg-r-${dg.id}, ${dg.color})"><div class="rpg-btop">`
-      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${esc(dg.name)} ${boss ? 'ボス' : `F${floor}`}</span></div>`
+      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${boss ? 'ボス' : `F${floor}`} ${esc(dg.name)}</span></div>`
       + `<div class="rpg-mon${boss ? ' rpg-boss' : ''}" id="bt-mon"><span class="rpg-mon-e" aria-hidden="true">${mon.e}</span>${boss ? '<span class="rpg-bosstag">BOSS</span>' : ''}</div>`
       + `<div class="rpg-hpl"><b class="rpg-hpname">${esc(mon.n)}</b>${barHTML('bt-ehp', `${mon.n}のHP`)}</div>`
       + `<div class="rpg-hpl"><span class="rpg-hpname" aria-hidden="true">${K.AVATARS[d.av] ?? K.AVATARS[0]}</span>${barHTML('bt-hhp', '旅人のHP')}<span class="rpg-left" id="bt-left"></span></div>`
@@ -123,13 +123,15 @@
   };
 
   // ---- 登場画面 ----
-  // 編成の行（仲間を1枚でも持っているときだけ）: 編成 ◀ 名前 ▶ ［へんせい］。◀▶ は枠が2つ以上のときだけ
+  // 編成の行（仲間を1枚でも持っているときだけ）: 編成 ◀ 名前 ▶ チーム 南アメリカ×3 ＋25% ［へんせい］。◀▶ は枠が2つ以上のときだけ。
+  // チームボーナスは別の行にしない（スマホのボスでも［たたかう］が最初の画面に入るように）
   const teamRowHTML = () => {
-    const teams = Array.isArray(B.d.teams) ? B.d.teams : [], tm = teams[B.stats.team?.slot ?? 0], many = teams.length > 1;
+    const teams = Array.isArray(B.d.teams) ? B.d.teams : [], tb = B.stats.team || {}, tm = teams[tb.slot ?? 0], many = teams.length > 1;
     return '<div class="rpg-bteam"><span class="rpg-bteam-k">編成</span>'
       + (many ? '<button type="button" class="linkbtn rpg-tsw" id="bt-tprev" aria-label="前の編成">◀</button>' : '')
       + `<b class="rpg-tname" id="bt-tname">${esc(tm?.n ?? '編成1')}</b>`
       + (many ? '<button type="button" class="linkbtn rpg-tsw" id="bt-tnext" aria-label="次の編成">▶</button>' : '')
+      + (tb.bonus ? `<span class="rpg-bteam-b"><span class="rpg-bteam-bk">チーム </span>${esc(tb.group)}×${tb.n} <b>＋${Math.round(tb.bonus * 100)}%</b></span>` : '')
       + (typeof RPG.openTeam === 'function' ? '<button type="button" class="btn ghost rpg-tedit" id="bt-team">へんせい</button>' : '')
       + '</div>';
   };
@@ -142,7 +144,6 @@
       + (stats.party.length ? partyHTML(true)
         : hasCards && !tm.auto ? '<p class="hint">この編成には仲間がいないよ</p>'
           : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p>`)
-      + (tm.bonus ? `<p class="rpg-bline rpg-bteam-b">チーム ${esc(tm.group)}×${tm.n} ＋${Math.round(tm.bonus * 100)}%</p>` : '')
       + `<p class="rpg-bline">倒すのに必要な正解: 約${K.hitsNeeded(stats, en)}回 ／ まちがえてOK: ${K.missesAllowed(stats, en)}回まで</p>`
       + (g ? `<p class="rpg-bline">がんばりゲージ +${Math.round(TB.gaugeStep * 100 * g)}%</p>` : '')
       + (boss ? '<p class="rpg-bline">旗1枚につき正解1回で取りもどせる（Lv が足りないと2回かかることも）。旗を全部取りもどしたら勝ち！</p>' : '')
@@ -320,9 +321,10 @@
       return wait();
     }
     const crit = Math.random() < TB.critRate, dmg = K.damage(B.stats.atk, B.combo, crit);
-    // 仲間が1枚以上いれば「チリ・ペルーの援護！」を足して、仲間カードが跳ねる（assist）
+    // 仲間が1枚以上いれば後ろに「（チリ・ペルーの援護）」を足して、仲間カードが跳ねる（assist）。
+    // スマホのログは1行で末尾が … で切れるので、ダメージを先に書く
     const mates = B.stats.party.map(c => nameOf(c.a)).join('・');
-    const head = `${crit ? '会心！ ' : ''}${nameOf(q.a)}！ ${mates ? `${mates}の援護！ ` : ''}`;
+    const head = `${crit ? '会心！ ' : ''}${nameOf(q.a)}！ `, tail = mates ? `（${mates}の援護）` : '';
     B.combo++;
     B.maxCombo = Math.max(B.maxCombo, B.combo);
     if (B.boss) {   // ボスはいまの旗の残りだけ（余りは持ち越さない）
@@ -330,11 +332,11 @@
       f.hp = Math.max(0, f.hp - dmg);
       B.again = f.hp > 0;
       if (!B.again) { f.got = true; B.order.shift(); }
-      say(B.again ? `${head}${B.mon.n}に${dmg}ダメージ` : `${head}旗を取りもどした`);
+      say(B.again ? `${head}${B.mon.n}に${dmg}ダメージ${tail}` : `${head}旗を取りもどした${tail}`);
     } else {
       B.ehp = Math.max(0, B.ehp - dmg);
       B.got.push(q.a);
-      say(`${head}${B.mon.n}に${dmg}ダメージ`);
+      say(`${head}${B.mon.n}に${dmg}ダメージ${tail}`);
     }
     drawTop();
     if (mates) assist();

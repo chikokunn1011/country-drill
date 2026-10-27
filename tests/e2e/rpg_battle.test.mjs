@@ -105,7 +105,7 @@ t('home_buttons_start_battle', async page => {
   await page.click('#rpg-next');
   assert.equal(await page.isVisible('#scr-battle'), true);
   assert.equal(await phase(page), 'intro');
-  assert.ok((await text(page, '#scr-battle .rpg-bwhere')).includes('F3'));
+  assert.equal(await text(page, '#scr-battle .rpg-bwhere'), 'F3 アマゾンの密林');   // フロアが先（短いスマホで … に切られるのは名前のほう）
   assert.deepEqual(await page.evaluate(() => RPG.opts), {});
   // にげて冒険ホームへ → クリアしたフロアのボタン → F2
   page.once('dialog', d => d.accept());
@@ -113,7 +113,7 @@ t('home_buttons_start_battle', async page => {
   assert.equal(await page.isVisible('#scr-rpg'), true);
   await page.click('.rpg-fl[data-d="samerica"][data-f="2"]');
   assert.equal(await phase(page), 'intro');
-  assert.ok((await text(page, '#scr-battle .rpg-bwhere')).includes('F2'));
+  assert.equal(await text(page, '#scr-battle .rpg-bwhere'), 'F2 アマゾンの密林');
   assert.ok((await text(page, '#bt-intro')).includes('ヤドクガエル'));
 });
 
@@ -483,7 +483,9 @@ t('intro_switch_team', async page => {
   assert.equal((await readSave(page)).tsel, 1);
   assert.notEqual(await need(), n0);
   assert.notEqual(await page.getAttribute('#bt-hhp', 'aria-valuemax'), hp0);
-  assert.ok((await text(page, '#bt-intro')).includes('チーム 南アメリカ×3 ＋25%'), await text(page, '#bt-intro'));
+  // チームボーナスは編成の行の中（スマホでは「チーム」の字を隠して1行に）
+  assert.match(await text(page, '#bt-intro .rpg-bteam'), /(チーム )?南アメリカ×3 ＋25%/);
+  assert.equal(await page.locator('#bt-intro .rpg-bteam-b').textContent(), 'チーム 南アメリカ×3 ＋25%');
   assert.equal(await page.locator('#bt-intro .rpg-party img').count(), 3);
   assert.equal(await page.locator('.rpg-btop .rpg-party img').count(), 3);
   assert.equal(await page.locator('.rpg-btop .rpg-team-tag').innerText(), '＋25%');
@@ -530,8 +532,8 @@ t('assist_log', async page => {
   await battleGuard(page);
   await page.locator(`#scr-battle .choice[data-a="${await cur(page)}"]`).click();
   const s = await text(page, '#bt-log');
-  assert.ok(s.includes('ブラジルの援護！'), s);
-  assert.match(s, /の援護！ (ヤドクガエル|おしゃべりオウム)に\d+ダメージ/);
+  // ダメージが先、援護は後ろ（スマホの1行のログで … に切られるのは援護のほう）
+  assert.match(s, /！ (ヤドクガエル|おしゃべりオウム)に\d+ダメージ（ブラジルの援護）/);
   assert.equal(await page.locator('.rpg-btop .rpg-party.rpg-assist').count(), 1);
   await page.waitForTimeout(700);
   assert.equal(await page.locator('.rpg-assist').count(), 0);
@@ -539,7 +541,7 @@ t('assist_log', async page => {
   await writeSave(page, saveWith({ lv: 20, floors: { samerica: 4 }, cards: { br: [1, 0], cl: [1, 0] } }));
   await startBattle(page, 'samerica', 5);
   await battleAnswer(page, true);
-  assert.match(await text(page, '#bt-log'), /(ブラジル・チリ|チリ・ブラジル)の援護！ 旗を取りもどした/);
+  assert.match(await text(page, '#bt-log'), /！ 旗を取りもどした（(ブラジル・チリ|チリ・ブラジル)の援護）/);
 });
 
 t('no_party_log_unchanged', async page => {

@@ -312,16 +312,17 @@ t('deco_change_sends_set_deco', async (page, app) => {
 });
 
 t('record_and_deco_both_sent', async (page, app) => {
-  // かざりを変えてからレベルアップ: 記録（rpg_update）を先に、GAP をあけてかざり（rpg_set_deco）を1回ずつ
+  // かざりを変えてからレベルアップ: 記録（rpg_update）とかざり（rpg_set_deco）を1回ずつ、GAP をあけて送る。
+  // どちらが先かは［レベルアップ］を押すまでの時間しだい（WAIT より遅いとかざりが先）なので、順番は見ない
   await registered(page, app);
   await pickDeco(page, ['br', 'jp']);
   await page.click('#rpg-lvup');
-  await until(() => callsOf(app, 'rpg_set_deco').length > 0, 30000);
+  await until(() => callsOf(app, 'rpg_set_deco').length > 0 && callsOf(app, 'rpg_update').length > 0, 30000);
   await page.waitForTimeout(1500);
   const up = callsOf(app, 'rpg_update'), dc = callsOf(app, 'rpg_set_deco');
   assert.deepEqual(up.map(c => c.args.p_lv), [6]);
   assert.deepEqual(dc.map(c => c.args.p_deco), [['br', 'jp']]);
-  assert.ok(dc[0].at - up[0].at >= 10000, String(dc[0].at - up[0].at));
+  assert.ok(Math.abs(dc[0].at - up[0].at) >= 10000, String(dc[0].at - up[0].at));
   await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 2);
   assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 6, dungeons: 0, floors: 0, deco: ['br', 'jp'] });
 });

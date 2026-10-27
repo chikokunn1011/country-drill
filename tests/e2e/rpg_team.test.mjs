@@ -209,6 +209,23 @@ t('back_to_battle', async page => {
   assert.equal(await text(page, '#tm-back'), '← 冒険');
 });
 
+// バトルの登場画面から来たときの強さは、そのフロア（back.floor）のもの。がんばりゲージはフロアごとなので次のフロアとは違う
+t('stats_use_back_floor', async page => {
+  await writeSave(page, saveWith({ ...CARDS, floors: { samerica: 2 }, gauge: { 'samerica:1': 3 } }));
+  const want = await page.evaluate(() => {
+    const d = RPG.get(), K = RPG_CORE;
+    return { f1: K.battleStats(d, 'samerica', 1, d.tsel).atk, f3: K.battleStats(d, 'samerica', 3, d.tsel).atk };
+  });
+  assert.notEqual(want.f1, want.f3);
+  const atk = async () => +(await text(page, '#tm-stats')).match(/⚔️ ([\d,]+)/)[1].replace(/,/g, '');
+  await page.evaluate(() => RPG.openTeam({ id: 'samerica', floor: 1 }));
+  assert.equal(await atk(), want.f1);
+  // 冒険から開いたら次に挑むフロア（F3）
+  await page.evaluate(() => RPG.open('team'));
+  await page.$eval('#tm-dg', s => { s.value = 'samerica'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+  assert.equal(await atk(), want.f3);
+});
+
 t('no_cards_hint', async page => {
   await team(page, saveWith({ coins: 0 }));
   const s = await text(page, '#scr-team');
@@ -268,6 +285,9 @@ t('deco_toggle_and_show', async page => {
   assert.deepEqual((await readSave(page)).deco, ['jp', 'cl', 'br']);
   await page.waitForFunction(() => document.querySelectorAll('#rpg-deco img').length === 3);
   assert.deepEqual(await page.$$eval('#rpg-deco img', els => els.map(e => e.alt)), ['日本', 'チリ', 'ブラジル']);
+  // 国旗は 4:3（24×18）のまま（object-fit で切らない）
+  for (const m of await page.$$eval('#rpg-deco img', els => els.map(e => ({ w: e.clientWidth, h: e.clientHeight, fit: getComputedStyle(e).objectFit }))))
+    assert.deepEqual(m, { w: 24, h: 18, fit: 'contain' });
   assert.equal(await page.locator('#rpg-deco .rpg-deco-empty').count(), 0);
   assert.deepEqual((await events(page, 'rpg:deco')).map(e => e.deco), [['jp', 'cl', 'br']]);
 });
