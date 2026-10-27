@@ -2,7 +2,7 @@
   'use strict';
   // 国旗クエスト（RPG）の本体: セーブ（RPG.tx）、クイズのコインの受け取り（#pcoin・結果のパネル・トースト）、バッジのコインの支払い、
   // 冒険ホーム（入口・はじめての画面・引き継ぎコード・開発用パネル）、タブ間の同期、RPG.snapshot()
-  // 国旗ガチャと仲間の一覧、仲間の世界地図・シェア・演出（RPG.fx）は rpg-cards.js（このあとに読む）が window.RPG に足す
+  // 国旗ガチャと仲間の一覧、仲間の世界地図・シェア・演出（RPG.fx）は rpg-cards.js（このあとに読む）が、編成画面は rpg-team.js が window.RPG に足す
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // ---- 起動時のチェック。足りなければ何もしない（ボタンも画面も作らない。クイズはそのまま動く） ----
@@ -648,7 +648,8 @@
       + `<button type="button" class="rpg-next" id="rpg-next"><span class="rpg-next-k" aria-hidden="true">▸</span>`
       + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
       + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
-        + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button></div>' : '')
+        + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button>'
+        + (SCREENS.includes('team') ? '<button class="btn ghost" id="rpg-to-team">⚔️ 編成</button>' : '') + '</div>' : '')
       + (SCREENS.includes('rpgrank') ? '<button class="btn ghost rpg-to-rank" id="rpg-to-rank">🏆 冒険ランキング</button>' : '') + '</div>'
       + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div><div class="rpg-amap" id="rpg-amap">${amapHTML(d, sel, nf)}</div><div class="rpg-dgs" id="rpg-dgs">${DG.map(g => plateHTML(d, g, sel)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
@@ -678,6 +679,7 @@
     $('rpg-next').onclick = nx.go;
     if ($('rpg-to-gacha')) $('rpg-to-gacha').onclick = () => open('gacha');
     if ($('rpg-to-cards')) $('rpg-to-cards').onclick = () => open('cards');
+    if ($('rpg-to-team')) $('rpg-to-team').onclick = () => open('team');
     if ($('rpg-to-rank')) $('rpg-to-rank').onclick = () => open('rpgrank');
     // マップのダンジョンを押すと、その図版だけを見せる（描き直さない。フォーカスはそのダンジョンに残る）
     const pick = node => {
@@ -754,7 +756,7 @@
     const now = document.querySelector('#rpg-res .rpg-now');
     if (now) now.textContent = `いま ${fmt(d.coins)}`;
     if (screen === 'rpg') renderHome();
-    RPG.redraw(screen, d);   // ガチャ・仲間の画面（rpg-cards.js）
+    RPG.redraw(screen, d);   // ガチャ・仲間の画面（rpg-cards.js）・編成の画面（rpg-team.js）
   };
   // 別のタブがセーブを書いたら（storage イベント。localStorage.clear() のときは key が null）再読み込みなしで描き直す。
   // 描き直しの tx は変わらなければ書かないので、タブどうしで書き合いにならない

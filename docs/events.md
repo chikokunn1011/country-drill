@@ -97,6 +97,8 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 `#r-ext` の中身は rpg.js のもの（`innerHTML` で書きかえる）。バッジなどほかの機能は `#r-ext` の中に入れず、`#r-side` の中で `#r-ext` の直前に自分の要素を差し込む（同じく `outcome === 'clear'` のときだけ）。
 
+機能ファイルどうしの画面の行き来は `window.RPG` を通す。`RPG.open(name, opts)` は `RPG.opts = opts` を置いて `show(name)`（その画面が無ければ冒険ホーム）。編成画面（rpg-team.js の `#scr-team`）は `RPG.openTeam(back?)` で開く（`RPG.open('team', back ? { back } : {})` の近道）。`back` が `{ id, floor }` なら戻るボタンが「← バトルにもどる」になり、押すと `RPG.open('battle', { id, floor })` でその登場画面を作り直す。無ければ「← 冒険」で冒険ホームに戻る。rpg-team.js が読めなかったときは `RPG.openTeam` が無く、冒険ホームに［⚔️ 編成］は出ない。
+
 ## 7. rpg.js / rpg-cards.js / rpg-battle.js → ほかの機能（バッジなど）
 
 `rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` など）は rpg-battle.js、ほかは rpg.js。
@@ -104,7 +106,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | イベント | detail | メモ |
 |---|---|---|
 | `rpg:ready` | `{intro, lv, coins, owned}` | 読み込み時に1回。バッジのさかのぼり判定は `RPG.snapshot()` で |
-| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty'｜'levelup'｜'gacha'｜'debug', coins, earned}` | コインが変わったとき。`levelup`（レベルアップ）と `gacha`（ガチャを引いた）は使った分なので `delta` が負。`debug` は開発用（`RPG.debug.give`・`?rpgdebug=1` のパネル）。`coins` `earned` は出した時点の額 |
+| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty'｜'levelup'｜'gacha'｜'slot'｜'debug', coins, earned}` | コインが変わったとき。`levelup`（レベルアップ）と `gacha`（ガチャを引いた）と `slot`（編成の枠を買った。rpg-team.js が出す）は使った分なので `delta` が負。`debug` は開発用（`RPG.debug.give`・`?rpgdebug=1` のパネル）。`coins` `earned` は出した時点の額 |
 | `rpg:levelup` | `{lv, from}` | 「上げられるだけ上げる」でも1回。バッジは `from < 10 <= lv` のように、またいだかで判定する |
 | `rpg:join` | `{a, via:'learn'｜'gacha', owned}` | 新しく仲間になった |
 | `rpg:promote` | `{a, star, via:'learn'｜'gacha'}` | マスター昇格・ガチャでのランクアップ |
@@ -144,12 +146,12 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 ## 9. 読み込みの順番
 
-- 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
+- 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `rpg-team.js` → `rpg-rank.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
 - CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
 - 起動時に使うグローバルを `typeof` で確かめ、足りなければ `console.error('[rpg] …')` のように出して何もしない（ボタンも画面も作らない）。クイズはそのまま動く。
-  - `rpg-cards.js` は rpg.js の作った `window.RPG` に足すだけなので、`window.RPG` が無ければ（rpg.js が読めない・起動しなかった）黙って何もしない（知らせるのは rpg.js と rpg-battle.js）。`rpg-cards.js` だけが読めなかったときは、rpg.js の `window.RPG` にある代わり（地図・シェア・演出なし）で冒険ホーム・クイズのコイン・バトルが動き、ガチャと仲間の画面と入口は無い（つぎにやることでガチャをすすめず、`RPG.open('gacha')` `RPG.open('cards')` は冒険ホームを開く。1400px 以上の冒険ホームの右の列に、空の地図の枠は出さない）。
+  - `rpg-cards.js` は rpg.js の作った `window.RPG` に足すだけなので、`window.RPG` が無ければ（rpg.js が読めない・起動しなかった）黙って何もしない（知らせるのは rpg.js と rpg-battle.js）。`rpg-team.js` も同じで、`window.RPG` か `RPG.cardHTML`（rpg-cards.js）が無ければ黙って何もしない。`rpg-cards.js` だけが読めなかったときは、rpg.js の `window.RPG` にある代わり（地図・シェア・演出なし）で冒険ホーム・クイズのコイン・バトルが動き、ガチャと仲間の画面と入口は無い（つぎにやることでガチャをすすめず、`RPG.open('gacha')` `RPG.open('cards')` は冒険ホームを開く。1400px 以上の冒険ホームの右の列に、空の地図の枠は出さない）。
 - 機能ファイルと、それを読みこむ index.html の行は同じコミットで公開し、`?v=` を上げる（キャッシュの食い違いを防ぐ）。
 
 ## 10. badges.js が読むもの・出すもの

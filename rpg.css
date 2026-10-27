@@ -826,3 +826,56 @@ body.rpg-staging { overflow: hidden; }
 @media (min-width: 900px) {
   .rpg-rr-cols { display: grid; grid-template-columns: 340px minmax(0, 1fr); align-items: start; gap: var(--col-gap, 24px); }
 }
+
+/* ---- 編成（rpg-team.js の #scr-team）と冒険ホームの［⚔️ 編成］ ---- */
+/* 冒険ホーム: ［編成］があるときはガチャを1行目いっぱいに、2行目に［仲間］［編成］ */
+.rpg-go:has(#rpg-to-team) #rpg-to-gacha { grid-column: 1 / -1; }
+.tm-side, .tm-main { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+:is(.tm-side, .tm-main) p { margin: 0; }
+/* 枠のタブ（買った枠は名前、まだの枠は🔒と値段） */
+.tm-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tm-tabs button { min-width: 0; max-width: 100%; padding: 7px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink);
+  font: 700 .9rem var(--font-display); cursor: pointer; overflow-wrap: anywhere; }
+.tm-tabs button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.tm-tabs button[data-buy] { border-style: dashed; color: var(--muted); font-family: var(--font-mono); }
+.tm-tabs button[data-buy]:not(:disabled) { color: var(--ink); border-color: var(--accent); }
+.tm-tabs button:disabled { cursor: default; opacity: .7; }
+.tm-namerow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tm-title { font: 900 1.1rem var(--font-display); overflow-wrap: anywhere; }
+.tm-title[hidden], .tm-name[hidden], .tm-rename[hidden] { display: none; }
+.tm-name { flex: 0 1 12em; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--accent); border-radius: 8px; padding: 6px 8px; }
+.tm-rename { padding-inline: 4px; }
+.tm-mode { margin-left: auto; font: 700 .8rem var(--font-display); color: var(--muted); }
+.tm-mode.is-auto { color: var(--accent); }
+/* 3枠（空きは点線）。押すと外れる。国旗は欠けさせない（contain）・動かさない */
+.tm-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tm-slots .rpg-pc, .tm-empty { min-width: 0; min-height: 92px; padding: 8px 4px; border-radius: 10px; }
+.tm-slots .rpg-pc { justify-content: center; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; font-size: .75rem; cursor: pointer; }
+.tm-slots .rpg-pc img { width: 56px; }
+.tm-pn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.tm-empty { display: grid; place-items: center; border: 2px dashed var(--line); color: var(--muted); font-size: .8rem; }
+.tm-dgrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .9rem; }
+.tm-stats { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font: 700 1rem var(--font-display); font-variant-numeric: tabular-nums; }
+.tm-bonus { color: var(--ok); }
+.tm-nobonus { color: var(--muted); font-size: .85rem; }
+.tm-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tm-btns .btn { padding: 10px 8px; font-size: .9rem; }
+.tm-none[hidden], .tm-main .chips[hidden] { display: none; }
+.tm-none { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* 一覧: カードの下にグループの名前。入っている国は枠の色を濃く */
+.tm-cell { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tm-grp { font-size: .7rem; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.rpg-card.is-in { box-shadow: 0 0 0 3px var(--accent); }
+.rpg-card.is-in .rpg-lab { background: var(--accent); color: var(--accent-ink); }
+.rpg-card:disabled { cursor: default; }
+/* PC: 左に枠と強さ（sticky）、右に一覧 */
+@media (min-width: 900px) {
+  #scr-team {
+    display: grid; align-items: start; grid-template-columns: 360px minmax(0, 1fr); grid-template-areas: "head head" "side main";
+    column-gap: var(--col-gap, 24px); row-gap: var(--vgap, 16px);
+  }
+  #scr-team > .rpg-head { grid-area: head; }
+  .tm-side { grid-area: side; position: sticky; top: var(--pad-y, 16px); }
+  .tm-main { grid-area: main; }
+  .tm-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+}
