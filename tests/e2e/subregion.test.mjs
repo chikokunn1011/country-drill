@@ -110,3 +110,17 @@ t('count_comes_back', async page => {
   await pickSetup(page, { region: 'アジア' });
   assert.equal(await page.locator('#counts .chip[data-c="10"]').getAttribute('aria-pressed'), 'true');
 });
+
+// どの地域でも点線の枠が地図の反対側へ飛ばない（北米の西端 -170 は世界地図の西端 -169 より西）
+t('frame_stays_on_one_side', async page => {
+  await pickSetup(page, { kind: 'practice' });
+  const regions = await page.evaluate(() => Object.keys(REGION_BOX));
+  for (const r of regions) {
+    const w = await page.evaluate(r => {
+      renderRegionMap(r);
+      const xs = $('rmap').querySelector('.frame').getAttribute('d').slice(1, -1).split('L').map(p => +p.split(',')[0]);
+      return { span: Math.max(...xs) - Math.min(...xs), jump: Math.max(...xs.slice(1).map((x, i) => Math.abs(x - xs[i]))) };
+    }, r);
+    assert.ok(w.jump < 100, `${r}: ${JSON.stringify(w)}`);
+  }
+});

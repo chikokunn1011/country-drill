@@ -824,7 +824,9 @@ function renderRegionMap(region) {
     for (let i = 0; i <= N; i++) pts.push([x1, y1 - (y1 - y0) * i / N]);
     for (let i = 0; i <= N; i++) pts.push([x1 - (x1 - x0) * i / N, y0]);
     for (let i = 0; i <= N; i++) pts.push([x0, y0 + (y1 - y0) * i / N]);
-    frame.setAttribute('d', 'M' + pts.map(p => rmap.proj(p.map(v => v > 180 ? v - 360 : v)).map(v => v.toFixed(1)).join(',')).join('L') + 'Z');
+    // 世界地図の左右の端（WORLD_BOX の西端・東端）をこえる経度は端にそろえる。こえると線が地図の反対側へ飛ぶ（北米の -170 など）
+    const lon = x => { x = Math.min(WORLD_BOX[2] - .01, Math.max(WORLD_BOX[0] + .01, x)); return x > 180 ? x - 360 : x; };
+    frame.setAttribute('d', 'M' + pts.map(([x, y]) => rmap.proj([lon(x), y]).map(v => v.toFixed(1)).join(',')).join('L') + 'Z');
   } else frame.setAttribute('d', '');
   rmap.s.setAttribute('aria-label', `世界地図。${regionLabel(region)}（${pool.size}か国）に色がついている`);
 }
