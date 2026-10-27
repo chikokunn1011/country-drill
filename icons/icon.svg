@@ -1,17 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- 国旗マスター: 紙の上の旗（中に地球）と等高線 -->
-  <rect width="512" height="512" rx="112" fill="#f4f6ef"/>
-  <g fill="none" stroke="#1f5f8b" stroke-width="10" opacity=".28">
-    <path d="M40 420 C140 380 200 470 300 430 S440 380 480 410"/>
-    <path d="M30 470 C140 430 220 510 330 470 S450 430 490 460"/>
-    <path d="M30 90 C120 60 190 120 280 80"/>
-  </g>
-  <line x1="138" y1="88" x2="138" y2="440" stroke="#1b2a33" stroke-width="26" stroke-linecap="round"/>
-  <circle cx="138" cy="84" r="22" fill="#e39b2d"/>
-  <path d="M152 112 C230 86 300 150 400 118 L400 296 C300 328 230 264 152 290 Z" fill="#1f5f8b"/>
-  <g fill="none" stroke="#f4f6ef" stroke-width="12" stroke-linecap="round">
-    <circle cx="276" cy="205" r="58"/>
-    <ellipse cx="276" cy="205" rx="24" ry="58"/>
-    <line x1="218" y1="205" x2="334" y2="205"/>
-  </g>
+  <!-- 国旗マスター: 国旗の4つの型（縦3色・十字・丸・横3色）を並べたタイル -->
+  <rect width="512" height="512" rx="112" fill="#1b2a33"/>
+  <defs>
+    <clipPath id="t1"><rect x="64" y="64" width="180" height="180" rx="26"/></clipPath>
+    <clipPath id="t2"><rect x="268" y="64" width="180" height="180" rx="26"/></clipPath>
+    <clipPath id="t3"><rect x="64" y="268" width="180" height="180" rx="26"/></clipPath>
+    <clipPath id="t4"><rect x="268" y="268" width="180" height="180" rx="26"/></clipPath>
+  </defs>
+  <!-- 縦3色 -->
+  <g clip-path="url(#t1)"><rect x="64" y="64" width="60" height="180" fill="#1f5f8b"/><rect x="124" y="64" width="60" height="180" fill="#f4f6ef"/><rect x="184" y="64" width="60" height="180" fill="#c43d3d"/></g>
+  <!-- 十字 -->
+  <g clip-path="url(#t2)"><rect x="268" y="64" width="180" height="180" fill="#2e8b57"/><rect x="268" y="138" width="180" height="32" fill="#f4f6ef"/><rect x="316" y="64" width="32" height="180" fill="#f4f6ef"/></g>
+  <!-- 丸 -->
+  <g clip-path="url(#t3)"><rect x="64" y="268" width="180" height="180" fill="#f4f6ef"/><circle cx="154" cy="358" r="46" fill="#c43d3d"/></g>
+  <!-- 横3色 -->
+  <g clip-path="url(#t4)"><rect x="268" y="268" width="180" height="60" fill="#e39b2d"/><rect x="268" y="328" width="180" height="60" fill="#1b2a33"/><rect x="268" y="388" width="180" height="60" fill="#c43d3d"/></g>
 </svg>
