@@ -194,3 +194,10 @@ test('rank_of_rejects_on_failure', async () => {
   await assert.rejects(load(reply({ message: 'boom' }, 500)).R.rankOf({ board: 'f2n:all:10', timeMs: 8000 }));
   await assert.rejects(load(() => Promise.reject(new TypeError('Failed to fetch'))).R.rankOf({ board: 'f2n:all:10', timeMs: 8000 }));
 });
+
+test('rpg_codes_match_countries', () => {
+  const sql = read('supabase/schema.sql');
+  const codes = sql.match(/function rpg_codes\(\)[\s\S]*?array\[([^\]]*)\]/)[1].match(/'([a-z]{2})'/g).map(s => s.slice(1, 3));
+  const C = vm.runInNewContext(read('countries.js').replace('window.COUNTRIES=', ''));
+  assert.deepEqual(codes, [...C.map(c => c.a)]);   // vm 側の配列は prototype が別物なので、こちら側の配列にして比べる
+});

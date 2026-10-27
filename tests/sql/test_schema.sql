@@ -341,4 +341,70 @@ do $$ begin
 end $$;
 reset role;
 
+\echo '- rpg_set_deco'
+-- かざり（プロフィールの国旗3つまで）。10秒の連投よけは deco_at で数え、rpg_update の updated_at とは別
+reset role; truncate rpg_players; set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_register('00000000-0000-4000-8000-000000000001', 'チコ', 12, 2, 13);
+  assert r->>'ok' = 'true', format('register: %s', r);
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp', 'br', 'cl']);
+  assert r = '{"ok":true}'::jsonb, format('set_deco: %s', r);
+  assert (select deco from top_rpg2('lv') where nickname = 'チコ') = '{jp,br,cl}'::text[], format('top_rpg2 の deco: %s', (select deco from top_rpg2('lv')));
+  assert (select deco from top_rpg2('dg') where nickname = 'チコ') = '{jp,br,cl}'::text[], 'dg でも deco';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp', 'br', 'cl', 'fr'])->>'reason' = 'bad_deco', '4つはだめ';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp', 'jp'])->>'reason' = 'bad_deco', '重なりはだめ';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['zz'])->>'reason' = 'bad_deco', '知らないコード';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['JP'])->>'reason' = 'bad_deco', '大文字は知らないコード';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array[null]::text[])->>'reason' = 'bad_deco', 'null を含む';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp', null])->>'reason' = 'bad_deco', 'null を含む（2つ目）';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array[['jp', 'br']])->>'reason' = 'bad_deco', '2次元の配列';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', null)->>'reason' = 'bad_deco', 'null';
+end $$;
+reset role;
+do $$ begin
+  assert (select deco from rpg_players) = '{jp,br,cl}'::text[], 'だめな送信では変わらない';
+end $$;
+update rpg_players set updated_at = now() - interval '1 minute', deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', '{}');
+  assert r = '{"ok":true}'::jsonb, format('空にする: %s', r);
+  assert (select deco from top_rpg2('lv')) = '{}'::text[], '空になった';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp'])->>'reason' = 'too_soon', '10秒以内はだめ';
+  r := rpg_update('00000000-0000-4000-8000-000000000001', 13, 2, 13);
+  assert r->>'ok' = 'true', format('かざりを変えても rpg_update は too_soon にならない: %s', r);
+  assert rpg_set_deco('00000000-0000-4000-8000-0000000000ff', array['jp'])->>'reason' = 'not_found', '登録していない';
+  assert rpg_set_deco('bad', array['jp'])->>'reason' = 'bad_token', '短い合言葉';
+  assert rpg_set_deco(null, array['jp'])->>'reason' = 'bad_token', 'null の合言葉';
+  assert rpg_unregister('00000000-0000-4000-8000-000000000001')->>'ok' = 'true', '消す';
+  assert rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp'])->>'reason' = 'not_found', '消した行';
+  assert (select count(*) from top_rpg2('x')) = 0, '知らない並べ方は空';
+  assert (select count(*) from top_rpg2(null)) = 0, 'null は空';
+  begin perform rpg_codes(); raise exception 'anon が rpg_codes() を呼べた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+do $$ begin
+  assert cardinality(rpg_codes()) = 195, format('195か国: %s', cardinality(rpg_codes()));
+end $$;
+
+\echo '- top_rpg2'
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, created_at, deco) values
+  ('\x01', 'A', 20, 1, 7, now() - interval '5 min', '{fr}'),
+  ('\x02', 'B', 25, 0, 4, now() - interval '3 min', '{}'),
+  ('\x03', 'C', 20, 1, 7, now() - interval '2 min', '{jp,br}'),
+  ('\x04', 'D', 10, 3, 16, now() - interval '1 min', '{cl}');
+set role anon;
+do $$ begin
+  assert (select array_agg(nickname) from top_rpg2('lv')) = array['B', 'A', 'C', 'D'], format('lv: %s', (select array_agg(nickname) from top_rpg2('lv')));
+  assert (select array_agg(nickname) from top_rpg2('dg')) = array['D', 'A', 'C', 'B'], format('dg: %s', (select array_agg(nickname) from top_rpg2('dg')));
+  assert (select deco from top_rpg2('lv') where nickname = 'C') = '{jp,br}'::text[], 'C の deco';
+end $$;
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) select int4send(i), 'p' || i, i % 50 + 1, 0, 0 from generate_series(1, 60) i;
+set role anon;
+do $$ begin assert (select count(*) from top_rpg2('lv')) = 50, '50件まで'; end $$;
+reset role;
+
 \echo 'ALL SQL TESTS PASSED'
