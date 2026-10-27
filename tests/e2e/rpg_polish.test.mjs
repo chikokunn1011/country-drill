@@ -24,7 +24,7 @@ const t = (name, fn, { timeout = 60_000, ...opts } = {}) => test(name, { timeout
 });
 
 const SHARE_URL = 'https://chikokunn1011.github.io/country-drill/';
-const TAG = '#195か国ドリル';
+const TAG = '#国旗マスター';
 const WIDE = { width: 1440, height: 900 }, LAPTOP = { width: 1280, height: 720 };
 const DOPA = { settings: { region: 'all', dopa: true, sound: false } };
 const count = (page, sel) => page.locator(sel).count();
