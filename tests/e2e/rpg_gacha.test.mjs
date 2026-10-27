@@ -167,11 +167,15 @@ t('pull_stage', async page => {
 }, { seed: 1 });
 
 t('pull_stage_reduced_motion', async page => {
-  // reduced motion では演出なしで、最初から表
+  // reduced motion（PC の「アニメーション効果」オフなど）でも演出は出す。パックは動かさず（落ちる・揺れるなし）、ふわっと出て光るだけ
   await gacha(page, saveWith({ coins: 100 }));
   await page.click('#ga-1');
-  assert.equal(await page.isVisible('#ga-stage'), false);
-  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
+  assert.equal(await page.isVisible('#ga-stage'), true);
+  const names = await page.$eval('#ga-stage .rpg-pack.is-big', el => getComputedStyle(el).animationName);
+  assert.ok(names.includes('rpg-st-fade') && !names.includes('rpg-st-pack'), names);
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 1);
+  await page.waitForFunction(() => $('ga-stage').hidden, null, { timeout: 4000 });
+  await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
 }, { reducedMotion: 'reduce' });
 
 t('intro_ten_pull_cards', async page => {
@@ -354,12 +358,16 @@ t('saved_before_animation', async page => {
   assert.equal(s.coins, 0);
 });
 
-t('reduced_motion_face_up', async page => {
+t('reduced_motion_flip', async page => {
+  // reduced motion でも裏向きで並べて順にめくる（カードは回さない）。スキップ → ［ぜんぶめくる］で全部表、すぐ押せる
   await gacha(page, saveWith({ coins: 1100 }));
   await page.click('#ga-10');
   assert.equal(await page.locator('#ga-res .rpg-card').count(), 10);
+  assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 10);
+  assert.equal(await page.$eval('#ga-res .rpg-card-back', el => getComputedStyle(el).transform), 'none');
+  await page.click('#ga-stage');
+  await page.evaluate(() => $('ga-flipall').click());
   assert.equal(await page.locator('#ga-res .rpg-card.is-back').count(), 0);
-  // めくるのを待たないので、すぐ押せる。めくるものが無いので［ぜんぶめくる］は出ない
   assert.equal(await page.isEnabled('#ga-1'), true);
   assert.equal(await page.isVisible('#ga-flipall'), false);
 }, { reducedMotion: 'reduce' });

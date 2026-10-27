@@ -226,7 +226,8 @@
     $('ga-empty').hidden = false;
   };
   // ---- 引く演出（#ga-stage）: パックが落ちてきて揺れ、いちばんいい★の色に光ってはじける（★3 は銀から金に変わる）。
-  // 結果のカードはうしろに裏向きで並べておき、演出が終わる（showMs たつ・押す・Esc）とめくり始める。reduced motion では出さない
+  // 結果のカードはうしろに裏向きで並べておき、演出が終わる（showMs たつ・押す・Esc）とめくり始める。
+  // reduced motion（PC の「アニメーション効果」オフなど）でも出す。そのときは動かさず、ふわっと出て光るだけ（rpg.css）
   let stageTimer = null, stageDone = null;
   const closeStage = () => {
     clearTimeout(stageTimer);
@@ -254,9 +255,9 @@
     else SND.play(best === 3 ? 'promo' : 'pull');
     stageTimer = setTimeout(closeStage, T.gacha.showMs + (best === 3 ? 500 : 0));
   };
-  // 結果を裏向きで並べて flipMs ずつめくる（reduced motion なら最初から表）。カードは1枚ずつ足していったときの★とかさね
+  // 結果を裏向きで並べて flipMs ずつめくる（reduced motion でも。そのときは回さずに表になる）。カードは1枚ずつ足していったときの★とかさね
   const drawResults = (res, before, d, region) => {
-    const box = $('ga-res'), back = !reduced(), now = { cards: { ...before }, coins: 0, earned: 0 };
+    const box = $('ga-res'), back = true, now = { cards: { ...before }, coins: 0, earned: 0 };
     box.innerHTML = res.map(r => {
       K.addCard(now, r.a, r.star);
       return cardHTML(r.a, { cards: { [r.a]: now.cards[r.a] }, fr: d.fr }, { face: back ? 'back' : 'up', label: GA_LABEL[r.out](r.star) });

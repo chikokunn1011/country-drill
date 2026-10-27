@@ -646,21 +646,33 @@ body.rpg-staging { overflow: hidden; }
     80% { transform: scale(1.1); filter: brightness(1.4); opacity: 1; }
     100% { transform: scale(1.5); filter: brightness(3); opacity: 0; }
   }
-  @keyframes rpg-st-glow {
-    0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
-    75% { box-shadow: 0 0 0 3px var(--gl), 0 0 60px 18px var(--gl); }
-    100% { box-shadow: 0 0 0 4px var(--gl), 0 0 120px 60px var(--gl); }
-  }
-  @keyframes rpg-st-promo {
-    0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
-    52% { box-shadow: 0 0 0 3px var(--rpg-gl2), 0 0 50px 14px var(--rpg-gl2); }
-    60% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 80px 26px var(--rpg-gl3); }
-    100% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 140px 70px var(--rpg-gl3); }
-  }
-  @keyframes rpg-st-promo-bg { 0% { --gl: var(--rpg-gl2); } 58% { --gl: var(--rpg-gl3); } }
-  @keyframes rpg-st-rays { 0%, 35% { opacity: 0; } 80% { opacity: .55; } 100% { opacity: 1; } }
   @keyframes rpg-st-say { 0%, 45% { opacity: 0; transform: scale(.8); } 60% { opacity: 1; transform: scale(1.12); } 70%, 100% { opacity: 1; transform: none; } }
 }
+/* reduced motion（PC の「アニメーション効果」オフなど）の演出: 動かさず、パックがふわっと出て光が強くなり、★3 は銀から金に変わる */
+@media (prefers-reduced-motion: reduce) {
+  .rpg-gstage .rpg-pack.is-big { animation: rpg-st-fade var(--show, 1700ms) ease-out forwards, rpg-st-glow var(--show, 1700ms) ease-in forwards; }
+  .rpg-gstage.is-promo .rpg-pack.is-big { animation-duration: calc(var(--show, 1700ms) + 500ms); animation-name: rpg-st-fade, rpg-st-promo; }
+  .rpg-gstage::before { animation: rpg-st-rays var(--show, 1700ms) ease-in forwards; }
+  .rpg-gstage.is-promo::before { animation-duration: calc(var(--show, 1700ms) + 500ms); }
+  .rpg-gstage-say { animation: rpg-st-saylit var(--show, 1700ms) ease-out forwards; }
+  .rpg-gstage.is-promo .rpg-gstage-say { animation-duration: calc(var(--show, 1700ms) + 500ms); }
+  .rpg-gstage.is-promo { animation: rpg-st-promo-bg calc(var(--show, 1700ms) + 500ms) steps(1) forwards; }
+  @keyframes rpg-st-fade { 0% { opacity: 0; } 20%, 80% { opacity: 1; filter: none; } 100% { opacity: 1; filter: brightness(1.6); } }
+  @keyframes rpg-st-saylit { 0%, 45% { opacity: 0; } 60%, 100% { opacity: 1; } }
+}
+@keyframes rpg-st-glow {
+  0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
+  75% { box-shadow: 0 0 0 3px var(--gl), 0 0 60px 18px var(--gl); }
+  100% { box-shadow: 0 0 0 4px var(--gl), 0 0 120px 60px var(--gl); }
+}
+@keyframes rpg-st-promo {
+  0%, 30% { box-shadow: 0 0 0 2px #f2cf6b, 0 0 0 0 transparent; }
+  52% { box-shadow: 0 0 0 3px var(--rpg-gl2), 0 0 50px 14px var(--rpg-gl2); }
+  60% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 80px 26px var(--rpg-gl3); }
+  100% { box-shadow: 0 0 0 4px var(--rpg-gl3), 0 0 140px 70px var(--rpg-gl3); }
+}
+@keyframes rpg-st-promo-bg { 0% { --gl: var(--rpg-gl2); } 58% { --gl: var(--rpg-gl3); } }
+@keyframes rpg-st-rays { 0%, 35% { opacity: 0; } 80% { opacity: .55; } 100% { opacity: 1; } }
 
 /* 仲間の一覧（スマホ: 上に地図、下に一覧。地図の中身は rpg-cards.js の RPG.worldMap が描く。描く前の空のあいだは出さない） */
 .rpg-cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
