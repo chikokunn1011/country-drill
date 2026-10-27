@@ -72,14 +72,18 @@ t('add_and_remove_cards', async page => {
   assert.equal(await page.locator('#tm-slots .tm-empty').count(), 2);
 });
 
-// おまかせのまま一覧を押すと、いまのおまかせ3枚を「自分で組んだ」にしてから外す／入れる
+// まだ組んでいない枠（c === null）: 強い順の3枚を見せてヒントを出す。一覧を押すと、その3枚を自分で組んだことにしてから外す／入れる
+const UNTOUCHED = 'まだ組んでないよ（強い順の3枚で戦う）';
 t('auto_slot_becomes_custom', async page => {
   await team(page, saveWith(CARDS));
-  assert.ok((await text(page, '#tm-side')).includes('おまかせ中'));
+  assert.ok((await text(page, '#tm-side')).includes(UNTOUCHED));
+  assert.equal((await text(page, '#tm-side')).includes('おまかせ中'), false);
   assert.deepEqual(await slots(page), ['br', 'id', 'th']);
+  assert.equal((await readSave(page)).teams[0].c, null);
   await page.click(card('th'));
   assert.deepEqual((await readSave(page)).teams[0].c, ['br', 'id']);
-  assert.equal((await text(page, '#tm-side')).includes('おまかせ中'), false);
+  assert.equal((await text(page, '#tm-side')).includes(UNTOUCHED), false);
+  assert.equal((await text(page, '#tm-side')).includes('自分で組んだ'), false);
   await page.click(card('vn'));
   assert.deepEqual((await readSave(page)).teams[0].c, ['br', 'id', 'vn']);
 });
@@ -91,18 +95,44 @@ t('full_slots_toast', async page => {
   assert.deepEqual((await readSave(page)).teams[0].c, ['th', 'vn', 'id']);
 });
 
-t('auto_fill_and_reset', async page => {
+// ［おまかせ］は1つだけ。選んでいるダンジョンで強い順の3枚を、ふつうの編成（c = 配列）として入れる。null には戻せない
+t('auto_button_fills_strongest', async page => {
   await team(page, saveWith({ ...CARDS, teams: [{ n: '編成1', c: ['vn'] }] }));
+  assert.equal(await page.locator('#tm-reset').count(), 0);
+  assert.equal(await page.locator('#tm-mode').count(), 0);
+  assert.equal((await text(page, '#tm-side')).includes('おまかせで埋める'), false);
+  assert.equal(await text(page, '#tm-auto'), 'おまかせ');
+  assert.equal(await page.locator('#tm-side button:text-matches("おまかせ")').count(), 1);
+  assert.equal((await text(page, '#tm-side')).includes(UNTOUCHED), false);
+  // ダンジョンで中身が変わる: 南アメリカなら br が地域ボーナスで先頭、アジアでも br（★2）が先頭
   await page.selectOption('#tm-dg', 'samerica');
+  await page.click('#tm-auto');
+  const sa = await page.evaluate(() => RPG_CORE.party(RPG.get(), 'samerica').map(p => p.a));
+  assert.deepEqual((await readSave(page)).teams[0].c, sa);
   await page.selectOption('#tm-dg', 'asia');
   await page.click('#tm-auto');
   const want = await page.evaluate(() => RPG_CORE.party(RPG.get(), 'asia').map(p => p.a));
+  assert.deepEqual(want, ['br', 'id', 'th']);
   assert.deepEqual((await readSave(page)).teams[0].c, want);
   assert.deepEqual(await slots(page), want);
-  await page.click('#tm-reset');
-  assert.equal((await readSave(page)).teams[0].c, null);
-  assert.ok((await text(page, '#tm-side')).includes('おまかせ中'));
-  assert.equal(await page.isDisabled('#tm-reset'), true);
+  // ふつうの編成なので、たまたま同じグループ（id・th は東南アジア）ならチームボーナスがつく
+  assert.ok((await text(page, '#tm-stats')).includes('東南アジア×2 ＋10%'));
+});
+
+// まだ組んでいない枠でも［おまかせ］を押すと配列になる。強い3枚が同じグループならチームボーナスがつく
+t('auto_button_team_bonus', async page => {
+  await team(page, saveWith({ coins: 0, cards: { th: [1, 0], vn: [1, 0], id: [1, 0], fr: [1, 0] }, floors: CARDS.floors }));
+  assert.ok((await text(page, '#tm-side')).includes(UNTOUCHED));
+  // null のあいだはボーナスなし（今と同じ強さ）
+  assert.ok((await text(page, '#tm-stats')).includes('チームボーナスなし'));
+  await page.click('#tm-auto');
+  const c = (await readSave(page)).teams[0].c;
+  assert.deepEqual([...c].sort(), ['id', 'th', 'vn']);
+  assert.equal((await text(page, '#tm-side')).includes(UNTOUCHED), false);
+  const s = await text(page, '#tm-stats');
+  assert.ok(s.includes('東南アジア×3 ＋25%'), s);
+  const st = await page.evaluate(() => RPG_CORE.battleStats(RPG.get(), 'asia', 1, 0));
+  assert.ok(s.includes(`⚔️ ${st.atk}`) && s.includes(`❤️ ${st.hp}`), `${s} / ${st.atk} ${st.hp}`);
 });
 
 t('buy_slot', async page => {
@@ -187,7 +217,7 @@ t('readonly_no_write', async page => {
   for (const sel of ['#tm-auto', '#tm-rename', '#tm-tabs button:nth-child(2)']) assert.equal(await page.isDisabled(sel), true, sel);
   page.on('dialog', d => d.accept());
   await page.evaluate(() => {
-    for (const el of document.querySelectorAll('#tm-grid .rpg-card, #tm-slots .rpg-pc, #tm-tabs button, #tm-auto, #tm-reset, #tm-rename')) {
+    for (const el of document.querySelectorAll('#tm-grid .rpg-card, #tm-slots .rpg-pc, #tm-tabs button, #tm-auto, #tm-rename')) {
       el.disabled = false;
       el.click();
     }
