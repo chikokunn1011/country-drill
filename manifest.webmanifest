@@ -1,0 +1,17 @@
+{
+  "name": "国旗マスター",
+  "short_name": "国旗マスター",
+  "description": "国旗・国名・場所を4択クイズで覚える、195か国の学習サイト。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b2a33",
+  "theme_color": "#1f5f8b",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
