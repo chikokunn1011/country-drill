@@ -437,6 +437,7 @@
       $('bt-end').querySelector('.rpg-bend-x').after(sb);
     }
     if (win) RPG.fx('win', $('bt-end'));
+    else SND.play('lose');
     clearTop($('bt-end'));
     $('bt-end').scrollIntoView({ block: 'nearest' });
     ($('bt-nextfloor') || $('bt-again') || $('bt-home')).focus({ preventScroll: true });

@@ -89,6 +89,10 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .switch { display: inline-flex; align-items: center; gap: 8px; font-size: .95rem; cursor: pointer; }
 .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
 .field > label.switch { font-size: .95rem; letter-spacing: 0; color: var(--ink); font-weight: 500; }
+.vol-row { gap: 10px; margin-top: 8px; }
+.vol-row input[type=range] { flex: 1; max-width: 240px; accent-color: var(--accent); }
+.vol-row input:disabled { opacity: .4; }
+#set-vol-n { min-width: 2.5em; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .row.end { justify-content: flex-end; }
 .row.center { justify-content: center; }
@@ -331,10 +335,15 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div class="panel">
       <h2>設定</h2>
       <div class="field">
+        <span class="lbl">音</span>
+        <label class="switch"><input type="checkbox" id="set-sound"> 効果音を鳴らす</label>
+        <div class="row vol-row" id="set-vol-row"><label class="hint" for="set-vol">音量</label><input type="range" id="set-vol" min="10" max="100" step="10"><span class="hint" id="set-vol-n"></span></div>
+        <p class="hint">正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。</p>
+      </div>
+      <div class="field">
         <span class="lbl">演出</span>
         <label class="switch"><input type="checkbox" id="set-dopa"> ドパガキ向け</label>
-        <p class="hint">正解すると紙吹雪・コンボ・スコア倍率・効果音でド派手に盛り上がる、刺激つよめのモード。</p>
-        <label class="switch" id="set-sound-row"><input type="checkbox" id="set-sound"> 効果音を鳴らす</label>
+        <p class="hint">正解すると紙吹雪・コンボ・スコア倍率でド派手に盛り上がる、刺激つよめのモード（効果音もド派手になる）。</p>
       </div>
       <div class="field">
         <span class="lbl">記録</span>
@@ -446,6 +455,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="world.js"></script>
 <script src="ranking.js"></script>
 <script src="trivia.js"></script>
+<script src="sound.js?v=1"></script>
 <script>
 /* ---------- データ ---------- */
 // ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ
@@ -488,7 +498,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70 }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -584,19 +594,19 @@ function zoomableMap(c, label, opts = {}) {
   return box;
 }
 
-/* ---------- ドパガキ向けの演出（紙吹雪・効果音・ポップ文字） ---------- */
+/* ---------- ドパガキ向けの演出（紙吹雪・ド派手な効果音・ポップ文字）。ふだんの効果音は sound.js の SND ---------- */
 const FX = {
   ac: null, parts: [], cv: null, raf: 0,
   audio() {
-    if (!S.sound) return null;
-    try { this.ac ||= new (window.AudioContext || window.webkitAudioContext)(); if (this.ac.state === 'suspended') this.ac.resume(); return this.ac; } catch { return null; }
+    if (!S.sound || !(Number(S.vol ?? 70) > 0)) return null;
+    return SND.ctx();   // 音量は SND とおなじ
   },
   tone(ac, f, t, dur, type = 'square', vol = .07, slide) {
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
-    o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + .02);
+    o.connect(g).connect(SND.out() || ac.destination); o.start(t); o.stop(t + dur + .02);
   },
   sfx(kind, combo = 0) {
     const ac = this.audio(); if (!ac) return;
@@ -698,7 +708,9 @@ $('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c
 function renderSettings() {
   $('set-dopa').checked = S.dopa;
   $('set-sound').checked = S.sound;
-  $('set-sound-row').hidden = !S.dopa;
+  $('set-vol').value = S.vol ?? 70;
+  $('set-vol').disabled = !S.sound;
+  $('set-vol-n').textContent = S.sound ? `${S.vol ?? 70}` : 'オフ';
   const n = Object.values(misses).filter(v => v > 0).length;
   $('set-record').textContent = n ? `まちがえた記録: ${n}か国` : 'まちがえた記録はまだない';
   $('set-reset').hidden = !n;
@@ -708,7 +720,9 @@ $('set-dopa').onchange = e => {
   S.dopa = e.target.checked; store.set('settings', S); applyDopa(); renderSettings();
   if (S.dopa) { FX.sfx('correct', 3); FX.confetti(e.target.getBoundingClientRect(), 80); FX.pop('ドパミン全開！'); }
 };
-$('set-sound').onchange = e => { S.sound = e.target.checked; store.set('settings', S); if (S.sound) FX.sfx('correct', 0); };
+$('set-sound').onchange = e => { S.sound = e.target.checked; store.set('settings', S); renderSettings(); SND.play('correct'); };
+$('set-vol').oninput = e => { S.vol = +e.target.value; $('set-vol-n').textContent = `${S.vol}`; };
+$('set-vol').onchange = () => { store.set('settings', S); SND.play('correct'); };
 $('set-reset').onclick = () => { misses = {}; store.set('misses', misses); emit('drill:misses-reset', {}); renderSettings(); };
 $('set-done').onclick = () => show('home');
 
@@ -847,6 +861,7 @@ function answer(a) {
   emit('drill:answer', { sid: G.sid, a: c.a, right, first, missesBefore: mb, missesAfter: misses[c.a] || 0,
     mode: G.mode.k, kind: G.kind, region: S.region, hint: G.hint, streak: G.streak });
   if (S.dopa) dopaAnswer(right);
+  else SND.play(right ? 'correct' : G.kind === 'ta' ? 'fail' : 'wrong', { combo: G.streak });
   // タイムアタック: 正解なら解説を出さずにすぐ次へ、最後の問題ならタイム確定。不正解はその場で失格
   if (G.kind === 'ta' && right) {
     if (G.queue.length) return nextQuestion();
@@ -975,6 +990,7 @@ function showResult() {
   resultAt = performance.now();
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
+  else SND.play(G.wrongs === 0 ? 'perfect' : 'clear');
   if (taForm) taResult(RANKING.boardKey(G.mode.k, S.region, P.count), G.timeMs, n);
 }
 // 結果画面を出した直後のクリックは結果カードのボタンに届かせない。キャプチャで止めるので onclick もフォームの送信も起きない
@@ -1170,10 +1186,10 @@ const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[loc
 show(start);
 </script>
 <script src="rpg-core.js?v=2"></script>
-<script src="rpg.js?v=3"></script>
-<script src="rpg-cards.js?v=2"></script>
-<script src="rpg-battle.js?v=1"></script>
+<script src="rpg.js?v=4"></script>
+<script src="rpg-cards.js?v=3"></script>
+<script src="rpg-battle.js?v=2"></script>
 <script src="rpg-rank.js?v=3"></script>
-<script src="badges.js?v=2"></script>
+<script src="badges.js?v=3"></script>
 </body>
 </html>

@@ -370,6 +370,7 @@
       d = x;
     });
     if (!d || !wrote) return;
+    SND.play('levelup');
     emit('rpg:levelup', { lv: d.lv, from });
     emitCoins(d, -cost, 'levelup');
   };
@@ -384,6 +385,7 @@
       if (x.lv > from) d = x;
     });
     if (!d || !wrote) return;
+    SND.play('levelup');
     emit('rpg:levelup', { lv: d.lv, from });
     emitCoins(d, -spent, 'levelup');
   };

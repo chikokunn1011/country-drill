@@ -627,6 +627,7 @@
   // トーストを1枚出す（toast はいつもグローバルの名前で呼ぶ）。個別のトーストは、ドパガキなら音と、金・虹なら紙吹雪（§5.4）
   function showToast({ html, key }) {
     toast(html, TOAST_MS);
+    if (key && !S.dopa) SND.play('badge');
     if (!key || !S.dopa) return;
     FX.sfx('correct', 8);
     const el = $('toasts')?.lastElementChild;   // toast() は何も返さないので、いま足した1枚
@@ -668,7 +669,8 @@
     const ext = host.querySelector(':scope > #r-ext'), btns = host.querySelector(':scope > .row.center');
     if (ext) ext.before(box); else if (btns) btns.before(box); else host.append(box);
     panelAdd(box, items);
-    if (S.dopa && items.length) setTimeout(() => panelFx(box), PANEL_FX_DELAY);   // 結果のファンファーレのあと（ヒントの注意だけのパネルでは鳴らさない）
+    if (S.dopa && items.length) setTimeout(() => panelFx(box), PANEL_FX_DELAY);
+    else if (items.length) setTimeout(() => { if (box.isConnected && !$('scr-result').hidden) SND.play('badge'); }, PANEL_FX_DELAY);   // 結果のファンファーレのあと（ヒントの注意だけのパネルでは鳴らさない）
   }
   // 結果パネルのドパガキの演出（§5.4）。結果画面を離れた・次の結果に変わったら何もしない。
   // 紙吹雪はパネルの真ん中が画面内に見えていればそこから、見えていなければ画面の中央（null）から
