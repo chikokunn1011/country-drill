@@ -101,6 +101,7 @@ body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
 
 /* 900–1279: question | choices, answer strip below */
 @media (max-width: 1279.98px) {
+  #rmap .map { width: auto; height: clamp(110px, calc(100dvh - 590px), 260px); max-width: 100%; margin-inline: auto; }
   #qcard { --strip-h: 150px; --mh: calc(100cqh - var(--strip-h) - 14px); }
   #qcard > .rslot, #qcard > .reveal {
     grid-column: 1 / -1; grid-row: 2; height: var(--strip-h); align-self: stretch;
@@ -184,12 +185,16 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   .home .flags img { width: 100%; border-radius: 4px; }
 
   /* setup: modes in one row of 4, then あそび方 | 地域・問題数 */
-  #scr-setup .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "modes modes" "nameopt nameopt" "kinds opts"; row-gap: 18px; }
+  #scr-setup .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "modes modes" "nameopt nameopt" "kinds opts" "rmap opts"; grid-template-rows: auto auto auto 1fr; row-gap: 18px; }
   #scr-setup .col:first-child { display: contents; }
+  /* 地域の世界地図は あそび方 の下。高さは画面の高さに合わせる（背の低い PC でもスクロールしない） */
+  #scr-setup .col + .col { display: contents; }
+  #rmap { grid-area: rmap; margin: 0; align-self: start; }
+  #rmap .map { width: auto; height: clamp(110px, calc(100dvh - 590px), 300px); max-width: 100%; }
+  #scr-setup .opts { grid-area: opts; display: flex; flex-direction: column; gap: 14px; border-left: 1px dashed var(--line); padding-left: var(--col-gap); align-self: stretch; }
   #modes { grid-area: modes; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   #nameopt-field { grid-area: nameopt; }
   #kinds-field { grid-area: kinds; }
-  #scr-setup .col + .col { grid-area: opts; }
   #kinds { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
   body[data-screen="setup"] #scr-setup { flex: 1 0 auto; justify-content: center; }
   #modes .modecard { min-height: clamp(84px, 12vh, 150px); justify-content: center; padding: 18px 22px; }
