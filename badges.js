@@ -538,7 +538,7 @@
   // 時間（ms）
   const TOAST_MS = 4500;                               // バッジのトーストを出しておく時間（§5.3）
   const TOAST_GAP = 400;                               // 続けて出すトーストのずらし（§5.3）
-  const GACHA_HOLD = 3000, GACHA_HOLD_REDUCED = 1000;  // 最後の rpg:pull から、ガチャの演出中としてお知らせを待つ時間。reduced motion なら短く（§5.1）
+  const GACHA_HOLD = 4000, GACHA_HOLD_REDUCED = 1000;  // 最後の rpg:pull から、ガチャの演出中（パックの演出＋めくる）としてお知らせを待つ時間。reduced motion なら短く（§5.1）
   const PANEL_FX_DELAY = 700;                          // 結果のファンファーレから、パネルの音と紙吹雪まで（§5.4）
   const COPIED_MS = 2000;                              // シェアの「コピー済み」を出しておく時間（§6.3）
   let run = null;           // クイズ中なら { sid }。drill:start で作り、drill:result で捨てる（保留の判定に使う）

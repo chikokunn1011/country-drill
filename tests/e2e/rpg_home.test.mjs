@@ -271,9 +271,9 @@ t('next_action_rules', async page => {
   const next = async save => { await home(page, save); return text(page, '#rpg-next'); };
   // (1) まだ引いていない・10連が引ける
   let s = await next(saveWith({ coins: 1000 }));
-  assert.ok(s.includes('まずは国旗ガチャ10連で仲間をさがそう（南アメリカがおすすめ）'), s);
+  assert.ok(s.includes('まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）'), s);
   await page.click('#rpg-next');
-  assert.deepEqual(await page.evaluate(() => RPG.opts), { region: '南アメリカ' });
+  assert.deepEqual(await page.evaluate(() => RPG.opts), { region: 'all' });
   // (2) 今日の無料ガチャ
   s = await next(saveWith({ pulls: 1, day: { d: localToday(), n: {}, first: true, free: false } }));
   assert.ok(s.includes('今日の無料ガチャが引けるよ'), s);
@@ -682,7 +682,7 @@ t('badges_real_integration', async page => {
 t('badges_real_gacha_hold', async page => {
   // 南アメリカ以外の49か国を仲間にしておく → 南アメリカの10連で最初の NEW が50か国目
   const codes = await page.evaluate(() => C.filter(c => c.r !== '南アメリカ').slice(0, 49).map(c => c.a));
-  await writeSave(page, saveWith({ coins: 1000, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  await writeSave(page, saveWith({ coins: 1500, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));   // 地域をしぼった10連は ●1,500
   assert.deepEqual(await toastTexts(page), []);
   await page.evaluate(() => RPG.open('gacha'));
   await page.click('#ga-regions .chip[data-r="南アメリカ"]');

@@ -92,7 +92,7 @@ const RPG_SCENES = {
   },
   battle_boss: page => rpgBattle(page, 5),
   gacha_result: async page => {
-    await rpgLoad(page, { ...RPG_SAVE, coins: 1000 });
+    await rpgLoad(page, { ...RPG_SAVE, coins: 1500 });   // 地域をしぼった10連は ●1,500
     await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
     await page.click('#ga-10');
     await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));   // reduced motion なので最初から表（［ぜんぶめくる］は出ない）

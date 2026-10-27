@@ -424,7 +424,7 @@ function addDay(s, day) {                         // day は 'YYYY-MM-DD'（イ�
 |---|---|
 | クイズ中（`run` がある。`drill:start` から `drill:result` まで） | 出さない。`drill:result` で出す |
 | バトル中（`drill:screen {name:'battle'}` から `rpg:battle` まで） | 出さない。`rpg:battle` が来たとき、またはバトル画面を離れたときに出す |
-| ガチャの演出中（`screen === 'gacha'` で、最後の `rpg:pull` から3秒以内。reduced motion なら1秒） | 出さない。3秒後か、ガチャ画面を離れたときに出す |
+| ガチャの演出中（`screen === 'gacha'` で、最後の `rpg:pull` から4秒以内。reduced motion なら1秒） | 出さない。4秒後か、ガチャ画面を離れたときに出す |
 | `#detail` ダイアログが開いている（図鑑の詳細など） | 出さない（モーダルの下に隠れるため）。ダイアログの `close` イベントで出す |
 | それ以外 | すぐ出す |
 

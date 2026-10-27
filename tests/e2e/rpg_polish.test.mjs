@@ -149,7 +149,7 @@ t('share_fallbacks', async page => {
 
 t('share_cards_50', async page => {
   const codes = await page.evaluate(() => C.filter(c => c.r !== '南アメリカ').map(c => c.a).sort().slice(0, 49));
-  await writeSave(page, saveWith({ coins: 100, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  await writeSave(page, saveWith({ coins: 150, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
   await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
   await page.click('#ga-1');
   await page.locator('#ga-main .rpg-share').waitFor();
@@ -304,7 +304,7 @@ t('gold_fx', async page => {
   // 天井の1回前なので、1回引くと★3
   for (const rm of ['no-preference', 'reduce']) {
     await page.emulateMedia({ reducedMotion: rm });
-    await writeSave(page, saveWith({ coins: 100, pity: 49 }));
+    await writeSave(page, saveWith({ coins: 150, pity: 49 }));
     await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
     await wrapFx(page);
     await page.click('#ga-1');

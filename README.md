@@ -12,6 +12,7 @@
 
 - 準備: Supabase の SQL Editor に `supabase/schema.sql` を貼って実行する（何度流しても大丈夫）
 - 記録の消し方: Table Editor で `scores` テーブルを開き、消したい行を削除する
+- 冒険ランキング（レベル順・クリアしたダンジョン順）は `rpg_scores` テーブル。消し方は同じ（`rpg-rank.js`、冒険ホームの［🏆 冒険ランキング］）
 - テスト: 初回だけ `cd tests/e2e && npm install`。そのあとリポジトリ直下で `node --test 'tests/unit/*.test.mjs' 'tests/e2e/*.test.mjs'`（Playwright と Chromium が必要）と `bash tests/sql/run.sh`（PostgreSQL 16 が必要）
 - PC の見た目: `pc.css`（900px 以上でだけ読み込む）。スマホ幅の見た目は index.html のインライン CSS
 - PC レイアウトのテスト: `node --test tests/e2e/pc_layout.test.mjs` で PC の大きさ（1024×768・1366×657・1366×768・1920×1080）の収まりを見る
@@ -24,11 +25,12 @@
 
 ## 冒険（国旗クエスト）
 
-クイズでコインを稼いで、旅人のレベルアップ・国旗ガチャ（仲間のカード）・ダンジョンのバトルに使う RPG（`rpg-core.js` `rpg.js` `rpg-cards.js` `rpg-battle.js` `rpg.css`。設定の「冒険（コイン・RPG）を表示する」で隠せる）。
+クイズでコインを稼いで、旅人のレベルアップ・国旗ガチャ（仲間のカード）・ダンジョンのバトルに使う RPG（`rpg-core.js` `rpg.js` `rpg-cards.js` `rpg-battle.js` `rpg-rank.js` `rpg.css`。設定の「冒険（コイン・RPG）を表示する」で隠せる）。
 
-- ファイルの分け方: `rpg-core.js` は計算だけ（DOM を触らない）、`rpg.js` はセーブ・クイズのコイン・冒険ホーム、`rpg-cards.js` は国旗ガチャ・仲間の一覧・仲間の世界地図・シェア・演出、`rpg-battle.js` はバトル。この順に読み込み、ファイルどうしは `window.RPG` でつながる
+- ファイルの分け方: `rpg-core.js` は計算だけ（DOM を触らない）、`rpg.js` はセーブ・クイズのコイン・冒険ホーム、`rpg-cards.js` は国旗ガチャ（国旗パックのサムネイルと引く演出をふくむ）・仲間の一覧・仲間の世界地図・シェア・演出、`rpg-battle.js` はバトル、`rpg-rank.js` は冒険ランキング。この順に読み込み、ファイルどうしは `window.RPG` でつながる
 - データはこの端末の localStorage（キー `rpg`）にだけ保存する。別の端末へは冒険ホームの「データ（引き継ぎコード）」のコードで移す
 - 開発用パネル（コインを足す・Lv を変える・フロアを開く）は URL に `?rpgdebug=1` を付けると冒険ホームに出る
+- ガチャは全世界が 1回 ●100・10回 ●1,000。地域をしぼると `TUNING.gacha.regionMul`（1.5倍）。引く演出の長さは `TUNING.gacha.showMs`
 - 値段・確率・強さなどの数値は全部 `rpg-core.js` の `TUNING` にある（ペースは `tests/unit/rpg-balance.test.mjs` で確かめる）
 
 ## バッジ・称号
