@@ -248,7 +248,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .rmap .map path:not(.graticule):not(.frame):not(.in) { fill: color-mix(in srgb, var(--land) 55%, var(--ocean)); }
 .rmap .map path.in { fill: var(--hl); stroke: var(--ink); stroke-width: .6; }
 .rmap .map .dot { fill: var(--hl); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.rmap .map .frame { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.rmap .map .frame { fill: color-mix(in srgb, var(--hl) 16%, transparent); stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .rmap { margin-bottom: 4px; }
 .opts { display: flex; flex-direction: column; gap: 14px; }
 .rgroups { display: flex; flex-direction: column; gap: 8px; }
@@ -835,12 +835,15 @@ function renderSetup() {
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
   // タイムアタック中は細かい地域を選べない（ランキングの区分は6地域）。選んでいたら親の地域にする
-  if (P.kind === 'ta' && SUBREGIONS[S.region]) { S.region = parentRegion(S.region); store.set('settings', S); }
+  // 練習・挑戦に戻ったら、親の地域のままなら前の細かい地域に戻す
+  if (P.kind === 'ta' && SUBREGIONS[S.region]) { S.sub = S.region; S.region = parentRegion(S.region); store.set('settings', S); }
+  else if (P.kind !== 'ta' && S.sub) { if (S.region === parentRegion(S.sub)) S.region = S.sub; delete S.sub; store.set('settings', S); }
   $('regions').innerHTML = regionGroups(S.region, P.kind === 'ta');
   $('regions-hint').textContent = P.kind === 'ta' ? 'タイムアタックはランキングの区分に合わせて、大きい地域だけ。'
     : '大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。';
   renderRegionMap(S.region);
-  P.count = fitCount(P.count, S.region);
+  // 国の数より多い問題数は「全部」にする。P.want に選んだ問題数を残し、国の多い地域に戻したら元に戻す
+  P.count = fitCount(P.want ?? P.count, S.region);
   $('counts').innerHTML = countChips(S.region, P.count);
 }
 $('modes').onclick = e => { const b = e.target.closest('.modecard'); if (!b) return; P.mode = b.dataset.k; store.set('setup', P); renderSetup(); };
@@ -853,7 +856,7 @@ $('rmap').onclick = e => {
   const steps = [sub, c.r, 'all'].filter(Boolean), i = steps.indexOf(S.region);
   S.region = steps[i < 0 ? 0 : (i + 1) % steps.length]; store.set('settings', S); renderSetup();
 };
-$('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
+$('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = P.want = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
 $('quit').onclick = () => show('setup');

@@ -91,3 +91,22 @@ t('ranking_opens_with_parent_region', async page => {
   assert.equal(await page.evaluate(() => RK.region), '北・中央アメリカ');
   assert.equal(await page.locator('#rk-regions .chip').count(), 7);
 });
+
+// 練習 → タイムアタック → 練習 で、選んでいた細かい地域に戻る
+t('sub_region_comes_back_after_ta', async page => {
+  await pickSetup(page, { kind: 'practice', region: '北・中央アメリカ' });
+  await pickSetup(page, { region: 'カリブ海' });
+  await pickSetup(page, { kind: 'ta' });
+  assert.equal(await page.evaluate(() => S.region), '北・中央アメリカ');
+  await pickSetup(page, { kind: 'practice' });
+  assert.equal(await page.evaluate(() => S.region), 'カリブ海');
+});
+
+// 10問で東アジア（5か国）を選ぶと「全部」になるが、アジアに戻すと10問に戻る
+t('count_comes_back', async page => {
+  await pickSetup(page, { kind: 'practice', region: 'アジア', count: 10 });
+  await pickSetup(page, { region: '東アジア' });
+  assert.equal(await page.locator('#counts .chip[data-c="all"]').getAttribute('aria-pressed'), 'true');
+  await pickSetup(page, { region: 'アジア' });
+  assert.equal(await page.locator('#counts .chip[data-c="10"]').getAttribute('aria-pressed'), 'true');
+});
