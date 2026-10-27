@@ -174,3 +174,54 @@ t('old_or_deleted_registration', async (page, app) => {
   await page.waitForFunction(() => store.get('rpgRank', null) === null, null, { timeout: 8000 });
   assert.deepEqual(app.db.calls.map(c => c.name).filter(n => n.startsWith('rpg_up')), ['rpg_update']);
 });
+
+// 冒険データを消すと、ランキングからも消える（返事の届かなかった登録の合言葉も）。つながらなければ次の起動で消し直す
+const wipe = async page => {
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => RPG.open('rpg'));
+  await page.click('#rpg-data summary');
+  await page.click('#rpg-wipe');
+};
+t('wipe_removes_from_ranking', async (page, app) => {
+  const T = '00000000-0000-4000-8000-00000000000b', P = '00000000-0000-4000-8000-00000000000c';
+  app.db.rpgRows.push(
+    { token: T, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) },
+    { token: P, nickname: 'チコ別', lv: 3, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) },
+    { token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) },
+  );
+  await page.evaluate(({ T, P }) => { store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 9, dungeons: 0, floors: 2 } }); store.set('rpgRankPending', P); }, { T, P });
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  await wipe(page);
+  await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
+  assert.deepEqual(app.db.rpgRows.map(r => r.nickname), ['ミケ']);
+  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_unregister').map(c => c.args.p_token), [T, P]);
+  assert.deepEqual(await page.evaluate(() => [store.get('rpgRank', null), store.get('rpgRankPending', null)]), [null, null]);
+  // 消したあとは登録していない扱い（はじめからやり直すと、載せるフォームが出る）
+  await page.evaluate(() => RPG.open('rpgrank'));
+  assert.equal(await page.isVisible('#rr-auto'), false);
+});
+
+t('wipe_not_registered', async (page, app) => {
+  await writeSave(page, saveWith({ lv: 5 }));
+  await wipe(page);
+  await page.waitForTimeout(500);
+  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_unregister'), []);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpgRankDel')), null);
+});
+
+t('wipe_offline_retries_on_startup', async (page, app) => {
+  const T = '00000000-0000-4000-8000-00000000000d';
+  app.db.rpgRows.push({ token: T, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
+  await page.evaluate(T => store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 9, dungeons: 0, floors: 2 } }), T);
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  app.db.down = true;
+  await wipe(page);
+  await page.waitForFunction(() => store.get('rpgRank', null) === null);
+  await page.waitForTimeout(500);
+  assert.deepEqual(await page.evaluate(() => store.get('rpgRankDel')), [T]);   // 消せるまで覚えておく
+  assert.equal(app.db.rpgRows.length, 1);
+  app.db.down = false;
+  await page.reload();
+  await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
+  assert.equal(app.db.rpgRows.length, 0);
+});

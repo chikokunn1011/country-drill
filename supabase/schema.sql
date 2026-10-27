@@ -1,7 +1,7 @@
 -- 195か国ドリル タイムアタックのランキング用（Supabase）
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
--- 冒険の rpg_register / rpg_update / rpg_rename / top_rpg / rpg_rank_of だけ。
+-- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of だけ。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -112,6 +112,7 @@ grant execute on function top_scores(text, text) to anon;
 -- ---- 冒険（国旗クエスト）のランキング ----
 -- 1人（1つの端末）1行。はじめて載せるとき（rpg_register）に端末が作った秘密の合言葉（p_token）を送り、DB にはそのハッシュだけ残す。
 -- そのあとは合言葉で、記録の更新（rpg_update）と名前の変更（rpg_rename）だけができる（別の名前でもう1回は登録できない）。
+-- 冒険データを消すと、合言葉で行ごと消す（rpg_unregister）。
 -- ニックネームは全角半角・大文字小文字をそろえて、ほかの人と同じものは使えない。記録はそれぞれ今までの最高を残す。
 -- 並べ方は 'lv'（レベル → ダンジョン → フロア → 先に載せた順）と 'dg'（ダンジョン → フロア → レベル → 先に載せた順）
 -- 変な記録は Table Editor の rpg_players から行を消せばランキングからも消える
@@ -230,6 +231,20 @@ begin
 end $$;
 revoke all on function rpg_rename(text, text) from public;
 grant execute on function rpg_rename(text, text) to anon;
+
+-- 冒険データを消したときに、その端末の行を消す（ランキングからも消える）。もう無ければ not_found
+create or replace function rpg_unregister(p_token text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  delete from rpg_players where token_hash = v_hash;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function rpg_unregister(text) from public;
+grant execute on function rpg_unregister(text) to anon;
 
 -- 上位50人。p_sort は 'lv' か 'dg'。それ以外は空。created_at は最後に記録が変わった時刻（前の形と列をそろえて関数を作り直さずに済むようにしている）
 create or replace function top_rpg(p_sort text)

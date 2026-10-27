@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // 冒険（国旗クエスト）のランキング（#scr-rpgrank）: 旅人のレベル順と、クリアしたダンジョンの数の順。
-  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / top_rpg / rpg_rank_of）。1人1行。
+  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of）。1人1行。
   // rpg.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // rpg.js が起動していない・ランキングの接続先が無いときは何もしない（冒険ホームにランキングの入口が出ないだけ）
@@ -148,6 +148,39 @@
     $('rr-name').value = reg()?.name || '';
     $('rr-name').focus();
   };
+  // 冒険データを消したら、ランキングからも消す。消す合言葉は DEL に覚えておき、つながらなかったら次の起動で消し直す
+  // （返事が届かなかった登録の合言葉 rpgRankPending も、通っていたかもしれないので一緒に消す）
+  const DEL = 'rpgRankDel';
+  const dels = () => { const l = store.get(DEL, []); return Array.isArray(l) ? l.filter(x => typeof x === 'string') : []; };
+  let dropping = false;
+  const dropTokens = async () => {
+    if (dropping) return;
+    dropping = true;
+    try {
+      for (let list = dels(); list.length; list = dels()) {
+        const done = [];
+        for (const token of list) {
+          const res = await RANKING.rpgUnregister({ token });
+          if (res.ok || res.reason !== 'network') done.push(token);   // もう無い（not_found）も消せたことにする
+        }
+        const rest = dels().filter(x => !done.includes(x));   // 消しているあいだに増えた分は残す
+        if (rest.length) store.set(DEL, rest); else try { localStorage.removeItem(DEL); } catch {}
+        if (done.length < list.length) break;   // つながらない: 次の起動で
+      }
+    } finally { dropping = false; }
+  };
+  const unregister = () => {
+    const r = reg(), pending = store.get('rpgRankPending', null), list = dels();
+    const tokens = [r?.token, typeof pending === 'string' ? pending : null].filter((x, i, a) => x && !list.includes(x) && a.indexOf(x) === i);
+    clearTimeout(autoTimer); autoTimer = null;
+    try { localStorage.removeItem(KEY); localStorage.removeItem('rpgRankPending'); } catch {}
+    if (!tokens.length) return;
+    store.set(DEL, [...list, ...tokens]);
+    dropTokens();
+  };
+  document.addEventListener('rpg:wipe', () => { try { unregister(); } catch (e) { console.error('[rpg]', e); } });
+  dropTokens();
+
   // きっかけ: レベルアップ・バトルに勝った（新しいフロアやボス）・別のタブがセーブを書いた・起動時
   document.addEventListener('rpg:levelup', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
   document.addEventListener('rpg:battle', e => { try { if (e.detail?.win) scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });

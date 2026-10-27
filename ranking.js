@@ -41,7 +41,7 @@
       return await res.json();
     } finally { clearTimeout(timer); }
   }
-  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename）。返事の rank_lv などは rankLv などにする
+  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename / rpg_unregister）。返事の rank_lv などは rankLv などにする
   async function rpgCall(name, args) {
     try {
       const r = await rpc(name, args);
@@ -98,6 +98,10 @@
     },
     async rpgRename({ token, nickname }) {
       return rpgCall('rpg_rename', { p_token: token, p_nickname: nickname });
+    },
+    // 冒険のランキングからこの端末の記録を消す（冒険データを消したとき）。もう無いときは reason 'not_found'
+    async rpgUnregister({ token }) {
+      return rpgCall('rpg_unregister', { p_token: token });
     },
     // 冒険の上位50件。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
     async rpgTop({ sort }) {

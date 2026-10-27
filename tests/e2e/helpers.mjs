@@ -91,7 +91,7 @@ export function fakeDb() {
         .map(({ nickname, time_ms, created_at }) => ({ nickname, time_ms, created_at }));
     },
     rank_of: ({ p_board, p_time_ms }) => rankOf(p_board, p_time_ms),
-    // 冒険のランキング（rpg_register / rpg_update / rpg_rename / top_rpg / rpg_rank_of と同じ形。名前は文字数と重なりだけ見る。
+    // 冒険のランキング（rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of と同じ形。名前は文字数と重なりだけ見る。
     // 10秒の連投よけはしない）。rpgRows の行は { token, nickname, lv, dungeons, floors, created_at, at }
     rpg_register({ p_token, p_nickname, p_lv, p_dungeons, p_floors }) {
       const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
@@ -115,6 +115,12 @@ export function fakeDb() {
       if (rpgRows.some(x => x !== r && x.nickname === nickname)) return { ok: false, reason: 'name_taken' };
       r.nickname = nickname;
       return { ok: true, nickname };
+    },
+    rpg_unregister({ p_token }) {
+      const i = rpgRows.findIndex(r => r.token === p_token);
+      if (i < 0) return { ok: false, reason: 'not_found' };
+      rpgRows.splice(i, 1);
+      return { ok: true };
     },
     top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
