@@ -1,6 +1,7 @@
 // rpg-core.js（国旗クエストの計算部品）の単体テスト。countries.js と一緒に vm で読み込み、globalThis.RPG_CORE を使う
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { T0, read, plain, loadCtx, loadCore, dWith, mulberry32 } from './rpg_load.mjs';
 
 const IDS = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];
@@ -35,6 +36,7 @@ test('tuning_and_tables', () => {
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
+    team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
   }));
   assert.equal(TUNING.quiz.decay[2][0], Infinity);
 
@@ -202,16 +204,85 @@ test('card_and_party', () => {
 
 test('battle_stats', () => {
   const K = loadCore();
-  assert.deepEqual(plain(K.battleStats(dWith(K), 'samerica', 1)), { atk: 10, hp: 36, party: [], gauge: 0 });
+  assert.deepEqual(plain(K.battleStats(dWith(K), 'samerica', 1)), { atk: 10, hp: 36, party: [], gauge: 0, team: { bonus: 0, group: null, n: 0, slot: 0, auto: true } });
   // round((10+round(Σ))×1.1)、round((36+round(3Σ))×1.1)
   const g = K.battleStats(dWith(K, { gauge: { 'samerica:1': 2 } }), 'samerica', 1);
   assert.deepEqual(plain({ atk: g.atk, hp: g.hp, gauge: g.gauge }), { atk: 11, hp: 40, gauge: 2 });
   // ゲージはフロアごと
   assert.equal(K.battleStats(dWith(K, { gauge: { 'samerica:1': 2 } }), 'samerica', 2).atk, 10);
   // ★1・なかよし5・地域ボーナスの3枚: Σ = 3×1.725 = 5.175 → こうげき 10+5、HP 36+round(15.525)
+  // おまかせでも3枚とも南アメリカなのでチームボーナス +25%（設計書 §1.2）: round(15×1.25)、round(52×1.25)
   const c = K.battleStats(dWith(K, { cards: { br: [1, 0], ar: [1, 0], pe: [1, 0] }, fr: { br: 5, ar: 5, pe: 5 } }), 'samerica', 1);
-  assert.deepEqual(plain({ atk: c.atk, hp: c.hp }), { atk: 15, hp: 52 });
+  assert.deepEqual(plain({ atk: c.atk, hp: c.hp }), { atk: 19, hp: 65 });
+  assert.deepEqual(plain(c.team), { bonus: 0.25, group: '南アメリカ', n: 3, slot: 0, auto: true });
+  // グループがばらばらならボーナス無し（今と同じ強さ）: br 南アメリカ・jp 東アジア・fr 西ヨーロッパ
+  const m = K.battleStats(dWith(K, { cards: { br: [1, 0], jp: [1, 0], fr: [1, 0] } }), 'samerica', 1);
+  assert.deepEqual(plain({ atk: m.atk, hp: m.hp, bonus: m.team.bonus }), { atk: 14, hp: 47, bonus: 0 });
   assert.deepEqual(plain(c.party.map(p => p.a)), ['ar', 'br', 'pe']);
+});
+
+test('groups_cover_all_once', () => {
+  const { ctx } = loadCtx(); const K = ctx.RPG_CORE;
+  const all = K.GROUPS.flatMap(g => g.a);
+  assert.equal(K.GROUPS.length, 13);
+  assert.equal(all.length, 195);
+  assert.equal(new Set(all).size, 195);
+  assert.equal(K.groupOf('th'), '東南アジア'); assert.equal(K.groupOf('mx'), '北・中央アメリカ');
+  assert.equal(K.groupOf('cu'), 'カリブ海'); assert.equal(K.groupOf('zz'), null);
+});
+test('groups_match_index_subregions', () => {
+  const K = loadCore();
+  const SUB = vm.runInNewContext('(' + read('index.html').match(/const SUBREGIONS = (\{[\s\S]*?\n\});/)[1] + ')');
+  for (const [k, o] of Object.entries(SUB)) assert.deepEqual(plain(K.GROUPS.find(g => g.k === k).a), o.a.split(' '), k);
+});
+test('team_bonus', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.teamBonus([])), { bonus: 0, group: null, n: 0 });
+  assert.deepEqual(plain(K.teamBonus(['th', 'jp', 'br'])), { bonus: 0, group: null, n: 1 });
+  assert.deepEqual(plain(K.teamBonus(['th', 'vn', 'br'])), { bonus: 0.1, group: '東南アジア', n: 2 });
+  assert.deepEqual(plain(K.teamBonus(['th', 'vn', 'id'])), { bonus: 0.25, group: '東南アジア', n: 3 });
+});
+test('team_party_skips_unowned', () => {
+  const K = loadCore();
+  const d = dWith(K, { cards: { th: [1, 0], vn: [2, 0] }, teams: [{ n: 'A', c: ['vn', 'id', 'th'] }] });
+  assert.deepEqual(plain(K.teamParty(d, 'asia')).map(p => p.a), ['vn', 'th']);
+  assert.deepEqual(plain(K.teamParty(d, 'asia', 3)), plain(K.party(d, 'asia')));   // 無い枠はおまかせ
+});
+test('battle_stats_team_bonus', () => {
+  const K = loadCore();
+  const d = dWith(K, { cards: { th: [1, 0], vn: [1, 0], id: [1, 0] }, teams: [{ n: 'A', c: ['th', 'vn', 'id'] }] });
+  const s = K.battleStats(d, 'asia', 1);   // カード 1×1.5×3=4.5→5、旅人 Lv1 atk10 hp36
+  assert.equal(s.atk, Math.round((10 + 5) * 1.25)); assert.equal(s.hp, Math.round((36 + Math.round(13.5)) * 1.25));
+  assert.deepEqual(plain(s.team), { bonus: 0.25, group: '東南アジア', n: 3, slot: 0, auto: false });
+});
+test('old_save_same_strength', () => {
+  const K = loadCore();
+  const raw = { ...K.fresh(T0), cards: { br: [2, 1], cl: [1, 0], jp: [3, 4] } };
+  delete raw.teams; delete raw.tsel; delete raw.deco;
+  const d = K.sanitize(raw, T0), p = K.party(d, 'samerica');
+  const s = K.battleStats(d, 'samerica', 1);
+  assert.deepEqual(plain(s.party), plain(p)); assert.equal(s.team.auto, true); assert.equal(s.team.slot, 0);
+});
+test('buy_slot_edges', () => {
+  const K = loadCore();
+  const d = dWith(K, { coins: 2000 });
+  assert.equal(K.slotCost(d), 2000); assert.equal(K.buySlot(d), 2000);
+  assert.equal(d.coins, 0); assert.equal(d.teams.length, 2); assert.equal(d.tsel, 1); assert.deepEqual(plain(d.teams[1]), { n: '編成2', c: null });
+  d.coins = 2999; assert.equal(K.buySlot(d), 0); assert.equal(d.teams.length, 2); assert.equal(d.coins, 2999);
+  const full = dWith(K, { coins: 1e6, teams: [1, 2, 3, 4, 5].map(i => ({ n: 'x' + i, c: null })) });
+  assert.equal(K.slotCost(full), null); assert.equal(K.buySlot(full), 0); assert.equal(full.coins, 1e6);
+});
+test('sanitize_teams_garbage', () => {
+  const K = loadCore(), S = x => plain(K.sanitize({ ...K.fresh(T0), ...x }, T0));
+  assert.deepEqual(S({ teams: 'x' }).teams, [{ n: '編成1', c: null }]);
+  assert.deepEqual(S({ teams: [] }).teams, [{ n: '編成1', c: null }]);
+  assert.equal(S({ teams: Array(7).fill({ n: 'a', c: null }) }).teams.length, 5);
+  assert.deepEqual(S({ teams: [{ n: '  ', c: ['th', 'th', 'zz', '__proto__', 'vn', 'id', 'jp'] }] }).teams, [{ n: '編成1', c: ['th', 'vn', 'id'] }]);
+  assert.deepEqual(S({ teams: [{ n: 'とても長い名前の編成です', c: 5 }] }).teams, [{ n: 'とても長い名前の', c: null }]);
+  assert.equal(S({ teams: [{ n: 'a', c: null }], tsel: 4 }).tsel, 0);
+  assert.equal(S({ tsel: 'abc' }).tsel, 0);
+  assert.deepEqual(S({ deco: ['jp', 'jp', 'zz', 'br', 'cl', 'fr'] }).deco, ['jp', 'br', 'cl']);
+  assert.deepEqual(S({ deco: {} }).deco, []);
 });
 
 test('judge_rules', () => {
@@ -252,6 +323,7 @@ const FRESH = {
   paid: [],
   st: { win: 0, lose: 0, flee: 0, revive: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
   badgesPaid: [], gr: '',
+  teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
 };
 // テスト側で作る引き継ぎコード（実装の base64url とは別に Node の Buffer で作る）
 const enc = obj => 'CQ1.' + Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url');
