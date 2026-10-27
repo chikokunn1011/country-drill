@@ -1,12 +1,12 @@
 (() => {
   'use strict';
   // 冒険（国旗クエスト）のランキング（#scr-rpgrank）: 旅人のレベル順と、クリアしたダンジョンの数の順。
-  // 記録は Supabase の rpg_scores（supabase/schema.sql の submit_rpg / top_rpg / rpg_rank_of）。同じニックネームは自己ベストだけ出る。
+  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / top_rpg / rpg_rank_of）。1人1行。
   // rpg.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // rpg.js が起動していない・ランキングの接続先が無いときは何もしない（冒険ホームにランキングの入口が出ないだけ）
   const RPG = window.RPG;
-  if (typeof RPG?.tx !== 'function' || !window.RANKING?.enabled || typeof RANKING.rpgTop !== 'function') return;
+  if (typeof RPG?.tx !== 'function' || !window.RANKING?.enabled || typeof RANKING.rpgRegister !== 'function') return;   // 古い ranking.js がキャッシュに残っているときも出さない
 
   const K = RPG_CORE, DG = K.DUNGEONS, BOSS = 5, MAX_FLOORS = DG.length * BOSS;
   // いまのセーブの記録: レベル・ボスを倒したダンジョンの数・クリアしたフロアの合計
@@ -15,14 +15,17 @@
     return { lv: d.lv, dungeons: fl.filter(n => n >= BOSS).length, floors: fl.reduce((s, n) => s + n, 0) };
   };
   const SORTS = { lv: 'レベル', dg: 'ダンジョン' };
-  // 自動更新: 1回載せたら、ニックネームと最後に送った記録を localStorage（キー rpgRank）に覚えておき、
-  // レベルアップ・バトルの勝ち（新しいフロア・ボス）・起動時に記録が変わっていれば送り直す。
-  // DB は同じ名前の10秒以内の連投を断る（too_soon）ので、前に送ってから GAP ミリ秒あける。通信の失敗は次のきっかけで送り直す
+  // 登録は1回だけ: はじめて載せるとき、この端末で合言葉（token、UUID）を作って送り、ニックネーム・合言葉・最後に送った記録を
+  // localStorage（キー rpgRank）に覚える。そのあとは別の名前では登録できず、名前だけ変えられる（記録はそのまま）。
+  // 自動更新: レベルアップ・バトルの勝ち（新しいフロア・ボス）・起動時に記録が変わっていれば送り直す。
+  // DB は10秒以内の連投を断る（too_soon）ので、前に送ってから GAP ミリ秒あける。通信の失敗は次のきっかけで送り直す
   const KEY = 'rpgRank', GAP = 11000, WAIT = 1500;
-  const reg = () => { const r = store.get(KEY, null); return r && typeof r.name === 'string' && r.name ? r : null; };
+  // 合言葉の無い前の形（自動更新だけの版）の覚え書きは、DB の記録を消したので登録していないことにする
+  const reg = () => { const r = store.get(KEY, null); return r && typeof r.name === 'string' && r.name && typeof r.token === 'string' ? r : null; };
+  const newToken = () => crypto.randomUUID?.() ?? ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
   const same = (x, y) => x.lv === y.lv && x.dungeons === y.dungeons && x.floors === y.floors;
   const ranks = r => `レベル順 ${r.rankLv}位・ダンジョン順 ${r.rankDg}位`;
-  let autoTimer = null, lastSent = 0, sending = false;
+  let autoTimer = null, lastSent = 0, sending = false, renaming = false;
   // 登録していて、送った記録といまの記録がちがえば、少し待ってから送る（続けて上がったら1回にまとめる）
   const scheduleAuto = () => {
     const r = reg(), d = RPG.get();
@@ -37,14 +40,18 @@
     const rec = recordOf(d);
     if (r.sent && same(r.sent, rec)) return;
     sending = true; lastSent = Date.now();
-    const res = await RANKING.rpgSubmit({ nickname: r.name, ...rec });
+    const res = await RANKING.rpgUpdate({ token: r.token, ...rec });
     sending = false;
     if (res.ok) {
-      if (reg()?.name === r.name) store.set(KEY, { name: r.name, sent: rec });
+      const now = reg();
+      if (now?.token === r.token) store.set(KEY, { ...now, sent: rec });
       if (document.body.dataset.screen === 'rpgrank') { drawMe(); load(); }
       scheduleAuto();   // 送っているあいだにまた上がっていたら
     } else if (res.reason === 'too_soon') scheduleAuto();
-    else console.warn('ranking auto', res.reason);   // つながらない・断られたら、次のきっかけまで待つ
+    else if (res.reason === 'not_found') {   // DB から消された: 登録していないことにして、もう一回載せてもらう
+      if (reg()?.token === r.token) try { localStorage.removeItem(KEY); } catch {}
+      if (document.body.dataset.screen === 'rpgrank') drawMe();
+    } else console.warn('ranking auto', res.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
 
   const HTML = '<div class="rpg-head"><button type="button" class="linkbtn rpg-back">← 冒険</button><h2 class="rpg-h2">冒険ランキング</h2></div>'
@@ -53,8 +60,8 @@
     + '<form class="taform" id="rr-form" novalidate><div class="row"><input id="rr-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）">'
     + '<button class="btn" id="rr-submit">載せる</button></div></form><p class="tamsg" id="rr-msg" role="status"></p>'
     + '<div class="rpg-rr-auto" id="rr-auto" hidden><p>✅ <b id="rr-auto-name"></b> で登録ずみ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなるよ</p>'
-    + '<button type="button" class="linkbtn" id="rr-stop">自動で更新するのをやめる</button></div>'
-    + '<p class="hint">1回載せると、そのあとは自動で記録が新しくなる（同じニックネームは自己ベストだけ出る）</p></div>'
+    + '<button type="button" class="linkbtn" id="rr-rename">名前を変える</button></div>'
+    + '<p class="hint" id="rr-note">登録は1人1回だけ（あとから名前だけ変えられる）。載せると、そのあとは自動で記録が新しくなる。ほかの人と同じニックネームは使えない</p></div>'
     + '<div class="rpg-rr-main"><div class="seg" id="rr-tabs" role="group" aria-label="並べ方">'
     + Object.entries(SORTS).map(([k, v]) => `<button type="button" data-s="${k}">${v}</button>`).join('') + '</div>'
     + '<p class="hint" id="rr-how"></p>'
@@ -73,11 +80,12 @@
     $('rr-me').innerHTML = d.intro
       ? `<p class="rpg-rr-h">きみの記録</p><p class="rpg-rr-rec"><b>Lv ${r.lv}</b><span>${recText(r)}</span></p>`
       : '<p class="rpg-rr-h">まだ旅に出ていないよ</p><p class="hint">冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる</p>';
-    form.hidden = !d.intro;
     const g = reg();
+    form.hidden = !d.intro || (!!g && !renaming);   // 登録ずみなら、［名前を変える］を押したときだけ
     $('rr-auto').hidden = !d.intro || !g;
     if (g) $('rr-auto-name').textContent = g.name;
-    $('rr-submit').textContent = g ? '名前を変えて載せる' : '載せる';
+    $('rr-submit').textContent = g ? '変える' : '載せる';
+    $('rr-rename').hidden = renaming;
     $('rr-rank').textContent = '';
     if (!d.intro) return;
     // 何位相当か（失敗したら何も出さない。原因はコンソール）
@@ -109,7 +117,8 @@
     if (o.sort in SORTS) R.sort = o.sort;
     for (const b of $('rr-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.s === R.sort));
     $('rr-how').textContent = HOW[R.sort];
-    $('rr-name').value = store.get('nickname', '') || '';
+    renaming = false;
+    $('rr-name').value = reg()?.name || store.get('nickname', '') || '';
     $('rr-msg').textContent = ''; $('rr-msg').className = 'tamsg';
     drawMe();
     load();
@@ -133,11 +142,11 @@
     load();
   };
   $('rr-retry').onclick = () => load();
-  $('rr-stop').onclick = () => {
-    try { localStorage.removeItem(KEY); } catch {}
-    clearTimeout(autoTimer); autoTimer = null;
+  $('rr-rename').onclick = () => {
+    renaming = true;
     drawMe();
-    $('rr-msg').textContent = '自動で更新するのをやめたよ（載っている記録はそのまま）'; $('rr-msg').className = 'tamsg';
+    $('rr-name').value = reg()?.name || '';
+    $('rr-name').focus();
   };
   // きっかけ: レベルアップ・バトルに勝った（新しいフロアやボス）・別のタブがセーブを書いた・起動時
   document.addEventListener('rpg:levelup', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
@@ -153,17 +162,33 @@
     if (!chk.ok) return fail(chk.reason);
     const d = RPG.get();
     if (!d.intro) return;
+    const g = reg();
+    if (g && chk.name === g.name) { renaming = false; drawMe(); return say('名前はそのままだよ'); }
     btn.disabled = true; say('送信中…');   // 連打しても1回しか送らない
-    const r = await RANKING.rpgSubmit({ nickname: chk.name, ...recordOf(d) });
+    // 登録ずみなら名前だけ変える。まだなら合言葉を作って登録（送る前に覚えておき、通信が切れても同じ合言葉でやり直す）
+    const pending = store.get('rpgRankPending', null);
+    const token = g ? g.token : (typeof pending === 'string' ? pending : newToken());
+    if (!g) store.set('rpgRankPending', token);
+    const rec = recordOf(d);
+    let r = g ? await RANKING.rpgRename({ token, nickname: chk.name }) : await RANKING.rpgRegister({ token, nickname: chk.name, ...rec });
+    // 前に登録は通ったのに返事が届かなかった: 合言葉はもう登録ずみなので、名前を合わせる
+    if (!g && !r.ok && r.reason === 'already') r = await RANKING.rpgRename({ token, nickname: chk.name });
     btn.disabled = false;
-    if (!r.ok) return fail(r.reason);
-    store.set('nickname', chk.name);
-    store.set(KEY, { name: chk.name, sent: recordOf(d) });
+    if (!r.ok) {
+      if (r.reason === 'not_found' && g) { try { localStorage.removeItem(KEY); } catch {} renaming = false; drawMe(); }
+      return fail(r.reason);
+    }
     lastSent = Date.now();
+    store.set('nickname', chk.name);
+    store.set(KEY, { name: chk.name, token, sent: g ? g.sent : rec });
+    try { localStorage.removeItem('rpgRankPending'); } catch {}
+    renaming = false;
+    btn.textContent = '変える';
     drawMe();
-    say(`載せたよ！ ${ranks(r)}　これからは自動で更新するね`, 'ok');
-    $('rr-rank').textContent = '';
+    say(g ? `名前を「${chk.name}」に変えたよ` : `載せたよ！ ${ranks(r)}　これからは自動で更新するね`, 'ok');
+    if (!g) $('rr-rank').textContent = '';
     load();
+    scheduleAuto();
   };
 
   // タイムアタックのランキング画面から冒険のランキングへ（冒険を隠している人には出さない: body.rpg-off）
