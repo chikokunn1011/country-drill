@@ -182,6 +182,7 @@
   };
   // 表にする。★3 は表になったところで金色の演出
   const flipCard = el => {
+    if (el.classList.contains('is-back')) SND.play('flip');
     el.classList.remove('is-back');
     el.removeAttribute('aria-label');
     if (el.classList.contains('is-gold')) fx('gold', el);
@@ -250,6 +251,7 @@
     document.body.classList.add('rpg-staging');
     $('ga-skip').focus({ preventScroll: true });
     if (best === 3 && S.dopa) FX.sfx('fanfare');
+    else SND.play(best === 3 ? 'promo' : 'pull');
     stageTimer = setTimeout(closeStage, T.gacha.showMs + (best === 3 ? 500 : 0));
   };
   // 結果を裏向きで並べて flipMs ずつめくる（reduced motion なら最初から表）。カードは1枚ずつ足していったときの★とかさね
@@ -459,7 +461,7 @@
     box.hidden = !list.length;
   };
 
-  // 演出。ドパガキ（S.dopa は毎回読む）と reduced motion を見て決める。FX の効果音・振動はドパガキ ON のときだけ、
+  // 演出。ドパガキ（S.dopa は毎回読む）と reduced motion を見て決める。FX の効果音・振動はドパガキ ON のときだけ（OFF なら SND のふつうの効果音）、
   // 紙吹雪・フラッシュ・ポップ・浮かぶ数字は reduced motion では呼ばない（FX は自分では確かめないため）
   //   hit:   el（モンスター）が揺れて白く光り、n（ダメージ）が浮かぶ（reduced motion では白く光るだけ）。combo はこの正解をふくむ連続正解の数
   //   miss:  el（旅人の HP バー）が赤く光る
@@ -502,6 +504,7 @@
           clearTimeout(glowTimer.get(el));
           glowTimer.set(el, setTimeout(() => el.classList.remove('rpg-hitglow'), GLOW_MS));
         }
+        SND.play('hit', { combo: dopa ? 0 : combo });   // 当たった音はいつも。ドパガキはコンボの音も重ねる
         if (dopa) {
           FX.sfx('correct', combo);
           if (!still) {
@@ -518,10 +521,13 @@
           ouchTimer.set(el, setTimeout(() => el.classList.remove('rpg-ouch'), OUCH_MS));
         }
         if (dopa) { FX.sfx('wrong'); FX.buzz([60, 40, 60]); if (!still) FX.flash('rgb(255 59 48 / .35)'); }
+        else SND.play('damage');
       } else if (kind === 'win') {
         if (dopa) { FX.sfx('fanfare'); if (!still) FX.confetti(null, 220, true); }
+        else SND.play('win');
       } else if (kind === 'gold') {
         el?.classList.add('is-gold');
+        SND.play('gold');
         if (dopa && !still) { FX.flash('rgb(255 196 0 / .55)'); FX.confetti(rect(), 90); }
       } else if (kind === 'count') {
         if (!el) return;
