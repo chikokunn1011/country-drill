@@ -21,6 +21,7 @@
   const K = RPG_CORE, T = K.TUNING, TB = T.battle, DG = K.DUNGEONS, RPG = window.RPG;
   const BOSS = 5;             // フロアは F1〜F4 とボス（5）
   const LOG_LINES = 3;        // ログは直近3行
+  const ASSIST_MS = 600;      // 正解の援護で仲間に .rpg-assist を付けておく時間
   const COIN = RPG.COIN;
   const LABEL = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？' };
   const MODES = new Set(['f2n', 'n2f', 'm2f']);
@@ -57,17 +58,29 @@
 
   // ---- 上の列（モンスター・HP・のこりミス・仲間・取りもどした旗・ログ） ----
   const barHTML = (id, label) => `<div class="rpg-hp" id="${id}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0"><i></i></div><span class="rpg-hpnum"></span>`;
-  // 仲間3枚（国旗と★）。tags なら地域ボーナスの札も
-  const partyHTML = tags => `<ul class="rpg-party">${B.stats.party.map(({ a }) => {
-    const star = B.d.cards[a]?.[0] || 1, bonus = B.dg.r === 'all' || byA.get(a)?.r === B.dg.r;
-    return `<li class="rpg-pc"><img src="${flag(a)}" alt="${esc(nameOf(a))}"><span class="rpg-stars" role="img" aria-label="★${star}">${'★'.repeat(star)}</span>`
-      + `${tags && bonus ? `<span class="rpg-tag">地域ボーナス ×${T.card.regionMul}</span>` : ''}</li>`;
-  }).join('')}</ul>`;
+  // 仲間3枚（国旗と★）。tags なら地域ボーナスの札も（登場画面）、無ければ端にチームボーナスの札（上の列）。
+  // --i は正解の援護で左から順に跳ねるときのずらし（rpg.css の rpg-hop）
+  const partyHTML = tags => {
+    const tb = B.stats.team?.bonus || 0;
+    return `<ul class="rpg-party">${B.stats.party.filter(({ a }) => byA.has(a)).map(({ a }, i) => {
+      const star = B.d.cards[a]?.[0] || 1, bonus = B.dg.r === 'all' || byA.get(a)?.r === B.dg.r;
+      return `<li class="rpg-pc" style="--i:${i}"><img src="${flag(a)}" alt="${esc(nameOf(a))}"><span class="rpg-stars" role="img" aria-label="★${star}">${'★'.repeat(star)}</span>`
+        + `${tags && bonus ? `<span class="rpg-tag">地域ボーナス ×${T.card.regionMul}</span>` : ''}</li>`;
+    }).join('')}${!tags && tb ? `<li class="rpg-team-tag"><span role="img" aria-label="チームボーナス ＋${Math.round(tb * 100)}%">＋${Math.round(tb * 100)}%</span></li>` : ''}</ul>`;
+  };
+  // 上の列の仲間を描き直す（登場画面で編成を切り替えたとき）。仲間0枚なら列ごと無くす
+  const drawParty = () => {
+    const old = sec.querySelector('.rpg-btop .rpg-party');
+    if (!B.stats.party.length) return old?.remove();
+    const box = document.createElement('div');
+    box.innerHTML = partyHTML(false);
+    if (old) old.replaceWith(box.firstElementChild); else $('bt-flags').before(box.firstElementChild);
+  };
   // #scr-battle > .rpg-stage: 1つ目の子が上の列（.rpg-btop）、2つ目の子が問題の列（登場画面・問題・答え合わせ・終わりが入れかわる）
   const stageHTML = () => {
     const { dg, floor, mon, boss, d } = B;
     return `<div class="rpg-stage" data-phase="${B.phase}" style="--rpg-c: var(--rpg-r-${dg.id}, ${dg.color})"><div class="rpg-btop">`
-      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${esc(dg.name)} ${boss ? 'ボス' : `F${floor}`}</span></div>`
+      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${boss ? 'ボス' : `F${floor}`} ${esc(dg.name)}</span></div>`
       + `<div class="rpg-mon${boss ? ' rpg-boss' : ''}" id="bt-mon"><span class="rpg-mon-e" aria-hidden="true">${mon.e}</span>${boss ? '<span class="rpg-bosstag">BOSS</span>' : ''}</div>`
       + `<div class="rpg-hpl"><b class="rpg-hpname">${esc(mon.n)}</b>${barHTML('bt-ehp', `${mon.n}のHP`)}</div>`
       + `<div class="rpg-hpl"><span class="rpg-hpname" aria-hidden="true">${K.AVATARS[d.av] ?? K.AVATARS[0]}</span>${barHTML('bt-hhp', '旅人のHP')}<span class="rpg-left" id="bt-left"></span></div>`
@@ -110,12 +123,28 @@
   };
 
   // ---- 登場画面 ----
+  // 編成の行（仲間を1枚でも持っているときだけ）: 編成 ◀ 名前 ▶ チーム 南アメリカ×3 ＋25% ［へんせい］。◀▶ は枠が2つ以上のときだけ。
+  // チームボーナスは別の行にしない（スマホのボスでも［たたかう］が最初の画面に入るように）
+  const teamRowHTML = () => {
+    const teams = Array.isArray(B.d.teams) ? B.d.teams : [], tb = B.stats.team || {}, tm = teams[tb.slot ?? 0], many = teams.length > 1;
+    return '<div class="rpg-bteam"><span class="rpg-bteam-k">編成</span>'
+      + (many ? '<button type="button" class="linkbtn rpg-tsw" id="bt-tprev" aria-label="前の編成">◀</button>' : '')
+      + `<b class="rpg-tname" id="bt-tname">${esc(tm?.n ?? '編成1')}</b>`
+      + (many ? '<button type="button" class="linkbtn rpg-tsw" id="bt-tnext" aria-label="次の編成">▶</button>' : '')
+      + (tb.bonus ? `<span class="rpg-bteam-b"><span class="rpg-bteam-bk">チーム </span>${esc(tb.group)}×${tb.n} <b>＋${Math.round(tb.bonus * 100)}%</b></span>` : '')
+      + (typeof RPG.openTeam === 'function' ? '<button type="button" class="btn ghost rpg-tedit" id="bt-team">へんせい</button>' : '')
+      + '</div>';
+  };
   const introHTML = () => {
-    const { en, stats, mon, boss, d, id, floor } = B, g = stats.gauge;
+    const { en, stats, mon, boss, d, id, floor } = B, g = stats.gauge, tm = stats.team || {};
+    const hasCards = Object.keys(d.cards || {}).length > 0;
     return '<div class="rpg-bintro" id="bt-intro">'
       + `<p class="rpg-bmeet"><span class="rpg-bmeet-e" aria-hidden="true">${mon.e}</span><b>${esc(mon.n)}</b>があらわれた！</p>`
+      + (hasCards ? teamRowHTML() : '')
+      + (stats.party.length ? partyHTML(true)
+        : hasCards && !tm.auto ? '<p class="hint">この編成には仲間がいないよ</p>'
+          : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p>`)
       + `<p class="rpg-bline">倒すのに必要な正解: 約${K.hitsNeeded(stats, en)}回 ／ まちがえてOK: ${K.missesAllowed(stats, en)}回まで</p>`
-      + (stats.party.length ? partyHTML(true) : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p>`)
       + (g ? `<p class="rpg-bline">がんばりゲージ +${Math.round(TB.gaugeStep * 100 * g)}%</p>` : '')
       + (boss ? '<p class="rpg-bline">旗1枚につき正解1回で取りもどせる（Lv が足りないと2回かかることも）。旗を全部取りもどしたら勝ち！</p>' : '')
       + (id === DG[0].id && floor === 1 && !(d.floors[id] > 0) ? '<p class="rpg-bline">正解すると攻撃！ まちがえると反撃されるよ</p>' : '')
@@ -153,6 +182,28 @@
     if (sec.hidden) { RPG.opts = {}; show('battle'); }   // render からもう一度 start しない
     $('bt-fight')?.focus({ preventScroll: true });
     return true;
+  };
+  // 登場画面で使う編成を切り替える（step は +1 / -1、端で回る）。tsel を書いて、強さ・必要な正解の数・上の列を描き直す。
+  // フォーカスは押したボタン（キーなら［たたかう］）に戻す。新しい版のデータのあいだは何もしない
+  const switchTeam = (step, focusId) => {
+    if (!B || B.phase !== 'intro' || RPG.status === 'readOnly') return;
+    const n = Array.isArray(B.d.teams) ? B.d.teams.length : 0;
+    if (n < 2) return;
+    const cur = B.stats.team?.slot ?? 0, to = ((cur + step) % n + n) % n;
+    if (RPG.tx(x => { x.tsel = to; return true; }) !== true) return;
+    B.d = RPG.get();
+    B.stats = K.battleStats(B.d, B.id, B.floor);
+    B.hp = B.stats.hp;
+    if (!B.boss) B.need = K.hitsNeeded(B.stats, B.en);
+    drawParty();
+    drawTop();
+    $('bt-col').innerHTML = introHTML();
+    ($(focusId) || $('bt-fight'))?.focus({ preventScroll: true });
+  };
+  // 編成画面へ（drill:screen でバトルは片付く。［← バトルにもどる］で同じフロアの登場画面を start が作り直す）
+  const editTeam = () => {
+    if (!B || B.phase !== 'intro' || typeof RPG.openTeam !== 'function') return;
+    RPG.openTeam({ id: B.id, floor: B.floor });
   };
   // 始めていない画面（RPG.open を通らずに開いた・始めるのに失敗した）
   const idle = () => {
@@ -270,7 +321,10 @@
       return wait();
     }
     const crit = Math.random() < TB.critRate, dmg = K.damage(B.stats.atk, B.combo, crit);
-    const head = `${crit ? '会心！ ' : ''}${nameOf(q.a)}！ `;
+    // 仲間が1枚以上いれば後ろに「（チリ・ペルーの援護）」を足して、仲間カードが跳ねる（assist）。
+    // スマホのログは1行で末尾が … で切れるので、ダメージを先に書く
+    const mates = B.stats.party.map(c => nameOf(c.a)).join('・');
+    const head = `${crit ? '会心！ ' : ''}${nameOf(q.a)}！ `, tail = mates ? `（${mates}の援護）` : '';
     B.combo++;
     B.maxCombo = Math.max(B.maxCombo, B.combo);
     if (B.boss) {   // ボスはいまの旗の残りだけ（余りは持ち越さない）
@@ -278,16 +332,27 @@
       f.hp = Math.max(0, f.hp - dmg);
       B.again = f.hp > 0;
       if (!B.again) { f.got = true; B.order.shift(); }
-      say(B.again ? `${head}${B.mon.n}に${dmg}ダメージ` : `${head}旗を取りもどした`);
+      say(B.again ? `${head}${B.mon.n}に${dmg}ダメージ${tail}` : `${head}旗を取りもどした${tail}`);
     } else {
       B.ehp = Math.max(0, B.ehp - dmg);
       B.got.push(q.a);
-      say(`${head}${B.mon.n}に${dmg}ダメージ`);
+      say(`${head}${B.mon.n}に${dmg}ダメージ${tail}`);
     }
     drawTop();
+    if (mates) assist();
     RPG.fx('hit', $('bt-mon'), dmg, B.combo);   // モンスターが揺れてダメージの数字が浮かぶ（ドパガキ ON なら効果音・紙吹雪・COMBO）
     if (B.boss ? !B.order.length : B.ehp === 0) return finish(true);
     wait();
+  };
+  // 上の列の仲間に .rpg-assist を 600ms 付ける（跳ねる・光るは rpg.css。続けて正解したら付け直して最初から）
+  const assist = () => {
+    const ul = sec.querySelector('.rpg-btop .rpg-party');
+    if (!ul) return;
+    clearTimeout(B.assistTimer);
+    ul.classList.remove('rpg-assist');
+    void ul.offsetWidth;   // 付け直したときもアニメーションを最初から
+    ul.classList.add('rpg-assist');
+    B.assistTimer = setTimeout(() => ul.classList.remove('rpg-assist'), ASSIST_MS);
   };
   // 自動送り（待っているあいだのステージのタップと Enter も）
   const advance = () => {
@@ -482,6 +547,7 @@
         const b = B;
         ({
           'bt-flee': askFlee, 'bt-fight': fight, 'bt-next': next, 'bt-practice': practice,
+          'bt-tprev': () => switchTeam(-1, 'bt-tprev'), 'bt-tnext': () => switchTeam(1, 'bt-tnext'), 'bt-team': editTeam,
           'bt-nextfloor': () => b.next && tryStart(b.next.id, b.next.floor),
           'bt-again': () => tryStart(b.id, b.floor),
           'bt-home': () => show('rpg'),
@@ -505,6 +571,9 @@
         if (B.phase === 'intro') $('bt-fight')?.click();
         else if (B.phase === 'reveal') $('bt-next')?.click();
         else if (B.waiting) advance();
+      } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && B.phase === 'intro') {
+        e.preventDefault();
+        switchTeam(e.key === 'ArrowLeft' ? -1 : 1, 'bt-fight');
       } else if (e.key === 'Escape') askFlee();
     } catch (err) { console.error('[rpg]', err); }
   });

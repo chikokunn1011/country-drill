@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './helpers.mjs';
 
 // RPG のファイル。既存のテストが「RPG がある」ことだけで落ちるときは、開くときに blockScripts: RPG_FILES を渡す
-export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-rank.js'];
+export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // window.__ev に積むイベント（helpers の events(page, type?) で読める）
 export const RPG_EVENTS = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer', 'rpg:battle', 'rpg:clear',
-  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'badge:earned', 'badge:title',
+  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:deco', 'badge:earned', 'badge:title',
   'drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
 
 // 読み込むたびに（再読み込みのあとも）ページのスクリプトより前に走る。イベントを window.__ev に、出たトーストの文字を window.__toasts に積む

@@ -177,15 +177,88 @@ t('phone_sticky_top', async page => {
   await labelBelowTop(page);
 });
 
+// 上の列の仲間の国旗のうち、見えている（offsetParent が null でない）数
+const visibleParty = page => page.$$eval('.rpg-btop .rpg-party img', els => els.filter(e => e.offsetParent !== null).length);
+
+// スマホ: 旅人の HP の行の下に仲間3枚を1行で（国旗 28px 幅＋★）
+t('phone_shows_party', async page => {
+  // チームボーナスの札は自分で組んだ枠だけ（おまかせにはつかない）
+  await writeSave(page, { ...PARTY, teams: [{ n: '編成1', c: ['br', 'cl', 'jp'] }] });
+  await startBattle(page, 'samerica', 1);
+  assert.equal(await visibleParty(page), 3);
+  const m = await page.evaluate(() => {
+    const ul = document.querySelector('.rpg-btop .rpg-party'), hhp = $('bt-hhp').getBoundingClientRect();
+    const lis = [...ul.querySelectorAll('.rpg-pc')].map(li => li.getBoundingClientRect()), tag = ul.querySelector('.rpg-team-tag')?.getBoundingClientRect();
+    return { hhp: hhp.bottom, top: ul.getBoundingClientRect().top, tops: lis.map(r => Math.round(r.top)), tag: tag && { top: tag.top, bottom: tag.bottom, last: lis[2].bottom, first: lis[0].top },
+      w: ul.querySelector('img').getBoundingClientRect().width, stars: [...ul.querySelectorAll('.rpg-stars')].filter(e => e.offsetParent !== null).length };
+  });
+  assert.ok(m.top >= m.hhp - 1, `仲間の列 ${m.top} が旅人の HP ${m.hhp} より上`);
+  assert.equal(new Set(m.tops).size, 1, `仲間が1行に並ばない ${m.tops}`);
+  assert.equal(Math.round(m.w), 28);
+  // 南アメリカ×2 のチームボーナスの札も同じ行に
+  assert.ok(m.tag && m.tag.top >= m.tag.first && m.tag.bottom <= m.tag.last, `チームの札 ${JSON.stringify(m.tag)}`);
+  assert.equal(m.stars, 3);
+  assert.ok(await noHScroll(page));
+}, { viewport: PHONE });
+
+// スマホ 390×844: ボス（説明の行が多い）で同じ地域の3枚・枠2つ（◀▶ とチームボーナス）でも、登場画面の［たたかう］は最初の画面に入る
+t('phone_boss_fight_visible', async page => {
+  await writeSave(page, { ...PARTY, cards: { br: [2, 1], cl: [1, 0], ar: [1, 0] }, tsel: 0,
+    teams: [{ n: '編成1', c: ['br', 'cl', 'ar'] }, { n: '編成2', c: ['br'] }] });
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 5));
+  await page.locator('#bt-intro').waitFor();
+  assert.equal(await page.locator('#bt-tprev, #bt-tnext').count(), 2);
+  assert.ok((await page.innerText('#bt-intro .rpg-bteam')).includes('＋25%'), await page.innerText('#bt-intro .rpg-bteam'));
+  const b = await rect(page, '#bt-fight');
+  assert.ok(b.bottom <= PHONE.height, `［たたかう］の下端 ${b.bottom} が画面（${PHONE.height}）の外`);
+  // チームボーナスは編成の行の中（別の行を足さない）
+  assert.equal(await page.locator('#bt-intro > .rpg-bteam-b').count(), 0);
+  assert.ok(await noHScroll(page));
+  // 短いスマホ 360×640 でも入る
+  await page.setViewportSize(SHORT);
+  const s = await rect(page, '#bt-fight');
+  assert.ok(s.bottom <= SHORT.height, `${size(SHORT)}: ［たたかう］の下端 ${s.bottom} が画面の外`);
+  assert.ok(await noHScroll(page));
+}, { viewport: PHONE });
+
+// 正解の援護: 動きを抑える設定では跳ねない（アニメーション 0）で枠が光るだけ。ふつうは .rpg-pc が跳ねる（国旗の img には transform をかけない）
+for (const reducedMotion of ['reduce', 'no-preference']) {
+  t(`assist_motion_${reducedMotion}`, async page => {
+    await writeSave(page, PARTY);
+    await startBattle(page, 'samerica', 1);
+    await battleGuard(page);
+    await page.locator(`#scr-battle .choice[data-a="${await page.evaluate(() => RPG_BATTLE.cur())}"]`).click();
+    const m = await page.evaluate(() => {
+      const pcs = [...document.querySelectorAll('.rpg-btop .rpg-pc')];
+      return { assist: !!document.querySelector('.rpg-btop .rpg-party.rpg-assist'),
+        anims: pcs.reduce((n, el) => n + el.getAnimations().length, 0),
+        shadow: getComputedStyle(pcs[0]).boxShadow,
+        imgAnims: [...document.querySelectorAll('.rpg-btop .rpg-pc img')].reduce((n, el) => n + el.getAnimations().length, 0) };
+    });
+    assert.equal(m.assist, true);
+    assert.equal(m.imgAnims, 0);
+    if (reducedMotion === 'reduce') {
+      assert.equal(m.anims, 0);
+      assert.notEqual(m.shadow, 'none');
+    } else assert.equal(m.anims, 3);
+  }, { reducedMotion });
+}
+
 t('short_phone_one_line', async page => {
   await writeSave(page, PARTY);
   await startBattle(page, 'samerica', 1);
   const top = await rect(page, '.rpg-btop');
   assert.ok(top.height <= 58, `上の列の高さ ${top.height}`);   // 約56px
+  // ダンジョン名は … で切れても、フロア（F1）は見える（フロアが先）
+  assert.match(await page.innerText('.rpg-bwhere'), /^F1 /);
+  assert.equal(await page.evaluate(() => { const e = document.querySelector('.rpg-bwhere'), r = document.createRange(); r.setStart(e.firstChild, 0); r.setEnd(e.firstChild, 2); return r.getBoundingClientRect().right <= e.getBoundingClientRect().right; }), true);
   assert.ok((await rect(page, '#bt-flee')).height >= 24, `［にげる］の高さ ${(await rect(page, '#bt-flee')).height} が 24px より低い（押しにくい）`);
   assert.equal(await page.isVisible('.rpg-flagtext'), true);
   assert.match(await page.innerText('.rpg-flagtext'), /旗/);
   assert.equal(await page.locator('#bt-flags .rpg-cloth:visible').count(), 0);   // 旗の列は「旗 n/N」の文字だけ
+  // 仲間は国旗だけ（3つ見える。★は隠す）
+  assert.equal(await visibleParty(page), 3);
+  assert.equal(await page.locator('.rpg-btop .rpg-stars:visible').count(), 0);
   for (const mode of ['f2n', 'n2f', 'm2f']) {
     await page.evaluate(([a, m]) => RPG_BATTLE.force(a, m), [LONG, mode]);
     const c4 = await rect(page, '#scr-battle .choice:nth-child(4)');
@@ -203,6 +276,7 @@ t('short_phone_one_line', async page => {
   await startBattle(page, 'samerica', 5);
   const boss = await rect(page, '.rpg-btop');
   assert.ok(boss.height <= 58, `ボスの上の列の高さ ${boss.height}`);
+  assert.match(await page.innerText('.rpg-bwhere'), /^ボス /);
   assert.equal(await page.isVisible('#bt-mon .rpg-bosstag'), true);
   const tag = await page.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.rpg-bosstag')).fontSize));
   assert.ok(tag >= 8.8, `BOSS の札の文字 ${tag}px が小さすぎる`);   // .55rem

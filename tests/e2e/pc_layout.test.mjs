@@ -450,7 +450,7 @@ test('result_single_column_when_side_empty', { timeout: 120_000 }, async () => {
   try {
     const { page } = app;
     // 接続先が未設定の状態にする（submit.test.mjs の disabled_when_not_configured と同じ）
-    await page.route('**/ranking.js', async route => {
+    await page.route('**/ranking.js*', async route => {
       const res = await route.fetch();
       await route.fulfill({ response: res, body: (await res.text()) + '\nRANKING.enabled = false;\n' });
     });

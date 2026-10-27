@@ -194,3 +194,45 @@ test('rank_of_rejects_on_failure', async () => {
   await assert.rejects(load(reply({ message: 'boom' }, 500)).R.rankOf({ board: 'f2n:all:10', timeMs: 8000 }));
   await assert.rejects(load(() => Promise.reject(new TypeError('Failed to fetch'))).R.rankOf({ board: 'f2n:all:10', timeMs: 8000 }));
 });
+
+test('rpg_codes_match_countries', () => {
+  const sql = read('supabase/schema.sql');
+  const codes = sql.match(/function rpg_codes\(\)[\s\S]*?array\[([^\]]*)\]/)[1].match(/'([a-z]{2})'/g).map(s => s.slice(1, 3));
+  const C = vm.runInNewContext(read('countries.js').replace('window.COUNTRIES=', ''));
+  assert.deepEqual(codes, [...C.map(c => c.a)]);   // vm 側の配列は prototype が別物なので、こちら側の配列にして比べる
+});
+
+test('rpc_error_has_status_number', async () => {
+  // HTTP エラーの例外には状態の数字が入る（top_rpg2 がまだ無い 404 を見分けるため）
+  const { R } = load(reply({ message: 'Could not find the function' }, 404));
+  await assert.rejects(R.top({ board: 'f2n:all:10', period: 'all' }), e => e.status === 404);
+});
+
+test('rpg_top_falls_back_on_404', async () => {
+  // DB に top_rpg2 がまだ無い（404）ときは top_rpg を呼ぶ。かざりは空
+  const row = { nickname: 'ミケ', lv: 3, dungeons: 1, floors: 5, created_at: '2026-10-25T00:00:00Z' };
+  const { R, calls } = load(url => url.endsWith('/top_rpg2') ? reply({ message: 'nope' }, 404)() : reply([row])());
+  const rows = await R.rpgTop({ sort: 'lv' });
+  assert.deepEqual(calls.map(c => c.url.slice(RPC.length)), ['top_rpg2', 'top_rpg']);
+  assert.equal(calls[1].opts.body, '{"p_sort":"lv"}');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].nickname, 'ミケ');
+  assert.deepEqual(plain(rows[0].deco), []);
+  // top_rpg2 があればかざりも返す（配列でなければ空）。404 以外の失敗は reject
+  const two = load(reply([{ ...row, deco: ['jp', 'br'] }, { ...row, nickname: 'タロウ', deco: null }]));
+  const r2 = await two.R.rpgTop({ sort: 'dg' });
+  assert.deepEqual(two.calls.map(c => c.url.slice(RPC.length)), ['top_rpg2']);
+  assert.deepEqual(plain(r2.map(r => r.deco)), [['jp', 'br'], []]);
+  const bad = load(reply({ message: 'boom' }, 500));
+  await assert.rejects(bad.R.rpgTop({ sort: 'lv' }), e => e.status === 500);
+  assert.equal(bad.calls.length, 1);
+});
+
+test('rpg_set_deco_args', async () => {
+  const { R, calls } = load(reply({ ok: true }));
+  assert.deepEqual(plain(await R.rpgSetDeco({ token: 't', deco: ['jp'] })), { ok: true });
+  assert.equal(calls[0].url, RPC + 'rpg_set_deco');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { p_token: 't', p_deco: ['jp'] });
+  assert.deepEqual(plain(await load(reply({ ok: false, reason: 'bad_deco' })).R.rpgSetDeco({ token: 't', deco: ['zz'] })), { ok: false, reason: 'bad_deco' });
+  assert.equal(R.message('bad_deco'), 'かざりの国が正しくないみたい');
+});

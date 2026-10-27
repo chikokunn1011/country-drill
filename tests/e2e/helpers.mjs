@@ -91,15 +91,16 @@ export function fakeDb() {
         .map(({ nickname, time_ms, created_at }) => ({ nickname, time_ms, created_at }));
     },
     rank_of: ({ p_board, p_time_ms }) => rankOf(p_board, p_time_ms),
-    // 冒険のランキング（rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of と同じ形。名前は文字数と重なりだけ見る。
-    // 10秒の連投よけはしない）。rpgRows の行は { token, nickname, lv, dungeons, floors, created_at, at }
+    // 冒険のランキング（rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と同じ形。
+    // 名前は文字数と重なりだけ、かざりは数・重なり・国コードの形だけ見る。10秒の連投よけはしない）。
+    // rpgRows の行は { token, nickname, lv, dungeons, floors, deco, created_at, at }（deco は無くてもよい = 空）
     rpg_register({ p_token, p_nickname, p_lv, p_dungeons, p_floors }) {
       const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
       if (rpgRows.some(r => r.token === p_token)) return { ok: false, reason: 'already' };
       if (len < 1 || len > 12) return { ok: false, reason: 'bad_name' };
       if (rpgRows.some(r => r.nickname === nickname)) return { ok: false, reason: 'name_taken' };
       const at = new Date().toISOString();
-      rpgRows.push({ token: p_token, nickname, lv: p_lv, dungeons: p_dungeons, floors: p_floors, created_at: at, at });
+      rpgRows.push({ token: p_token, nickname, lv: p_lv, dungeons: p_dungeons, floors: p_floors, deco: [], created_at: at, at });
       return { ok: true, ...rpgRank(p_lv, p_dungeons, p_floors) };
     },
     rpg_update({ p_token, p_lv, p_dungeons, p_floors }) {
@@ -122,10 +123,18 @@ export function fakeDb() {
       rpgRows.splice(i, 1);
       return { ok: true };
     },
+    rpg_set_deco({ p_token, p_deco }) {
+      const r = rpgRows.find(r => r.token === p_token);
+      if (!Array.isArray(p_deco) || p_deco.length > 3 || new Set(p_deco).size !== p_deco.length || !p_deco.every(a => /^[a-z]{2}$/.test(a))) return { ok: false, reason: 'bad_deco' };
+      if (!r) return { ok: false, reason: 'not_found' };
+      r.deco = [...p_deco];
+      return { ok: true };
+    },
+    top_rpg2: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, deco, at }) => ({ nickname, lv, dungeons, floors, deco: deco ?? [], created_at: at })) : [],
     top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
   };
-  // calls: 届いた RPC の記録 { name, args }。down を true にすると通信失敗になる
+  // calls: 届いた RPC の記録 { name, args, at }（at は届いた時刻 ms）。down を true にすると通信失敗になる
   return { rows, rpgRows, calls: [], down: false, rpc };
 }
 
@@ -135,7 +144,7 @@ async function supabaseRoute(route, db) {
   const req = route.request();
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
   const name = new URL(req.url()).pathname.split('/').pop(), args = req.postDataJSON() ?? {};
-  db.calls.push({ name, args });
+  db.calls.push({ name, args, at: Date.now() });
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
   const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors'].some(k => k in args && !Number.isInteger(args[k]));

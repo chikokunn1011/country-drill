@@ -1,7 +1,7 @@
 -- 195か国ドリル タイムアタックのランキング用（Supabase）
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
--- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of だけ。
+-- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of だけ。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -263,6 +263,69 @@ begin
 end $$;
 revoke all on function top_rpg(text) from public;
 grant execute on function top_rpg(text) to anon;
+
+-- ---- 冒険ランキングのかざり（プロフィールに飾る国旗を3つまで） ----
+-- サーバーは冒険のデータを持たないので「本当に持っている仲間か」は確かめない。見た目だけのもの（2026-10-27）
+alter table rpg_players add column if not exists deco text[] not null default '{}';   -- 国コード 0〜3個
+alter table rpg_players add column if not exists deco_at timestamptz;                  -- 最後にかざりを変えた時刻（連投よけ）
+
+-- 195か国の国コード（countries.js と同じ並び。tests/unit/ranking.test.mjs で一致を確かめる）
+create or replace function rpg_codes() returns text[]
+language sql immutable set search_path = public, pg_temp as $$
+  select array['af', 'al', 'dz', 'ad', 'ao', 'ag', 'ar', 'am', 'au', 'at', 'az', 'bs', 'bh', 'bd', 'bb', 'by', 'be', 'bz', 'bj', 'bt',
+               'bo', 'ba', 'bw', 'br', 'bn', 'bg', 'bf', 'bi', 'cv', 'kh', 'cm', 'ca', 'cf', 'td', 'cl', 'cn', 'co', 'km', 'cg', 'cd',
+               'cr', 'ci', 'hr', 'cu', 'cy', 'cz', 'dk', 'dj', 'dm', 'do', 'ec', 'eg', 'sv', 'gq', 'er', 'ee', 'sz', 'et', 'fj', 'fi',
+               'fr', 'ga', 'gm', 'ge', 'de', 'gh', 'gr', 'gd', 'gt', 'gn', 'gw', 'gy', 'ht', 'va', 'hn', 'hu', 'is', 'in', 'id', 'ir',
+               'iq', 'ie', 'il', 'it', 'jm', 'jp', 'jo', 'kz', 'ke', 'ki', 'kp', 'kr', 'xk', 'kw', 'kg', 'la', 'lv', 'lb', 'ls', 'lr',
+               'ly', 'li', 'lt', 'lu', 'mg', 'mw', 'my', 'mv', 'ml', 'mt', 'mh', 'mr', 'mu', 'mx', 'fm', 'md', 'mc', 'mn', 'me', 'ma',
+               'mz', 'mm', 'na', 'nr', 'np', 'nl', 'nz', 'ni', 'ne', 'ng', 'mk', 'no', 'om', 'pk', 'pw', 'pa', 'pg', 'py', 'pe', 'ph',
+               'pl', 'pt', 'qa', 'ro', 'ru', 'rw', 'kn', 'lc', 'vc', 'ws', 'sm', 'st', 'sa', 'sn', 'rs', 'sc', 'sl', 'sg', 'sk', 'si',
+               'sb', 'so', 'za', 'ss', 'es', 'lk', 'sd', 'sr', 'se', 'ch', 'sy', 'tj', 'tz', 'th', 'tl', 'tg', 'to', 'tt', 'tn', 'tr',
+               'tm', 'tv', 'ug', 'ua', 'ae', 'gb', 'us', 'uy', 'uz', 'vu', 've', 'vn', 'ye', 'zm', 'zw']
+$$;
+revoke all on function rpg_codes() from public, anon, authenticated;
+
+-- かざりを変える（3つまで・重なり無し・rpg_codes() のどれか）。10秒以内の連投は断る（deco_at で数える。rpg_update の updated_at とは別）
+create or replace function rpg_set_deco(p_token text, p_deco text[]) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+  v_row rpg_players;
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  if p_deco is null or cardinality(p_deco) > 3 or coalesce(array_ndims(p_deco), 1) <> 1
+     or array_position(p_deco, null) is not null
+     or not (p_deco <@ rpg_codes())
+     or (select count(distinct x) from unnest(p_deco) x) <> cardinality(p_deco) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_deco');
+  end if;
+  select * into v_row from rpg_players where token_hash = v_hash for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if v_row.deco_at > now() - interval '10 seconds' then return jsonb_build_object('ok', false, 'reason', 'too_soon'); end if;
+  update rpg_players set deco = p_deco, deco_at = now() where id = v_row.id;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function rpg_set_deco(text, text[]) from public;
+grant execute on function rpg_set_deco(text, text[]) to anon;
+
+-- 上位50人（かざりつき）。並びは top_rpg と同じ。top_rpg は返す列の形を変えると drop が要るので新しい名前で作り、
+-- 古い top_rpg はキャッシュに残った古い rpg-rank.js のために残す
+create or replace function top_rpg2(p_sort text)
+returns table(nickname text, lv int, dungeons int, floors int, deco text[], created_at timestamptz)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+#variable_conflict use_column
+begin
+  if p_sort is null or p_sort not in ('lv', 'dg') then return; end if;
+  if p_sort = 'lv' then
+    return query select p.nickname, p.lv, p.dungeons, p.floors, p.deco, p.updated_at from rpg_players p
+      order by p.lv desc, p.dungeons desc, p.floors desc, p.created_at limit 50;
+  else
+    return query select p.nickname, p.lv, p.dungeons, p.floors, p.deco, p.updated_at from rpg_players p
+      order by p.dungeons desc, p.floors desc, p.lv desc, p.created_at limit 50;
+  end if;
+end $$;
+revoke all on function top_rpg2(text) from public;
+grant execute on function top_rpg2(text) to anon;
 
 -- PostgREST に関数が増えたことを知らせる
 notify pgrst, 'reload schema';

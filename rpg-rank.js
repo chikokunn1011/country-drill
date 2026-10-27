@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   // 冒険（国旗クエスト）のランキング（#scr-rpgrank）: 旅人のレベル順と、クリアしたダンジョンの数の順。
-  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / rpg_unregister / top_rpg / rpg_rank_of）。1人1行。
+  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg2 / rpg_rank_of）。1人1行。
   // rpg.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // rpg.js が起動していない・ランキングの接続先が無いときは何もしない（冒険ホームにランキングの入口が出ないだけ）
@@ -14,22 +14,32 @@
     const fl = DG.map(g => Math.max(0, Math.min(BOSS, (d.floors || {})[g.id] || 0)));
     return { lv: d.lv, dungeons: fl.filter(n => n >= BOSS).length, floors: fl.reduce((s, n) => s + n, 0) };
   };
+  // 送るかざり: セーブの deco のうち持っている仲間（cards）の国だけ（冒険ホームの旅人カードと同じしぼり方）
+  const decoOf = d => (Array.isArray(d.deco) ? d.deco : []).filter(a => byA.has(a) && d.cards?.[a]);
   const SORTS = { lv: 'レベル', dg: 'ダンジョン' };
   // 登録は1回だけ: はじめて載せるとき、この端末で合言葉（token、UUID）を作って送り、ニックネーム・合言葉・最後に送った記録を
   // localStorage（キー rpgRank）に覚える。そのあとは別の名前では登録できず、名前だけ変えられる（記録はそのまま）。
-  // 自動更新: レベルアップ・バトルの勝ち（新しいフロア・ボス）・起動時に記録が変わっていれば送り直す。
+  // 自動更新: レベルアップ・バトルの勝ち（新しいフロア・ボス）・かざりの変更・起動時に記録かかざりが変わっていれば送り直す。
+  // 記録は rpg_update、かざりは rpg_set_deco で別々に送る（1回に片方。記録が先）。送ったものは sent に覚える（sent.deco が無い = 空）。
   // DB は10秒以内の連投を断る（too_soon）ので、前に送ってから GAP ミリ秒あける。通信の失敗は次のきっかけで送り直す
   const KEY = 'rpgRank', GAP = 11000, WAIT = 1500;
   // 合言葉の無い前の形（自動更新だけの版）の覚え書きは、DB の記録を消したので登録していないことにする
   const reg = () => { const r = store.get(KEY, null); return r && typeof r.name === 'string' && r.name && typeof r.token === 'string' ? r : null; };
   const newToken = () => crypto.randomUUID?.() ?? ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
   const same = (x, y) => x.lv === y.lv && x.dungeons === y.dungeons && x.floors === y.floors;
+  // まだ送っていないもの: 'rec'（記録）・'deco'（かざり。古い ranking.js で rpgSetDeco が無いときは送らない）・null（どちらも送ってある）
+  const sameDeco = (x, y) => x.length === y.length && x.every((a, i) => a === y[i]);
+  const todo = (r, d) => {
+    if (!r.sent || !same(r.sent, recordOf(d))) return 'rec';
+    if (typeof RANKING.rpgSetDeco === 'function' && !sameDeco(Array.isArray(r.sent.deco) ? r.sent.deco : [], decoOf(d))) return 'deco';
+    return null;
+  };
   const ranks = r => `レベル順 ${r.rankLv}位・ダンジョン順 ${r.rankDg}位`;
   let autoTimer = null, lastSent = 0, sending = false, renaming = false;
   // 登録していて、送った記録といまの記録がちがえば、少し待ってから送る（続けて上がったら1回にまとめる）
   const scheduleAuto = () => {
     const r = reg(), d = RPG.get();
-    if (!r || !d.intro || (r.sent && same(r.sent, recordOf(d)))) return;
+    if (!r || !d.intro || !todo(r, d)) return;
     clearTimeout(autoTimer);
     autoTimer = setTimeout(sendAuto, Math.max(WAIT, lastSent + GAP - Date.now()));
   };
@@ -37,21 +47,22 @@
     autoTimer = null;
     const r = reg(), d = RPG.get();
     if (!r || !d.intro || sending) return;
-    const rec = recordOf(d);
-    if (r.sent && same(r.sent, rec)) return;
+    const what = todo(r, d);
+    if (!what) return;
+    const rec = recordOf(d), deco = decoOf(d), sent = what === 'rec' ? rec : { deco };
     sending = true; lastSent = Date.now();
-    const res = await RANKING.rpgUpdate({ token: r.token, ...rec });
+    const res = what === 'rec' ? await RANKING.rpgUpdate({ token: r.token, ...rec }) : await RANKING.rpgSetDeco({ token: r.token, deco });
     sending = false;
     if (res.ok) {
       const now = reg();
-      if (now?.token === r.token) store.set(KEY, { ...now, sent: rec });
+      if (now?.token === r.token) store.set(KEY, { ...now, sent: { ...now.sent, ...sent } });   // 送らなかった方は残す
       if (document.body.dataset.screen === 'rpgrank') { drawMe(); load(); }
-      scheduleAuto();   // 送っているあいだにまた上がっていたら
+      scheduleAuto();   // もう片方（記録かかざり）がまだ・送っているあいだにまた上がっていたら
     } else if (res.reason === 'too_soon') scheduleAuto();
     else if (res.reason === 'not_found') {   // DB から消された: 登録していないことにして、もう一回載せてもらう
       if (reg()?.token === r.token) try { localStorage.removeItem(KEY); } catch {}
       if (document.body.dataset.screen === 'rpgrank') drawMe();
-    } else console.warn('ranking auto', res.reason);   // つながらない・断られたら、次のきっかけまで待つ
+    } else console.warn(`ranking auto ${what}`, res.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
 
   const HTML = '<div class="rpg-head"><button type="button" class="linkbtn rpg-back">← 冒険</button><h2 class="rpg-h2">冒険ランキング</h2></div>'
@@ -108,7 +119,10 @@
     list.innerHTML = (rows ?? []).map((r, i) => {
       if (!i || !same(r, rows[i - 1])) no = i + 1;
       const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>・F${r.floors}</small></span>`;
-      return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}</span>`
+      // かざり: 知っている国だけ3つまで（DB も3つまでしか受け付けないが、念のため）。名前の中に入れて列を増やさない（スマホで名前が細くならない）
+      const deco = (Array.isArray(r.deco) ? r.deco : []).filter((a, j, l) => byA.has(a) && l.indexOf(a) === j).slice(0, 3)
+        .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
+      return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}${deco ? `<span class="rr-deco">${deco}</span>` : ''}</span>`
         + `${R.sort === 'lv' ? lv + dg : dg + lv}<span class="mono at">${jstDay(r.at)}</span></li>`;
     }).join('');
   };
@@ -181,8 +195,9 @@
   document.addEventListener('rpg:wipe', () => { try { unregister(); } catch (e) { console.error('[rpg]', e); } });
   dropTokens();
 
-  // きっかけ: レベルアップ・バトルに勝った（新しいフロアやボス）・別のタブがセーブを書いた・起動時
+  // きっかけ: レベルアップ・バトルに勝った（新しいフロアやボス）・かざりを変えた・別のタブがセーブを書いた・起動時
   document.addEventListener('rpg:levelup', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
+  document.addEventListener('rpg:deco', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
   document.addEventListener('rpg:battle', e => { try { if (e.detail?.win) scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
   window.addEventListener('storage', e => { if (e.key === 'rpg') try { scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
   scheduleAuto();

@@ -19,6 +19,8 @@
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
+    // 編成: 枠は最大 slots 個。slotCost[i] は i+2 枠目の値段。bonus[n] は同じグループ n 枚のときのチームボーナス
+    team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
   };
   const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
 
@@ -107,15 +109,70 @@
       .sort((x, y) => y.atk - x.atk || y.star - x.star || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0))
       .slice(0, 3).map(({ a, atk }) => ({ a, atk }));
   };
-  // 旅人 ＋ 仲間3枚 ×（1 + 0.05 × がんばりゲージ）。ゲージはフロアごと（'samerica:1' の形）
-  const battleStats = (d, id, floor) => {
-    const h = heroStats(d.lv), p = party(d, id), sum = p.reduce((s, c) => s + c.atk, 0);
-    const gauge = (d.gauge || {})[id + ':' + floor] || 0, mul = 1 + TUNING.battle.gaugeStep * gauge;
+  // ---- 編成とチームボーナス（13グループ） ----
+  // 最初の10個は index.html の SUBREGIONS の文字列をそのまま写す（同じことを単体テストで確かめる）。残り3つは6地域から作る
+  const SUB = [
+    ['東アジア', 'cn jp kp kr mn'],
+    ['東南アジア', 'bn kh id la my mm ph sg th tl vn'],
+    ['南アジア', 'af bd bt in mv np pk lk'],
+    ['中央アジア', 'kz kg tj tm uz'],
+    ['西アジア', 'am az bh ge ir iq il jo kw lb om qa sa sy tr ae ye'],
+    ['東ヨーロッパ', 'al by ba bg hr cz ee hu xk lv lt md me mk pl ro ru rs sk si ua'],
+    ['西ヨーロッパ', 'ad at be cy dk fi fr de gr va is ie it li lu mt mc nl no pt sm es se ch gb'],
+    ['カリブ海', 'ag bs bb cu dm do gd ht jm kn lc vc tt'],
+    ['アフリカ北側', 'dz bj bf cv cm cf td ci dj eg gq er et gm gh gn gw ke lr ly ml mr ma ne ng st sn sl so ss sd tg tn ug'],
+    ['アフリカ南側', 'ao bw bi km cg cd sz ga ls mg mw mu mz na rw sc za tz zm zw'],
+  ].map(([k, a]) => ({ k, a: a.split(' ') }));
+  const CARIB = new Set(SUB.find(g => g.k === 'カリブ海').a);
+  const GROUPS = [
+    ...SUB,
+    ...['南アメリカ', 'オセアニア', '北・中央アメリカ'].map(r => ({ k: r, a: C.filter(c => c.r === r && !CARIB.has(c.a)).map(c => c.a) })),
+  ];
+  const GROUP_OF = new Map(GROUPS.flatMap(g => g.a.map(a => [a, g.k])));
+  const groupOf = a => GROUP_OF.get(a) ?? null;
+  // いちばん多いグループの枚数 n（同数なら list で先に出たほう）。2枚 +10%、3枚 +25%
+  const teamBonus = list => {
+    const cnt = new Map();
+    for (const a of list || []) { const g = groupOf(a); if (g) cnt.set(g, (cnt.get(g) || 0) + 1); }
+    let group = null, n = 0;
+    for (const [g, k] of cnt) if (k > n) { group = g; n = k; }
+    return n < 2 ? { bonus: 0, group: null, n } : { bonus: TUNING.team.bonus[Math.min(n, 3)], group, n };
+  };
+  // 枠 t の仲間。枠が無いか c === null（おまかせ）なら party()。配列なら c の順で、持っている国だけ
+  const teamParty = (d, id, t = d.tsel) => {
+    const tm = (d.teams || [])[t];
+    if (!tm || !Array.isArray(tm.c)) return party(d, id);
+    const dg = dungeonOf(id), fr = d.fr || {}, cards = d.cards || {};
+    return tm.c.filter(a => Object.prototype.hasOwnProperty.call(cards, a))
+      .map(a => ({ a, atk: cardAtk(cards[a], fr[a], !!dg && (dg.r === 'all' || REGION.get(a) === dg.r)) }));
+  };
+  // (旅人 ＋ 仲間) ×（1 + 0.05 × がんばりゲージ）×（1 + チームボーナス）。ゲージはフロアごと（'samerica:1' の形）
+  // おまかせの枠にはチームボーナスをかけない（一度も編成を組んでいないセーブは今と同じ強さ）
+  const battleStats = (d, id, floor, t = d.tsel) => {
+    const h = heroStats(d.lv), p = teamParty(d, id, t), sum = p.reduce((s, c) => s + c.atk, 0);
+    const tm = (d.teams || [])[t], auto = !tm || !Array.isArray(tm.c);
+    const tb = auto ? { bonus: 0, group: null, n: 0 } : teamBonus(p.map(c => c.a));
+    const gauge = (d.gauge || {})[id + ':' + floor] || 0, mul = (1 + TUNING.battle.gaugeStep * gauge) * (1 + tb.bonus);
     return {
       atk: Math.round((h.atk + Math.round(sum)) * mul),
       hp: Math.round((h.hp + Math.round(TUNING.card.hpMul * sum)) * mul),
       party: p, gauge,
+      team: { bonus: tb.bonus, group: tb.group, n: tb.n, slot: t ?? 0, auto },
     };
+  };
+  // 次の枠の値段（もう最大なら null）
+  const slotCost = d => {
+    const n = list(d.teams).length;
+    return n >= 1 && n < TUNING.team.slots ? TUNING.team.slotCost[n - 1] : null;
+  };
+  // 枠を1つ買う。払った額を返す（買えなかったら 0）。新しい枠はおまかせで、それを選んだ状態にする
+  const buySlot = d => {
+    const cost = slotCost(d);
+    if (cost == null || !(d.coins >= cost)) return 0;
+    d.coins -= cost;
+    d.teams.push({ n: '編成' + (d.teams.length + 1), c: null });
+    d.tsel = d.teams.length - 1;
+    return cost;
   };
 
   // ---- 勝てそうか（表示は 余裕／ちょうど／きびしい） ----
@@ -172,6 +229,7 @@
     paid: [],
     st: { win: 0, lose: 0, flee: 0, revive: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
     badgesPaid: [], gr: '',
+    teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
   });
   const KNOWN = new Set(Object.keys(fresh('')));
 
@@ -193,6 +251,18 @@
   const isCard = c => Array.isArray(c) && c.length === 2 && Number.isInteger(c[0]) && c[0] >= 1 && c[0] < TUNING.card.base.length
     && Number.isInteger(c[1]) && c[1] >= 0 && c[1] <= TUNING.card.stackMax;
   const isPaid = p => Array.isArray(p) && p.length === 2 && typeof p[0] === 'string' && Number.isInteger(p[1]) && p[1] >= 0;
+
+  // 編成の枠: 1..slots 個。名前は前後の空白を除いて nameMax 文字まで（空なら「編成N」）。c は null か国コード3つまで（重なり無し）
+  // 持っていない国は消さない（使うときに teamParty がしぼる）
+  const sanitizeTeams = v => {
+    const a = list(v).slice(0, TUNING.team.slots).map((t, i) => {
+      const def = '編成' + (i + 1);
+      if (!isObj(t)) return { n: def, c: null };
+      const n = typeof t.n === 'string' ? [...t.n.trim()].slice(0, TUNING.team.nameMax).join('') : '';   // 絵文字を半分に切らない
+      return { n: n || def, c: Array.isArray(t.c) ? uniq(t.c.filter(isCode)).slice(0, 3) : null };
+    });
+    return a.length ? a : [{ n: '編成1', c: null }];
+  };
 
   // 入力が何でも例外を出さずに fresh の形にそろえる。知らない最上位の項目は残す（新しい版から戻ったときに消さない）
   const sanitize = (x, todayStr) => {
@@ -230,7 +300,10 @@
       st: Object.fromEntries(Object.keys(f.st).map(k => [k, num(st[k], 0, BIG)])),
       badgesPaid: uniq(list(s.badgesPaid).filter(id => typeof id === 'string')),
       gr: GR.has(s.gr) ? s.gr : '',
+      teams: sanitizeTeams(s.teams),
+      deco: uniq(list(s.deco).filter(isCode)).slice(0, 3),
     };
+    d.tsel = int(s.tsel, 0, d.teams.length - 1) ?? 0;
     for (const k of Object.keys(s)) if (!KNOWN.has(k) && k !== '__proto__') d[k] = s[k];
     return d;
   };
@@ -602,7 +675,7 @@
     levelCost, maxLevelUp, heroStats,
     stageOf, recLv, enemy, firstClearTotal,
     battleReward, damage,
-    cardAtk, party, battleStats,
+    cardAtk, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
     hitsNeeded, missesAllowed, judge,
     floorsOf,
     today, dayNum, shortCoins,
