@@ -95,7 +95,8 @@ const RPG_SCENES = {
     await rpgLoad(page, { ...RPG_SAVE, coins: 1500 });   // 地域をしぼった10連は ●1,500
     await page.evaluate(() => RPG.open('gacha', { region: '南アメリカ' }));
     await page.click('#ga-10');
-    await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));   // reduced motion なので最初から表（［ぜんぶめくる］は出ない）
+    await page.click('#ga-skip');   // 1枚ずつ見せる演出をとばす（とばすと一覧は全部表）
+    await page.waitForFunction(() => !document.querySelector('#ga-res .rpg-card.is-back'));
   },
   cards: async page => { await rpgLoad(page, RPG_SAVE); await page.evaluate(() => RPG.open('cards')); },
 };

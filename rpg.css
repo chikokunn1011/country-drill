@@ -613,6 +613,45 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-gstage-say { margin: 0; min-height: 1.4em; font: 900 1.25rem var(--font-display); color: var(--gl); text-shadow: 0 0 12px var(--gl); }
 .rpg-gstage-skip { position: absolute; bottom: max(16px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); padding: 8px 18px; border: 1px solid rgb(255 255 255 / .35); border-radius: 999px; background: rgb(255 255 255 / .08); color: #fff; font: 700 .85rem var(--font-display); cursor: pointer; }
 body.rpg-staging { overflow: hidden; }
+/* 1枚ずつ見せる（.is-reveal）。カードの★の色 --gl で後ろが光る。下に、もう出たカードの小さい国旗 */
+.rpg-gstage.is-reveal { --gl: var(--rpg-gl1); }
+.rpg-gstage.is-reveal::before { opacity: .16; animation: none; }
+.rpg-gst-count { margin: 0; min-height: 1.4em; font: 700 .95rem var(--font-mono); color: rgb(255 255 255 / .75); text-align: center; }
+.rpg-gst-card { --gl: var(--rpg-gl1); position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.rpg-gst-card.is-s2 { --gl: var(--rpg-gl2); }
+.rpg-gst-card.is-s3 { --gl: var(--rpg-gl3); }
+.rpg-gst-card::before { content: ""; position: absolute; inset: -40% -60%; z-index: -1; pointer-events: none; opacity: 0; background: radial-gradient(closest-side, var(--gl), transparent); transition: opacity .3s; }
+.rpg-gst-card:has(.rpg-card:not(.is-back))::before { opacity: .55; }
+.rpg-gst-card.is-s3:has(.rpg-card:not(.is-back))::before { opacity: .9; }
+.rpg-gst-card .rpg-card { width: min(62vw, 240px, 40vh); cursor: pointer; box-shadow: 0 10px 40px rgb(0 0 0 / .45); }
+.rpg-gst-card .rpg-card-face { padding: 10px 10px 12px; gap: 4px; }
+.rpg-gst-card .rpg-card-name { font-size: min(1.25rem, max(calc(95cqw / var(--n, 6)), min(.8rem, calc(95cqw / var(--l, 6))))); }
+.rpg-gst-card .rpg-card-star { font-size: 1.3rem; }
+.rpg-gst-card .rpg-card .rpg-lab { font-size: .8rem; }
+.rpg-gst-card .rpg-card-back span { font-size: 2.4rem; }
+.rpg-gst-say { margin: 0; min-height: 1.4em; font: 900 1.2rem var(--font-display); color: #fff; text-shadow: 0 0 12px var(--gl); text-align: center; }
+.rpg-gst-got { list-style: none; margin: 0; padding: 0; min-height: 30px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: min(92vw, 420px); }
+.rpg-gst-got li { width: 34px; border: 2px solid var(--rpg-b1); border-radius: 4px; background: var(--surface); }
+.rpg-gst-got li.rpg-s2 { border-color: var(--rpg-b2); }
+.rpg-gst-got li.rpg-s3 { border-color: var(--rpg-b3); box-shadow: 0 0 8px var(--rpg-b3); }
+.rpg-gst-got img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; }
+@media (prefers-reduced-motion: no-preference) {
+  /* パックから飛び出す → めくれる（裏の模様が回って消える）→ 表がぽんと出る。★3 は大きめに */
+  .rpg-gst-card .rpg-card { animation: rpg-gst-in .3s cubic-bezier(.2, .8, .3, 1.2) both; }
+  .rpg-gst-card .rpg-card:not(.is-back) { animation: rpg-gst-pop .35s ease-out both; }
+  .rpg-gst-card.is-s3 .rpg-card:not(.is-back) { animation: rpg-gst-pop3 .6s ease-out both; }
+  .rpg-gst-got li:last-child { animation: rpg-gst-thumb .3s ease-out both; }
+  @keyframes rpg-gst-in { from { transform: translateY(40px) scale(.3) rotate(-10deg); opacity: 0; } }
+  @keyframes rpg-gst-pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: none; } }
+  @keyframes rpg-gst-pop3 { 0% { transform: scale(.9); filter: brightness(2); } 40% { transform: scale(1.14); } 100% { transform: none; filter: none; } }
+  @keyframes rpg-gst-thumb { from { transform: translateY(-16px) scale(1.4); opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rpg-gst-card .rpg-card { animation: rpg-gst-fade .3s ease-out both; }
+  .rpg-gst-card.is-s3 .rpg-card:not(.is-back) { animation: rpg-gst-flash .6s ease-out both; }
+  @keyframes rpg-gst-fade { from { opacity: 0; } }
+  @keyframes rpg-gst-flash { 0% { filter: brightness(2); } 100% { filter: none; } }
+}
 
 @media (prefers-reduced-motion: no-preference) {
   .rpg-pack-rays { animation: rpg-spin 18s linear infinite; }
@@ -630,6 +669,7 @@ body.rpg-staging { overflow: hidden; }
   .rpg-gstage .rpg-pack.is-big { animation: rpg-st-pack var(--show, 1700ms) cubic-bezier(.3, .7, .4, 1) forwards, rpg-st-glow var(--show, 1700ms) ease-in forwards; }
   .rpg-gstage.is-promo .rpg-pack.is-big { animation-duration: calc(var(--show, 1700ms) + 500ms); animation-name: rpg-st-pack, rpg-st-promo; }
   .rpg-gstage::before { animation: rpg-st-rays var(--show, 1700ms) ease-in forwards, rpg-spin 6s linear infinite; }
+  .rpg-gstage.is-reveal::before { animation: rpg-spin 6s linear infinite; }
   .rpg-gstage.is-promo::before { animation-duration: calc(var(--show, 1700ms) + 500ms), 6s; }
   .rpg-gstage-say { animation: rpg-st-say var(--show, 1700ms) ease-out forwards; }
   .rpg-gstage.is-promo .rpg-gstage-say { animation-duration: calc(var(--show, 1700ms) + 500ms); }
