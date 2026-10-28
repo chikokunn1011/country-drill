@@ -80,12 +80,15 @@ begin
       'scores', (select count(*) from scores),
       'daily', (select count(*) from daily_scores),
       'rpg', (select count(*) from rpg_players)),
+    -- rpg は新しく登録した人（created_at）を数える
     'today', jsonb_build_object(
       'scores', (select count(*) from scores where created_at >= v_today),
-      'daily', (select count(*) from daily_scores where created_at >= v_today)),
+      'daily', (select count(*) from daily_scores where created_at >= v_today),
+      'rpg', (select count(*) from rpg_players where created_at >= v_today)),
     'week', jsonb_build_object(
       'scores', (select count(*) from scores where created_at >= v_week),
-      'daily', (select count(*) from daily_scores where created_at >= v_week)),
+      'daily', (select count(*) from daily_scores where created_at >= v_week),
+      'rpg', (select count(*) from rpg_players where created_at >= v_week)),
     'last_at', greatest(
       (select max(created_at) from scores),
       (select max(created_at) from daily_scores),
@@ -186,6 +189,7 @@ revoke all on function admin_boards() from public, anon;
 grant execute on function admin_boards() to authenticated;
 
 -- 消す。行を admin_trash に入れてから消し、admin_log に1件残す（0件なら残さない）
+-- ついでに、30日より古いごみ（もう戻せないもの。名前が入っている）を本当に消す
 create or replace function admin_delete(p_kind text, p_ids bigint[]) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
@@ -193,6 +197,7 @@ declare
   v_ids bigint[];
 begin
   perform admin_check();
+  delete from admin_trash where at < now() - interval '30 days';
   if p_kind = 'scores' then
     with d as (delete from scores where id = any(p_ids) returning *),
          t as (insert into admin_trash (kind, row_data) select 'scores', to_jsonb(d) from d returning (row_data->>'id')::bigint as id)

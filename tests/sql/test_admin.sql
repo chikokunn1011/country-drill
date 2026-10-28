@@ -117,18 +117,20 @@ insert into scores (board, nickname, time_ms, questions, created_at) values
   ('f2n:asia:10', 'ミケ', 9000, 10, now());
 insert into daily_scores (day, nickname, correct, total, time_ms) values (current_date, 'チコ', 20, 20, 60000);
 insert into rpg_players (token_hash, nickname, lv, dungeons, floors, updated_at) values ('\x01', 'タマ', 5, 1, 5, now() + interval '1 minute');
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, created_at, updated_at) values ('\x02', 'ポチ', 5, 1, 5, now() - interval '30 days', now() - interval '30 days');
 set role authenticated;
 do $$ declare r jsonb := admin_stats(); begin
   assert r->'ok' = 'true'::jsonb, format('ok: %s', r);
-  assert r->'counts' = '{"scores":2,"daily":1,"rpg":1}'::jsonb, format('counts: %s', r->'counts');
-  assert r->'today' = '{"scores":1,"daily":1}'::jsonb, format('today: %s', r->'today');
-  assert r->'week' = '{"scores":1,"daily":1}'::jsonb, format('week: %s', r->'week');
+  assert r->'counts' = '{"scores":2,"daily":1,"rpg":2}'::jsonb, format('counts: %s', r->'counts');
+  assert r->'today' = '{"scores":1,"daily":1,"rpg":1}'::jsonb, format('today: %s', r->'today');
+  assert r->'week' = '{"scores":1,"daily":1,"rpg":1}'::jsonb, format('week: %s', r->'week');
   assert (r->>'last_at')::timestamptz > now(), format('last_at は rpg の updated_at: %s', r->>'last_at');
   assert r->'recent_log' = '[]'::jsonb, format('recent_log: %s', r->'recent_log');
 end $$;
 reset role;
 
 \echo '- list_hides_token_hash'
+delete from rpg_players where nickname = 'ポチ';
 set role authenticated;
 do $$ declare r jsonb := admin_list('rpg', '{}'); begin
   assert (r->>'total')::int = 1, format('rpg: %s', r);
@@ -425,5 +427,22 @@ do $$ declare r jsonb; begin
   assert r = '{"ok":false,"reason":"name_taken"}'::jsonb, format('全部うまっている: %s', r);
 end $$;
 reset role;
+
+\echo '- delete_purges_trash_older_than_30_days'
+truncate scores, admin_log, admin_trash;
+insert into admin_trash (kind, row_data, at) values
+  ('scores', '{"id": 901, "nickname": "とても古い"}', now() - interval '31 days'),
+  ('scores', '{"id": 902, "nickname": "まだ戻せる"}', now() - interval '29 days');
+insert into scores (board, nickname, time_ms, questions) values ('f2n:asia:10', 'けす', 8000, 10);
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_delete('scores', array[(admin_list('scores', '{}')->'rows'->0->>'id')::bigint]);
+  assert r->>'deleted' = '1', format('delete: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select array_agg(row_data->>'nickname' order by id) from admin_trash) = array['まだ戻せる', 'けす'],
+    format('31日前のごみだけ消える: %s', (select array_agg(row_data->>'nickname') from admin_trash));
+end $$;
 
 \echo 'ALL ADMIN SQL TESTS PASSED'

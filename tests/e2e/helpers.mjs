@@ -198,8 +198,8 @@ function addAdmin(db) {
       const today = Date.parse(`${jstDay()}T00:00:00+09:00`), week = weekStart();
       const all = [...db.rows, ...db.dailyRows].map(r => r.created_at).concat(db.rpgRows.flatMap(r => [r.created_at, r.at, r.updated_at])).filter(Boolean).sort();
       return { ok: true, counts: { scores: db.rows.length, daily: db.dailyRows.length, rpg: db.rpgRows.length },
-        today: { scores: since(db.rows, today), daily: since(db.dailyRows, today) },
-        week: { scores: since(db.rows, week), daily: since(db.dailyRows, week) },
+        today: { scores: since(db.rows, today), daily: since(db.dailyRows, today), rpg: since(db.rpgRows, today) },
+        week: { scores: since(db.rows, week), daily: since(db.dailyRows, week), rpg: since(db.rpgRows, week) },
         last_at: all.at(-1) ?? null, recent_log: db.adminLog.slice(-5).reverse() };
     },
     admin_list({ p_kind, p_filter }) {
