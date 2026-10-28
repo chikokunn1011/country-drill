@@ -2,7 +2,7 @@
   'use strict';
   // 今日の難問（#scr-daily）: 毎日1回だけ挑戦できる20問。全員同じ問題（daily-core.js が日付から作る）。1ミスでそこまで、全問正解ならタイム。
   // クイズの画面は index.html の startDaily（タイムアタックと同じ進み方）を使い、進み具合は drill:daily で受け取る。
-  // その日のランキングは Supabase の daily_scores（supabase/schema.sql の submit_daily / top_daily / daily_rank_of）。
+  // その日のランキングは Supabase の daily_scores（supabase/schema.sql の submit_daily2 / top_daily2 / daily_rank_of）。載せるのはプロフィール（profile.js）で。
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   const NEED = {
@@ -21,8 +21,8 @@
   const mdShort = day => { const [, m, d] = day.split('-'); return `${+m}/${+d}`; };
   const STAGE = ['', '★', '★★', '★★★'];
   const MODE_LABEL = { f2n: '国旗 → 国名', n2f: '国名 → 国旗', m2f: '場所 → 国旗', f2m: '国旗 → 場所' };
-  const MSG = { name_taken: '今日はそのニックネームがもう載っているよ。ちがう名前にしてね' };
-  const message = reason => MSG[reason] ?? RANKING.message(reason);
+  // profile.js が読めなかった（配信漏れ）ときは、ランキングは見るだけ
+  const P = () => window.PROFILE ?? null;
   const qsCache = {};
   const questions = day => qsCache[day] ||= K.build(day, C);
 
@@ -46,7 +46,7 @@
   };
   // サーバーが受け付けるのは今日と、0時30分までの昨日（schema.sql の daily_day_open と同じ）
   const canSend = r => {
-    if (!RANKING.enabled || typeof RANKING.dailySubmit !== 'function' || !r || r.sent) return false;
+    if (!RANKING.enabled || typeof RANKING.dailySubmit2 !== 'function' || !r || r.sent) return false;
     if (r.day === today()) return true;
     return r.day === K.addDays(today(), -1) && (86400e3 - K.msToNextDay(new Date())) < 30 * 60e3;
   };
@@ -130,16 +130,14 @@
         <p class="qlabel">${head}</p><p class="score">${big}</p>
         ${clear ? '' : `<p class="hint">タイム ${RANKING.formatTime(r.timeMs)}</p>`}
         <p class="tarank" id="dl-rank"></p>
-        ${canSend(r) ? `<div class="tabox"><form class="field" id="dl-form" novalidate><label for="dl-name">ランキングに載せる？</label>
-          <div class="row"><input id="dl-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）"><button class="btn" id="dl-submit">載せる</button></div></form>
-          <p class="tamsg" id="dl-msg" role="status"></p></div>` : r.sent ? `<p class="tamsg ok">「${esc(r.sent.name)}」で載せたよ！</p>` : ''}
+        ${canSend(r) ? (P() ? '<div id="dl-post"></div>' : '<p class="tamsg ng">ランキングに載せるには、ページを読み直してね</p>') : r.sent ? `<p class="tamsg ok">「${esc(r.sent.name)}」で載せたよ！</p>` : ''}
         <div class="row center"><button class="btn ghost" id="dl-share">結果をシェア</button></div>
         <p class="hint dl-next" id="dl-next"></p>
         ${r.day !== day ? '<div class="row center"><button class="btn" id="dl-start">今日の難問に挑戦する</button></div>' : ''}
       </div>${answersHTML(r.day, r.day === day ? '今日の問題と答え' : '昨日の問題と答え', r, r.day === day ? Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)) : N)}`;
       if ($('dl-start')) $('dl-start').onclick = start;
       $('dl-share').onclick = () => share(r);
-      if (canSend(r)) form(r);
+      if (canSend(r) && P()) post(r);
       const dayWord = r.day === day ? '今日' : '昨日';
       if (RANKING.enabled && !r.sent) RANKING.dailyRankOf({ day: r.day, correct: r.correct, timeMs: r.timeMs })
         .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = `${dayWord}${n}位 相当`; }, e => console.warn('daily rankOf', e));
@@ -173,30 +171,25 @@
     startDaily(questions(day), sid);
   }
 
-  function form(r) {
-    const name = $('dl-name'), btn = $('dl-submit'), msg = $('dl-msg');
-    const say = (text, cls = '') => { msg.textContent = text; msg.className = `tamsg ${cls}`; };
-    name.value = store.get('nickname', '');
-    $('dl-form').onsubmit = async e => {
-      e.preventDefault();
-      const fail = reason => { say(message(reason), 'ng'); btn.textContent = 'もう一回送る'; };
-      const chk = RANKING.checkName(name.value);
-      if (!chk.ok) return fail(chk.reason);
-      btn.disabled = true; say('送信中…');
-      let res = await RANKING.dailySubmit({ day: r.day, nickname: chk.name, correct: r.correct, total: N, timeMs: r.timeMs });
-      // 前に送ったときに登録はできていて、返事だけ届かなかった: 同じ名前・同じ記録の行があれば、載せたことにする
-      if (res.reason === 'name_taken') {
-        const rows = await RANKING.dailyTop({ day: r.day }).catch(() => []);
-        const i = rows.findIndex(x => x.nickname === chk.name && x.correct === r.correct && x.timeMs === Math.floor(r.timeMs));
-        if (i >= 0) res = { ok: true, rank: null };
-      }
-      btn.disabled = false;
-      if (!res.ok) return fail(res.reason);
-      store.set('nickname', chk.name);
+  // 結果の「載せる」箱（profile.js の postBox）。プロフィールがあって自動 ON なら、出したときにすぐ送る
+  function post(r) {
+    const dayWord = r.day === today() ? '今日' : '昨日';
+    P().postBox($('dl-post'), { label: 'ランキングに載せる？', send: async token => {
+      const res = await RANKING.dailySubmit2({ token, day: r.day, correct: r.correct, total: N, timeMs: r.timeMs });
+      // 前に送ったときに載っていて、返事だけ届かなかった（1日1回なので2回目は already）: 載せたことにする
+      if (!res.ok && res.reason !== 'already') return res;
+      const name = P().get()?.name ?? '', rank = res.ok ? res.rank : null;
       const now = rec();
-      if (now?.day === r.day) save({ ...now, sent: { name: chk.name, rank: res.rank } });
-      if (!sec.hidden) { V.tab = r.day === today() ? 'today' : 'yday'; render(); }
-    };
+      if (now?.day === r.day) save({ ...now, sent: { name, rank } });
+      // 箱の外（順位・表）だけ新しくする。箱は postBox が「載せたよ」に描きかえる
+      if (!sec.hidden) {
+        if (rank && $('dl-rank')) $('dl-rank').textContent = `${dayWord}${rank}位`;
+        V.tab = r.day === today() ? 'today' : 'yday';
+        for (const b of $('dl-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === V.tab));
+        load();
+      }
+      return { ok: true, text: res.ok ? `「${name}」で載せたよ！${rank ? ` ${dayWord}${rank}位` : ''}` : RANKING.message('already') };
+    } });
   }
 
   function share(r) {
@@ -218,18 +211,20 @@
     $('dl-answers').innerHTML = V.tab === 'yday' ? answersHTML(day, `昨日（${md(day)}）の問題と答え`, r?.day === day && r.status === 'done' ? r : null) : '';
     list.setAttribute('aria-busy', true); $('dl-retry').disabled = true;
     let rows = null;
-    try { rows = await RANKING.dailyTop({ day }); } catch (e) { console.warn('daily top', e); }
+    try { rows = await RANKING.dailyTop2({ day }); } catch (e) { console.warn('daily top', e); }
     if (seq !== V.seq) return;
     list.setAttribute('aria-busy', false); $('dl-retry').disabled = false;
     $('dl-error').hidden = !!rows;
     $('dl-empty').hidden = !rows || rows.length > 0;
-    const me = r?.day === day ? r.sent?.name : null;
+    // 自分の行は pid で見分ける（名前は変えられるので）
+    const me = P()?.get()?.pid ?? null;
     let no = 0;
     list.innerHTML = (rows ?? []).map((x, i) => {
       const p = rows[i - 1];
       if (!i || x.correct !== p.correct || x.timeMs !== p.timeMs) no = i + 1;   // 同じ記録は同じ順位（daily_rank_of とそろえる）
       const score = x.correct >= x.total ? '<b class="dl-all">全問正解</b>' : `<b>${x.correct}問</b>`;
-      return `<li class="${no <= 3 ? 'top' : ''}${x.nickname === me ? ' me' : ''}"><span class="no">${no}</span><span class="nick">${esc(x.nickname)}</span>${score}<span class="mono">${RANKING.formatTime(x.timeMs)}</span></li>`;
+      const nick = P() ? P().nameHTML(x) : esc(x.nickname);
+      return `<li class="${no <= 3 ? 'top' : ''}${me && x.pid === me ? ' me' : ''}"><span class="no">${no}</span><span class="nick">${nick}</span>${score}<span class="mono">${RANKING.formatTime(x.timeMs)}</span></li>`;
     }).join('');
   }
 
