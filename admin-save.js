@@ -62,12 +62,30 @@
     const importAll = obj => {
       if (!isObj(obj) || obj.app !== 'country-drill' || obj.kind !== 'save' || !isObj(obj.data)) return { ok: false, reason: 'bad_file' };
       if (!Object.values(obj.data).every(v => typeof v === 'string')) return { ok: false, reason: 'bad_file' };
-      return guard(() => {
-        const backup = exportAll();
-        for (const k of allKeys()) if (!OWN.has(k) && !(k in obj.data)) storage.removeItem(k);
-        for (const [k, v] of Object.entries(obj.data)) if (!OWN.has(k)) storage.setItem(k, v);
+      // 書く前に全部確かめる。rpg / badges は write と同じ shaped を通した文字列を入れる
+      const put = {};
+      for (const [k, v] of Object.entries(obj.data)) {
+        if (OWN.has(k)) continue;
+        if (k === 'rpg' || k === 'badges') {
+          const p = parse(v), out = p.ok ? shaped(k, p.v) : null;
+          if (out == null) return { ok: false, reason: 'bad_file' };
+          put[k] = out;
+        } else put[k] = v;
+      }
+      let backup;
+      try {
+        backup = exportAll();
+        for (const k of allKeys()) if (!OWN.has(k) && !Object.hasOwn(put, k)) storage.removeItem(k);
+        for (const [k, v] of Object.entries(put)) storage.setItem(k, v);
         return { ok: true, backup };
-      });
+      } catch {
+        // 途中で失敗したら、バックアップの中身に戻す（戻せる分だけ）
+        if (backup) {
+          try { for (const k of allKeys()) if (!OWN.has(k) && !Object.hasOwn(backup.data, k)) storage.removeItem(k); } catch {}
+          for (const [k, v] of Object.entries(backup.data)) { try { storage.setItem(k, v); } catch {} }
+        }
+        return { ok: false, reason: 'storage', backup };
+      }
     };
 
     // ---- スナップショット（最大5個。古いものから消える） ----

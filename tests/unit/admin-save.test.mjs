@@ -206,3 +206,30 @@ test('unreadable_storage_does_not_overwrite_rpg', () => {
   assert.deepEqual(plain(A.rpgCoins(5)), { ok: false, reason: 'storage' });
   assert.deepEqual(plain(A.badgesAll()), { ok: false, reason: 'storage' });
 });
+
+test('import_validates_rpg_and_badges_before_writing', () => {
+  const { A, st } = load({ a: '1' });
+  const before = st.dump();
+  for (const bad of ['garbage', '[1]']) {
+    for (const key of ['rpg', 'badges']) {
+      assert.deepEqual(plain(A.importAll({ app: 'country-drill', kind: 'save', data: { b: '2', [key]: bad } })), { ok: false, reason: 'bad_file' });
+    }
+  }
+  assert.deepEqual(st.dump(), before);
+  // 形の合うものは sanitize した結果が入る
+  const r = A.importAll({ app: 'country-drill', kind: 'save', data: { rpg: JSON.stringify({ coins: -5 }) } });
+  assert.equal(r.ok, true);
+  assert.equal(JSON.parse(st.getItem('rpg')).coins, 0);
+});
+
+test('import_rolls_back_when_storage_throws', () => {
+  const { A, st } = load({ a: '1', c: '3' });
+  const before = st.dump(), set = st.setItem;
+  let n = 0;
+  st.setItem = (k, v) => { if (++n === 2) throw new Error('quota'); set(k, v); };
+  const r = A.importAll({ app: 'country-drill', kind: 'save', data: { x: '1', y: '2', z: '3' } });
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'storage');
+  assert.deepEqual(plain(r.backup.data), before);
+  assert.deepEqual(st.dump(), before);
+});
