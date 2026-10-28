@@ -926,3 +926,9 @@ body.rpg-staging { overflow: hidden; }
   .tm-main { grid-area: main; }
   .tm-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 }
+/* 鏡の地球の答え合わせ: 押した旗と正解の旗を並べる */
+.rpg-rv-pick { margin: 0; font: 700 .95rem var(--font-display); text-align: center; }
+.rpg-rv-pair { display: flex; justify-content: center; gap: 16px; }
+.rpg-rv-pair figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.rpg-rv-pair img { width: 72px; height: auto; border: 1px solid var(--line); border-radius: 4px; }
+.rpg-rv-pair figcaption { font-size: .75rem; color: var(--muted); text-align: center; }
