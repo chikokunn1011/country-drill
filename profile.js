@@ -231,7 +231,7 @@
   // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。箱を描いた時点でプロフィールがあって自動 ON ならすぐ送る、そうでなければ［載せる］、
   // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す。
   // 自動で送るのは描いた時点だけ。あとでほかの場所でプロフィールを作った・自動を ON にしたときは描き直すだけ（載せないままにした記録を、見ていないところで送らない）
-  // next() は載せたあとにフォーカスを移す先（TA の［ランキングを見る］など。無い・隠れていれば状態の文）
+  // next() は載せたあとにフォーカスを移す先（TA の［ランキングを見る］など。無い・隠れていれば状態の文。キーボードで来たときは枠が出る）
   const postBox = (el, { label = 'ランキングに載せる？', send, next }) => {
     // state: idle（まだ）・busy（作っている・送っている）・fail（失敗。msg にわけ）・done（載せた。msg に文）
     const st = { state: 'idle', msg: '', input: null };
@@ -241,7 +241,12 @@
     el.innerHTML = '<div class="tabox pf-post"><div class="pf-post-body"></div><p class="tamsg" role="status" tabindex="-1"></p><div class="pf-post-tail"></div></div>';
     const body = el.querySelector('.pf-post-body'), msg = el.querySelector('[role=status]'), tail = el.querySelector('.pf-post-tail');
     let shown = null;   // いま body に出している形（同じなら作り直さない。入力の途中を消さない）
+    // 状態の文は、空のままページに入ってから少し待って書く（自動 ON で描いてすぐの「送信中…」を、中身ごと差し込んだ扱いにしない）。
+    // 待つあいだに文のある状態になったら、文と中身がずれないように描くのもまとめて待つ
+    let live = false;
+    setTimeout(() => { live = true; draw(); }, 100);
     const draw = () => {
+      if (!live && st.msg) return;
       const p = get();
       // 押したボタン・入力欄が箱の中にあったか（描き直しで消える前に見る）
       const had = el.contains(document.activeElement);
@@ -261,11 +266,13 @@
         tail.innerHTML = kind === 'form' ? '<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p>' : '';
       }
       // フォーカスが箱の中にあったときだけ移す（自動 ON で描いたとき・ほかの場所を触っているときは動かさない）。
-      // 次に押せるもの（fail は［もう一回送る］、done は next）があればそこへ。無ければ、消えた要素に残って <body> に落ちたときだけ状態の文へ
+      // 次に押せるもの（fail は［もう一回送る］、done は next）があればそこへ。無ければ、消えた要素に残って <body> に落ちたとき・空になった状態の文に
+      // いるときだけ、新しくできた入力やボタン（not_found で名前の入力・名前が変わった［〜で載せる］）、それも無ければ状態の文（busy・done）へ
       if (!had) return;
       const to = st.state === 'fail' ? body.querySelector('button') : st.state === 'done' ? next?.() : null;
+      const a = document.activeElement;
       if (to?.isConnected && !to.hidden) to.focus({ preventScroll: true });
-      else if (!el.contains(document.activeElement)) msg.focus({ preventScroll: true });
+      else if (!el.contains(a) || (a === msg && !st.msg)) (body.querySelector('input, button') ?? msg).focus({ preventScroll: true });
     };
     const go = async () => {
       const p = get();

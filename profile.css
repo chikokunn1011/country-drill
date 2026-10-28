@@ -40,7 +40,11 @@
 #pf-tr-in { font-family: var(--font-mono); letter-spacing: .04em; }
 /* 結果画面の「載せる」箱。中身の入れ物（状態の文の前と後ろ）は並びに出さず、中の要素が外枠の flex に並ぶ。自動 OFF のときの問いかけ */
 .pf-post-body, .pf-post-tail { display: contents; }
-.pf-post .tamsg:focus { outline: none; } /* 状態の文は描き直しでフォーカスを置くだけ（押せるものではないので枠は出さない） */
+/* 状態の文（role=status）は空のときも読み上げの木に残す（index.html の .tamsg:empty は display: none）。見た目は場所を取らない */
+.pf-post .tamsg:empty { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* 描き直しで状態の文にフォーカスを置いたとき: キーボードなら居場所が見えるようにボタンと同じ枠、クリック・タップのあとは出さない */
+.pf-post .tamsg:focus { outline: none; }
+.pf-post .tamsg:focus-visible { outline: 3px solid var(--hl); outline-offset: 2px; border-radius: 4px; }
 .pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
 .pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }
 /* ホームの［プロフィール］: 横に並ぶホーム（900〜1279）で［冒険］もあって6つのときは、rpg.css の1行の均等割りだと1つ 130px ほどになり

@@ -295,6 +295,70 @@ t('postBox auto does not steal focus', async (page, { db }) => {
   await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
   assert.equal((await focusInfo(page)).id, 'outside');
 });
+// 押したボタンが消えて、状態の文も空のとき（not_found で名前の入力に変わった・名前が変わって［〜で載せる］を作り直した）は、
+// 空の文ではなく新しくできた入力やボタンへ移す（<body> に落とさない）
+t('postBox not_found by keyboard focuses input', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await drawBox(page);
+  db.profiles.length = 0;   // 別の端末に引き継がれた
+  await page.focus('#box button:has-text("チコ で載せる")');
+  await page.keyboard.press('Enter');
+  await page.locator('#box button', { hasText: 'プロフィールを作って載せる' }).waitFor();
+  const f = await page.evaluate(() => ({ tag: document.activeElement.tagName, inBox: !!document.activeElement.closest('#box') }));
+  assert.deepEqual(f, { tag: 'INPUT', inBox: true });
+});
+t('postBox rename keeps focus on send button', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await drawBox(page);
+  await page.focus('#box button:has-text("チコ で載せる")');
+  assert.deepEqual(await page.evaluate(() => PROFILE.rename('ハナ')), { ok: true });
+  await page.locator('#box button', { hasText: 'ハナ で載せる' }).waitFor();
+  assert.equal(await page.evaluate(() => document.activeElement.textContent), 'ハナ で載せる');
+});
+// 状態の文は空のときも読み上げの木に残す（display: none だと、最初の「送信中…」で中身ごと現れて読まれないことがある）。
+// 見た目は空のとき場所を取らない
+t('postBox empty status stays in accessibility tree', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await drawBox(page);
+  const s = await page.evaluate(() => {
+    const m = document.querySelector('#box [role=status]'), r = m.getBoundingClientRect();
+    return { text: m.textContent, display: getComputedStyle(m).display, w: r.width, h: r.height };
+  });
+  assert.equal(s.text, '');
+  assert.notEqual(s.display, 'none');
+  assert.ok(s.w <= 1 && s.h <= 1, `空の文が場所を取っている: ${s.w}x${s.h}`);
+});
+// 自動 ON で描いたときも、状態の文はまず空でページに入り、そのあとで「送信中…」になる（中身ごと差し込むと読まれないことがある）
+t('postBox auto inserts empty status first', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => {
+    window.__first = null;
+    new MutationObserver(ms => {
+      for (const m of ms) for (const n of m.addedNodes) {
+        const s = n.nodeType === 1 && n.querySelector?.('[role=status]');
+        if (s && window.__first === null) window.__first = s.textContent;
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await drawBox(page);
+  await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
+  assert.equal(await page.evaluate(() => window.__first), '');
+});
+// キーボードで押して状態の文にフォーカスが移ったときは、どこにいるか見えるように枠を出す（next が無い箱: 毎日・冒険）
+t('postBox status shows focus ring after keyboard', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await drawBox(page);
+  await page.focus('#box button:has-text("チコ で載せる")');
+  await page.keyboard.press('Enter');
+  await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
+  const o = await page.evaluate(() => { const a = document.activeElement; return { tag: a.tagName, style: getComputedStyle(a).outlineStyle }; });
+  assert.equal(o.tag, 'P');
+  assert.notEqual(o.style, 'none');
+});
 
 // lost(token) は、いまのプロフィールがその合言葉のときだけ消す（遅れて届いた古い合言葉の not_found で、新しいプロフィールを消さない）。
 // 引数なしは今までどおり消す
