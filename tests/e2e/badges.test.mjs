@@ -44,7 +44,7 @@ async function startPractice(page) {
 t('loads_and_counts', async page => {
   assert.deepEqual(await page.evaluate(() => ({
     title: typeof BADGES.title, count: BADGES.count(), text: BADGES.title(), key: BADGES.titleKey(),
-    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=7"]'),
+    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=8"]'),
   })), { title: 'function', count: { got: 0, total: 26, byColor: { 1: 0, 2: 0, 3: 0, 4: 0 } }, text: '', key: null, css: true, js: true });
 });
 
@@ -934,10 +934,24 @@ t('rpg_hidden_without_rpg', async page => {
   assert.deepEqual(d.sent, []);
 });
 
+// 英雄の塔: rpg:tower が来たら snapshot の tower でその場で判定し直す（10階で「塔の見習い」）
+t('rpg_tower_badge_on_event', async (page, app) => {
+  await withRpg(app, { intro: true, lv: 30, floors: { world: 5 }, st: { win: 3 }, tower: 9 });
+  const before = (await earned(page)).map(e => e.id);
+  assert.ok(!before.some(id => id.startsWith('rpg-tower')), json(before));
+  await page.evaluate(() => {
+    window.__snap = { ...window.__snap, tower: 10 };
+    document.dispatchEvent(new CustomEvent('rpg:tower', { detail: { floor: 10, win: true, best: 10, newBest: true, coins: 35 } }));
+  });
+  const ev = (await earned(page)).filter(e => e.id.startsWith('rpg-tower'));
+  assert.deepEqual(ev.map(e => e.id), ['rpg-tower@1']);
+  assert.equal(typeof (await saved(page)).got['rpg-tower@1'], 'number');
+});
+
 // 起動時に snapshot からさかのぼる。払いは retro: true で1つずつ1回、トーストはまとめて1枚。読み直しても二度払いしない
 t('rpg_retro_on_startup', async (page, app) => {
   await withRpg(app, { intro: true, lv: 12, owned: 60, floors: { samerica: 5 }, st: { win: 3 }, bountyDays: 2, overcome: { jp: 1 } });
-  assert.equal(await page.evaluate(() => BADGES.count().total), 37);
+  assert.equal(await page.evaluate(() => BADGES.count().total), 38);
   const want = ['rpg-start@1', 'rpg-first-win@1', 'rpg-lv@1', 'rpg-boss@1', 'rpg-cards@1', 'rpg-bounty@1', 'overcome@1'].sort();
   const ev = await earned(page);
   assert.deepEqual(ev.map(e => e.id).sort(), want);

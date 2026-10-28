@@ -74,6 +74,10 @@ export function fakeDb() {
     const me = { lv, dungeons, floors }, above = sort => rpgBests(sort).filter(r => cmpKeys(RPG_KEYS[sort](r), RPG_KEYS[sort](me)) < 0).length + 1;
     return { rank_lv: above('lv'), rank_dg: above('dg') };
   };
+  // 塔: tower > 0 の人を、塔 → レベル → 塔を送った時刻の順に
+  const towerAt = r => Date.parse(r.tower_at ?? r.at ?? r.created_at);
+  const towerBests = () => rpgRows.filter(r => (r.tower ?? 0) > 0).sort((a, b) => b.tower - a.tower || b.lv - a.lv || towerAt(a) - towerAt(b));
+  const towerRank = (tower, lv) => rpgRows.filter(r => (r.tower ?? 0) > tower || ((r.tower ?? 0) === tower && r.lv > lv)).length + 1;
   // 今日の難問の行 { day, nickname, correct, total, time_ms, created_at }
   const dailyRows = [];
   const dailyRank = (day, correct, t) => dailyRows.filter(r => r.day === day && (r.correct > correct || (r.correct === correct && r.time_ms < t))).length + 1;
@@ -96,7 +100,7 @@ export function fakeDb() {
     rank_of: ({ p_board, p_time_ms }) => rankOf(p_board, p_time_ms),
     // 冒険のランキング（rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と同じ形。
     // 名前は文字数と重なりだけ、かざりは数・重なり・国コードの形だけ見る。10秒の連投よけはしない）。
-    // rpgRows の行は { token, nickname, lv, dungeons, floors, deco, created_at, at }（deco は無くてもよい = 空）
+    // rpgRows の行は { token, nickname, lv, dungeons, floors, deco, tower, tower_at, created_at, at }（deco は無くてもよい = 空、tower は無くてもよい = 0）
     rpg_register({ p_token, p_nickname, p_lv, p_dungeons, p_floors }) {
       const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
       if (rpgRows.some(r => r.token === p_token)) return { ok: false, reason: 'already' };
@@ -136,6 +140,17 @@ export function fakeDb() {
     top_rpg2: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, deco, at }) => ({ nickname, lv, dungeons, floors, deco: deco ?? [], created_at: at })) : [],
     top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
+    // 英雄の塔（rpg_set_tower / top_tower / rpg_tower_rank_of と同じ形。行の tower は無くてもよい = 0、tower_at は塔を送った時刻）
+    rpg_set_tower({ p_token, p_tower }) {
+      if (typeof p_token !== 'string' || !/^[0-9a-f-]{32,64}$/.test(p_token)) return { ok: false, reason: 'bad_token' };
+      if (!Number.isInteger(p_tower) || p_tower < 0 || p_tower > 100000) return { ok: false, reason: 'bad_record' };
+      const r = rpgRows.find(r => r.token === p_token);
+      if (!r) return { ok: false, reason: 'not_found' };
+      Object.assign(r, { tower: Math.max(r.tower ?? 0, p_tower), tower_at: new Date().toISOString() });
+      return { ok: true, rank_tower: towerRank(r.tower, r.lv) };
+    },
+    top_tower: () => towerBests().slice(0, 50).map(r => ({ nickname: r.nickname, tower: r.tower, lv: r.lv, deco: r.deco ?? [], created_at: r.tower_at ?? r.at })),
+    rpg_tower_rank_of: ({ p_tower, p_lv }) => ({ rank: towerRank(p_tower, p_lv) }),
     // 今日の難問（submit_daily / top_daily / daily_rank_of と同じ形。日付は形だけ、名前は文字数と同じ日の重なりだけ見る）
     submit_daily({ p_day, p_nickname, p_correct, p_total, p_time_ms }) {
       const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
@@ -163,7 +178,7 @@ async function supabaseRoute(route, db) {
   db.calls.push({ name, args, at: Date.now() });
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
-  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total'].some(k => k in args && !Number.isInteger(args[k]));
+  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total', 'p_tower'].some(k => k in args && !Number.isInteger(args[k]));
   if (!fn || badInt) return route.fulfill({ status: fn ? 400 : 404, headers: CORS, contentType: 'application/json', body: JSON.stringify({ message: 'fake supabase: bad request' }) });
   return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(fn(args)) });
 }

@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer } from './helpers.mjs';
-import { openRpg, writeSave, saveWith } from './rpg_helpers.mjs';
+import { openRpg, writeSave, saveWith, startTower, winTowerFloor } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -325,4 +325,97 @@ t('record_and_deco_both_sent', async (page, app) => {
   assert.ok(Math.abs(dc[0].at - up[0].at) >= 10000, String(dc[0].at - up[0].at));
   await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 2);
   assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 6, dungeons: 0, floors: 0, deco: ['br', 'jp'] });
+});
+
+// ---- 英雄の塔（rpg_set_tower・top_tower・rpg_tower_rank_of） ----
+const TT = '00000000-0000-4000-8000-0000000000ee';
+const TOWER_SAVE = f => saveWith({ lv: 30, floors: { world: 5 }, story: ['ch1'], ...f });
+
+t('tower_tab', async (page, app) => {
+  app.db.rpgRows.push(
+    { token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, deco: ['jp'], tower: 12, tower_at: ago(60), created_at: ago(90), at: ago(90) },
+    { token: 't-taro', nickname: 'タロウ', lv: 50, dungeons: 3, floors: 16, tower: 30, tower_at: ago(50), created_at: ago(80), at: ago(80) },
+    { token: 't-hana', nickname: 'ハナ', lv: 99, dungeons: 3, floors: 16, created_at: ago(70), at: ago(70) },   // 塔 0 は出ない
+  );
+  await writeSave(page, TOWER_SAVE({ tower: { best: 20 } }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  const tabs = await page.$$eval('#rr-tabs button', bs => bs.map(b => b.textContent));
+  assert.deepEqual(tabs, ['レベル', 'ダンジョン', '英雄の塔']);
+  await page.click('#rr-tabs button[data-s="tower"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
+  const r = await rows(page);
+  assert.ok(r[0].startsWith('1 タロウ 🗼30階 Lv 50') && r[1].startsWith('2 ミケ 🗼12階 Lv 30'), r.join('|'));
+  assert.equal(await page.locator('#rr-list li').nth(1).locator('.rr-deco img').count(), 1);
+  assert.equal(await text(page, '#rr-how'), '上位50人まで。最高記録の階 → レベルの順');
+  assert.equal(await page.getAttribute('#rr-tabs button[data-s="tower"]', 'aria-pressed'), 'true');
+  // 自分の記録: 自己ベストと、何位相当か
+  assert.ok((await text(page, '#rr-me')).includes('英雄の塔 自己ベスト 20階'), await text(page, '#rr-me'));
+  await page.waitForFunction(() => $('rr-rank').textContent.includes('相当'));
+  assert.equal(await text(page, '#rr-rank'), '英雄の塔 2位 相当');
+  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_tower_rank_of').at(-1).args, { p_tower: 20, p_lv: 30 });
+  assert.equal(callsOf(app, 'top_tower').length >= 1, true);
+  // 同じ記録は同じ順位
+  app.db.rpgRows.push({ token: 't-kai', nickname: 'カイ', lv: 30, dungeons: 0, floors: 0, tower: 12, tower_at: ago(10), created_at: ago(10), at: ago(10) });
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.click('#rr-tabs button[data-s="tower"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 3);
+  assert.deepEqual((await rows(page)).map(x => x.split(' ').slice(0, 2).join(' ')), ['1 タロウ', '2 ミケ', '2 カイ']);
+  // もどすと今のタブ
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 4);
+  assert.ok(!(await text(page, '#rr-me')).includes('英雄の塔'));
+});
+
+t('tower_tab_not_ready', async (page, app) => {
+  // DB にまだ top_tower が無い（本番に適用する前）: 「準備中」と出して、エラーにしない
+  delete app.db.rpc.top_tower;
+  delete app.db.rpc.rpg_tower_rank_of;
+  await writeSave(page, TOWER_SAVE({ tower: { best: 3 } }));
+  await page.evaluate(() => RPG.open('rpgrank', { sort: 'tower' }));
+  await page.waitForFunction(() => !$('rr-soon').hidden);
+  assert.ok((await text(page, '#rr-soon')).includes('準備中'));
+  assert.equal(await page.isVisible('#rr-error'), false);
+  assert.equal(await page.isVisible('#rr-empty'), false);
+  assert.equal(await page.locator('#rr-list li').count(), 0);
+  // ほかのタブにもどると今どおり
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.waitForFunction(() => !$('rr-empty').hidden);
+  assert.equal(await page.isVisible('#rr-soon'), false);
+});
+
+t('tower_auto_send', async (page, app) => {
+  // 登録ずみ・塔で新しい階に勝った（rpg:tower の newBest）→ GAP のあとに rpg_set_tower を token と best で送る
+  app.db.rpgRows.push({ token: TT, nickname: 'チコ', lv: 30, dungeons: 1, floors: 5, created_at: ago(60), at: ago(60) });
+  await page.evaluate(T => store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 30, dungeons: 1, floors: 5 } }), TT);
+  await writeSave(page, TOWER_SAVE({}));
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower'), []);   // best 0 は送らない
+  await startTower(page);
+  await winTowerFloor(page);
+  await until(() => callsOf(app, 'rpg_set_tower').length > 0, 30000);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower').map(c => c.args), [{ p_token: TT, p_tower: 1 }]);
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.tower === 1);
+  assert.equal(app.db.rpgRows[0].tower, 1);
+  // 同じ best では送り直さない（読み込み直しても）
+  await page.reload();
+  await page.waitForTimeout(2500);
+  assert.equal(callsOf(app, 'rpg_set_tower').length, 1);
+});
+
+t('tower_auto_send_needs_register', async (page, app) => {
+  // 未登録なら塔の記録があっても送らない。登録したばかりの人は「塔はまだ送っていない」扱いで、GAP のあとに送る
+  await writeSave(page, TOWER_SAVE({ tower: { best: 3 } }));
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('rpg:tower', { detail: { floor: 3, win: true, best: 3, newBest: true, coins: 28 } })));
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower'), []);
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.fill('#rr-name', 'チコ');
+  await page.click('#rr-submit');
+  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
+  const reg = callsOf(app, 'rpg_register')[0];
+  await until(() => callsOf(app, 'rpg_set_tower').length > 0, 30000);
+  const tw = callsOf(app, 'rpg_set_tower');
+  assert.deepEqual(tw.map(c => c.args), [{ p_token: reg.args.p_token, p_tower: 3 }]);
+  assert.ok(tw[0].at - reg.at >= 10000, String(tw[0].at - reg.at));
+  await page.waitForFunction(() => store.get('rpgRank')?.sent?.tower === 3);
 });

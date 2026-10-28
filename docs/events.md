@@ -115,9 +115,9 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `rpg:answer` | `{a, right, mode, dungeon, boss}` | バトル中の回答。コインの計算には使わない |
 | `rpg:battle` | `{dungeon, floor, boss, win, first, mistakes, revived, gauge, maxCombo, lv, recLv}` | 英雄の塔では1階終わるごとに `dungeon: 'tower'`（`floor` は塔の階、`boss` は中ボス、`first` はその階をはじめて勝った、`gauge` は 0）。塔では `rpg:clear` は出さない |
 | `rpg:clear` | `{dungeon}` | ボスを初めて倒した（ストーリーのダンジョンだけ） |
-| `rpg:tower` | `{floor, win, best, newBest, coins}` | 英雄の塔の1階が終わるたび（`rpg:battle` とコインのあと）。`best` は書いたあとの最高記録（勝ったいちばん上の階）、`newBest` はこの階で `best` が増えたか、`coins` はこの階でもらった塔のコイン（基本＋ボーナス。負けは 0） |
+| `rpg:tower` | `{floor, win, best, newBest, coins}` | 英雄の塔の1階が終わるたび（`rpg:battle` とコインのあと）。`best` は書いたあとの最高記録（勝ったいちばん上の階）、`newBest` はこの階で `best` が増えたか、`coins` はこの階でもらった塔のコイン（基本＋ボーナス。負けは 0）。badges.js はこれで `RPG.snapshot().tower` の塔のバッジを判定し直し、rpg-rank.js は `newBest` なら塔の記録の送信（`rpg_set_tower`）を予約する |
 | `rpg:tower-floor` | `{floor}` | 英雄の塔の1階が始まるたび（1階・つぎの階へ・［もう一度］。1階はバトル画面を出したあと）。2階から先と［もう一度］はバトル画面のままなので `drill:screen` が出ない。badges.js はこれでバトル中の保留を始める |
-| `rpg:tower-end` | `{cleared, best}` | 英雄の塔の1回が終わったとき（負け・［やめる］・にげる・バトルの画面を離れた）。`cleared` はその回で勝ったいちばん上の階（0 もある）。ページを閉じたときは出ない |
+| `rpg:tower-end` | `{cleared, best}` | 英雄の塔の1回が終わったとき（負け・［やめる］・にげる・バトルの画面を離れた）。`cleared` はその回で勝ったいちばん上の階（0 もある）。ページを閉じたときは出ない。rpg-rank.js は送っていない塔の記録があれば送信を予約する |
 | `rpg:overcome` | `{a, total}` | |
 | `rpg:bounty` | `{a, doneAll, totalDays}` | |
 | `rpg:deco` | `{deco}` | 冒険ホームの旅人カードのかざりを［決定］で変えて保存できたとき（rpg.js）。`deco` は保存した国コードの配列（0..3、持っている仲間だけ、選んだ順）。変わらなかった・保存できなかったときは出さない。冒険ランキングのかざりの送信（rpg-rank.js）が受け取る |

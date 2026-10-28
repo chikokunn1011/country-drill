@@ -126,6 +126,25 @@
       const r = await rpc('rpg_rank_of', { p_lv: lv, p_dungeons: dungeons, p_floors: floors });
       return { rankLv: r.rank_lv, rankDg: r.rank_dg };
     },
+    // 英雄の塔: 最高記録の階を送る（記録・かざりとは別。10秒の連投よけも別）。返事の rank_tower は rankTower に。失敗しても例外は投げず { ok:false, reason }
+    async rpgSetTower({ token, tower }) {
+      try {
+        const r = await rpc('rpg_set_tower', { p_token: token, p_tower: tower });
+        return r.ok ? { ok: true, rankTower: r.rank_tower } : { ok: false, reason: r.reason };
+      } catch (e) {
+        console.warn('ranking rpg_set_tower', e);
+        return { ok: false, reason: 'network' };
+      }
+    },
+    // 塔の上位50件（塔 → レベルの順、かざりつき）。失敗したら reject（DB にまだ top_tower が無いときは e.status が 404）
+    async topTower() {
+      const rows = await rpc('top_tower', {});
+      return rows.map(r => ({ nickname: r.nickname, tower: r.tower, lv: r.lv, deco: Array.isArray(r.deco) ? r.deco : [], at: new Date(r.created_at) }));
+    },
+    // この塔の記録なら何位相当か（数を返す）。失敗したら reject
+    async rpgTowerRankOf({ tower, lv }) {
+      return (await rpc('rpg_tower_rank_of', { p_tower: tower, p_lv: lv })).rank;
+    },
     // 今日の難問: 記録を送る（day は日本時間の 'YYYY-MM-DD'、total は問題数）。失敗しても例外は投げず { ok:false, reason }
     async dailySubmit({ day, nickname, correct, total, timeMs }) {
       try {
