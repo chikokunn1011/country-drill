@@ -13,7 +13,9 @@
     const store = storage || globalThis.sessionStorage;
     const read = () => { try { const a = JSON.parse(store.getItem(KEY)); return a && a.access_token ? a : null; } catch { return null; } };
     const write = a => store.setItem(KEY, JSON.stringify(a));
-    const clear = () => { try { store.removeItem(KEY); } catch { /* 消せなくても進める */ } };
+    // gen: 保存を消す・ログインし直すたびに進める。途中の refresh が、そのあとで古い合札を書きもどさないように
+    let gen = 0;
+    const clear = () => { gen++; try { store.removeItem(KEY); } catch { /* 消せなくても進める */ } };
 
     // 8秒で打ち切る fetch。返事の本文を読み終えるまでを8秒に入れる（ヘッダーのあとで止まっても待ち続けない）。
     // 返すのは { ok, status, body }（body は JSON として読めなければ null）。通信できない・8秒たった なら code 'network'
@@ -35,27 +37,32 @@
         })()]);
       } catch (e) { throw err(`network: ${e && e.message}`, 'network'); } finally { clearTimeout(timer); }
     }
-    // token の返事から保存用の形にする（expires_at は秒 → ミリ秒）
+    // token の返事から保存用の形にする。期限はこの端末の時計で数える（expires_in があればそれを使う。
+    // サーバーの expires_at はサーバーの時計なので、端末の時計が進んでいると毎回 refresh してしまう）
     const session = (t, email, prev) => ({
       access_token: t.access_token, refresh_token: t.refresh_token,
-      expires_at: t.expires_at ? t.expires_at * 1000 : now() + (t.expires_in || 3600) * 1000,
+      expires_at: Number.isFinite(t.expires_in) && t.expires_in > 0 ? now() + t.expires_in * 1000
+        : t.expires_at ? t.expires_at * 1000 : now() + 3600 * 1000,
       last: prev ? prev.last : now(), email: (t.user && t.user.email) || email || (prev && prev.email) || '',
       uid: (t.user && typeof t.user.id === 'string' && t.user.id) || (prev && prev.uid) || '',   // 操作ログの「だれが」を自分と見分ける用
     });
 
     // 合札の更新。断られた（429 以外の 4xx）ときだけ保存を消して relogin。
     // 5xx・429・つながらない・8秒たった は code 'network' にして保存は残す（あとでやり直せる）
-    let refreshing = null;
+    let refreshing = null, orphan = null;
     function refresh() {
       return refreshing ||= (async () => {
-        const a = read();
+        const a = read(), g = gen;
         if (!a || !a.refresh_token) { clear(); throw err('relogin', 'relogin'); }
         const res = await send('/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: a.refresh_token } });
         if (!res.ok) {
-          if (res.status >= 400 && res.status < 500 && res.status !== 429) { clear(); throw err('relogin', 'relogin', res.status); }
+          if (res.status >= 400 && res.status < 500 && res.status !== 429) { if (g === gen) clear(); throw err('relogin', 'relogin', res.status); }   // ログインし直したあとの合札は消さない
           throw err(`refresh: HTTP ${res.status}`, 'network', res.status);
         }
-        const next = session(res.body || {}, a.email, a);
+        // 待っているあいだにログアウト・ログインし直しがあったら、古い合札で作った新しい合札は書かない
+        const next = session(res.body || {}, a.email, a), cur = read();
+        // （サーバーには生きている合札なので、logout が無効にできるよう orphan に取っておく）
+        if (g !== gen || !cur || cur.refresh_token !== a.refresh_token) { if (next.access_token) orphan = next; throw err('relogin', 'relogin'); }
         if (!next.access_token) { clear(); throw err('relogin', 'relogin'); }
         write(next); return next;
       })().finally(() => { refreshing = null; });
@@ -65,10 +72,24 @@
     const rpcOnce = (name, args, a) => send(`/rest/v1/rpc/${name}`, { headers: { Authorization: `Bearer ${a.access_token}` }, body: args ?? {} });
     const isDenied = (res, b) => (res.status === 401 || res.status === 403) && b && b.code === '42501';
 
+    // サーバーの合札を無効にする（どれも失敗してよい）。access_token の期限が切れかけていたら、先に refresh_token で
+    // 新しい access_token をもらう（期限切れの access_token では /logout が断られ、refresh_token がサーバーに残るので）
+    async function revoke(a) {
+      try {
+        if (!a) return;
+        if (now() >= a.expires_at - SKEW_MS && a.refresh_token) {
+          const res = await send('/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: a.refresh_token } });
+          if (!res.ok || !res.body || !res.body.access_token) return;
+          a = { access_token: res.body.access_token };
+        }
+        await send('/auth/v1/logout', { headers: { Authorization: `Bearer ${a.access_token}` } });
+      } catch { /* 失敗しても進める */ }
+    }
+
     function loggedIn() {
       const a = read();
       if (!a) return false;
-      if (!(now() - a.last < IDLE_MS)) { clear(); return false; }
+      if (!(now() - a.last < IDLE_MS)) { clear(); revoke(a); return false; }   // 30分: 待たずに消し、サーバーの合札も無効にしに行く
       return true;
     }
 
@@ -103,16 +124,21 @@
       if (!res.ok) return { ok: false, reason: res.status >= 500 ? 'network' : res.status === 429 ? 'rate_limited' : 'bad_login' };
       const s = session(res.body || {}, email);
       if (!s.access_token) return { ok: false, reason: 'bad_login' };
-      write(s);
+      gen++; write(s);
       try { await call('admin_whoami', {}); }
       catch (e) { clear(); return { ok: false, reason: e.code === 'denied' ? 'not_admin' : 'network' }; }
       return { ok: true };
     }
 
+    // 先に保存を消して（画面はすぐログアウトにできる）から、サーバーの合札を無効にする。
+    // 途中の refresh があれば終わるのを待ち、その refresh がもらった合札（orphan）も無効にする。どれも失敗しても消す
     async function logout() {
-      const a = read();
-      try { if (a) await send('/auth/v1/logout', { headers: { Authorization: `Bearer ${a.access_token}` } }); } catch { /* 失敗しても消す */ }
+      const a = read(), pending = refreshing;
       clear();
+      if (pending) await pending.catch(() => {});
+      const fresh = orphan; orphan = null;
+      await revoke(fresh || a);
+      if (fresh && a && fresh.access_token !== a.access_token) await revoke(a);
     }
 
     return { login, logout, loggedIn, call, email: () => (read() || {}).email || '', uid: () => (read() || {}).uid || '' };

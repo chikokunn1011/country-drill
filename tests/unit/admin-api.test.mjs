@@ -144,7 +144,8 @@ test('call_after_idle_30min_is_relogin_without_fetch', async () => {
   const { api, calls, storage, clock } = setup([]); seed(storage);
   clock.t = NOW + 31 * 60_000;
   await assert.rejects(api.call('f', {}), e => e.code === 'relogin');
-  assert.equal(calls.length, 0); assert.equal(storage.getItem('adminAuth'), null);
+  // rpc は送らない（送るのはサーバーの合札を無効にする /logout だけ）
+  assert.equal(calls.filter(c => !/\/auth\/v1\/logout$/.test(c.url)).length, 0); assert.equal(storage.getItem('adminAuth'), null);
 });
 
 test('refresh_does_not_reset_idle_clock', async () => {
@@ -222,4 +223,81 @@ test('exports_url_and_key', () => {
   vm.runInContext(src, ctx);
   assert.equal(ctx.ADMIN_API.URL, 'https://vgdkklvhtvcamtxwjpke.supabase.co');
   assert.equal(ctx.ADMIN_API.KEY, 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV');
+});
+
+// ---- 1回目のレビューの直し ----
+test('logout_during_refresh_does_not_bring_session_back', async () => {
+  let release;
+  const held = new Promise(r => { release = r; });
+  // 1: 止めた refresh、2: logout（refresh がもらった新しい合札で）
+  const { api, calls, storage } = setup([() => held, json(204, null), json(204, null)]); seed(storage, { expires_at: NOW + 30_000 });
+  const pending = api.call('admin_list', {}).catch(e => e);
+  await new Promise(r => setTimeout(r, 0));
+  const out = api.logout();
+  assert.equal(api.loggedIn(), false, 'ログアウトを押したらすぐ消す（サーバーの返事を待たない）');
+  release(tok(1));
+  await out;
+  assert.equal((await pending).code, 'relogin');
+  assert.equal(storage.getItem('adminAuth'), null, 'ログアウトのあとで合札を書きもどさない');
+  assert.equal(api.loggedIn(), false);
+  assert.equal(calls.filter(c => /\/rest\//.test(c.url)).length, 0, 'ログアウトのあとで rpc を送らない');
+  const outs = calls.filter(c => /\/auth\/v1\/logout$/.test(c.url)).map(c => c.init.headers.Authorization);
+  assert.ok(outs.includes('Bearer a1'), `refresh がもらった合札も無効にする: ${outs}`);
+});
+
+test('refresh_4xx_after_relogin_keeps_new_session', async () => {
+  let release;
+  const held = new Promise(r => { release = r; });
+  const { api, storage } = setup([() => held, tok(5), json(200, { ok: true })]); seed(storage, { expires_at: NOW + 30_000 });
+  const pending = api.call('f', {}).catch(e => e);
+  await new Promise(r => setTimeout(r, 0));
+  storage.removeItem('adminAuth');
+  assert.deepEqual({ ...(await api.login('me@x.jp', 'pw')) }, { ok: true });
+  release(json(400, { error: 'invalid_grant' }));
+  assert.equal((await pending).code, 'relogin');
+  assert.equal(saved(storage).access_token, 'a5', '古い refresh が断られても、ログインし直した合札は消さない');
+});
+
+test('idle_logout_revokes_server_session', async () => {
+  const { api, calls, storage, clock } = setup([json(204, null)]); seed(storage);
+  clock.t = NOW + 31 * 60_000;
+  assert.equal(api.loggedIn(), false);
+  assert.equal(storage.getItem('adminAuth'), null);
+  await new Promise(r => setTimeout(r, 0));
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/auth\/v1\/logout$/);
+  assert.equal(calls[0].init.headers.Authorization, 'Bearer a0');
+});
+
+test('refresh_finishing_after_clear_does_not_write', async () => {
+  let release;
+  const held = new Promise(r => { release = r; });
+  const { api, storage } = setup([() => held]); seed(storage, { expires_at: NOW + 30_000 });
+  const pending = api.call('f', {}).catch(e => e);
+  await new Promise(r => setTimeout(r, 0));
+  storage.removeItem('adminAuth');
+  seed(storage, { access_token: 'b0', refresh_token: 'q0' });   // ほかで合札が入れかわった
+  release(tok(1));
+  const e = await pending;
+  assert.equal(e.code, 'relogin');
+  assert.equal(saved(storage).refresh_token, 'q0', '入れかわった合札を古い refresh の結果で上書きしない');
+});
+
+test('logout_with_expired_token_refreshes_first', async () => {
+  const { api, calls, storage, clock } = setup([tok(2), json(204, null)]); seed(storage);
+  clock.t = NOW + 61 * 60_000; seed(storage, { last: clock.t - 60_000 });   // 期限切れ・30分はたっていない
+  await api.logout();
+  assert.match(calls[0].url, /grant_type=refresh_token$/);
+  assert.match(calls[1].url, /\/auth\/v1\/logout$/);
+  assert.equal(calls[1].init.headers.Authorization, 'Bearer a2');
+  assert.equal(storage.getItem('adminAuth'), null);
+});
+
+test('fast_device_clock_does_not_refresh_every_call', async () => {
+  // 端末の時計がサーバーより2時間進んでいる。サーバーの expires_at はもう過ぎて見える
+  const fast = NOW + 2 * 3600_000;
+  const { api, calls } = setup([tok(1), json(200, { ok: true }), json(200, {}), json(200, {})], { now: fast });
+  assert.deepEqual({ ...(await api.login('me@x.jp', 'pw')) }, { ok: true });
+  await api.call('admin_stats', {}); await api.call('admin_stats', {});
+  assert.deepEqual(calls.map(c => c.url.replace(URL0, '')), ['/auth/v1/token?grant_type=password', '/rest/v1/rpc/admin_whoami', '/rest/v1/rpc/admin_stats', '/rest/v1/rpc/admin_stats']);
 });
