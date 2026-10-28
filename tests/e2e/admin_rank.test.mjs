@@ -205,8 +205,9 @@ t('filters_and_paging', async (page, { db }) => {
   // board で絞る
   await page.fill('#r-f-q', '');
   await page.selectOption('#r-f-board', 'f2n:asia:5');
-  await page.waitForFunction(() => document.querySelectorAll('#r-table tbody tr[data-id]').length === 1);
-  assert.match(await page.textContent('#r-table tbody'), /はなこ/);
+  // 前の検索（たろう）も1行なので、行数ではなく中身が入れかわるのを待つ
+  await page.waitForFunction(() => /はなこ/.test(document.querySelector('#r-table tbody')?.textContent ?? ''));
+  assert.equal(await rows(page).count(), 1);
   // daily は日付の欄、scores の board は隠れる
   await kind(page, 'daily');
   assert.equal(await page.isVisible('#r-f-day'), true);
