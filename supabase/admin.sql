@@ -291,9 +291,11 @@ begin
       return jsonb_build_object('ok', false, 'reason', 'ng_name');
     end if;
   end if;
+  -- rpg は本編の rpg_rename と同じ順（名前の鍵 → 行の鍵）で取る。逆の順だと同時に同じ名前にしたとき deadlock になる。
+  -- なので rpg の行の鍵は下のループの中で、名前の鍵のあとに取る
   if p_kind = 'scores' then select nickname into v_before from scores where id = p_id for update;
   elsif p_kind = 'daily' then select nickname into v_before from daily_scores where id = p_id for update;
-  else select nickname into v_before from rpg_players where id = p_id for update;
+  else perform 1 from rpg_players where id = p_id;
   end if;
   if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
   loop
@@ -302,6 +304,8 @@ begin
     begin
       if p_kind = 'rpg' then
         perform pg_advisory_xact_lock(hashtext('rpgname:' || v_norm));  -- rpg_register と同じ鍵
+        select nickname into v_before from rpg_players where id = p_id for update;
+        if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
         if exists (select 1 from rpg_players where lower(normalize(nickname, NFKC)) = v_norm and id <> p_id) then
           raise unique_violation;
         end if;
