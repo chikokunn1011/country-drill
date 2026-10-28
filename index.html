@@ -1222,6 +1222,22 @@ $('rcard').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.repeat && !$('scr-result').hidden && e.target.closest?.('#rcard button')) e.preventDefault();
 }, true);
+// DB は同じ board への10秒以内の連投を断る（too_soon）。［もう一回］で続けてクリアすると当たりやすいので、断られたら
+// その board に前に送ってから TA_GAP ミリ秒たつまで待って1回だけ送り直す（待つあいだは「送信中…」のまま）。結果画面を離れても送るのはやめない（自己ベストを消さない）。
+// 同じ board への送信は順に1つずつ（送り直しと次のクリアの送信がぶつかって、また断られないように）
+const TA_GAP = 11000, taSent = {}, taQueue = {};
+function taSubmit(args) {
+  const once = () => { taSent[args.board] = Date.now(); return RANKING.submit2(args); };
+  const run = async () => {
+    const r = await once();
+    if (r.ok || r.reason !== 'too_soon') return r;
+    await new Promise(ok => setTimeout(ok, Math.max(1000, taSent[args.board] + TA_GAP - Date.now())));
+    return once();
+  };
+  const p = (taQueue[args.board] ?? Promise.resolve()).then(run, run);
+  taQueue[args.board] = p.catch(() => {});
+  return p;
+}
 // タイムアタックの結果画面：何位相当かの問い合わせと、プロフィールでのランキングへの登録（profile.js の「載せる」箱）。
 // 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
 function taResult(board, timeMs, questions) {
@@ -1234,7 +1250,7 @@ function taResult(board, timeMs, questions) {
   // プロフィールがあって自動 ON ならすぐ送る。載せたら「ランキングを見る」を出す
   PROFILE.postBox(post, {
     label: 'ランキングに載せる',
-    send: token => RANKING.submit2({ token, board, timeMs, questions }).then(r => {
+    send: token => taSubmit({ token, board, timeMs, questions }).then(r => {
       if (!r.ok) return r;
       open.hidden = false; open.onclick = () => openRanking(board);
       return { ok: true, text: `載せたよ！ ${ranks(r)}` };

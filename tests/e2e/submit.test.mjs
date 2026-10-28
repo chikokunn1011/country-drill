@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, clearTimeAttack, warned } from './helpers.mjs';
+import { startServer, openApp, clearTimeAttack, answerCorrect, settleResult, warned } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -28,6 +28,17 @@ const send = async (page, name) => { await page.fill('#ta-post input', name); aw
 const record = (board, nickname, time_ms, created_at = new Date()) => ({ board, nickname, time_ms, questions: 5, created_at: created_at.toISOString() });
 // 偽DB と localStorage にプロフィール（チコ）を入れて開き直す。patch で auto などを変える
 const PID = 'abcdefghjk12';
+// too_soon のあと送り直すまでの待ち（index.html の TA_GAP より長く。時計を進めて飛ばす）
+const TA_WAIT = 12_000;
+// cond() が真になるまで待つ（偽DBの呼び出しは Node 側にあるので、ページの中ではなくここで見る）
+async function waitUntil(cond, ms = 5000) {
+  for (const end = Date.now() + ms; !cond(); await new Promise(ok => setTimeout(ok, 50))) if (Date.now() > end) throw new Error('waitUntil: timeout');
+}
+// 時計を TA_WAIT ずつ進めながら cond() が真になるまで待つ（待ちのタイマーが仕掛けられる前に進めても取りこぼさないように、くり返す）
+async function passUntil(page, cond, tries = 5) {
+  for (let i = 0; i < tries && !cond(); i++) { await page.clock.fastForward(TA_WAIT); await waitUntil(cond, 1000).catch(() => {}); }
+  assert.ok(cond(), 'passUntil: timeout');
+}
 async function withProfile(page, db, patch = {}) {
   db.profiles.push({ token: 'tok-1', nickname: 'チコ', pid: PID });
   await page.evaluate(p => localStorage.setItem('profile', JSON.stringify(p)),
@@ -161,11 +172,14 @@ t('name_checked_locally', async (page, { db }) => {
   assert.equal(await page.isEnabled('#ta-post form .btn'), true);
 });
 
+// 断られたわけを出す。too_soon は1回だけ待って送り直すので、2回続けて断られたときに出る（待ちは時計を進めて飛ばす）
 t('server_reason_shown', async (page, { db }) => {
   const ok = db.rpc.submit_score2;
   db.rpc.submit_score2 = () => ({ ok: false, reason: 'too_soon' });
+  await page.clock.install();
   await withProfile(page, db);
   await clearTimeAttack(page);
+  await passUntil(page, () => submits(db).length === 2);
   await msgShown(page, '少し待ってから');
   assert.equal(await text(page, '#ta-post .tamsg'), '少し待ってからもう一回送ってね');
   assert.equal(await text(page, '#ta-post [data-pf="retry"]'), 'もう一回送る');
@@ -174,8 +188,37 @@ t('server_reason_shown', async (page, { db }) => {
   db.rpc.submit_score2 = ok;
   await page.click('#ta-post [data-pf="retry"]');
   await msgShown(page, '載せたよ！');
-  assert.equal(submits(db).length, 2);
+  assert.equal(submits(db).length, 3);
   assert.equal(db.rows.length, 1);
+});
+
+// DB は同じ board への10秒以内の連投を断る（too_soon）。［もう一回］で続けてクリアして断られても、待って1回送り直す。
+// 結果画面を離れても送るのはやめない（自己ベストが消えないように）
+t('too_soon_retried_after_leaving', async (page, { db }) => {
+  const ok = db.rpc.submit_score2;
+  let calls = 0;
+  db.rpc.submit_score2 = args => (++calls === 2 ? { ok: false, reason: 'too_soon' } : ok(args));
+  await page.clock.install();
+  await withProfile(page, db);
+  await clearTimeAttack(page);
+  await msgShown(page, '載せたよ！');
+  // すぐもう一回。2回目は断られ、送信中のまま待つ
+  await page.click('#r-again');
+  const n = await page.evaluate(() => G.set.length);
+  for (let i = 0; i < n; i++) await answerCorrect(page);
+  await page.locator('#scr-result').waitFor();
+  await waitUntil(() => submits(db).length === 2);
+  await page.waitForTimeout(300);
+  assert.equal(await text(page, '#ta-post .tamsg'), '送信中…');
+  const timeMs = await page.evaluate(() => Math.floor(G.timeMs));
+  // 待っているあいだに結果画面を離れる
+  await settleResult(page);
+  await page.click('#r-setup');
+  assert.equal(await page.locator('#ta-post').count(), 0);
+  await passUntil(page, () => submits(db).length === 3);
+  await waitUntil(() => db.rows.length === 2);
+  assert.equal(db.rows.length, 2);
+  assert.equal(db.rows[1].time_ms, timeMs);
 });
 
 t('double_click_submits_once', async (page, { db }) => {
