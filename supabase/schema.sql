@@ -1,10 +1,14 @@
 -- 195か国ドリル タイムアタックのランキング用（Supabase）
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
--- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
--- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と、
--- 今日の難問の submit_daily / top_daily / daily_rank_of と、
+-- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score2 / top_scores2 / rank_of と、
+-- 冒険の rpg_update2 / rpg_unregister2 / top_rpg3 / rpg_rank_of と、
+-- 今日の難問の submit_daily2 / top_daily2 / daily_rank_of と、
 -- サイト共通のプロフィールの profile_create / profile_me / profile_rename / profile_set / profile_card /
 -- profile_transfer_start / profile_transfer_claim だけ。
+-- 前の版のページのための古い関数（submit_score / top_scores / rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco /
+-- top_rpg / top_rpg2 / submit_daily / top_daily）も残している。名前を送って書きこむものはこのファイルの最後で old_version を返す中身に入れかえる。
+-- 本番に流すとき: 「>>> SQL Editor」〜「<<< SQL Editor」の間（中に delete がある関数）は SQL Editor で Run する。
+-- 「>>> old_version」〜「<<< old_version」の間はサイトを公開した後に流す。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -39,6 +43,7 @@ $$;
 revoke all on function jst_week_start() from public, anon, authenticated;
 
 -- 自分より速い自己ベストを持つ人数＋1（歴代と今週）。同タイムは数えない
+-- 人の区別はプロフィールがあれば profile_id、プロフィールより前の古い記録は名前（profile_id の列は下の「サイト共通のプロフィール」で足す）
 create or replace function rank_of(p_board text, p_time_ms int) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare
@@ -46,9 +51,9 @@ declare
 begin
   return jsonb_build_object(
     'rank_all', (select count(*) + 1 from (
-      select 1 from scores where board = p_board group by nickname having min(time_ms) < p_time_ms) b),
+      select 1 from scores where board = p_board group by coalesce('p' || profile_id, 'n:' || nickname) having min(time_ms) < p_time_ms) b),
     'rank_week', (select count(*) + 1 from (
-      select 1 from scores where board = p_board and created_at >= week_start group by nickname having min(time_ms) < p_time_ms) b));
+      select 1 from scores where board = p_board and created_at >= week_start group by coalesce('p' || profile_id, 'n:' || nickname) having min(time_ms) < p_time_ms) b));
 end $$;
 revoke all on function rank_of(text, int) from public;
 grant execute on function rank_of(text, int) to anon;
@@ -681,9 +686,13 @@ begin
   select * into v_t from profile_transfers
     where code_hash = sha256(convert_to(v_code, 'UTF8')) and used_at is null and expires_at > now() and data is not null for update;
   if not found then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
-  -- 新しい合言葉がもうほかのプロフィールのものなら入れかえられない（端末は合言葉を作り直して送る）
-  if exists (select 1 from profiles where token_hash = v_hash) then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  -- 新しい合言葉がもうほかのプロフィール（か冒険ランキングの行）のものなら入れかえられない（端末は合言葉を作り直して送る）
+  if exists (select 1 from profiles where token_hash = v_hash) or exists (select 1 from rpg_players where token_hash = v_hash) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_token');
+  end if;
   update profiles set token_hash = v_hash, updated_at = now() where id = v_t.profile_id returning * into v_p;
+  -- 冒険ランキングの行の合言葉もそろえる（古い rpg_unregister も新しい端末の合言葉で動くように）
+  update rpg_players set token_hash = v_hash where profile_id = v_t.profile_id;
   update profile_transfers set used_at = now(), data = null where id = v_t.id;
   return jsonb_build_object('ok', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'data', v_t.data);
 end $$;
@@ -706,4 +715,222 @@ end $$;
 revoke all on function profile_migrate_rpg() from public, anon, authenticated;
 do $$ begin perform profile_migrate_rpg(); end $$;
 
+-- ---- ランキングをプロフィールで載せる ----
+-- タイムアタック・今日の難問・冒険の記録は、名前の代わりにプロフィールの合言葉で送る（2026-10-28）
+-- 表の nickname にはプロフィールのいまの名前を入れる（Table Editor で見やすいように）。ランキングに出す名前・かざりは profiles から取る
+-- 人の区別はプロフィールがあれば profile_id、プロフィールより前の古い記録は名前（coalesce('p' || profile_id, 'n:' || nickname)）
+
+-- 記録を受け付ける。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank_all":n,"rank_week":n}（チェックの値は submit_score と同じ）
+create or replace function submit_score2(p_token text, p_board text, p_time_ms int, p_questions int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_cnt text := split_part(p_board, ':', 3);
+  v_p profiles;
+begin
+  if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  if not coalesce(p_board ~ '^(f2n|n2f|m2f|f2m):(all|asia|europe|africa|namerica|samerica|oceania):(5|10|20|all)$', false)
+     or p_questions is null
+     or (v_cnt = 'all' and p_questions not between 1 and 195)
+     or (v_cnt <> 'all' and p_questions::text <> v_cnt) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_board');
+  end if;
+  if p_time_ms is null or p_time_ms < p_questions * 400 then
+    return jsonb_build_object('ok', false, 'reason', 'too_fast');
+  end if;
+  if p_time_ms > 10800000 then
+    return jsonb_build_object('ok', false, 'reason', 'too_slow');
+  end if;
+  v_p := profile_by_token(p_token);
+  if v_p.id is null then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  -- 同じ board・同じ人の同時送信が両方通らないように、確認から登録までを順番待ちにする
+  perform pg_advisory_xact_lock(hashtext('pfscore:' || p_board || ':' || v_p.id));
+  if exists (select 1 from scores where board = p_board and profile_id = v_p.id and created_at > now() - interval '10 seconds') then
+    return jsonb_build_object('ok', false, 'reason', 'too_soon');
+  end if;
+  insert into scores (board, nickname, time_ms, questions, profile_id) values (p_board, v_p.nickname, p_time_ms, p_questions, v_p.id);
+  return jsonb_build_object('ok', true) || rank_of(p_board, p_time_ms);
+end $$;
+revoke all on function submit_score2(text, text, int, int) from public;
+grant execute on function submit_score2(text, text, int, int) to anon;
+
+-- 上位50件（同じ人は最速1件）。p_period は 'all' か 'week'。それ以外は空。古い記録は pid が null・deco が空
+create or replace function top_scores2(p_board text, p_period text)
+returns table(nickname text, pid text, deco text[], time_ms int, created_at timestamptz)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+#variable_conflict use_column
+declare
+  week_start timestamptz := jst_week_start();
+begin
+  if p_period is null or p_period not in ('all', 'week') then return; end if;
+  return query
+    select coalesce(p.nickname, b.nickname), p.pid, coalesce(p.deco, '{}'), b.time_ms, b.created_at from (
+      select distinct on (coalesce('p' || s.profile_id, 'n:' || s.nickname)) s.nickname, s.profile_id, s.time_ms, s.created_at from scores s
+      where s.board = p_board and (p_period = 'all' or s.created_at >= week_start)
+      order by coalesce('p' || s.profile_id, 'n:' || s.nickname), s.time_ms, s.created_at
+    ) b
+    left join profiles p on p.id = b.profile_id
+    order by b.time_ms, b.created_at
+    limit 50;
+end $$;
+revoke all on function top_scores2(text, text) from public;
+grant execute on function top_scores2(text, text) to anon;
+
+-- 今日の難問の記録を受け付ける。1日1回は profile_id で（2回目は already）。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank":n}
+-- 表の名前の unique（同じ日に同じ名前は1回）は古い記録のためのもの。同じ日に同じ名前の古い記録があれば、表の nickname は「名前#pid」にする
+create or replace function submit_daily2(p_token text, p_day text, p_correct int, p_total int, p_time_ms int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_day date := daily_day(p_day);
+  v_p profiles;
+  v_name text;
+  v_id bigint;
+begin
+  if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  if v_day is null or not daily_day_open(v_day, now()) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_day');
+  end if;
+  if p_total is distinct from daily_count() or p_correct is null or p_correct not between 0 and p_total then
+    return jsonb_build_object('ok', false, 'reason', 'bad_record');
+  end if;
+  if p_time_ms is null or p_time_ms < greatest(p_correct, 1) * 400 then
+    return jsonb_build_object('ok', false, 'reason', 'too_fast');
+  end if;
+  if p_time_ms > 10800000 then
+    return jsonb_build_object('ok', false, 'reason', 'too_slow');
+  end if;
+  v_p := profile_by_token(p_token);
+  if v_p.id is null then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if exists (select 1 from daily_scores where day = v_day and profile_id = v_p.id) then
+    return jsonb_build_object('ok', false, 'reason', 'already');
+  end if;
+  v_name := case when exists (select 1 from daily_scores where day = v_day and lower(normalize(nickname, NFKC)) = lower(normalize(v_p.nickname, NFKC)))
+                 then v_p.nickname || '#' || v_p.pid else v_p.nickname end;
+  insert into daily_scores (day, nickname, correct, total, time_ms, profile_id) values (v_day, v_name, p_correct, p_total, p_time_ms, v_p.id)
+    on conflict do nothing returning id into v_id;
+  if v_id is null then return jsonb_build_object('ok', false, 'reason', 'already'); end if;
+  return jsonb_build_object('ok', true) || daily_rank_of(p_day, p_correct, p_time_ms);
+end $$;
+revoke all on function submit_daily2(text, text, int, int, int) from public;
+grant execute on function submit_daily2(text, text, int, int, int) to anon;
+
+-- その日の上位50件（pid・かざりつき）。日付がおかしければ空
+create or replace function top_daily2(p_day text)
+returns table(nickname text, pid text, deco text[], correct int, total int, time_ms int, created_at timestamptz)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+#variable_conflict use_column
+declare
+  v_day date := daily_day(p_day);
+begin
+  if v_day is null then return; end if;
+  return query
+    select coalesce(p.nickname, d.nickname), p.pid, coalesce(p.deco, '{}'), d.correct, d.total, d.time_ms, d.created_at from daily_scores d
+    left join profiles p on p.id = d.profile_id
+    where d.day = v_day
+    order by d.correct desc, d.time_ms, d.created_at
+    limit 50;
+end $$;
+revoke all on function top_daily2(text) from public;
+grant execute on function top_daily2(text) to anon;
+
+-- 冒険の記録を入れる／新しくする（行が無ければ作る。それぞれ今までの最高を残す）。10秒以内の連投は断る
+-- 行の token_hash はプロフィールと同じ。同じ合言葉でプロフィールにつながっていない行（引っ越しで名前がぶつかった人）があれば、その行をつなぐ
+-- 行の nickname はプロフィールの名前。ほかの行とぶつかるときは「名前#pid」にする（ランキングに出す名前は profiles から取る）
+create or replace function rpg_update2(p_token text, p_lv int, p_dungeons int, p_floors int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_p profiles;
+  v_row rpg_players;
+begin
+  if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  if not rpg_record_ok(p_lv, p_dungeons, p_floors) then return jsonb_build_object('ok', false, 'reason', 'bad_record'); end if;
+  v_p := profile_by_token(p_token);
+  if v_p.id is null then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  -- 同じ人の同時送信で行が2つできないように順番待ち
+  perform pg_advisory_xact_lock(hashtext('pfrpg:' || v_p.id));
+  update rpg_players set profile_id = v_p.id where token_hash = v_p.token_hash and profile_id is null;
+  select * into v_row from rpg_players where profile_id = v_p.id for update;
+  if not found then
+    insert into rpg_players (token_hash, nickname, lv, dungeons, floors, profile_id)
+      values (v_p.token_hash,
+              case when exists (select 1 from rpg_players where nickname = v_p.nickname) then v_p.nickname || '#' || v_p.pid else v_p.nickname end,
+              p_lv, p_dungeons, p_floors, v_p.id)
+      returning * into v_row;
+    return jsonb_build_object('ok', true) || rpg_rank_of(v_row.lv, v_row.dungeons, v_row.floors);
+  end if;
+  if v_row.updated_at > now() - interval '10 seconds' then return jsonb_build_object('ok', false, 'reason', 'too_soon'); end if;
+  update rpg_players set lv = greatest(lv, p_lv), dungeons = greatest(dungeons, p_dungeons), floors = greatest(floors, p_floors), updated_at = now()
+    where id = v_row.id returning * into v_row;
+  return jsonb_build_object('ok', true) || rpg_rank_of(v_row.lv, v_row.dungeons, v_row.floors);
+end $$;
+revoke all on function rpg_update2(text, int, int, int) from public;
+grant execute on function rpg_update2(text, int, int, int) to anon;
+
+-- 上位50人（pid・かざりつき）。並びは top_rpg2 と同じ。名前・かざりは profiles から（プロフィールにつながっていない行は rpg_players のもの）
+create or replace function top_rpg3(p_sort text)
+returns table(nickname text, pid text, deco text[], lv int, dungeons int, floors int, created_at timestamptz)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+#variable_conflict use_column
+begin
+  if p_sort is null or p_sort not in ('lv', 'dg') then return; end if;
+  if p_sort = 'lv' then
+    return query select coalesce(f.nickname, r.nickname), f.pid, coalesce(f.deco, r.deco), r.lv, r.dungeons, r.floors, r.updated_at
+      from rpg_players r left join profiles f on f.id = r.profile_id
+      order by r.lv desc, r.dungeons desc, r.floors desc, r.created_at limit 50;
+  else
+    return query select coalesce(f.nickname, r.nickname), f.pid, coalesce(f.deco, r.deco), r.lv, r.dungeons, r.floors, r.updated_at
+      from rpg_players r left join profiles f on f.id = r.profile_id
+      order by r.dungeons desc, r.floors desc, r.lv desc, r.created_at limit 50;
+  end if;
+end $$;
+revoke all on function top_rpg3(text) from public;
+grant execute on function top_rpg3(text) to anon;
+
+-- >>> SQL Editor（中に delete があるので、本番では Supabase の SQL Editor でこの間を Run する）
+-- 冒険データを消したときに、この人の冒険ランキングの行を消す（プロフィールは残す）。もう無ければ not_found
+create or replace function rpg_unregister2(p_token text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_p profiles;
+begin
+  if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  v_p := profile_by_token(p_token);
+  if v_p.id is null then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  delete from rpg_players where profile_id = v_p.id;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function rpg_unregister2(text) from public;
+grant execute on function rpg_unregister2(text) to anon;
+-- <<< SQL Editor
+
 notify pgrst, 'reload schema';
+
+-- >>> old_version（本番ではサイトを公開した後にこの間を流す）
+-- 前の版のページがキャッシュに残っている人のために、名前を送って書きこむ古い関数は残して、中身だけ「ページを読み直してね」にする。
+-- 名前をプロフィールと別に送れる道を残さないため（drop はしない）。戻すときはこの間より上の元の中身を流し直す
+create or replace function submit_score(p_board text, p_nickname text, p_time_ms int, p_questions int) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+create or replace function submit_daily(p_day text, p_nickname text, p_correct int, p_total int, p_time_ms int) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+create or replace function rpg_register(p_token text, p_nickname text, p_lv int, p_dungeons int, p_floors int) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+create or replace function rpg_rename(p_token text, p_nickname text) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+create or replace function rpg_update(p_token text, p_lv int, p_dungeons int, p_floors int) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+create or replace function rpg_set_deco(p_token text, p_deco text[]) returns jsonb
+language sql volatile security definer set search_path = public, pg_temp as $$
+  select '{"ok":false,"reason":"old_version"}'::jsonb
+$$;
+notify pgrst, 'reload schema';
+-- <<< old_version
