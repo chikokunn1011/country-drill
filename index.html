@@ -166,6 +166,8 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .map path { fill: var(--land); stroke: var(--border-land); stroke-width: .5; vector-effect: non-scaling-stroke; }
 .map path.on { fill: var(--hl); stroke: var(--ink); stroke-width: .8; }
 .map circle.ring { fill: none; stroke: var(--hl); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.map circle.ring.far:not(.show) { display: none; }
+.map .sphere { fill: none; stroke: var(--border-land); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .map .graticule { fill: none; stroke: var(--border-land); stroke-width: .3; stroke-dasharray: 2 3; }
 .map.zoomable { cursor: grab; }
 .zoomctl { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
@@ -616,15 +618,29 @@ function projectionFor(c, region, w, h) {
   if (x1 - x0 > 180) { x0 = c.ll[1] - 40; x1 = c.ll[1] + 40; } // 米国など飛び地が広い国
   if (small) { x0 = x1 = c.ll[1]; y0 = y1 = c.ll[0]; }
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  const span = Math.max(x1 - x0, (y1 - y0) * 1.6, 28) * 1.5;
-  const half = span / 2, vhalf = Math.min(80, half / 1.6);
-  return d3.geoNaturalEarth1().rotate([-cx, 0]).fitExtent([[0, 0], [w, h]], bboxPoints(cx - half, Math.max(-85, cy - vhalf), cx + half, Math.min(85, cy + vhalf))).clipExtent([[0, 0], [w, h]]);
+  const make = span => {
+    const half = span / 2, vhalf = Math.min(80, half / 1.6);
+    return d3.geoNaturalEarth1().rotate([-cx, 0]).fitExtent([[0, 0], [w, h]], bboxPoints(cx - half, Math.max(-85, cy - vhalf), cx + half, Math.min(85, cy + vhalf))).clipExtent([[0, 0], [w, h]]);
+  };
+  let span = Math.max(x1 - x0, (y1 - y0) * 1.6, 28) * 1.5;
+  // 海ばかりで陸がほとんど写らない国（太平洋の島国など）は、近くの大陸が入るまで広げる
+  const key = `${c.a}:${w}x${h}`;
+  if (!(key in spanCache)) {
+    let k = 1;
+    while (k < 4 && landShare(make(span * k), w, h) < 0.05) k *= 1.4;
+    spanCache[key] = k;
+  }
+  return make(span * spanCache[key]);
 }
-function drawMap(svg, c, { region = 'all', highlight = true, w = W, h = H } = {}) {
+const spanCache = {};
+const landShare = (proj, w, h) => { const path = d3.geoPath(proj); return feats.reduce((a, g) => a + path.area(g), 0) / (w * h); };
+function drawMap(svg, c, { region = 'all', highlight = true, w = W, h = H, wide = false } = {}) {
+  // wide: 画面の外も切らずに地球全体を描く（出題地図で世界まで縮小できるように）
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const proj = projectionFor(c, region, w, h), path = d3.geoPath(proj);
+  if (wide) proj.clipExtent(null);
   const f = featOf(c);
-  let out = `<path class="graticule" d="${path(graticule)}"></path>`;
+  let out = (wide ? `<path class="sphere" d="${path({ type: 'Sphere' })}"></path>` : '') + `<path class="graticule" d="${path(graticule)}"></path>`;
   for (const g of feats) {
     const d = path(g);
     if (d) out += `<path d="${d}"${highlight && f && String(g.id) === String(f.id) ? ' class="on"' : ''}></path>`;
@@ -633,9 +649,11 @@ function drawMap(svg, c, { region = 'all', highlight = true, w = W, h = H } = {}
     // 小さい国、地域全体を映して小さく見える国には丸印をつける
     const onPath = f ? path(f) : null;
     const small = c.ar < (SUBREGIONS[region] ? 30000 : REGION_BOX[region] ? 120000 : 25000) || !f; // 細かい地域は地図が大きく映るので丸印は小さい国だけ
-    if (small || !onPath) { const q = proj([c.ll[1], c.ll[0]]); if (q) out += `<circle class="ring" cx="${q[0]}" cy="${q[1]}" r="12"></circle>`; }
+    // wide の地図では大きい国にも丸印を用意しておき、縮小したときだけ見せる
+    if (small || !onPath || wide) { const q = proj([c.ll[1], c.ll[0]]); if (q) out += `<circle class="ring${small || !onPath ? '' : ' far'}" cx="${q[0]}" cy="${q[1]}" r="12"></circle>`; }
   }
   svg.innerHTML = `<g class="layer">${out}</g>`;
+  return proj;
 }
 function mapSvg(c, label, opts = {}) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -646,16 +664,32 @@ function mapSvg(c, label, opts = {}) {
 function zoomableMap(c, label, opts = {}) {
   // 出題用の大きい地図。ホイール／ピンチ／ドラッグと ＋－ ボタンで拡大縮小できる
   const box = document.createElement('div'); box.className = 'mapbox';
-  const s = mapSvg(c, label, opts); s.classList.add('zoomable'); box.append(s);
-  const g = s.querySelector('.layer');
-  const zoom = d3.zoom().scaleExtent([1, 10]).translateExtent([[0, 0], [W, H]]).extent([[0, 0], [W, H]]).on('zoom', e => g.setAttribute('transform', e.transform));
+  // 最初は国（地域）のまわりを映し、縮小すると地球全体まで引ける
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.classList.add('map', 'zoomable'); s.setAttribute('role', 'img'); s.setAttribute('aria-label', label);
+  const proj = drawMap(s, c, { ...opts, wide: true }); box.append(s);
+  const g = s.querySelector('.layer'), ring = s.querySelector('.ring');
+  const [[bx0, by0], [bx1, by1]] = d3.geoPath(proj).bounds({ type: 'Sphere' });
+  const kmin = Math.min(1, W / (bx1 - bx0), H / (by1 - by0));
+  const pad = 40;
+  // 地球全体がちょうど収まる表示
+  const whole = d3.zoomIdentity.translate((W - (bx0 + bx1) * kmin) / 2, (H - (by0 + by1) * kmin) / 2).scale(kmin);
+  const zoom = d3.zoom().scaleExtent([kmin, 10])
+    .translateExtent([[Math.min(0, bx0) - pad, Math.min(0, by0) - pad], [Math.max(W, bx1) + pad, Math.max(H, by1) + pad]]).extent([[0, 0], [W, H]])
+    .on('zoom', e => {
+      const k = e.transform.k;
+      g.setAttribute('transform', e.transform);
+      // 縮小しても丸印が見えるように、画面上の大きさを保つ。大きい国の丸印は縮小したときだけ出す
+      if (ring) { ring.setAttribute('r', 12 / Math.min(1, k)); ring.classList.toggle('show', k < 0.75); }
+    });
   const sel = d3.select(s).call(zoom);
   const ctl = document.createElement('div'); ctl.className = 'zoomctl';
-  ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset">戻す</button>';
-  const [minus, plus, reset] = ctl.children;
+  ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset" data-z="world">全体</button><button type="button" class="reset" data-z="back">戻す</button>';
+  const [minus, plus, world, reset] = ctl.children;
   minus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1 / 1.6);
   plus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1.6);
-  reset.onclick = () => sel.transition().duration(200).call(zoom.transform, d3.zoomIdentity);
+  world.onclick = () => sel.transition().duration(300).call(zoom.transform, whole);
+  reset.onclick = () => sel.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
   box.append(ctl);
   return box;
 }
