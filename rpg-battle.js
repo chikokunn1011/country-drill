@@ -506,7 +506,7 @@
     RPG.drawShares($('bt-shares'), shares || []);   // 仲間の節目に届いたら、その場に［シェア］（設計書 §3.7）
     // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
     if (win && b.boss && first && d) {
-      const sb = RPG.shareButton(b.id === 'mworld' ? 'final2' : b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final
+      const sb = RPG.shareButton(b.id === 'mworld' ? 'final2' : b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final、鏡の地図喰いは final2
       sb.id = 'bt-share';
       $('bt-end').querySelector('.rpg-bend-x').after(sb);
     }

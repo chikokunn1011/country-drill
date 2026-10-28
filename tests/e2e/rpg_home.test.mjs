@@ -25,7 +25,10 @@ const t = (name, fn, { rpgErrorOk = false, ...opts } = {}) => test(name, { timeo
 });
 
 const STORY1 = '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。';
-const ALL_CLEAR = { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 };
+const EARTH_CLEAR = { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 };
+// 地球と鏡の地球の14個とも（ストーリーは読んだことにして、章の終わりの dialog を出さない）
+const ALL_CLEAR = { ...EARTH_CLEAR, msamerica: 5, moceania: 5, mnamerica: 5, meurope: 5, masia: 5, mafrica: 5, mworld: 5 };
+const READ_ALL = ['ch1', 'ch2'];
 const text = (page, sel) => page.locator(sel).innerText();
 // save があれば入れて読み込み直してから、冒険ホームを開く
 const home = async (page, save) => {
@@ -245,7 +248,7 @@ t('levelup_one', async page => {
   assert.equal(await page.isDisabled('#rpg-lvup'), true);
   const s = await text(page, '#rpg-lvup');
   assert.ok(s.includes('あと') && s.includes('50'), s);
-  await home(page, saveWith({ lv: 50, coins: 1e6 }));
+  await home(page, saveWith({ lv: 99, coins: 1e9 }));   // 上限は Lv99
   assert.equal(await page.isDisabled('#rpg-lvup'), true);
   assert.ok((await text(page, '#rpg-lvup')).includes('MAX'));
   assert.equal(await page.isDisabled('#rpg-lvmax'), true);
@@ -296,7 +299,7 @@ t('next_action_rules', async page => {
   assert.ok(s.includes('アマゾンの密林 ボス（ジャガー王）に挑戦！（推奨Lv5）'), s);
   assert.ok(s.includes('ちょっときびしいかも。クイズでコインを稼ごう'), s);
   // (5) 全部クリア
-  s = await next(saveWith({ pulls: 1, floors: ALL_CLEAR }));
+  s = await next(saveWith({ pulls: 1, floors: ALL_CLEAR, story: READ_ALL }));
   assert.ok(s.includes('全クリア！ 195か国を仲間にしよう（0/195）'), s);
   await page.click('#rpg-next');
   assert.deepEqual(await page.evaluate(() => RPG.opts), {});
@@ -325,7 +328,7 @@ t('dungeon_plates', async page => {
   await home(page, saveWith({ floors: { oceania: 1 } }));
   assert.ok(!(await text(page, '.rpg-plate[data-d="oceania"]')).includes('🔒'));
   assert.deepEqual((await fl('oceania')).map(x => x[3]), [false, false, true, true, true]);
-  await home(page, saveWith({ floors: ALL_CLEAR }));
+  await home(page, saveWith({ floors: ALL_CLEAR, story: READ_ALL }));
   assert.equal(await page.evaluate(() => RPG.nextFloor(RPG.get())), null);
   assert.equal(await page.locator('.rpg-fl:disabled').count(), 0);
 }, { blockScripts: ['badges.js', 'rpg-battle.js'] });   // next_action_rules と同じ理由
@@ -562,6 +565,53 @@ t('wipe_needs_two', async page => {
   assert.equal(await visible(page, '#rpg-intro'), true);
 });
 
+/* ---------- 章の終わりのストーリー（#rpg-story-dlg） ---------- */
+const storyOpen = page => page.evaluate(() => !!$('rpg-story-dlg')?.open);
+t('story_once_for_old_clear', async page => {
+  // 地図喰いを前に倒していて、ストーリーをまだ読んでいないセーブ
+  await home(page, saveWith({ floors: { world: 5 } }));
+  assert.equal(await storyOpen(page), true);
+  const s = await text(page, '#rpg-story-dlg');
+  for (const x of ['地図喰いをたおすと、195の旗が空に舞いもどった。', '鏡のような裂け目', '鏡の地図喰いをたおして、ふたつの地球をつなぐ裂け目を閉じよう！']) assert.ok(s.includes(x), `${x} が無い: ${s}`);
+  assert.ok(!s.includes('星喰い'), s);   // 第2章クリアの文はまだ
+  assert.equal(await page.locator('#rpg-story-dlg').count(), 1);
+  await page.click('#rpg-story-dlg .close');
+  assert.equal(await storyOpen(page), false);
+  assert.deepEqual((await readSave(page)).story, ['ch1']);
+  // 読み込み直しても出ない
+  await page.reload();
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await storyOpen(page), false);
+  // 2つとも読んでいなければ古い順に1つずつ（Esc で閉じても読んだことになる）
+  await home(page, saveWith({ floors: ALL_CLEAR }));
+  assert.ok((await text(page, '#rpg-story-dlg')).includes('鏡のような裂け目'));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => $('rpg-story-dlg').open && $('rpg-story-dlg').textContent.includes('母さま、あとはたのむ'));
+  const s2 = await text(page, '#rpg-story-dlg');
+  assert.ok(s2.includes('地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。'), s2);
+  await page.click('#rpg-story-dlg .close');
+  assert.deepEqual((await readSave(page)).story, ['ch1', 'ch2']);
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  assert.equal(await storyOpen(page), false);
+  // 新しい版のデータ（読み取り専用）のときは出さない
+  await home(page, { v: 99, intro: true, floors: { world: 5 } });
+  assert.equal(await storyOpen(page), false);
+});
+
+t('all_clear_after_mirror', async page => {
+  // 地球をクリアしただけなら、つぎは鏡のアマゾン F1
+  await home(page, saveWith({ pulls: 1, lv: 30, floors: EARTH_CLEAR, story: ['ch1'] }));
+  let s = await text(page, '#rpg-next');
+  assert.ok(s.includes('鏡のアマゾン F1 に挑戦！'), s);
+  assert.deepEqual(await page.evaluate(() => RPG.nextFloor(RPG.get())), { id: 'msamerica', floor: 1 });
+  // 14個とも: 全クリア
+  await home(page, saveWith({ pulls: 1, floors: ALL_CLEAR, story: READ_ALL }));
+  s = await text(page, '#rpg-next');
+  assert.ok(s.includes('全クリア！'), s);
+  assert.equal(await page.evaluate(() => RPG.nextFloor(RPG.get())), null);
+});
+
 /* ---------- 開発用パネル（?rpgdebug=1） ---------- */
 t('debug_panel', async page => {
   await home(page, saveWith({ coins: 5 }));
@@ -579,12 +629,12 @@ t('debug_panel', async page => {
   assert.equal((await readSave(page)).lv, 15);
   assert.equal(await page.evaluate(() => RPG.debug.setLv(20)), 20);
   assert.equal((await readSave(page)).lv, 20);
-  assert.equal(await page.evaluate(() => RPG.debug.setLv(999)), 50);   // 1..50 におさめる
+  assert.equal(await page.evaluate(() => RPG.debug.setLv(999)), 99);   // 1..99 におさめる
   await page.click('#rpg-dbg-unlock');
-  assert.deepEqual((await readSave(page)).floors, { samerica: 4, oceania: 4, namerica: 4, europe: 4, asia: 4, africa: 4, world: 4 });
+  assert.deepEqual((await readSave(page)).floors, Object.fromEntries(Object.keys(ALL_CLEAR).map(id => [id, 4])));   // 鏡の地球も
   await page.waitForFunction(() => document.querySelectorAll('.rpg-fl:disabled').length === 0);   // ボスまで全部押せる
   assert.deepEqual(await page.evaluate(() => [RPG.debug.unlock('asia', 5), RPG.debug.unlock('nowhere', 3), RPG.get().floors.asia]), [5, null, 5]);
-  assert.equal((await page.evaluate(() => RPG.debug.save())).lv, 50);
+  assert.equal((await page.evaluate(() => RPG.debug.save())).lv, 99);
   // 開発用パネルの［冒険データを消す］も2回たしかめる
   const dlg = answerDialogs(page);
   dlg.answers.push(true, true);

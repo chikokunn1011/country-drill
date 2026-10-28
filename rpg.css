@@ -10,6 +10,9 @@
 :root {
   --rpg-r-samerica: #6fa86a; --rpg-r-oceania: #4fa3c7; --rpg-r-namerica: #d29a4a; --rpg-r-europe: #a77bab;
   --rpg-r-asia: #d0705a; --rpg-r-africa: #c4a02a; --rpg-r-world: #5b6b73;
+  /* 鏡の地球（夜の色。元のダンジョンの色を暗くしたもの） */
+  --rpg-r-msamerica: #436540; --rpg-r-moceania: #2f6277; --rpg-r-mnamerica: #7e5c2c; --rpg-r-meurope: #644a67;
+  --rpg-r-masia: #7d4336; --rpg-r-mafrica: #766019; --rpg-r-mworld: #374045;
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 @media (prefers-color-scheme: dark) {
@@ -18,6 +21,10 @@
     --rpg-r-namerica: color-mix(in srgb, #d29a4a 70%, #fff); --rpg-r-europe: color-mix(in srgb, #a77bab 70%, #fff);
     --rpg-r-asia: color-mix(in srgb, #d0705a 70%, #fff); --rpg-r-africa: color-mix(in srgb, #c4a02a 70%, #fff);
     --rpg-r-world: color-mix(in srgb, #5b6b73 70%, #fff);
+    --rpg-r-msamerica: color-mix(in srgb, #436540 70%, #fff); --rpg-r-moceania: color-mix(in srgb, #2f6277 70%, #fff);
+    --rpg-r-mnamerica: color-mix(in srgb, #7e5c2c 70%, #fff); --rpg-r-meurope: color-mix(in srgb, #644a67 70%, #fff);
+    --rpg-r-masia: color-mix(in srgb, #7d4336 70%, #fff); --rpg-r-mafrica: color-mix(in srgb, #766019 70%, #fff);
+    --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
     --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
   }
 }
@@ -26,6 +33,10 @@
   --rpg-r-namerica: color-mix(in srgb, #d29a4a 70%, #fff); --rpg-r-europe: color-mix(in srgb, #a77bab 70%, #fff);
   --rpg-r-asia: color-mix(in srgb, #d0705a 70%, #fff); --rpg-r-africa: color-mix(in srgb, #c4a02a 70%, #fff);
   --rpg-r-world: color-mix(in srgb, #5b6b73 70%, #fff);
+  --rpg-r-msamerica: color-mix(in srgb, #436540 70%, #fff); --rpg-r-moceania: color-mix(in srgb, #2f6277 70%, #fff);
+  --rpg-r-mnamerica: color-mix(in srgb, #7e5c2c 70%, #fff); --rpg-r-meurope: color-mix(in srgb, #644a67 70%, #fff);
+  --rpg-r-masia: color-mix(in srgb, #7d4336 70%, #fff); --rpg-r-mafrica: color-mix(in srgb, #766019 70%, #fff);
+  --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 
@@ -144,6 +155,13 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-deco img { width: 24px; height: 18px; box-sizing: content-box; object-fit: contain; border: 1px solid var(--line); display: block; }
 .rpg-deco-empty { display: block; border: 1.5px dashed var(--line); }
 .rpg-deco-dlg .inner { gap: 12px; }
+/* 章の終わりのストーリー（#rpg-story-dlg）。見出しと文。文の箱ははじめての画面の .rpg-story を使う */
+.rpg-story-dlg { width: min(520px, calc(100vw - 32px)); }
+.rpg-story-dlg .inner { gap: 10px; }
+.rpg-story-h { margin: 0; font: 900 1.15rem var(--font-display); }
+.rpg-story-h + .rpg-story { margin: 0 0 6px; }
+.rpg-story-dlg .rpg-story p { margin: 0; }
+#rpg-story-ok { align-self: stretch; margin-top: 4px; }
 .rpg-deco-h { margin: 0; font: 900 1.1rem var(--font-display); }
 .rpg-deco-h small { font: 500 .85rem var(--font-mono); color: var(--muted); margin-left: .4em; }
 .rpg-deco-dlg .hint { margin: 0; }
@@ -199,6 +217,9 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-plate.rpg-locked .rpg-plate-name b { color: var(--muted); }
 
 /* 冒険マップ（図版の上。世界地図にダンジョン7つと道。開いた地域は地域の色、まだの地域は霧。押したダンジョンの図版だけを下に出す） */
+/* 章タブ（🌍地球・🪞鏡の地球。ボタンは .chip）。冒険マップの上 */
+.rpg-chtabs { display: flex; gap: 8px; }
+.rpg-chtabs .chip { flex: 1 1 0; font-weight: 700; }
 .rpg-amap { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 .rpg-amap-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
 .rpg-amap-h > b { font: 900 1.05rem var(--font-display); }
@@ -213,6 +234,18 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-amap-svg .rpg-am-r.is-done { fill: var(--rpg-c); }
 .rpg-amap-svg .rpg-am-road { fill: none; stroke: var(--muted); stroke-width: 4; stroke-dasharray: 2 9; stroke-linecap: round; opacity: .55; vector-effect: none; }
 .rpg-amap-svg .rpg-am-road.is-open { stroke: var(--ink); stroke-dasharray: none; opacity: .8; }
+/* 鏡の地球は夜の地図（ライトでもダークでも同じ夜の色）。陸は夜の霧、道は明るい線、名前は夜の色でふちどる */
+.rpg-amap-svg.is-mirror { --rpg-night: #18203a; --rpg-night-land: #333d61; --rpg-night-ink: #dfe5fb; background-color: var(--rpg-night); background-image: url("textures/ocean-dark.svg"); }
+.rpg-amap-svg.is-mirror .rpg-am-land, .rpg-amap-svg.is-mirror .rpg-am-r { fill: var(--rpg-night-land); }
+.rpg-amap-svg.is-mirror .rpg-am-r.is-open { fill: color-mix(in srgb, var(--rpg-c) 55%, var(--rpg-night-land)); }
+.rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: color-mix(in srgb, var(--rpg-c) 70%, #fff); }
+.rpg-amap-svg.is-mirror .rpg-am-road { stroke: var(--rpg-night-ink); }
+.rpg-amap-svg.is-mirror .rpg-am-road.is-open { stroke: var(--rpg-night-ink); }
+.rpg-amap-svg.is-mirror .rpg-am-name { fill: var(--rpg-night-ink); stroke: var(--rpg-night); }
+.rpg-amap-svg.is-mirror .rpg-am-node.is-locked .rpg-am-name { fill: color-mix(in srgb, var(--rpg-night-ink) 60%, var(--rpg-night)); }
+.rpg-amap-svg.is-mirror .rpg-am-node.is-locked .rpg-am-dot { fill: var(--rpg-night-land); stroke: var(--rpg-night-ink); }
+.rpg-amap-svg.is-mirror .rpg-am-node.is-sel .rpg-am-dot { stroke: var(--rpg-night-ink); }
+.rpg-amap-svg.is-mirror .rpg-am-track { stroke: color-mix(in srgb, var(--rpg-night-ink) 30%, var(--rpg-night)); }
 .rpg-am-node { cursor: pointer; outline: none; }
 .rpg-am-hit { fill: transparent; }
 .rpg-am-dot { fill: var(--surface); stroke: var(--rpg-c); stroke-width: 3; }
