@@ -33,10 +33,11 @@
 // 画面の色（設定の theme、未設定はライト）を描く前に当てる。'auto' なら data-theme を付けず、端末の設定に合わせる
 try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
 // 起きたエラーを localStorage adminErrors に新しい50件まで残す（admin.html のログタブで見る）。ここでは例外を出さない
-(() => { const rec = (msg, src, line) => { try { let a; try { a = JSON.parse(localStorage.getItem('adminErrors')); } catch {} a = Array.isArray(a) ? a : [];
-  a.push({ at: new Date().toISOString(), msg: String(msg).slice(0, 500), src: String(src || '').slice(0, 300), line: +line || 0 }); localStorage.setItem('adminErrors', JSON.stringify(a.slice(-50))); } catch {} };
+(() => { const rec = (msg, src, line, pre = '') => { try { let a; try { a = JSON.parse(localStorage.getItem('adminErrors')); } catch {} a = Array.isArray(a) ? a : [];
+  let m; try { m = String(msg); } catch { m = typeof msg; } // Symbol や null-prototype でも止まらない
+  a.push({ at: new Date().toISOString(), msg: (pre + m).slice(0, 500), src: String(src || '').slice(0, 300), line: +line || 0 }); localStorage.setItem('adminErrors', JSON.stringify(a.slice(-50))); } catch {} };
   addEventListener('error', e => rec(e.message || e.error, e.filename, e.lineno));
-  addEventListener('unhandledrejection', e => { let m; try { m = e.reason && e.reason.message || e.reason; } catch {} rec('unhandledrejection: ' + m, '', 0); }); })();
+  addEventListener('unhandledrejection', e => { let m; try { m = e.reason && e.reason.message || e.reason; } catch {} rec(m, '', 0, 'unhandledrejection: '); }); })();
 </script>
 <style>
 /* Layout: 地図帳の1ページ。ホーム→モード選択→出題カード。地図は選んだ地域に合わせて切り出す */
@@ -1391,7 +1392,8 @@ $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); 
 applyTheme();
 applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
-show(start);
+// #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く
+if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(start);
 </script>
 <script src="rpg-core.js?v=11"></script>
 <script src="rpg.js?v=9"></script>
@@ -1400,6 +1402,6 @@ show(start);
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=5"></script>
 <script src="badges.js?v=5"></script>
-<script src="daily.js?v=1"></script>
+<script src="daily.js?v=2"></script>
 </body>
 </html>
