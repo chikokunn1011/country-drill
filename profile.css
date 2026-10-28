@@ -16,3 +16,18 @@
 /* 結果画面の「載せる」箱。自動 OFF のときの問いかけ */
 .pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
 .pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }
+/* ホームの［プロフィール］: 横に並ぶホーム（900〜1279）で［冒険］もあって6つのときは、rpg.css の1行の均等割りだと1つ 130px ほどになり
+   「冒険 ●9,999 NEW」と「プロフィール」が2行に折れるので、3つずつ2行にする。札（.bdg-titlerow）と .dl-homerow は全幅のまま自分の行 */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 720px); }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > :not(.btn) { grid-column: 1 / -1; }
+}
+/* ≥1280 で6つのとき: badges.css の2列（高さ 1000 まで）は［プレイ］が全幅なので［設定］だけの行ができ、1280×577・1366×768・1920×800 で
+   縦にスクロールする。高さ 1000 を超える PC は1列のままだと 1920×1080 でもスクロールする。どちらも2列にして［プレイ］も1マスにし、2×3 に収める
+   幅は pc.css の 340px だと 1920 の大きい字で「冒険 ●9,999 NEW」が2行に折れるので 440px まで広げる（1280 では左の列いっぱいの約 425px）。
+   （冒険の表示が OFF・rpg.js が無いと5つなので、badges.css のまま。［プレイ］は塗りのボタンなので並んでも目立つ） */
+@media (min-width: 1280px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(100%, 440px); }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > #home-play { grid-column: auto; }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > :not(.btn) { grid-column: 1 / -1; }
+}

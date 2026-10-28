@@ -75,7 +75,8 @@
     changed();
     return { ok: true };
   };
-  const setAuto = on => { const p = read(); if (p && update(p.token, { auto: !!on })) { last = get(); redraw(); } };
+  // 自動の ON/OFF も profile:change で知らせる（rpg-rank.js が auto() を見て自動で送るかを決める）。変わらないときは知らせない
+  const setAuto = on => { const p = read(); if (p && (p.auto !== false) !== !!on && update(p.token, { auto: !!on })) changed(); };
   // 公開はサーバーにも送る（すぐ。失敗したら次のきっかけでまた送る）
   const setPublic = on => { const p = read(); if (p && update(p.token, { isPublic: !!on })) { last = get(); redraw(); sync(); } };
 
@@ -88,7 +89,7 @@
   };
 
   // ---- 称号・かざり・バッジの数・公開の同期 ----
-  // いまの値（読めないもの = undefined は送らない）。かざりは冒険のセーブの deco のうち持っている仲間の国だけ（rpg-rank.js と同じしぼり方）
+  // いまの値（読めないもの = undefined は送らない）。かざりは冒険のセーブの deco のうち持っている仲間の国だけ（rpg-rank.js と同じしぼり方）で、重なりは1つに
   const want = p => {
     const w = { isPublic: p.isPublic !== false };
     const B = window.BADGES;
@@ -96,7 +97,7 @@
       try { const c = B.count(); Object.assign(w, { title: B.title(), badges: c.got, badgesTotal: c.total }); } catch (e) { console.warn('[profile] badges', e); }
     }
     const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null;
-    if (d) w.deco = (Array.isArray(d.deco) ? d.deco : []).filter(a => byA.has(a) && d.cards?.[a]).slice(0, 3);
+    if (d) w.deco = [...new Set(Array.isArray(d.deco) ? d.deco : [])].filter(a => byA.has(a) && d.cards?.[a]).slice(0, 3);
     return w;
   };
   // sent とちがう項目だけ
@@ -121,7 +122,18 @@
     const d = diff(p);
     if (!Object.keys(d).length) return;
     syncing = true;
-    const r = await RANKING.profileSet({ token: p.token, ...d });
+    let r = await RANKING.profileSet({ token: p.token, ...d });
+    // 称号・かざり・バッジの数のどれかが断られた（bad_deco・bad_record など）: 公開の切りかえだけは届くように、それだけ送り直す
+    if (!r.ok && r.reason !== 'network' && r.reason !== 'not_found' && 'isPublic' in d && Object.keys(d).length > 1) {
+      console.warn('[profile] profile_set', r.reason);
+      const only = { isPublic: d.isPublic };
+      r = await RANKING.profileSet({ token: p.token, ...only });
+      if (r.ok) { const now = read(); if (now?.token === p.token) update(p.token, { sent: { ...now.sent, ...only } }); }
+      syncing = false;
+      if (r.reason === 'not_found') lost();
+      else if (!r.ok) console.warn('[profile] profile_set', r.reason);
+      return;   // 断られたほうは次のきっかけまで待つ
+    }
     syncing = false;
     if (r.ok) {
       const now = read();

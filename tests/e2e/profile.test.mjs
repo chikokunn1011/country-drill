@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer, openApp, PHONE, PC } from './helpers.mjs';
 import { measureFit, settleLayout } from './layout.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -214,6 +215,38 @@ t('sync title and badges', async (page, { db }) => {
   await page.click('body > [data-bdg-equip="rpg-final@1"]');
   await until(() => db.profiles[0].title === '世界を取りもどした者', 'title');
   assert.equal((await stored(page, 'profile')).sent.title, '世界を取りもどした者');
+});
+
+// 称号・バッジの数などが断られても（bad_record）、公開の切りかえだけは送り直して届ける
+t('public goes alone when the rest is refused', async (page, { db }) => {
+  const orig = db.rpc.profile_set;
+  db.rpc.profile_set = a => a.p_title != null || a.p_badges != null || a.p_deco != null ? { ok: false, reason: 'bad_record' } : orig(a);
+  await openWithProfile(page, db, '?bdgdebug=1');
+  await openProfile(page);
+  await page.click('#pf-public');
+  await until(() => db.profiles[0].is_public === false, 'is_public false');
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('profile')).sent.isPublic === false);
+  assert.equal((await stored(page, 'profile')).sent.title, undefined);   // 断られたほうは送ったことにしない
+});
+
+// かざりは同じ国を2回送らない（冒険のセーブの deco に重なりがあっても）
+t('sync deco without duplicates', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => {
+    window.RPG = { get: () => ({ deco: ['jp', 'jp', 'br', 'zz'], cards: { jp: 1, br: 1 } }) };
+    document.dispatchEvent(new CustomEvent('rpg:deco'));
+  });
+  await until(() => JSON.stringify(db.profiles[0].deco) === '["jp","br"]', 'deco jp,br');
+}, { blockScripts: RPG_FILES });
+
+// 自動の ON/OFF も profile:change で知らせる（rpg-rank.js などが auto() を見て動きを変える）
+t('setAuto emits profile:change', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => { window.__changes = []; document.addEventListener('profile:change', e => window.__changes.push(e.detail.profile?.auto)); });
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await page.evaluate(() => PROFILE.setAuto(false));   // 変わらないときは知らせない
+  await page.evaluate(() => PROFILE.setAuto(true));
+  assert.deepEqual(await page.evaluate(() => window.__changes), [false, true]);
 });
 
 for (const [label, viewport] of [['phone', PHONE], ['pc', PC], ['narrow', { width: 320, height: 640 }]]) {
