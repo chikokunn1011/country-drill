@@ -6,15 +6,15 @@
   const RULES = [
     { since: '2000-01-01', version: 1 },
   ];
-  const COUNT = 10;
+  const COUNT = 20;
   const MODES = ['f2n', 'n2f', 'm2f', 'f2m'];   // 国旗→国名・国名→国旗・場所→国旗・国旗→場所（首都は出さない）
   const SMALL_AR = 25000;                        // index.html の isSmall と同じ「小さい国」（km²）
   // 何問目からどの段階か（1: なじみの薄い国、2: 似た国旗、3: 似た国旗＋小さい国）
-  const stageOf = i => i < 3 ? 1 : i < 7 ? 2 : 3;
-  // よく知られた国。1問目〜3問目には出さない
+  const stageOf = i => i < 6 ? 1 : i < 14 ? 2 : 3;
+  // よく知られた国。1〜6問目と15〜20問目には出さない（7〜14問目もなるべく出さない）
   const FAMOUS = new Set(('jp us cn kr kp gb fr de it es ru ca br au in mx ar eg za ng ke tr sa ir iq id th vn ph my sg ' +
     'nz nl be ch se no dk fi pl pt gr ie at ua il pk bd cu jm co pe cl mn af ma ve').split(' '));
-  // 見まちがえやすい国旗のグループ。2問目の段階からは、ここから出して選択肢もそろえる
+  // 見まちがえやすい国旗のグループ。7問目からは、ここから出して選択肢もそろえる
   const SIMILAR = [
     'td ro ad md',      // 青・黄・赤のたて3色
     'id mc pl sg',      // 赤と白

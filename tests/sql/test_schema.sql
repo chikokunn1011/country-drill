@@ -142,12 +142,12 @@ end $$;
 
 \echo '- jst_week_start'
 reset role;
--- week_boundary と同じ別計算の月曜0時（日本時間）と一致し、日本時間の区切りはこの関数1か所にだけ書いてある
+-- week_boundary と同じ別計算の月曜0時（日本時間）と一致し、日本時間の区切りは週（jst_week_start）と今日の難問（daily_day_open）の2か所にだけ書いてある
 do $$ declare ws timestamptz := ((now() at time zone 'Asia/Tokyo')::date
                                  - (extract(isodow from now() at time zone 'Asia/Tokyo')::int - 1))::timestamp at time zone 'Asia/Tokyo';
 begin
   assert jst_week_start() = ws, format('jst_week_start: %s / 期待 %s', jst_week_start(), ws);
-  assert (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%Asia/Tokyo%') = 1,
+  assert (select string_agg(proname, ', ' order by proname) from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%Asia/Tokyo%') = 'daily_day_open, jst_week_start',
     format('Asia/Tokyo を書いている関数: %s',
       (select string_agg(proname, ', ') from pg_proc where pronamespace = 'public'::regnamespace and prosrc like '%Asia/Tokyo%'));
 end $$;
@@ -405,6 +405,70 @@ reset role; truncate rpg_players;
 insert into rpg_players (token_hash, nickname, lv, dungeons, floors) select int4send(i), 'p' || i, i % 50 + 1, 0, 0 from generate_series(1, 60) i;
 set role anon;
 do $$ begin assert (select count(*) from top_rpg2('lv')) = 50, '50件まで'; end $$;
+reset role;
+
+\echo '- daily: submit_daily / top_daily / daily_rank_of'
+reset role; truncate daily_scores;
+do $$ begin
+  assert daily_day('2026-10-28') = date '2026-10-28', 'daily_day';
+  assert daily_day('2026-02-30') is null, 'ありえない日付';
+  assert daily_day('20261028') is null, '形がちがう';
+  assert daily_day(null) is null, 'null';
+  -- 日本時間 10/28 0:10 → 10/28 と 10/27 はOK、10/26 と 10/29 はだめ。0:30 からは 10/27 もだめ
+  assert daily_day_open(date '2026-10-28', timestamptz '2026-10-27 15:10:00+00'), '今日';
+  assert daily_day_open(date '2026-10-27', timestamptz '2026-10-27 15:10:00+00'), '0:30 までは昨日も';
+  assert not daily_day_open(date '2026-10-27', timestamptz '2026-10-27 15:30:00+00'), '0:30 から昨日はだめ';
+  assert not daily_day_open(date '2026-10-26', timestamptz '2026-10-27 15:10:00+00'), 'おととい';
+  assert not daily_day_open(date '2026-10-29', timestamptz '2026-10-27 15:10:00+00'), '明日';
+  assert daily_day_open(date '2026-10-28', timestamptz '2026-10-28 14:59:59+00'), '23:59 は今日';
+  assert not daily_day_open(date '2026-10-28', timestamptz '2026-10-29 15:00:00+00'), '翌日の0時からはだめ';
+end $$;
+set role anon;
+do $$ declare
+  d text := to_char((now() at time zone 'Asia/Tokyo')::date, 'YYYY-MM-DD');
+  old text := to_char((now() at time zone 'Asia/Tokyo')::date - 2, 'YYYY-MM-DD');
+  r jsonb;
+begin
+  r := submit_daily(d, ' チコ ', 20, 20, 30000);
+  assert r = '{"ok":true,"rank":1}'::jsonb, format('全問正解: %s', r);
+  r := submit_daily(d, 'B', 20, 20, 25000);
+  assert r = '{"ok":true,"rank":1}'::jsonb, format('速い全問正解が1位: %s', r);
+  r := submit_daily(d, 'C', 12, 20, 9000);
+  assert r = '{"ok":true,"rank":3}'::jsonb, format('途中終了は全問正解の下: %s', r);
+  r := submit_daily(d, 'D', 12, 20, 12000);
+  assert r = '{"ok":true,"rank":4}'::jsonb, format('同じ正答数は速い順: %s', r);
+  r := submit_daily(d, 'E', 0, 20, 3000);
+  assert r = '{"ok":true,"rank":5}'::jsonb, format('0問も載る: %s', r);
+  assert submit_daily(d, 'チコ', 5, 20, 9000)->>'reason' = 'name_taken', '同じ日に同じ名前';
+  assert submit_daily(old, 'Z', 5, 20, 9000)->>'reason' = 'bad_day', 'おととい';
+  assert submit_daily('x', 'Z', 5, 20, 9000)->>'reason' = 'bad_day', '形がちがう日付';
+  assert submit_daily(null, 'Z', 5, 20, 9000)->>'reason' = 'bad_day', 'null の日付';
+  assert submit_daily(d, 'Z', 21, 20, 90000)->>'reason' = 'bad_record', '正答数が多すぎ';
+  assert submit_daily(d, 'Z', -1, 20, 9000)->>'reason' = 'bad_record', '正答数がマイナス';
+  assert submit_daily(d, 'Z', 5, 10, 9000)->>'reason' = 'bad_record', '問題数がちがう';
+  assert submit_daily(d, 'Z', null, 20, 9000)->>'reason' = 'bad_record', '正答数が null';
+  assert submit_daily(d, '', 5, 20, 9000)->>'reason' = 'bad_name', '空の名前';
+  assert submit_daily(d, '1234567890123', 5, 20, 9000)->>'reason' = 'bad_name', '13文字';
+  assert submit_daily(d, 'ＡＤＭＩＮ', 5, 20, 9000)->>'reason' = 'ng_name', 'NGワード';
+  assert submit_daily(d, 'Z', 20, 20, 7999)->>'reason' = 'too_fast', '20問で8秒未満';
+  assert submit_daily(d, 'Z', 0, 20, 399)->>'reason' = 'too_fast', '0問でも0.4秒未満はだめ';
+  assert submit_daily(d, 'Z', 5, 20, 10800001)->>'reason' = 'too_slow', '3時間より長い';
+  assert submit_daily(d, 'Z', 5, 20, null)->>'reason' = 'too_fast', 'タイムが null';
+  assert (select array_agg(nickname) from top_daily(d)) = array['B', 'チコ', 'C', 'D', 'E'], format('並び: %s', (select array_agg(nickname) from top_daily(d)));
+  assert (select row(correct, total, time_ms)::text from top_daily(d) where nickname = 'C') = '(12,20,9000)', 'C の行';
+  assert (select count(*) from top_daily(old)) = 0, 'ほかの日は空';
+  assert (select count(*) from top_daily('x')) = 0, '日付がおかしいと空';
+  assert daily_rank_of(d, 12, 9000) = '{"rank":3}'::jsonb, '同じ記録は同じ順位';
+  assert daily_rank_of(d, 20, 1000) = '{"rank":1}'::jsonb, 'いちばん速い';
+  begin perform * from daily_scores; raise exception 'anon が daily_scores を読めた';
+  exception when insufficient_privilege then null; end;
+  begin perform daily_day_open(current_date, now()); raise exception 'anon が daily_day_open を呼べた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role; truncate daily_scores;
+insert into daily_scores (day, nickname, correct, total, time_ms) select current_date, 'p' || i, i % 21, 20, 10000 + i from generate_series(1, 60) i;
+set role anon;
+do $$ begin assert (select count(*) from top_daily(to_char(current_date, 'YYYY-MM-DD'))) = 50, '50件まで'; end $$;
 reset role;
 
 \echo 'ALL SQL TESTS PASSED'
