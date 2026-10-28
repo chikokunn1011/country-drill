@@ -52,7 +52,7 @@
       if (document.body.dataset.screen === 'rpgrank') { drawMe(); load(); }
       scheduleAuto();   // 送っているあいだにまた上がっていたら
     } else if (res.reason === 'too_soon') scheduleAuto();
-    else if (res.reason === 'not_found') P.lost();   // 別の端末に引き継がれた: profile:change で描き直す
+    else if (res.reason === 'not_found') P.lost(p.token);   // 別の端末に引き継がれた: profile:change で描き直す（送った合言葉で。そのあいだに入れかわったプロフィールは消さない）
     else console.warn('ranking auto rpg_update2', res.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
 
@@ -94,8 +94,11 @@
     return p?.auto ? 'auto' : 'box';
   };
   // 箱で送る: いまの記録を rpg_update2 で。通ったら rpgSent に覚える。
-  // 送っているあいだは自動で送らない（箱でプロフィールを作ると profile:change で自動の予約が入る）。終わったら予約し直す
+  // 送っているあいだは自動で送らない（箱でプロフィールを作ると profile:change で自動の予約が入る）。終わったら予約し直す。
+  // 冒険データを消したときの消し直しがまだなら、自動と同じく先に消す（消せなければつながらなかったことにする。あとから消して新しい記録まで消さないように）
   const sendBox = async token => {
+    clearTimeout(autoTimer); autoTimer = null;
+    if (unregs().includes(token)) { await dropTokens(); if (unregs().includes(token)) { scheduleAuto(); return { ok: false, reason: 'network' }; } }
     const rec = recordOf(RPG.get()), p = prof();
     clearTimeout(autoTimer); autoTimer = null;
     sending = true; lastSent = Date.now();
@@ -182,6 +185,8 @@
   };
   $('rr-retry').onclick = () => load();
   $('rr-profile').onclick = () => show('profile');
+  // 画面を離れたら載せる箱を外す（隠れた箱が profile:change を聞き続けない。postBox は箱が DOM から外れると聞くのをやめる。開き直せば render が作り直す）
+  document.addEventListener('drill:screen', e => { if (e.detail?.name !== 'rpgrank' && postMode !== null) { $('rr-post').replaceChildren(); postMode = null; boxUsed = false; } });
   // 箱を押したら（作って載せる・載せる・もう一回送る）使ったことにする。作ったときの profile:change より先に（capture）
   for (const type of ['submit', 'click']) $('rr-post').addEventListener(type, e => { if (type === 'submit' || e.target.closest?.('[data-pf]')) boxUsed = true; }, true);
   // 冒険データを消したら、冒険ランキングからも消す（プロフィールは残す）。消す合言葉は rpgUnreg に覚えておき、つながらなかったら次の起動で消し直す。

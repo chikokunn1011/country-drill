@@ -219,6 +219,20 @@ t('lost_when_not_found', async (page, app) => {
   assert.equal(await page.isVisible('#rr-auto'), false);
 });
 
+t('late_not_found_keeps_new_profile', async (page, app) => {
+  // 古い合言葉で送っている途中にプロフィールが入れかわった（引き継ぎを受けた）: 遅れて届いた not_found で新しいプロフィールを消さない
+  let started = false;
+  await page.route('**/rest/v1/rpc/rpg_update2', async route => { started = true; await new Promise(ok => setTimeout(ok, 1500)); await route.fallback(); });
+  app.db.profiles.push({ id: 1, token: T0, nickname: 'チコ', pid: PID });
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify({ token: 'gone', pid: 'gonepid00001', name: 'チコ', auto: true, isPublic: true, sent: { isPublic: true } })), PID);
+  await writeSave(page, saveWith({ lv: 5 }));
+  await until(() => started, 8000);
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify({ token: '00000000-0000-4000-8000-0000000000a1', pid: p, name: 'チコ', auto: false, isPublic: true, sent: { isPublic: true } })), PID);
+  await until(() => callsOf(app, 'rpg_update2').length === 1, 8000);
+  await page.waitForTimeout(300);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('profile'))?.token), T0);
+});
+
 t('rename_shows_in_rpg_ranking', async (page, app) => {
   // 名前を変えると、冒険ランキングの名前も変わる（表の名前はプロフィールのもの）
   app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 5, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) });
@@ -376,6 +390,39 @@ t('wipe_offline_then_restart_waits', async (page, app) => {
   const names = app.db.calls.map(c => c.name).filter(n => n === 'rpg_unregister2' || n === 'rpg_update2');
   assert.equal(names.indexOf('rpg_unregister2') < names.indexOf('rpg_update2') && names.includes('rpg_unregister2'), true, names.join(','));
   assert.deepEqual(app.db.rpgRows.map(r => r.lv), [2]);
+});
+
+t('wipe_offline_then_box_waits', async (page, app) => {
+  // 自動 OFF でも同じ: 消し終わる前に冒険をやり直して箱で載せたら、先に消してから送る（次の起動で新しい記録まで消さない）
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app, { auto: false });
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  app.db.down = true;
+  await wipe(page);
+  await page.waitForFunction(() => localStorage.getItem('rpgUnreg') !== null);
+  await page.waitForTimeout(300);
+  await page.evaluate(() => RPG.tx(d => { d.intro = true; d.lv = 2; }));   // つながらないまま、読み直さずにはじめからやり直した
+  app.db.down = false;
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.click('#rr-post [data-pf="send"]');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  const names = app.db.calls.map(c => c.name).filter(n => n === 'rpg_unregister2' || n === 'rpg_update2');
+  assert.equal(names.indexOf('rpg_unregister2') < names.indexOf('rpg_update2') && names.includes('rpg_unregister2'), true, names.join(','));
+  assert.deepEqual(app.db.rpgRows.map(r => r.lv), [2]);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpgUnreg')), null);
+});
+
+t('left_rpgrank_box_detached', async (page, app) => {
+  // 冒険ランキングを離れたら載せる箱を外す（隠れた箱が profile:change を聞き続けない。開き直せば作り直す）
+  await withProfile(page, app, { auto: false });
+  await writeSave(page, saveWith({ lv: 7 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.locator('#rr-post [data-pf="send"]').waitFor();
+  await page.evaluate(() => RPG.open('rpg'));
+  assert.equal(await page.locator('#rr-post > *').count(), 0);
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.locator('#rr-post [data-pf="send"]').waitFor();
+  assert.deepEqual(callsOf(app, 'rpg_update2'), []);
 });
 
 t('old_rpgRankDel_drains', async (page, app) => {
