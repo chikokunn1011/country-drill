@@ -119,6 +119,32 @@ t('create_and_submit', async (page, { db }) => {
   assert.equal(db.rows.length, 2);
 });
 
+// 結果画面を離れたら「載せる」箱を外す。あとでプロフィールを作った・自動を ON にしても、載せないままにした記録は送らない
+t('left_result_box_stays_quiet', async (page, { db }) => {
+  // 自動 OFF で［チコ で載せる］を押さずにホームへ → 自動を ON
+  await withProfile(page, db, { auto: false });
+  await clearTimeAttack(page);
+  await rankShown(page);
+  await page.click('#r-setup');
+  await page.click('#brand');
+  assert.equal(await page.locator('#ta-post').count(), 0);
+  await page.evaluate(() => PROFILE.setAuto(true));
+  await page.waitForTimeout(300);
+  assert.equal(submits(db).length, 0);
+  // プロフィールが無いまま結果画面を離れ、あとで作る
+  await page.evaluate(() => localStorage.removeItem('profile'));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await clearTimeAttack(page);
+  await rankShown(page);
+  await page.click('#r-setup');
+  assert.equal(await page.locator('#ta-post').count(), 0);
+  assert.equal((await page.evaluate(() => PROFILE.create('ミケ'))).ok, true);
+  await page.waitForTimeout(300);
+  assert.equal(submits(db).length, 0);
+  assert.equal(db.rows.length, 0);
+});
+
 t('name_checked_locally', async (page, { db }) => {
   await clearTimeAttack(page);
   await rankShown(page); // 順位の問い合わせが済んでから数える

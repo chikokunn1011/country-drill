@@ -1229,6 +1229,14 @@ function taResult(board, timeMs, questions) {
       return { ok: true, text: `載せたよ！ ${ranks(r)}` };
     }),
   });
+  // 結果画面を離れたら箱を外す（結果画面に戻ることはない。隠れた箱が、あとでプロフィールを作った・自動を ON にしたときに
+  // 載せないままにした記録を送らないように。postBox は箱が DOM から外れると聞くのをやめる）。送っている途中の返事は外れた箱に書くだけ
+  const leave = e => {
+    if (e.detail?.name === 'result') return;
+    document.removeEventListener('drill:screen', leave);
+    post.remove();
+  };
+  document.addEventListener('drill:screen', leave);
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
