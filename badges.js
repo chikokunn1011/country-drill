@@ -223,7 +223,8 @@
       case 'join': return { via: o.via, owned: o.owned | 0 };
       case 'promote': return { learn: !!(o.via ? o.via === 'learn' : o.star === 2 && screen !== 'gacha') };
       case 'answer': return { a: o.a, right: !!o.right, mode: o.mode };
-      case 'battle': return { boss: !!o.boss, win: !!o.win, mistakes: o.mistakes | 0, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
+      // 英雄の塔（dungeon: 'tower'）の中ボスはボスとして数えない（ボス・無傷・格上の判定に使わない）
+      case 'battle': return { boss: !!o.boss && o.dungeon !== 'tower', win: !!o.win, mistakes: o.mistakes | 0, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
       case 'clear': return { dungeon: o.dungeon };
       case 'overcome': return { a: o.a };
       case 'bounty': return { totalDays: o.totalDays | 0 };

@@ -16,6 +16,7 @@
   /* 宇宙（星の色。夜空の上でも見えるよう、明るめの色） */
   --rpg-r-moon: #9aa6bd; --rpg-r-mercury: #9a8c80; --rpg-r-venus: #d6a144; --rpg-r-mars: #c4553a;
   --rpg-r-jupiter: #b9774a; --rpg-r-saturn: #b8a265; --rpg-r-blackhole: #7a5bb5;
+  --rpg-r-tower: #8a6fc4;   /* 英雄の塔（rpg-core.js の TOWER.color） */
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 @media (prefers-color-scheme: dark) {
@@ -31,7 +32,7 @@
     --rpg-r-moon: color-mix(in srgb, #9aa6bd 70%, #fff); --rpg-r-mercury: color-mix(in srgb, #9a8c80 70%, #fff);
     --rpg-r-venus: color-mix(in srgb, #d6a144 70%, #fff); --rpg-r-mars: color-mix(in srgb, #c4553a 70%, #fff);
     --rpg-r-jupiter: color-mix(in srgb, #b9774a 70%, #fff); --rpg-r-saturn: color-mix(in srgb, #b8a265 70%, #fff);
-    --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff);
+    --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff); --rpg-r-tower: color-mix(in srgb, #8a6fc4 70%, #fff);
     --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
   }
   :root:not([data-theme="light"]) .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }   /* ダークは --rpg-c がすでに白を混ぜてあるので、重ねて白くしない */
@@ -48,7 +49,7 @@
   --rpg-r-moon: color-mix(in srgb, #9aa6bd 70%, #fff); --rpg-r-mercury: color-mix(in srgb, #9a8c80 70%, #fff);
   --rpg-r-venus: color-mix(in srgb, #d6a144 70%, #fff); --rpg-r-mars: color-mix(in srgb, #c4553a 70%, #fff);
   --rpg-r-jupiter: color-mix(in srgb, #b9774a 70%, #fff); --rpg-r-saturn: color-mix(in srgb, #b8a265 70%, #fff);
-  --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff);
+  --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff); --rpg-r-tower: color-mix(in srgb, #8a6fc4 70%, #fff);
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 :root[data-theme="dark"] .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }
@@ -151,7 +152,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-intro .rpg-warn { align-self: stretch; text-align: left; }
 /* スマホ: 入れ物は透明にして、§3.2 の順（旅人・レベルアップ・つぎ・手配書・ガチャと仲間・図版・かせぎ方）に縦に並べる */
 .rpg-side, .rpg-main, .rpg-aside { display: contents; }
-@media (max-width: 899.98px) { :is(#rpg-warn, #rpg-hero, .rpg-lv, #rpg-next, #rpg-bounty) { order: -1; } }
+@media (max-width: 899.98px) { :is(#rpg-warn, #rpg-hero, .rpg-lv, #rpg-next, #rpg-tower, #rpg-bounty) { order: -1; } }
 
 /* 旅人カード */
 .rpg-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 14px; row-gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
@@ -192,6 +193,15 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-next { display: flex; align-items: flex-start; gap: 8px; width: 100%; text-align: left; cursor: pointer; background: var(--surface); color: var(--ink); border: 1.5px dashed var(--accent); border-radius: 12px; padding: 10px 14px; font: 700 .95rem/1.45 var(--font-display); }
 .rpg-next-k { color: var(--accent); }
 .rpg-next-w { display: block; font: 500 .8rem/1.5 var(--font-body); color: var(--ng); }
+/* 英雄の塔の入口（つぎにやることの下）。開いていなければ点線で、［挑戦］は押せない */
+.rpg-tower { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--rpg-r-tower); border-radius: 12px; padding: 10px 12px 10px 14px; }
+.rpg-tower-h { margin: 0; flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.rpg-tower-h b { font: 900 1rem var(--font-display); }
+.rpg-tower-e { font-size: 1.2rem; line-height: 1; }
+.rpg-tower-s { font: 500 .82rem var(--font-body); color: var(--muted); }
+#rpg-tower-go { flex: none; padding: 8px 16px; }
+.rpg-tower.rpg-locked { background: transparent; border-style: dashed; border-left-style: solid; border-left-color: var(--line); }
+.rpg-tower.rpg-locked b { color: var(--muted); }
 .rpg-go { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .rpg-go .btn { padding: 12px 10px; font-size: 1rem; }
 .rpg-free { display: block; font-size: .8em; }   /* 「無料1回！」はボタンの2行目に（途中で折り返さない） */
@@ -339,7 +349,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-debug-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .rpg-debug-row .btn { padding: 6px 12px; font-size: .85rem; }
 .rpg-debug-lv { display: inline-flex; align-items: center; gap: 6px; font: 700 .85rem var(--font-mono); }
-#rpg-dbg-lv { width: 4.5em; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+#rpg-dbg-lv, #rpg-dbg-tf { width: 4.5em; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
 
 /* PC: 左に旅人の列（上に固定）、右に図版。1400px 以上は右にもう1列（手配書と、仲間の小さい世界地図 #rpg-map。地図は下の「仲間の世界地図」） */
 @media (min-width: 900px) {

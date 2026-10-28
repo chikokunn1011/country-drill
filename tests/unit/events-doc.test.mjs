@@ -15,7 +15,7 @@ const spans = s => [...s.matchAll(/`([^`\n]+)`/g)].map(m => m[1]);
 
 const DRILL = ['drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
 const FEATURES = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer',
-  'rpg:battle', 'rpg:clear', 'rpg:overcome', 'rpg:bounty', 'rpg:share', 'badge:earned', 'badge:title'];
+  'rpg:battle', 'rpg:clear', 'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:tower', 'rpg:tower-end', 'badge:earned', 'badge:title'];
 // drill:* の detail のキー
 const KEYS = ['sid', 'mode', 'kind', 'region', 'n', 'hint', 'a', 'right', 'first', 'missesBefore', 'missesAfter', 'streak',
   'outcome', 'done', 'firstTry', 'wrongs', 'attempts', 'best', 'timeMs', 'missed', 'name'];

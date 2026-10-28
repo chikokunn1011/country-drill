@@ -258,6 +258,9 @@ test('rpg_ops', () => {
   assert.equal(d.s.streak, 12);
   d = run(K, X, [rp('battle', { ...win, boss: false, mistakes: 2 })]);
   assert.deepEqual([d.s.rpg.win, d.s.rpg.nodmg, d.s.rpg.under], [1, 0, 0]);
+  // 英雄の塔の中ボスは、ボス・無傷・格上の判定に使わない（初勝利・れんぞく正解は今のまま）
+  d = run(K, X, [rp('battle', { ...win, dungeon: 'tower', floor: 20 })]);
+  assert.deepEqual([d.s.rpg.win, d.s.rpg.nodmg, d.s.rpg.under, d.s.streak], [1, 0, 0, 12]);
   assert.equal(d.s.rpg.phoenix, undefined, '復活のバッジ（不死鳥）は無い');
 
   d = run(K, X, [rp('levelup', { lv: 12, from: 11 }), rp('levelup', { lv: 5, from: 4 })]);
