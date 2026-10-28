@@ -416,6 +416,139 @@ set role anon;
 do $$ begin assert (select count(*) from top_rpg2('lv')) = 50, '50件まで'; end $$;
 reset role;
 
+-- ---- 英雄の塔（最高記録の階）。送るのは rpg_set_tower、10秒の連投よけは tower_at で数える（updated_at・deco_at とは別） ----
+\echo '- rpg_set_tower'
+reset role; truncate rpg_players; set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_register('00000000-0000-4000-8000-000000000001', 'チコ', 12, 2, 13);
+  assert r->>'ok' = 'true', format('register: %s', r);
+  r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 12);
+  assert r = '{"ok":true,"rank_tower":1}'::jsonb, format('set_tower: %s', r);
+  assert rpg_set_tower('00000000-0000-4000-8000-000000000001', 13)->>'reason' = 'too_soon', 'すぐもう一回は too_soon';
+  r := rpg_update('00000000-0000-4000-8000-000000000001', 12, 2, 13);
+  assert r->>'reason' = 'too_soon', format('登録したばかりなので rpg_update は too_soon のまま（updated_at）: %s', r);
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp']);
+  assert r = '{"ok":true}'::jsonb, format('塔を送ったすぐあとでも rpg_set_deco は通る: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 12, format('tower = 12: %s', (select tower from rpg_players));
+  assert (select tower_at from rpg_players) > now() - interval '1 minute', 'tower_at はサーバー時刻';
+end $$;
+update rpg_players set tower_at = now() - interval '1 minute', updated_at = now() - interval '1 minute', deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 5);
+  assert r->>'ok' = 'true', format('小さい値も ok: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 12, '小さい値で上書きしない';
+end $$;
+update rpg_players set updated_at = now() - interval '1 minute', deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  -- 塔を送った（tower_at は今）すぐあとでも、記録・かざりは通る
+  r := rpg_update('00000000-0000-4000-8000-000000000001', 13, 2, 13);
+  assert r->>'ok' = 'true', format('rpg_update は tower_at を見ない: %s', r);
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', array['br']);
+  assert r->>'ok' = 'true', format('rpg_set_deco は tower_at を見ない: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 12, 'rpg_update は tower を変えない';
+end $$;
+-- 逆（かざり）: rpg_set_deco のすぐあと（deco_at は今）でも、塔は通る
+update rpg_players set tower_at = now() - interval '1 minute', deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp']);
+  assert r->>'ok' = 'true', format('かざり: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select deco_at from rpg_players) > now() - interval '5 seconds', 'deco_at は今';
+end $$;
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 15);
+  assert r->>'ok' = 'true', format('rpg_set_deco のすぐあとでも rpg_set_tower は通る（deco_at を見ない）: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 15, 'tower = 15';
+end $$;
+-- 逆（記録）: rpg_update を送ったすぐあと（updated_at は今）でも、塔は通る
+update rpg_players set tower_at = now() - interval '1 minute';
+-- deco_at を少し前にしておき、rpg_set_tower が deco_at を変えないことも見る
+update rpg_players set deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 20);
+  assert r->>'ok' = 'true', format('rpg_set_tower は updated_at・deco_at を見ない: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 20, 'tower = 20';
+  assert (select updated_at from rpg_players) > now() - interval '5 seconds', 'updated_at はそのまま（rpg_update の時刻）';
+  assert (select deco_at from rpg_players) < now() - interval '30 seconds', 'deco_at はそのまま（rpg_set_tower は変えない）';
+end $$;
+update rpg_players set tower_at = now() - interval '1 minute';
+set role anon;
+do $$ begin
+  assert rpg_set_tower('00000000-0000-4000-8000-000000000001', null)->>'reason' = 'bad_record', 'null';
+  assert rpg_set_tower('00000000-0000-4000-8000-000000000001', -1)->>'reason' = 'bad_record', '-1';
+  assert rpg_set_tower('00000000-0000-4000-8000-000000000001', 100001)->>'reason' = 'bad_record', '100001';
+  assert rpg_set_tower('abc', 3)->>'reason' = 'bad_token', '短い合言葉';
+  assert rpg_set_tower(null, 3)->>'reason' = 'bad_token', 'null の合言葉';
+  assert rpg_set_tower('00000000-0000-4000-8000-0000000000ff', 3)->>'reason' = 'not_found', '登録していない';
+  assert rpg_unregister('00000000-0000-4000-8000-000000000001')->>'ok' = 'true', '消す';
+  assert rpg_set_tower('00000000-0000-4000-8000-000000000001', 3)->>'reason' = 'not_found', '消した行';
+  begin update rpg_players set tower = 99; raise exception 'anon が tower を update できた';
+  exception when insufficient_privilege then null; end;
+  begin perform tower from rpg_players; raise exception 'anon が tower を select できた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+do $$ begin
+  assert (select bool_and(prosecdef) from pg_proc where pronamespace = 'public'::regnamespace
+          and proname in ('rpg_set_tower', 'top_tower', 'rpg_tower_rank_of')), '3つとも security definer';
+  assert (select count(*) from pg_proc where pronamespace = 'public'::regnamespace
+          and proname in ('rpg_set_tower', 'top_tower', 'rpg_tower_rank_of')
+          and proconfig = array['search_path=public, pg_temp']) = 3, '3つとも search_path を固定';
+end $$;
+
+\echo '- top_tower'
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, tower, tower_at, updated_at, deco) values
+  ('\x01', 'A', 20, 1, 7, 12, now() - interval '5 min', now() - interval '9 min', '{fr}'),
+  ('\x02', 'B', 25, 0, 4, 12, now() - interval '3 min', now() - interval '9 min', '{}'),
+  ('\x03', 'C', 20, 1, 7, 12, now() - interval '6 min', now() - interval '9 min', '{jp,br}'),
+  ('\x04', 'D', 10, 3, 16, 30, null, now() - interval '1 min', '{cl}'),
+  ('\x05', 'E', 99, 3, 16, 0, null, now() - interval '1 min', '{}');
+set role anon;
+do $$ begin
+  assert (select array_agg(nickname) from top_tower()) = array['D', 'B', 'C', 'A'], format('塔 → レベル → 時刻: %s', (select array_agg(nickname) from top_tower()));
+  assert (select tower from top_tower() where nickname = 'D') = 30, 'D の塔';
+  assert (select lv from top_tower() where nickname = 'B') = 25, 'B のレベル';
+  assert (select deco from top_tower() where nickname = 'C') = '["jp", "br"]'::jsonb, format('C の deco: %s', (select deco from top_tower() where nickname = 'C'));
+  assert (select created_at from top_tower() where nickname = 'D') > now() - interval '2 min', 'tower_at が無ければ updated_at';
+  assert (select created_at from top_tower() where nickname = 'A') < now() - interval '4 min', 'created_at は tower_at';
+  assert rpg_tower_rank_of(12, 20) = '{"rank":3}'::jsonb, format('塔12・Lv20: %s', rpg_tower_rank_of(12, 20));
+  assert rpg_tower_rank_of(12, 25) = '{"rank":2}'::jsonb, format('塔12・Lv25: %s', rpg_tower_rank_of(12, 25));
+  assert rpg_tower_rank_of(31, 1) = '{"rank":1}'::jsonb, '塔31 は1位';
+  assert rpg_tower_rank_of(12, 21) = '{"rank":3}'::jsonb, '塔12・Lv21 は B の下';
+  assert rpg_tower_rank_of(1, 1) = '{"rank":5}'::jsonb, format('塔1: %s', rpg_tower_rank_of(1, 1));
+end $$;
+reset role; truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, tower) select int4send(i), 'p' || i, i % 50 + 1, 0, 0, i from generate_series(1, 60) i;
+set role anon;
+do $$ begin
+  assert (select count(*) from top_tower()) = 50, '50件まで';
+  assert (select max(tower) from top_tower()) = 60 and (select min(tower) from top_tower()) = 11, '上から50人';
+end $$;
+reset role;
+
 \echo '- daily: submit_daily / top_daily / daily_rank_of'
 reset role; truncate daily_scores;
 do $$ begin

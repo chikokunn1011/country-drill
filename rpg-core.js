@@ -23,6 +23,10 @@
     team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
     // 宇宙のテーマ: 小さい国・大きい国の数（面積の順）、赤道の国の緯度（±度）
     space: { small: 40, big: 40, equator: 12 },
+    // 英雄の塔: f 階の推奨 Lv = 1 + floor((f-1) × recStep)。bossEvery 階ごとに中ボス（旗 bossFlags0 + f/bossEvery 枚、上限 bossFlagsMax）。
+    // 階を上がるたびに最大 HP の healPct 回復。袋は全世界から bagSize か国。similarFrom 階から似た旗の4択（1問ごとに similarRate）、
+    // spaceFrom 階から宇宙の形式の順。ごほうびは coinBase + f、はじめて勝った階は bestBonus。記録は maxFloor 階まで
+    tower: { recStep: 1.0, bossEvery: 10, bossFlags0: 5, bossFlagsMax: 12, healPct: 0.1, bagSize: 8, coinBase: 5, bestBonus: 20, similarFrom: 21, similarRate: 0.5, spaceFrom: 51, maxFloor: 100000 },
   };
   const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
 
@@ -131,12 +135,17 @@
     const last = 5 * (dungeonsOf(1).length + dungeonsOf(2).length);
     return s <= last ? recLv2(s) : recLv2(last) + Math.round((s - last) * TUNING.battle.recStep3);
   };
+  // 推奨 Lv R → 敵の数値（ストーリーと塔の両方が使う）。ボスは flags 枚の旗。
   // 推奨 Lv・仲間なしで、通常は正解約5回で勝ち・ミス3回まで OK。ボスは旗1枚が1発・ミス3回まで OK
+  const enemyAt = (R, boss, flags) => {
+    const B = TUNING.battle, h = heroStats(R);
+    return boss
+      ? { boss: true, recLv: R, flags, flagHp: h.atk, atk: Math.ceil(h.hp * B.bossHitPct) }
+      : { boss: false, recLv: R, hp: h.atk * B.enemyHits, atk: Math.ceil(h.hp * B.enemyHitPct) };
+  };
   const enemy = (id, floor) => {
-    const B = TUNING.battle, s = stageOf(id, floor), R = recLv(s), h = heroStats(R);
-    return floor >= 5
-      ? { boss: true, s, recLv: R, flags: dungeonOf(id).flags, flagHp: h.atk, atk: Math.ceil(h.hp * B.bossHitPct) }
-      : { boss: false, s, recLv: R, hp: h.atk * B.enemyHits, atk: Math.ceil(h.hp * B.enemyHitPct) };
+    const s = stageOf(id, floor), boss = floor >= 5;
+    return { s, ...enemyAt(recLv(s), boss, boss ? dungeonOf(id).flags : undefined) };
   };
 
   // ---- バトルのコイン・ダメージ ----
@@ -302,6 +311,7 @@
     st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
     badgesPaid: [], gr: '',
     teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
+    tower: { best: 0 },   // best = これまでに勝ったいちばん上の階
   });
   const KNOWN = new Set(Object.keys(fresh('')));
 
@@ -375,6 +385,7 @@
       teams: sanitizeTeams(s.teams),
       deco: uniq(list(s.deco).filter(isCode)).slice(0, 3),
       story: uniq(list(s.story).filter(id => STORY_IDS.includes(id))),
+      tower: { best: num((isObj(s.tower) ? s.tower : {}).best, 0, TUNING.tower.maxFloor) },
     };
     d.tsel = int(s.tsel, 0, d.teams.length - 1) ?? 0;
     for (const k of Object.keys(s)) if (!KNOWN.has(k) && k !== '__proto__') d[k] = s[k];
@@ -701,34 +712,42 @@
   // 通常フロアの国の袋: その階の国（シャッフル）→ 階の外の苦手な国を misses の多い順 → wk がある順に最大 weakMax 個
   // （苦手が無ければなかよし度の低い順。同点は乱数）→ 今日の手配書でまだ達成していない地域の国（袋に無ければ足す）。
   // 形式は袋の位置で modeCycle の順。手配書の国には tag:'wanted'
-  const battleBag = (d, m, id, floor, rng) => {
-    const dg = dungeonOf(id);
-    if (!dg) return [];
-    floor = normalFloor(floor);
-    const here = floorsOf(dg)[floor - 1] || [], codes = poolOf(dg), fr = d.fr || {}, wk = d.wk || {};
+  // 袋の共通部分（battleBag と towerBag）。here はこの階の国、codes は出してよい国全部、cy は形式の順
+  const bagOf = (d, m, here, codes, cy, rng) => {
+    const fr = d.fr || {}, wk = d.wk || {};
     const bag = shuffled(here, rng), away = shuffled(codes.filter(a => !here.includes(a)), rng);
     const weak = away.filter(a => isWeak(d, m, a)).sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x]);
     const pick = weak.length ? weak : [...away].sort((x, y) => (fr[x] || 0) - (fr[y] || 0));
     bag.push(...pick.slice(0, TUNING.battle.weakMax));
     const b = d.bounty || {}, done = list(b.done), wanted = list(b.a).filter(a => !done.includes(a) && codes.includes(a));
     for (const a of wanted) if (!bag.includes(a)) bag.push(a);
-    const cy = modeCycle(floor, dg.ch);
     return bag.map((a, i) => ({ a, mode: cy[i % cy.length], tag: wanted.includes(a) ? 'wanted' : null }));
   };
+  const battleBag = (d, m, id, floor, rng) => {
+    const dg = dungeonOf(id);
+    if (!dg) return [];
+    floor = normalFloor(floor);
+    return bagOf(d, m, floorsOf(dg)[floor - 1] || [], poolOf(dg), modeCycle(floor, dg.ch), rng);
+  };
+  // 補充の共通部分: here をシャッフルして、前の形式（無ければ f2n）の next
+  const refillOf = (here, next, last, rng) => shuffled(here, rng).map(a => ({ a, mode: next(last[a] ?? 'f2n'), tag: null }));
   // 袋が空になったら、その階の国をもう一度（シャッフル）、前と別の形式で。lastMode は {国コード: 前に出した形式}
   const refillBag = (id, floor, lastMode, rng) => {
     const dg = dungeonOf(id), last = lastMode || {};
     if (!dg) return [];
     floor = normalFloor(floor);
-    return shuffled(floorsOf(dg)[floor - 1] || [], rng).map(a => ({ a, mode: nextMode(last[a] ?? 'f2n', floor, dg.ch), tag: null }));
+    return refillOf(floorsOf(dg)[floor - 1] || [], mode => nextMode(mode, floor, dg.ch), last, rng);
   };
   // ボスの旗（flags 枚）: 地域の国を misses の多い順 → wk あり → なかよし度の低い順 → 乱数で並べ、苦手な国を上から
   // floor(枚数 × bossWeakPct) 個まで。残りは苦手でない国から乱数で選び、足りなければ苦手な国の続きで埋める
   const bossFlags = (d, m, id, rng) => {
     const dg = dungeonOf(id);
-    if (!dg) return [];
-    const fr = d.fr || {}, wk = d.wk || {}, n = dg.flags, cap = Math.floor(n * TUNING.battle.bossWeakPct);
-    const mixed = shuffled(poolOf(dg), rng);
+    return dg ? flagsOf(d, m, poolOf(dg), dg.flags, rng) : [];
+  };
+  // ボスの旗の共通部分（bossFlags と towerFlags）。pool から n 枚
+  const flagsOf = (d, m, pool, n, rng) => {
+    const fr = d.fr || {}, wk = d.wk || {}, cap = Math.floor(n * TUNING.battle.bossWeakPct);
+    const mixed = shuffled(pool, rng);
     const weak = mixed.filter(a => isWeak(d, m, a))
       .sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x] || (fr[x] || 0) - (fr[y] || 0));
     const out = weak.slice(0, cap);
@@ -763,10 +782,47 @@
   // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。出題は国旗・国名・場所だけ（首都は問題に出さない）
   const bossMode = (k, ch) => { const cy = modeCycle(5, ch); return cy[k % cy.length]; };
 
+  // ---- 英雄の塔（設計書 §6）。DUNGEONS には入れない。t は持たない（地域ボーナスは全員） ----
+  const TOWER = { id: 'tower', ch: 0, r: 'all', name: '英雄の塔', land: '英雄の塔', color: '#8a6fc4', flags: 12 };
+  // 通常の階の敵: 地球の7ダンジョンの F1〜F4 を順に並べたもの。中ボスは塔の番人
+  const TOWER_MONSTERS = { normal: dungeonsOf(1).flatMap(g => MONSTERS[g.id].slice(0, 4)), boss: { e: '🗼', n: '塔の番人' } };
+  // 地図喰い（world のボス）を倒すと開く
+  const towerOpen = d => ((d && d.floors || {}).world || 0) >= 5;
+  const towerRecLv = f => 1 + Math.floor((f - 1) * TUNING.tower.recStep);
+  const towerIsBoss = f => f % TUNING.tower.bossEvery === 0;
+  const towerBossFlagsN = f => { const T = TUNING.tower; return Math.min(T.bossFlagsMax, T.bossFlags0 + Math.floor(f / T.bossEvery)); };
+  const towerMonster = f => towerIsBoss(f) ? TOWER_MONSTERS.boss : TOWER_MONSTERS.normal[(f - 1) % TOWER_MONSTERS.normal.length];
+  const towerEnemy = f => { const boss = towerIsBoss(f); return { s: f, ...enemyAt(towerRecLv(f), boss, boss ? towerBossFlagsN(f) : undefined) }; };
+  // clearedFloor を勝ったあとの HP。中ボスの階なら全回復、ほかは最大 HP の healPct（切り上げ）を足して最大まで
+  const towerHeal = (hp, maxHp, clearedFloor) => towerIsBoss(clearedFloor) ? maxHp : Math.min(maxHp, hp + Math.ceil(maxHp * TUNING.tower.healPct));
+  // 形式の順: spaceFrom 階より前は f2n → n2f → m2f、そこから宇宙の順
+  const towerModes = f => f < TUNING.tower.spaceFrom ? modeCycle(3) : [...SPACE_CYCLE];
+  const towerNextMode = (mode, f) => f < TUNING.tower.spaceFrom ? nextMode(mode, 3) : nextMode(mode, 1, 3);
+  const towerBossMode = (k, f) => { const cy = towerModes(f); return cy[k % cy.length]; };
+  // この問題を似た旗の4択にするか（similarFrom 階から、1問ごとに similarRate）
+  const towerSimilar = (f, rng) => f >= TUNING.tower.similarFrom && rng() < TUNING.tower.similarRate;
+  const allCodes = () => C.map(c => c.a);
+  // 階の袋: 全世界からシャッフルで bagSize か国 → battleBag と同じく苦手（無ければなかよし度の低い国）と手配書を足す
+  const towerBag = (d, m, f, rng) => {
+    const codes = allCodes();
+    return bagOf(d, m, shuffled(codes, rng).slice(0, TUNING.tower.bagSize), codes, towerModes(f), rng);
+  };
+  // 詰め直し: 全世界から新しく bagSize か国。前の形式がある国は towerNextMode、無い国はその階の形式の順でまわす
+  const towerRefill = (f, lastMode, rng) => {
+    const last = lastMode || {}, cy = towerModes(f);
+    return shuffled(allCodes(), rng).slice(0, TUNING.tower.bagSize)
+      .map((a, i) => ({ a, mode: last[a] ? towerNextMode(last[a], f) : cy[i % cy.length], tag: null }));
+  };
+  const towerFlags = (d, m, f, rng) => flagsOf(d, m, allCodes(), towerBossFlagsN(f), rng);
+  // f 階を勝ったときのコイン。best は勝つ前の最高記録（勝った階）。はじめて勝った階だけボーナス
+  const towerReward = (f, best) => { const T = TUNING.tower; return { coins: T.coinBase + f, bonus: f > best ? T.bestBonus : 0 }; };
+  // 塔の強さ: 全世界ダンジョンと同じ（全員に地域ボーナス）、がんばりゲージは使わない
+  const towerStats = (d, t = d.tsel) => ({ ...battleStats(d, 'world', 0, t), gauge: 0 });
+
   globalThis.RPG_CORE = {
     TUNING, BIG, DUNGEONS, CHAPTERS, STORY_IDS, THEMES, chapterOf, dungeonsOf, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
     levelCost, maxLevelUp, heroStats,
-    stageOf, recLv, enemy, firstClearTotal,
+    stageOf, recLv, enemyAt, enemy, firstClearTotal,
     battleReward, damage,
     cardAtk, inDungeon, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
     hitsNeeded, missesAllowed, judge,
@@ -779,5 +835,7 @@
     ensureDay, bountyFor, resetWeak,
     pull, gachaRates, gachaCost,
     modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, similarChoices, themeChoices,
+    TOWER, TOWER_MONSTERS, towerOpen, towerRecLv, towerEnemy, towerIsBoss, towerBossFlagsN, towerMonster, towerHeal,
+    towerModes, towerNextMode, towerBossMode, towerSimilar, towerBag, towerRefill, towerFlags, towerReward, towerStats,
   };
 })();

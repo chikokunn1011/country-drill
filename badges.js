@@ -223,7 +223,8 @@
       case 'join': return { via: o.via, owned: o.owned | 0 };
       case 'promote': return { learn: !!(o.via ? o.via === 'learn' : o.star === 2 && screen !== 'gacha') };
       case 'answer': return { a: o.a, right: !!o.right, mode: o.mode };
-      case 'battle': return { boss: !!o.boss, win: !!o.win, mistakes: o.mistakes | 0, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
+      // 英雄の塔（dungeon: 'tower'）の中ボスはボスとして数えない（ボス・無傷・格上の判定に使わない）
+      case 'battle': return { boss: !!o.boss && o.dungeon !== 'tower', win: !!o.win, mistakes: o.mistakes | 0, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
       case 'clear': return { dungeon: o.dungeon };
       case 'overcome': return { a: o.a };
       case 'bounty': return { totalDays: o.totalDays | 0 };
@@ -356,6 +357,8 @@
         tiers: T3([50, 100, 195], '50か国の友 / 100か国の友 / 世界の友', g => `仲間の数が ${g}か国`) },
       { id: 'rpg-bounty', cat: 'rpg', icon: '🔎', name: '手配書ハンター', unit: '日', rpg: true, v: (s, x) => Math.max(s.rpg.bounty, n0(x.snap?.bountyDays)),
         tiers: T3([1, 10, 30], '新米探偵 / 敏腕探偵 / 名探偵', g => `手配書を全部達成した日が通算 ${g}日`) },
+      { id: 'rpg-tower', cat: 'rpg', icon: '🗼', name: '英雄の塔', unit: '階', rpg: true, v: (s, x) => n0(x.snap?.tower),
+        tiers: T3([10, 25, 50, 100], '塔の見習い / 塔の戦士 / 塔の勇者 / 英雄', g => `英雄の塔で ${g}階まで勝つ`) },
     ];
     // 段の色はふつう段の順（1 銅・2 銀・3 金）。1段だけのバッジと reg-world の金は color で決めてある
     return badges.map(b => ({ ...b, tiers: b.tiers.map((t, i) => ({ ...t, color: t.color || i + 1 })) }));
@@ -734,6 +737,7 @@
     if (d.name === 'home') renderHome();
     flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
   });
+  on('rpg:tower-floor', () => { battle = true; hideToasts(); });   // 塔の階が始まった（2階から先はバトル画面のままなので drill:screen が来ない）
   // 冒険（rpg.js / rpg-battle.js。§8.2）。バトルの1問ごと・クイズ中は積むだけ（drill:result でまとめて判定）
   for (const t of ['coins', 'levelup', 'join', 'promote', 'answer', 'battle', 'clear', 'overcome', 'bounty']) on('rpg:' + t, d => {
     if (t === 'coins' && d.reason !== 'start') return;   // バッジのごほうび（'badge'）などでは判定しない
@@ -742,6 +746,8 @@
     if (t === 'answer' || run) return;
     deliver(bs.commit());
   });
+  // 英雄の塔の階が終わった（tower.best が上がったかもしれない）。snapshot の tower でその場で判定し直す
+  on('rpg:tower', () => { try { if (!run) deliver(bs.commit()); } catch (e) { console.error('[badges]', e); } });
   on('rpg:pull', () => { lastPull = Date.now(); flush(); });   // ガチャの演出中は保留（§5.1）。保留の時間を決め直す
   $('detail').addEventListener('close', flush);   // ダイアログの下に隠れるので、開いている間は保留していた
   // 閉じる・隠れるときは、残っている op を保存だけする（判定は次の起動か次の結果で）

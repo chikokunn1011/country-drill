@@ -236,3 +236,35 @@ test('rpg_set_deco_args', async () => {
   assert.deepEqual(plain(await load(reply({ ok: false, reason: 'bad_deco' })).R.rpgSetDeco({ token: 't', deco: ['zz'] })), { ok: false, reason: 'bad_deco' });
   assert.equal(R.message('bad_deco'), 'かざりの国が正しくないみたい');
 });
+
+test('rpg_set_tower_args', async () => {
+  // 塔の最高記録を送る。返事の rank_tower は rankTower に。失敗しても例外は投げない
+  const { R, calls } = load(reply({ ok: true, rank_tower: 4 }));
+  assert.deepEqual(plain(await R.rpgSetTower({ token: 't', tower: 12 })), { ok: true, rankTower: 4 });
+  assert.equal(calls[0].url, RPC + 'rpg_set_tower');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { p_token: 't', p_tower: 12 });
+  assert.deepEqual(plain(await load(reply({ ok: false, reason: 'too_soon' })).R.rpgSetTower({ token: 't', tower: 3 })), { ok: false, reason: 'too_soon' });
+  assert.deepEqual(plain(await load(reply({ message: 'boom' }, 500)).R.rpgSetTower({ token: 't', tower: 3 })), { ok: false, reason: 'network' });
+});
+
+test('top_tower_maps_rows', async () => {
+  const row = { nickname: 'ミケ', tower: 12, lv: 30, deco: ['jp'], created_at: '2026-10-28T00:00:00Z' };
+  const { R, calls } = load(reply([row, { ...row, nickname: 'タロウ', deco: null }]));
+  const rows = await R.topTower();
+  assert.equal(calls[0].url, RPC + 'top_tower');
+  assert.equal(calls[0].opts.body, '{}');
+  assert.deepEqual(plain(rows.map(r => ({ ...r, at: r.at.toISOString() }))), [
+    { nickname: 'ミケ', tower: 12, lv: 30, deco: ['jp'], at: '2026-10-28T00:00:00.000Z' },
+    { nickname: 'タロウ', tower: 12, lv: 30, deco: [], at: '2026-10-28T00:00:00.000Z' }]);
+  // DB にまだ top_tower が無い（404）ときは e.status 付きで reject（rpg-rank.js が「準備中」と出す）
+  await assert.rejects(load(reply({ message: 'Could not find the function' }, 404)).R.topTower(), e => e.status === 404);
+  await assert.rejects(load(() => Promise.reject(new TypeError('Failed to fetch'))).R.topTower());
+});
+
+test('rpg_tower_rank_of', async () => {
+  const { R, calls } = load(reply({ rank: 3 }));
+  assert.equal(await R.rpgTowerRankOf({ tower: 12, lv: 30 }), 3);
+  assert.equal(calls[0].url, RPC + 'rpg_tower_rank_of');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { p_tower: 12, p_lv: 30 });
+  await assert.rejects(load(reply({ message: 'boom' }, 500)).R.rpgTowerRankOf({ tower: 1, lv: 1 }));
+});

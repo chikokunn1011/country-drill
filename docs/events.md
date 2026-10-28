@@ -102,19 +102,22 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 ## 7. rpg.js / rpg-cards.js / rpg-battle.js → ほかの機能（バッジなど）
 
-`rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` など）は rpg-battle.js、ほかは rpg.js。
+`rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` `rpg:tower` `rpg:tower-end` `rpg:tower-floor` など）は rpg-battle.js、ほかは rpg.js。
 
 | イベント | detail | メモ |
 |---|---|---|
 | `rpg:ready` | `{intro, lv, coins, owned}` | 読み込み時に1回。バッジのさかのぼり判定は `RPG.snapshot()` で |
-| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty'｜'levelup'｜'gacha'｜'slot'｜'debug', coins, earned}` | コインが変わったとき。`levelup`（レベルアップ）と `gacha`（ガチャを引いた）と `slot`（編成の枠を買った。rpg-team.js が出す）は使った分なので `delta` が負。`debug` は開発用（`RPG.debug.give`・`?rpgdebug=1` のパネル）。`coins` `earned` は出した時点の額 |
+| `rpg:coins` | `{delta, reason:'drill'｜'daily'｜'battle'｜'refund'｜'badge'｜'start'｜'overcome'｜'bounty'｜'levelup'｜'gacha'｜'slot'｜'tower'｜'debug', coins, earned}` | コインが変わったとき。`tower` は英雄の塔の1階ぶんのごほうび（基本＋はじめて勝った階のボーナス）。`levelup`（レベルアップ）と `gacha`（ガチャを引いた）と `slot`（編成の枠を買った。rpg-team.js が出す）は使った分なので `delta` が負。`debug` は開発用（`RPG.debug.give`・`?rpgdebug=1` のパネル）。`coins` `earned` は出した時点の額 |
 | `rpg:levelup` | `{lv, from}` | 「上げられるだけ上げる」でも1回。バッジは `from < 10 <= lv` のように、またいだかで判定する |
 | `rpg:join` | `{a, via:'learn'｜'gacha', owned}` | 新しく仲間になった |
 | `rpg:promote` | `{a, star, via:'learn'｜'gacha'}` | マスター昇格・ガチャでのランクアップ |
 | `rpg:pull` | `{region, count, free, results:[{a, star, out}], pity, pulls}` | |
 | `rpg:answer` | `{a, right, mode, dungeon, boss}` | バトル中の回答。コインの計算には使わない |
-| `rpg:battle` | `{dungeon, floor, boss, win, first, mistakes, revived, gauge, maxCombo, lv, recLv}` | |
-| `rpg:clear` | `{dungeon}` | ボスを初めて倒した |
+| `rpg:battle` | `{dungeon, floor, boss, win, first, mistakes, revived, gauge, maxCombo, lv, recLv}` | 英雄の塔では1階終わるごとに `dungeon: 'tower'`（`floor` は塔の階、`boss` は中ボス、`first` はその階をはじめて勝った、`gauge` は 0）。塔では `rpg:clear` は出さない |
+| `rpg:clear` | `{dungeon}` | ボスを初めて倒した（ストーリーのダンジョンだけ） |
+| `rpg:tower` | `{floor, win, best, newBest, coins}` | 英雄の塔の1階が終わるたび（`rpg:battle` とコインのあと）。`best` は書いたあとの最高記録（勝ったいちばん上の階）、`newBest` はこの階で `best` が増えたか、`coins` はこの階でもらった塔のコイン（基本＋ボーナス。負けは 0）。badges.js はこれで `RPG.snapshot().tower` の塔のバッジを判定し直し、rpg-rank.js は `newBest` なら塔の記録の送信（`rpg_set_tower`）を予約する |
+| `rpg:tower-floor` | `{floor}` | 英雄の塔の1階が始まるたび（1階・つぎの階へ・［もう一度］。1階はバトル画面を出したあと）。2階から先と［もう一度］はバトル画面のままなので `drill:screen` が出ない。badges.js はこれでバトル中の保留を始める |
+| `rpg:tower-end` | `{cleared, best}` | 英雄の塔の1回が終わったとき（負け・［やめる］・にげる・バトルの画面を離れた）。`cleared` はその回で勝ったいちばん上の階（0 もある）。ページを閉じたときは出ない。rpg-rank.js は送っていない塔の記録があれば送信を予約する |
 | `rpg:overcome` | `{a, total}` | |
 | `rpg:bounty` | `{a, doneAll, totalDays}` | |
 | `rpg:deco` | `{deco}` | 冒険ホームの旅人カードのかざりを［決定］で変えて保存できたとき（rpg.js）。`deco` は保存した国コードの配列（0..3、持っている仲間だけ、選んだ順）。変わらなかった・保存できなかったときは出さない。冒険ランキングのかざりの送信（rpg-rank.js）が受け取る |
@@ -125,8 +128,8 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 - `rpg:promote` の `via` は、覚えて昇格した（`'learn'`）か、ガチャでランクアップした（`'gacha'`）か。バッジの判定に使うので必ず入れる。
 - `rpg:battle` の `maxCombo` は「そのバトルで続けて正解した数の最大」。ダメージの式で使う「この問題の前の数」ではない。
 - `rpg:ready` は rpg.js を読み込んだときに1回だけ出る。あとから読むファイル（badges.js）には届かないので、起動時は `RPG.snapshot()` を同期で読む。
-- `RPG.snapshot()`（`window.RPG.snapshot()`）は `{intro, lv, coins, owned, ownedByStar, ownedByRegion, floors, cleared, earned, st, overcome, bountyDays}` を返す（読んだときのセーブの写し。書きかえてもセーブは変わらない）。
-  - `ownedByStar` は `{1, 2, 3}`（★ごとの仲間の数）、`ownedByRegion` は `{samerica, oceania, namerica, europe, asia, africa}`（地域ごとの仲間の数）、`floors` は `{ダンジョン id: クリアした最高フロア 0..5}`、`cleared` はボスを倒したダンジョンの id の配列（`floors[id] >= 5`）、`overcome` は `st.overcome`、`bountyDays` は `st.bountyDays`。
+- `RPG.snapshot()`（`window.RPG.snapshot()`）は `{intro, lv, coins, owned, ownedByStar, ownedByRegion, floors, cleared, earned, st, overcome, bountyDays, tower}` を返す（読んだときのセーブの写し。書きかえてもセーブは変わらない）。
+  - `ownedByStar` は `{1, 2, 3}`（★ごとの仲間の数）、`ownedByRegion` は `{samerica, oceania, namerica, europe, asia, africa}`（地域ごとの仲間の数）、`floors` は `{ダンジョン id: クリアした最高フロア 0..5}`、`cleared` はボスを倒したダンジョンの id の配列（`floors[id] >= 5`）、`overcome` は `st.overcome`、`bountyDays` は `st.bountyDays`、`tower` は英雄の塔の最高記録（勝ったいちばん上の階。数）。
   - 読む側は try/catch の中で、どのキーも無いかもしれない前提で `?.` と `?? 0` で読む。ボスを倒したかは `floors[id] >= 5` で判定する（`cleared` の形に頼らない）。
 - rpg.js は `drill:answer` の処理の中（クイズ中）に `rpg:overcome` などを出してよい。バッジはクイズ中は積むだけにし、`drill:result` でまとめて判定する。
 
@@ -167,16 +170,18 @@ badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-cards.js / rpg-battle
 | `rpg:join` | `via` `owned` | `via === 'learn'` なら覚えて仲間に。`owned` は仲間あつめ |
 | `rpg:promote` | `star` `via` | `via === 'learn'` ならマスター昇格。`via` が無ければ下の表の #2 |
 | `rpg:answer` | `a` `right` `mode` | クイズの回答と同じに数える（バトルはヒントなし）。積むだけで判定しない |
-| `rpg:battle` | `boss` `win` `mistakes` `revived` `maxCombo` `lv` `recLv` | 遊んだ日・れんぞく正解・初勝利・無傷の勝利・知識こそ力・不死鳥。バトル中の保留を終える |
+| `rpg:battle` | `dungeon` `boss` `win` `mistakes` `revived` `maxCombo` `lv` `recLv` | 遊んだ日・れんぞく正解・初勝利・無傷の勝利・知識こそ力・不死鳥。バトル中の保留を終える。`dungeon === 'tower'`（英雄の塔）は `boss` を false とみなす（無傷の勝利・知識こそ力に使わない） |
 | `rpg:clear` | `dungeon` | 倒したボス（旗を取りもどせ・世界を取りもどした） |
 | `rpg:overcome` | `a` | 苦手克服 |
 | `rpg:bounty` | `totalDays` | 手配書ハンター |
 | `rpg:pull` | （時刻だけ） | ガチャの演出中の保留を決め直す |
-| `rpg:ready` `rpg:share` | | 使わない |
+| `rpg:tower-floor` | （なし） | `drill:screen {name: 'battle'}` と同じく、バトル中にして出ているバッジのトーストを消す（塔の2階から先・［もう一度］） |
+| `rpg:tower` | （なし。`RPG.snapshot().tower` を読む） | 英雄の塔（`rpg-tower`）のバッジをその場で判定し直す（`RPG.snapshot().tower`。クイズ中は判定しない） |
+| `rpg:ready` `rpg:share` `rpg:tower-end` | | 使わない |
 
 - クイズ中（`drill:start` から `drill:result` まで）に来たものと `rpg:answer` は積むだけで、判定も保存もしない（クイズ中のものは `drill:result` でまとめて判定する）。クイズの外の `rpg:answer`（バトルの1問ごと）は、次に判定するイベント（ふつうはバトルの終わりの `rpg:battle`。ほかの `rpg:*` や `drill:result` などでもよい）でまとめて判定する。その前にページを閉じた・隠れた（`pagehide`・`visibilitychange`）ときは保存だけして、そのあとの判定（次に判定するイベントか、次の起動時）で判定する（隠れただけならページは残るので、戻ってきたあとの次のイベントで判定することもある）。ほかはすぐ判定して保存し、取れたステップは `badge:earned` で払う。
-- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から4秒（パックの演出＋めくる）。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
-- 起動時と判定のたびに `RPG.snapshot()` を同期で読む（7章）。使うキーは `intro` `lv` `owned` `floors` `st`（`st.win` `st.lose` `st.flee`）`overcome` `bountyDays`。ボスを倒したかは `floors` を見て、`floors[id] >= 5` なら倒したとみなす（`cleared` の形には頼らない）。冒険の値は、badges.js が覚えた値と snapshot の値の大きいほうで判定する。
+- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` か `rpg:tower-floor` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から4秒（パックの演出＋めくる）。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`・塔の階の `rpg:tower-floor`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
+- 起動時と判定のたびに `RPG.snapshot()` を同期で読む（7章）。使うキーは `intro` `lv` `owned` `floors` `st`（`st.win` `st.lose` `st.flee`）`overcome` `bountyDays` `tower`。ボスを倒したかは `floors` を見て、`floors[id] >= 5` なら倒したとみなす（`cleared` の形には頼らない）。冒険の値は、badges.js が覚えた値と snapshot の値の大きいほうで判定する。
 
 rpg.js へのお願い（バッジ設計 §8.4）と、rpg.js がやらなかったときのバッジ側の代わりの判定:
 

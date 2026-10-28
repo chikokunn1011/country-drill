@@ -1,7 +1,8 @@
 (() => {
   'use strict';
-  // 冒険（国旗クエスト）のランキング（#scr-rpgrank）: 旅人のレベル順と、クリアしたダンジョンの数の順。
-  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg2 / rpg_rank_of）。1人1行。
+  // 冒険（国旗クエスト）のランキング（#scr-rpgrank）: 旅人のレベル順と、クリアしたダンジョンの数の順と、英雄の塔の最高記録の階の順。
+  // 記録は Supabase の rpg_players（supabase/schema.sql の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg2 / rpg_rank_of
+  // と、塔の rpg_set_tower / top_tower / rpg_tower_rank_of）。1人1行。
   // rpg.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // rpg.js が起動していない・ランキングの接続先が無いときは何もしない（冒険ホームにランキングの入口が出ないだけ）
@@ -16,22 +17,28 @@
   };
   // 送るかざり: セーブの deco のうち持っている仲間（cards）の国だけ（冒険ホームの旅人カードと同じしぼり方）
   const decoOf = d => (Array.isArray(d.deco) ? d.deco : []).filter(a => byA.has(a) && d.cards?.[a]);
-  const SORTS = { lv: 'レベル', dg: 'ダンジョン' };
+  // 英雄の塔の最高記録（勝ったいちばん上の階）
+  const towerOf = d => { const n = d.tower?.best; return Number.isInteger(n) && n > 0 ? n : 0; };
+  const SORTS = { lv: 'レベル', dg: 'ダンジョン', tower: '英雄の塔' };
   // 登録は1回だけ: はじめて載せるとき、この端末で合言葉（token、UUID）を作って送り、ニックネーム・合言葉・最後に送った記録を
   // localStorage（キー rpgRank）に覚える。そのあとは別の名前では登録できず、名前だけ変えられる（記録はそのまま）。
   // 自動更新: レベルアップ・バトルの勝ち（新しいフロア・ボス）・かざりの変更・起動時に記録かかざりが変わっていれば送り直す。
-  // 記録は rpg_update、かざりは rpg_set_deco で別々に送る（1回に片方。記録が先）。送ったものは sent に覚える（sent.deco が無い = 空）。
+  // 記録は rpg_update、かざりは rpg_set_deco、塔は rpg_set_tower で別々に送る（1回に1つ。記録 → かざり → 塔の順）。
+  // 送ったものは sent に覚える（sent.deco が無い = 空、sent.tower が無い = 0。登録したばかりの人は塔をまだ送っていない）。
   // DB は10秒以内の連投を断る（too_soon）ので、前に送ってから GAP ミリ秒あける。通信の失敗は次のきっかけで送り直す
   const KEY = 'rpgRank', GAP = 11000, WAIT = 1500;
   // 合言葉の無い前の形（自動更新だけの版）の覚え書きは、DB の記録を消したので登録していないことにする
   const reg = () => { const r = store.get(KEY, null); return r && typeof r.name === 'string' && r.name && typeof r.token === 'string' ? r : null; };
   const newToken = () => crypto.randomUUID?.() ?? ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
   const same = (x, y) => x.lv === y.lv && x.dungeons === y.dungeons && x.floors === y.floors;
-  // まだ送っていないもの: 'rec'（記録）・'deco'（かざり。古い ranking.js で rpgSetDeco が無いときは送らない）・null（どちらも送ってある）
+  // まだ送っていないもの: 'rec'（記録）・'deco'（かざり。古い ranking.js で rpgSetDeco が無いときは送らない）・
+  // 'tower'（塔。best が送った値より大きいときだけ。古い ranking.js で rpgSetTower が無いときは送らない）・null（どれも送ってある）
   const sameDeco = (x, y) => x.length === y.length && x.every((a, i) => a === y[i]);
   const todo = (r, d) => {
     if (!r.sent || !same(r.sent, recordOf(d))) return 'rec';
     if (typeof RANKING.rpgSetDeco === 'function' && !sameDeco(Array.isArray(r.sent.deco) ? r.sent.deco : [], decoOf(d))) return 'deco';
+    const best = towerOf(d);
+    if (typeof RANKING.rpgSetTower === 'function' && best > 0 && best > (r.sent.tower ?? 0)) return 'tower';
     return null;
   };
   const ranks = r => `レベル順 ${r.rankLv}位・ダンジョン順 ${r.rankDg}位`;
@@ -49,15 +56,16 @@
     if (!r || !d.intro || sending) return;
     const what = todo(r, d);
     if (!what) return;
-    const rec = recordOf(d), deco = decoOf(d), sent = what === 'rec' ? rec : { deco };
+    const rec = recordOf(d), deco = decoOf(d), tower = towerOf(d), sent = what === 'rec' ? rec : what === 'deco' ? { deco } : { tower };
     sending = true; lastSent = Date.now();
-    const res = what === 'rec' ? await RANKING.rpgUpdate({ token: r.token, ...rec }) : await RANKING.rpgSetDeco({ token: r.token, deco });
+    const res = what === 'rec' ? await RANKING.rpgUpdate({ token: r.token, ...rec })
+      : what === 'deco' ? await RANKING.rpgSetDeco({ token: r.token, deco }) : await RANKING.rpgSetTower({ token: r.token, tower });
     sending = false;
     if (res.ok) {
       const now = reg();
       if (now?.token === r.token) store.set(KEY, { ...now, sent: { ...now.sent, ...sent } });   // 送らなかった方は残す
       if (document.body.dataset.screen === 'rpgrank') { drawMe(); load(); }
-      scheduleAuto();   // もう片方（記録かかざり）がまだ・送っているあいだにまた上がっていたら
+      scheduleAuto();   // ほか（記録・かざり・塔）がまだ・送っているあいだにまた上がっていたら
     } else if (res.reason === 'too_soon') scheduleAuto();
     else if (res.reason === 'not_found') {   // DB から消された: 登録していないことにして、もう一回載せてもらう
       if (reg()?.token === r.token) try { localStorage.removeItem(KEY); } catch {}
@@ -78,8 +86,10 @@
     + '<p class="hint" id="rr-how"></p>'
     + '<ol class="rklist rpg-rr-list" id="rr-list" aria-busy="false"></ol>'
     + '<p class="rkempty" id="rr-empty" hidden>まだ誰もいない。1位のチャンス！</p>'
+    + '<p class="rkempty" id="rr-soon" hidden>英雄の塔のランキングは準備中だよ。もう少し待ってね</p>'
     + '<div class="rkerror" id="rr-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="rr-retry">再読み込み</button></div></div></div>';
-  const HOW = { lv: '上位50人まで。レベル → クリアしたダンジョン → フロアの順', dg: '上位50人まで。クリアしたダンジョン → フロア → レベルの順' };
+  const HOW = { lv: '上位50人まで。レベル → クリアしたダンジョン → フロアの順', dg: '上位50人まで。クリアしたダンジョン → フロア → レベルの順',
+    tower: '上位50人まで。最高記録の階 → レベルの順' };
 
   const R = { sort: 'lv', seq: 0 };
   // 日付は日本時間で（タイムアタックのランキングとそろえる）
@@ -87,9 +97,10 @@
   const recText = r => `ダンジョン ${r.dungeons}/${DG.length}（フロア ${r.floors}/${MAX_FLOORS}）`;
 
   const drawMe = () => {
-    const d = RPG.get(), r = recordOf(d), form = $('rr-form');
+    const d = RPG.get(), r = recordOf(d), form = $('rr-form'), tw = R.sort === 'tower', best = towerOf(d);
     $('rr-me').innerHTML = d.intro
       ? `<p class="rpg-rr-h">きみの記録</p><p class="rpg-rr-rec"><b>Lv ${r.lv}</b><span>${recText(r)}</span></p>`
+        + (tw ? `<p class="hint rpg-rr-tw">🗼 英雄の塔 ${best ? `自己ベスト ${best}階` : 'まだ記録がないよ'}</p>` : '')
       : '<p class="rpg-rr-h">まだ旅に出ていないよ</p><p class="hint">冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる</p>';
     const g = reg();
     form.hidden = !d.intro || (!!g && !renaming);   // 登録ずみなら、［名前を変える］を押したときだけ
@@ -99,31 +110,51 @@
     $('rr-rename').hidden = renaming;
     $('rr-rank').textContent = '';
     if (!d.intro) return;
-    // 何位相当か（失敗したら何も出さない。原因はコンソール）
+    // 何位相当か（失敗したら何も出さない。原因はコンソール）。塔のタブでは塔の順位（記録が無い・古い ranking.js なら出さない）
+    if (tw) {
+      if (!best || typeof RANKING.rpgTowerRankOf !== 'function') return;
+      RANKING.rpgTowerRankOf({ tower: best, lv: r.lv }).then(n => {
+        const now = RPG.get();
+        if (R.sort === 'tower' && towerOf(now) === best && now.lv === r.lv && $('rr-rank') && Number.isInteger(n)) $('rr-rank').textContent = `英雄の塔 ${n}位 相当`;
+      }, e => console.warn('ranking rpgTowerRankOf', e));
+      return;
+    }
     const want = { ...r };
-    RANKING.rpgRankOf(want).then(x => { if (same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = `${ranks(x)} 相当`; },
+    RANKING.rpgRankOf(want).then(x => { if (R.sort !== 'tower' && same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = `${ranks(x)} 相当`; },
       e => console.warn('ranking rpgRankOf', e));
   };
   // 読み込み中は表を薄くするだけ。返事が前後しても、最後に頼んだ並べ方の表だけを出す
   const load = async () => {
     const seq = ++R.seq, list = $('rr-list');
     list.setAttribute('aria-busy', 'true'); $('rr-retry').disabled = true;
-    let rows = null;
-    try { rows = await RANKING.rpgTop({ sort: R.sort }); } catch (e) { console.warn('ranking rpgTop', e); }
+    const sort = R.sort, tw = sort === 'tower';
+    // 塔: DB にまだ top_tower が無い（404）・古い ranking.js（topTower が無い）なら「準備中」
+    let rows = null, soon = false;
+    try {
+      if (!tw) rows = await RANKING.rpgTop({ sort });
+      else if (typeof RANKING.topTower === 'function') rows = await RANKING.topTower();
+      else soon = true;
+    } catch (e) {
+      if (tw && e?.status === 404) soon = true;
+      else console.warn(tw ? 'ranking topTower' : 'ranking rpgTop', e);
+    }
     if (seq !== R.seq) return;
     list.setAttribute('aria-busy', 'false'); $('rr-retry').disabled = false;
-    $('rr-error').hidden = !!rows;
+    $('rr-soon').hidden = !soon;
+    $('rr-error').hidden = !!rows || soon;
     $('rr-empty').hidden = !rows || rows.length > 0;
-    // 同じ記録は同じ順位（rpg_rank_of の「自分より上の人数＋1」とそろえる）
+    // 同じ記録は同じ順位（rpg_rank_of・rpg_tower_rank_of の「自分より上の人数＋1」とそろえる）
+    const sameRow = tw ? (x, y) => x.tower === y.tower && x.lv === y.lv : same;
     let no = 0;
     list.innerHTML = (rows ?? []).map((r, i) => {
-      if (!i || !same(r, rows[i - 1])) no = i + 1;
-      const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>・F${r.floors}</small></span>`;
+      if (!i || !sameRow(r, rows[i - 1])) no = i + 1;
+      const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = tw ? `<span class="mono rpg-rr-tw">🗼${r.tower}階</span>`
+        : `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>・F${r.floors}</small></span>`;
       // かざり: 知っている国だけ3つまで（DB も3つまでしか受け付けないが、念のため）。名前の中に入れて列を増やさない（スマホで名前が細くならない）
       const deco = (Array.isArray(r.deco) ? r.deco : []).filter((a, j, l) => byA.has(a) && l.indexOf(a) === j).slice(0, 3)
         .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
       return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}${deco ? `<span class="rr-deco">${deco}</span>` : ''}</span>`
-        + `${R.sort === 'lv' ? lv + dg : dg + lv}<span class="mono at">${jstDay(r.at)}</span></li>`;
+        + `${sort === 'lv' ? lv + dg : dg + lv}<span class="mono at">${jstDay(r.at)}</span></li>`;
     }).join('');
   };
   const render = () => {
@@ -153,6 +184,7 @@
     RPG.opts = { sort: R.sort };
     for (const x of $('rr-tabs').children) x.setAttribute('aria-pressed', String(x.dataset.s === R.sort));
     $('rr-how').textContent = HOW[R.sort];
+    drawMe();   // 塔のタブでは、きみの記録に塔の自己ベストと順位を出す
     load();
   };
   $('rr-retry').onclick = () => load();
@@ -199,6 +231,9 @@
   document.addEventListener('rpg:levelup', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
   document.addEventListener('rpg:deco', () => { try { scheduleAuto(); } catch (e) { console.error('[rpg]', e); } });
   document.addEventListener('rpg:battle', e => { try { if (e.detail?.win) scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
+  // 英雄の塔: 新しい階に勝った・回が終わった
+  document.addEventListener('rpg:tower', e => { try { if (e.detail?.newBest) scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
+  document.addEventListener('rpg:tower-end', () => { try { scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
   window.addEventListener('storage', e => { if (e.key === 'rpg') try { scheduleAuto(); } catch (err) { console.error('[rpg]', err); } });
   scheduleAuto();
   $('rr-form').onsubmit = async e => {
