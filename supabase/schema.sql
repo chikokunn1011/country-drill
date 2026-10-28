@@ -1,5 +1,5 @@
 -- 195か国ドリル タイムアタックのランキング用（Supabase）
--- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
+-- 使い方: 何度流しても大丈夫。手元のテスト（tests/sql/run.sh）は全部流すが、本番は下の「本番に流すとき」のとおり区切りごとに流す（全部まとめて Run しない）。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score2 / top_scores2 / rank_of と、
 -- 冒険の rpg_update2 / rpg_unregister2 / top_rpg3 / rpg_rank_of と、
 -- 今日の難問の submit_daily2 / top_daily2 / daily_rank_of と、
@@ -7,8 +7,9 @@
 -- profile_transfer_start / profile_transfer_claim だけ。
 -- 前の版のページのための古い関数（submit_score / top_scores / rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco /
 -- top_rpg / top_rpg2 / submit_daily / top_daily）も残している。名前を送って書きこむものはこのファイルの最後で old_version を返す中身に入れかえる。
--- 本番に流すとき: 「>>> SQL Editor」〜「<<< SQL Editor」の間（中に delete がある関数）は SQL Editor で Run する。
--- 「>>> old_version」〜「<<< old_version」の間はサイトを公開した後に流す。
+-- 本番に流すとき: ① 「>>> SQL Editor」〜「<<< SQL Editor」の間と「>>> old_version」〜「<<< old_version」の間を除いた部分を流す（MCP の apply_migration。中に delete は無い）。
+-- ② 「>>> SQL Editor」〜「<<< SQL Editor」の間（中に delete がある関数）は SQL Editor で Run する。
+-- ⑤ サイトを公開した後に「>>> old_version」〜「<<< old_version」の間を流す（古い関数を止めて、その間に残った冒険ランキングの行も引っ越す）。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -187,14 +188,21 @@ declare
   v_why text;
 begin
   if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
-  -- 同じ名前・同じ合言葉の同時送信が両方通らないように順番待ち
+  -- 同じ名前・同じ合言葉の同時送信が両方通らないように順番待ち（pfname: は profile_create と同じ鍵）
   perform pg_advisory_xact_lock(hashtext('rpgname:' || coalesce(lower(normalize(v_name, NFKC)), '')));
+  perform pg_advisory_xact_lock(hashtext('pfname:' || coalesce(lower(normalize(v_name, NFKC)), '')));
   perform pg_advisory_xact_lock(hashtext('rpgtoken:' || p_token));
   if exists (select 1 from rpg_players where token_hash = v_hash) then return jsonb_build_object('ok', false, 'reason', 'already'); end if;
   v_why := rpg_name_problem(v_name, v_hash);
   if v_why is not null then return jsonb_build_object('ok', false, 'reason', v_why); end if;
+  -- プロフィールができた後（old_version に入れかえるまで）は、ほかのプロフィールの名前も使えない
+  if exists (select 1 from profiles where lower(normalize(nickname, NFKC)) = lower(normalize(v_name, NFKC)) and token_hash is distinct from v_hash) then
+    return jsonb_build_object('ok', false, 'reason', 'name_taken');
+  end if;
   if not rpg_record_ok(p_lv, p_dungeons, p_floors) then return jsonb_build_object('ok', false, 'reason', 'bad_record'); end if;
   insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values (v_hash, v_name, p_lv, p_dungeons, p_floors);
+  -- その場でプロフィールにする（新しい版を開いたとき、この合言葉で profile_me が通るように）
+  perform profile_migrate_rpg();
   return jsonb_build_object('ok', true) || rpg_rank_of(p_lv, p_dungeons, p_floors);
 end $$;
 revoke all on function rpg_register(text, text, int, int, int) from public;
@@ -241,19 +249,7 @@ end $$;
 revoke all on function rpg_rename(text, text) from public;
 grant execute on function rpg_rename(text, text) to anon;
 
--- 冒険データを消したときに、その端末の行を消す（ランキングからも消える）。もう無ければ not_found
-create or replace function rpg_unregister(p_token text) returns jsonb
-language plpgsql volatile security definer set search_path = public, pg_temp as $$
-declare
-  v_hash bytea := rpg_hash(p_token);
-begin
-  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
-  delete from rpg_players where token_hash = v_hash;
-  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
-  return jsonb_build_object('ok', true);
-end $$;
-revoke all on function rpg_unregister(text) from public;
-grant execute on function rpg_unregister(text) to anon;
+-- 冒険データを消すとき（rpg_unregister）は中に delete があるので、ファイルの下の「>>> SQL Editor」の間に置いている
 
 -- 上位50人。p_sort は 'lv' か 'dg'。それ以外は空。created_at は最後に記録が変わった時刻（前の形と列をそろえて関数を作り直さずに済むようにしている）
 create or replace function top_rpg(p_sort text)
@@ -456,6 +452,7 @@ grant execute on function top_daily(text) to anon;
 -- 名前は全角半角・大文字小文字をそろえて、ほかのプロフィールと同じものは使えない。
 -- 引き継ぎ: 前の端末が profile_transfer_start でデータを預けてコードをもらい、新しい端末が profile_transfer_claim でコードを入れると
 -- 合言葉が新しい端末のものに入れかわる（前の端末は not_found になる）。コードは24時間・1回だけ
+-- （返事が届かなかった端末がやり直せるように、使ったあとも期限までは、同じ新しい合言葉でなら同じ返事を返す）
 create table if not exists profiles (
   id bigint generated always as identity primary key,
   pid text not null unique default substr(replace(gen_random_uuid()::text, '-', ''), 1, 12),  -- 公開用のID
@@ -478,7 +475,7 @@ create table if not exists profile_transfers (
   id bigint generated always as identity primary key,
   code_hash bytea not null unique,       -- sha256(コード。ハイフン抜き・大文字)
   profile_id bigint not null references profiles(id),
-  data jsonb,                            -- 預けたデータ。使ったら・出し直したら null にする
+  data jsonb,                            -- 預けたデータ。出し直したら・期限が過ぎたら（次の start で）null にする。使っても期限までは残す
   expires_at timestamptz not null,       -- 出してから24時間
   used_at timestamptz,
   created_at timestamptz not null default now()
@@ -603,6 +600,10 @@ begin
   if char_length(p_title) > 40 or p_badges not between 0 and 500 or p_badges_total not between 0 and 500 then
     return jsonb_build_object('ok', false, 'reason', 'bad_record');
   end if;
+  -- 称号も窓の名前の横に出るので、名前と同じ NG ワード（NFKC＋小文字にして部分一致）で止める
+  if exists (select 1 from unnest(ng_words()) w where strpos(lower(normalize(p_title, NFKC)), w) > 0) then
+    return jsonb_build_object('ok', false, 'reason', 'ng_name');
+  end if;
   update profiles set is_public = coalesce(p_is_public, is_public), title = coalesce(p_title, title), deco = coalesce(p_deco, deco),
                       badges = coalesce(p_badges, badges), badges_total = coalesce(p_badges_total, badges_total), updated_at = now()
     where token_hash = v_hash;
@@ -663,8 +664,11 @@ begin
     continue when i = 6;
     v_code := v_code || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', get_byte(v_bytes, i) % 32 + 1, 1);
   end loop;
+  -- この人の前のコードは使えなくする（使ったあとのやり直し用に残していた data も消す）
   update profile_transfers set data = null, expires_at = least(expires_at, now())
-    where profile_id = v_id and used_at is null and expires_at > now();
+    where profile_id = v_id and data is not null;
+  -- 期限の過ぎた物の data は、誰かが次に start したときに消す
+  update profile_transfers set data = null where data is not null and expires_at <= now();
   insert into profile_transfers (code_hash, profile_id, data, expires_at)
     values (sha256(convert_to(v_code, 'UTF8')), v_id, p_data, v_expires);
   return jsonb_build_object('ok', true, 'code', v_code, 'expires_at', v_expires);
@@ -673,6 +677,8 @@ revoke all on function profile_transfer_start(text, jsonb) from public;
 grant execute on function profile_transfer_start(text, jsonb) to anon;
 
 -- 引き継ぎコードを使う。ハイフン・空白・小文字は許す。使えるコード（期限内・未使用）なら合言葉を新しい端末のものに入れかえて、預けたデータを返す
+-- 使ったあとも期限内なら、同じ新しい合言葉（＝もうこのプロフィールの合言葉）でのやり直しには同じ返事を返す（返事が届かなかった端末のため）。
+-- ちがう合言葉なら bad_code
 create or replace function profile_transfer_claim(p_code text, p_new_token text) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
@@ -684,8 +690,13 @@ begin
   if v_code !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{12}$' then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
   if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
   select * into v_t from profile_transfers
-    where code_hash = sha256(convert_to(v_code, 'UTF8')) and used_at is null and expires_at > now() and data is not null for update;
+    where code_hash = sha256(convert_to(v_code, 'UTF8')) and expires_at > now() and data is not null for update;
   if not found then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
+  if v_t.used_at is not null then
+    select * into v_p from profiles where id = v_t.profile_id;
+    if v_p.token_hash is distinct from v_hash then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
+    return jsonb_build_object('ok', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'data', v_t.data);
+  end if;
   -- 新しい合言葉がもうほかのプロフィール（か冒険ランキングの行）のものなら入れかえられない（端末は合言葉を作り直して送る）
   if exists (select 1 from profiles where token_hash = v_hash) or exists (select 1 from rpg_players where token_hash = v_hash) then
     return jsonb_build_object('ok', false, 'reason', 'bad_token');
@@ -693,22 +704,34 @@ begin
   update profiles set token_hash = v_hash, updated_at = now() where id = v_t.profile_id returning * into v_p;
   -- 冒険ランキングの行の合言葉もそろえる（古い rpg_unregister も新しい端末の合言葉で動くように）
   update rpg_players set token_hash = v_hash where profile_id = v_t.profile_id;
-  update profile_transfers set used_at = now(), data = null where id = v_t.id;
+  update profile_transfers set used_at = now() where id = v_t.id;
   return jsonb_build_object('ok', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'data', v_t.data);
 end $$;
 revoke all on function profile_transfer_claim(text, text) from public;
 grant execute on function profile_transfer_claim(text, text) to anon;
 
 -- 引っ越し: プロフィールより前に冒険ランキングに載っていた人を、同じ合言葉・名前・かざりのプロフィールにする（何度呼んでも増えない）
--- 名前がほかのプロフィールとぶつかる行は作らない（その人は冒険ランキングに残るがプロフィールは無いまま）
+-- 名前がほかのプロフィールとぶつかる行も宙に浮かせない。「名前の前7文字#pid の前4文字」（12文字まで）のプロフィールにする。
+-- 同じ合言葉なので本人の端末はそのプロフィールを使え、名前はあとで変えられる（ぶつかった相手のプロフィールにはつながない。同じ人とは限らないので）
 create or replace function profile_migrate_rpg() returns void
 language plpgsql volatile set search_path = public, pg_temp as $$
+declare
+  v_r rpg_players;
+  v_pid text;
 begin
-  insert into profiles (token_hash, nickname, deco, created_at)
-    select r.token_hash, r.nickname, r.deco, r.created_at from rpg_players r
-    where r.profile_id is null and not exists (select 1 from profiles p where p.token_hash = r.token_hash)
-    order by r.created_at
-    on conflict do nothing;
+  for v_r in select * from rpg_players x
+           where x.profile_id is null and not exists (select 1 from profiles p where p.token_hash = x.token_hash)
+           order by x.created_at loop
+    insert into profiles (token_hash, nickname, deco, created_at) values (v_r.token_hash, v_r.nickname, v_r.deco, v_r.created_at)
+      on conflict do nothing;
+    -- 名前がぶつかって入らなかったら、pid を先に決めて名前につける（pid までぶつかったら作り直す）
+    while not exists (select 1 from profiles p where p.token_hash = v_r.token_hash) loop
+      v_pid := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
+      insert into profiles (pid, token_hash, nickname, deco, created_at)
+        values (v_pid, v_r.token_hash, left(v_r.nickname, 7) || '#' || left(v_pid, 4), v_r.deco, v_r.created_at)
+        on conflict do nothing;
+    end loop;
+  end loop;
   update rpg_players r set profile_id = p.id from profiles p
     where r.profile_id is null and p.token_hash = r.token_hash;
 end $$;
@@ -720,12 +743,14 @@ do $$ begin perform profile_migrate_rpg(); end $$;
 -- 表の nickname にはプロフィールのいまの名前を入れる（Table Editor で見やすいように）。ランキングに出す名前・かざりは profiles から取る
 -- 人の区別はプロフィールがあれば profile_id、プロフィールより前の古い記録は名前（coalesce('p' || profile_id, 'n:' || nickname)）
 
--- 記録を受け付ける。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank_all":n,"rank_week":n}（チェックの値は submit_score と同じ）
+-- 記録を受け付ける。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank_all":n,"rank_week":n}（順位は自己ベストの。チェックの値は submit_score と同じ）
 create or replace function submit_score2(p_token text, p_board text, p_time_ms int, p_questions int) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
   v_cnt text := split_part(p_board, ':', 3);
   v_p profiles;
+  v_best int;
+  v_best_week int;
 begin
   if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
   if not coalesce(p_board ~ '^(f2n|n2f|m2f|f2m):(all|asia|europe|africa|namerica|samerica|oceania):(5|10|20|all)$', false)
@@ -748,7 +773,11 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'too_soon');
   end if;
   insert into scores (board, nickname, time_ms, questions, profile_id) values (p_board, v_p.nickname, p_time_ms, p_questions, v_p.id);
-  return jsonb_build_object('ok', true) || rank_of(p_board, p_time_ms);
+  -- 返す順位は今回のタイムではなく自己ベスト（歴代は歴代の、今週は今週の）の順位。自己ベストより遅いと自分の自己ベストを数えて1つ下がるので
+  -- （rank_of は同じタイムを数えないので、自分の自己ベストは入らない）
+  select min(time_ms), min(time_ms) filter (where created_at >= jst_week_start()) into v_best, v_best_week
+    from scores where board = p_board and profile_id = v_p.id;
+  return jsonb_build_object('ok', true, 'rank_all', rank_of(p_board, v_best)->'rank_all', 'rank_week', rank_of(p_board, v_best_week)->'rank_week');
 end $$;
 revoke all on function submit_score2(text, text, int, int) from public;
 grant execute on function submit_score2(text, text, int, int) to anon;
@@ -886,6 +915,20 @@ revoke all on function top_rpg3(text) from public;
 grant execute on function top_rpg3(text) to anon;
 
 -- >>> SQL Editor（中に delete があるので、本番では Supabase の SQL Editor でこの間を Run する）
+-- 前の版のページ用: 冒険データを消したときに、その端末の行を消す（ランキングからも消える）。もう無ければ not_found
+create or replace function rpg_unregister(p_token text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  delete from rpg_players where token_hash = v_hash;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function rpg_unregister(text) from public;
+grant execute on function rpg_unregister(text) to anon;
+
 -- 冒険データを消したときに、この人の冒険ランキングの行を消す（プロフィールは残す）。もう無ければ not_found
 create or replace function rpg_unregister2(p_token text) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
@@ -932,5 +975,8 @@ create or replace function rpg_set_deco(p_token text, p_deco text[]) returns jso
 language sql volatile security definer set search_path = public, pg_temp as $$
   select '{"ok":false,"reason":"old_version"}'::jsonb
 $$;
+-- ①〜ここまでの間に古いページの登録などで残った、プロフィールにつながっていない冒険ランキングの行を引っ越す
+-- （古い関数を止めた後なので、ここから後に増えることは無い）
+do $$ begin perform profile_migrate_rpg(); end $$;
 notify pgrst, 'reload schema';
 -- <<< old_version

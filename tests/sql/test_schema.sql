@@ -112,7 +112,7 @@ end $$;
 reset role; update scores set created_at = created_at - interval '11 seconds'; set role anon;
 do $$ declare r jsonb; v_pid text := profile_me('00000000-0000-4000-8000-0000000000a1')->>'pid'; begin
   r := submit_score2('00000000-0000-4000-8000-0000000000a1', 'f2n:asia:10', 8500, 10);
-  assert r = '{"ok":true,"rank_all":2,"rank_week":2}'::jsonb, format('チコ 8500（順位は今の記録で数えるので自分の 8000 が上）: %s', r);
+  assert r = '{"ok":true,"rank_all":1,"rank_week":1}'::jsonb, format('チコ 8500（自己ベストより遅いので自己ベスト 8000 の順位。自分は数えない）: %s', r);
   r := submit_score2('00000000-0000-4000-8000-0000000000a2', 'f2n:asia:10', 8200, 10);
   assert r = '{"ok":true,"rank_all":2,"rank_week":2}'::jsonb, format('ミケ 8200: %s', r);
   assert (select array_agg(row(nickname, time_ms)::text) from top_scores2('f2n:asia:10', 'all')) = array['(チコ,8000)', '(ミケ,8200)'],
@@ -127,6 +127,24 @@ do $$ declare r jsonb; v_pid text := profile_me('00000000-0000-4000-8000-0000000
   assert (select count(*) from top_scores2('f2n:asia:20', 'all')) = 0, '別の board は空';
   assert (profile_rename('00000000-0000-4000-8000-0000000000a2', 'ミケ子')->>'ok')::boolean, 'rename';
   assert (select array_agg(nickname) from top_scores2('f2n:asia:10', 'all')) = array['チコ', 'ミケ子'], '名前はプロフィールのいまの名前';
+end $$;
+
+\echo '- score2_rank_is_self_best'
+-- 返す順位は自己ベストの順位（歴代は歴代の自己ベスト、今週は今週の自己ベスト）。自分の自己ベストは数えない
+reset role; truncate scores;
+-- ハチ公（a3）の歴代の自己ベストは先週の 7000。ミケ子（a2）は今週 8000
+insert into scores (board, nickname, time_ms, questions, profile_id, created_at)
+  select 'f2n:asia:10', 'ハチ公', 7000, 10, id, jst_week_start() - interval '1 day' from profiles where nickname = 'ハチ公';
+insert into scores (board, nickname, time_ms, questions, profile_id) select 'f2n:asia:10', 'ミケ子', 8000, 10, id from profiles where nickname = 'ミケ子';
+-- チコ（a1）はこの board に自分だけ。自己ベストは 10000
+insert into scores (board, nickname, time_ms, questions, profile_id, created_at)
+  select 'f2n:asia:20', 'チコ', 10000, 20, id, now() - interval '1 minute' from profiles where nickname = 'チコ';
+set role anon;
+do $$ declare r jsonb; begin
+  r := submit_score2('00000000-0000-4000-8000-0000000000a1', 'f2n:asia:20', 12000, 20);
+  assert r = '{"ok":true,"rank_all":1,"rank_week":1}'::jsonb, format('ひとりなら遅くても1位: %s', r);
+  r := submit_score2('00000000-0000-4000-8000-0000000000a3', 'f2n:asia:10', 12000, 10);
+  assert r = '{"ok":true,"rank_all":1,"rank_week":2}'::jsonb, format('歴代は先週の 7000 で1位、今週は今回の 12000 でミケ子の下: %s', r);
 end $$;
 
 \echo '- score2_legacy_rows'
@@ -646,6 +664,11 @@ do $$ declare t text := '00000000-0000-4000-8000-0000000000a1'; r jsonb; begin
   assert profile_set(t, null, null, '{jp,fr,br,cl}', null, null)->>'reason' = 'bad_deco', '4つ';
   assert profile_set(t, null, null, array['jp', null], null, null)->>'reason' = 'bad_deco', 'null 入り';
   assert profile_set(t, null, repeat('あ', 41), null, null, null)->>'reason' = 'bad_record', '称号41文字';
+  -- 称号も名前と同じ NG ワード（NFKC＋小文字で部分一致）
+  assert profile_set(t, null, '死ね', null, null, null)->>'reason' = 'ng_name', '称号の NG';
+  assert profile_set(t, null, '旅人ＦＵＣＫ', null, null, null)->>'reason' = 'ng_name', '称号の NG（全角大文字）';
+  assert profile_set(t, true, 'ｼﾈ', '{jp}', 3, 10)->>'reason' = 'ng_name', '称号の NG（半角カナ）なら何も変えない';
+  assert profile_me(t)->>'title' = '', '称号は変わっていない';
   assert profile_set(t, null, null, null, 501, null)->>'reason' = 'bad_record', 'バッジ501';
   assert profile_set(t, null, null, null, -1, null)->>'reason' = 'bad_record', 'バッジ-1';
   assert profile_set(t, null, null, null, null, 501)->>'reason' = 'bad_record', '全部の数501';
@@ -727,13 +750,26 @@ begin
   assert c->'data' = '{"v":1,"keys":{"rpg":"{\"lv\":14}"}}', format('data が同じ: %s', c);
   assert profile_me('00000000-0000-4000-8000-0000000000a1')->>'reason' = 'not_found', '前の端末は not_found';
   assert profile_me('00000000-0000-4000-8000-0000000000a9')->>'nickname' = 'チコ', '新しい端末で使える';
-  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000b9')->>'reason' = 'bad_code', '2回目はだめ';
+  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000b9')->>'reason' = 'bad_code', 'ちがう合言葉での2回目はだめ';
+  -- 返事が届かなかった人のために、同じコード＋同じ新しい合言葉なら期限内は何度でも同じ返事
+  c := profile_transfer_claim(lower(r->>'code'), '00000000-0000-4000-8000-0000000000a9');
+  assert c->'ok' = 'true' and c->>'nickname' = 'チコ' and c->'data' = '{"v":1,"keys":{"rpg":"{\"lv\":14}"}}', format('同じ合言葉でやり直し: %s', c);
+  assert (profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000a9')->>'ok')::boolean, '3回目も同じ';
+  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000b9')->>'reason' = 'bad_code', 'やり直しのあとも、ちがう合言葉はだめ';
+  assert profile_me('00000000-0000-4000-8000-0000000000a9')->>'nickname' = 'チコ', 'やり直しても新しい端末のまま';
   assert profile_transfer_start('00000000-0000-4000-8000-0000000000a1', '{}')->>'reason' = 'not_found', '前の端末はもう出せない';
+  perform set_config('test.code', r->>'code', false);
 end $$;
 reset role;
 do $$ begin
-  assert (select data from profile_transfers) is null and (select used_at from profile_transfers) is not null, '使ったら data は null';
+  assert (select data from profile_transfers) is not null and (select used_at from profile_transfers) is not null, '使っても期限までは data を残す';
   assert (select code_hash from profile_transfers) <> '\x'::bytea and octet_length((select code_hash from profile_transfers)) = 32, 'コードはハッシュで残す';
+end $$;
+-- 期限が過ぎたら、同じ合言葉でもだめ
+update profile_transfers set expires_at = now() - interval '1 second';
+set role anon;
+do $$ begin
+  assert profile_transfer_claim(current_setting('test.code'), '00000000-0000-4000-8000-0000000000a9')->>'reason' = 'bad_code', '期限切れのやり直し';
 end $$;
 
 \echo '- transfer_reissue'
@@ -751,7 +787,10 @@ do $$ declare r1 jsonb; r2 jsonb; begin
 end $$;
 reset role;
 do $$ begin
-  assert (select count(*) from profile_transfers where data is not null) = 0, '出し直した前のコードの data も null';
+  assert (select count(*) from profile_transfers where data is not null and used_at is null) = 0, '出し直した前のコードの data も null';
+  assert (select count(*) from profile_transfers where data is not null) = 1, '残るのは使ったばかりの2つめ（期限まで）だけ';
+  assert (select data from profile_transfers where code_hash = sha256(convert_to(current_setting('test.code'), 'UTF8'))) is null,
+    '期限の過ぎた物（ほかの人のコードでも）は次の start で null';
 end $$;
 
 \echo '- transfer_expired'
@@ -854,6 +893,87 @@ do $$ declare f record; begin
   assert (select count(*) from pg_proc where pronamespace = 'public'::regnamespace
           and proname in ('submit_score2', 'top_scores2', 'submit_daily2', 'top_daily2', 'rpg_update2', 'rpg_unregister2', 'top_rpg3')) = 7, '7つともある';
 end $$;
+
+\echo '- migrate_rpg_name_clash'
+-- 名前がほかのプロフィールとぶつかる行も宙に浮かせない。「名前の前7文字#pid の前4文字」でプロフィールを作ってつなぐ（本人はあとで名前を変えられる）
+reset role; truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade;
+insert into profiles (token_hash, nickname) values (sha256(convert_to('00000000-0000-4000-8000-0000000000c1', 'UTF8')), 'ポチ');
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, deco) values
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000c2', 'UTF8')), 'ﾎﾟﾁ', 10, 1, 6, '{fr}'),
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000c3', 'UTF8')), 'あいうえおかきくけこ', 3, 0, 1, '{}');
+insert into profiles (token_hash, nickname) values (sha256(convert_to('00000000-0000-4000-8000-0000000000c4', 'UTF8')), 'あいうえおかきくけこ');
+do $$ begin perform profile_migrate_rpg(); perform profile_migrate_rpg(); end $$;
+do $$ begin
+  assert (select count(*) from rpg_players where profile_id is null) = 0, '宙に浮いた行は無い';
+  assert (select count(*) from profiles) = 4, format('2つ増える: %s', (select count(*) from profiles));
+  assert (select count(*) from rpg_players r join profiles p on p.id = r.profile_id where p.token_hash = r.token_hash) = 2, '同じ合言葉のプロフィールにつながる';
+end $$;
+set role anon;
+do $$ declare r jsonb; begin
+  r := profile_me('00000000-0000-4000-8000-0000000000c2');
+  assert r->>'nickname' = 'ﾎﾟﾁ#' || left(r->>'pid', 4) and r->'deco' = '["fr"]', format('ぶつかった人: %s', r);
+  r := profile_me('00000000-0000-4000-8000-0000000000c3');
+  assert r->>'nickname' = 'あいうえおかき#' || left(r->>'pid', 4), format('長い名前は前7文字: %s', r);
+  assert char_length(r->>'nickname') = 12, '12文字に収まる';
+  assert profile_me('00000000-0000-4000-8000-0000000000c1')->>'nickname' = 'ポチ', '前からいた人はそのまま';
+  assert (profile_rename('00000000-0000-4000-8000-0000000000c2', 'ポチ太')->>'ok')::boolean, 'あとで名前を変えられる';
+end $$;
+
+\echo '- deploy_steps'
+-- 本番の手順どおりに流す: ①（SQL Editor と old_version の間を除く）＋②（SQL Editor の間）→ 公開 → ⑤（old_version の間）
+reset role;
+\set schema_src `cat supabase/schema.sql`
+create temp table src as select :'schema_src'::text as s;
+create temp table parts as select
+  regexp_replace(regexp_replace(s, '\n-- >>> SQL Editor.*?\n-- <<< SQL Editor[^\n]*', '', 'g'), '\n-- >>> old_version.*?\n-- <<< old_version[^\n]*', '', 'g') as step1,
+  substring(s from '^(.*?)\n-- >>> old_version') as before_ov,
+  substring(s from '\n(-- >>> old_version.*?\n-- <<< old_version)') as ov,
+  (select string_agg(m[1], E'\n') from regexp_matches(s, '\n(-- >>> SQL Editor.*?\n-- <<< SQL Editor)', 'g') m) as editor
+  from src;
+do $$ declare p parts; begin
+  select * into p from parts;
+  -- ① は MCP の apply_migration で流すので delete を入れない（確認待ちで時間切れになる）
+  assert p.step1 !~* '\mdelete\s+from\M', '① に delete がある';
+  assert p.editor ~ 'function rpg_unregister\(' and p.editor ~ 'function rpg_unregister2\(', 'rpg_unregister と rpg_unregister2 は SQL Editor の間';
+  assert p.step1 ~ 'profile_migrate_rpg\(\);', '① で引っ越す';
+  assert p.ov ~ 'perform profile_migrate_rpg\(\);', '⑤ でもう一度引っ越す';
+  assert p.ov !~* '\mdelete\s+from\M', '⑤ にも delete は無い';
+  -- 先頭の使い方は「全部貼って Run」ではなく、区切りごとに流す書き方
+  assert split_part((select s from src), E'\n', 2) !~ '全部貼って', format('2行目: %s', split_part((select s from src), E'\n', 2));
+end $$;
+-- ①＋② まで（古い関数はまだ元の中身）
+truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade;
+select before_ov from parts \gexec
+set role anon;
+do $$ declare r jsonb; begin
+  assert (profile_create('00000000-0000-4000-8000-0000000000e1', 'ハナ')->>'ok')::boolean, '新しい版でハナ';
+  -- 古いページの登録は、プロフィールの名前とぶつかれば name_taken
+  assert rpg_register('00000000-0000-4000-8000-0000000000e2', 'ﾊﾅ', 3, 0, 1)->>'reason' = 'name_taken', 'プロフィールの名前とぶつかる';
+  -- 通った登録はその場でプロフィールになる（新しい版を開いても not_found にならない）
+  r := rpg_register('00000000-0000-4000-8000-0000000000e3', 'ポチ', 5, 1, 5);
+  assert (r->>'ok')::boolean, format('古いページの登録: %s', r);
+  assert profile_me('00000000-0000-4000-8000-0000000000e3')->>'nickname' = 'ポチ', 'すぐプロフィールになる';
+end $$;
+reset role;
+-- ここをすり抜けて残った行（手で入れた行など）。名前のぶつかる行とぶつからない行
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000e4', 'UTF8')), 'ハナ', 4, 0, 2),
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000e5', 'UTF8')), 'タマ', 2, 0, 0);
+-- ⑤
+select ov from parts \gexec
+do $$ begin
+  assert (select count(*) from rpg_players where profile_id is null) = 0, '⑤ のあと宙に浮いた行は無い';
+end $$;
+set role anon;
+do $$ begin
+  assert profile_me('00000000-0000-4000-8000-0000000000e5')->>'nickname' = 'タマ', '⑤ で引っ越す';
+  assert profile_me('00000000-0000-4000-8000-0000000000e4')->>'nickname' ~ '^ハナ#[0-9a-f]{4}$', '⑤ で、ぶつかる人も引っ越す';
+  assert profile_me('00000000-0000-4000-8000-0000000000e1')->>'nickname' = 'ハナ', '前からいたハナはそのまま';
+  assert rpg_register('00000000-0000-4000-8000-0000000000e6', 'ジロ', 3, 0, 1)->>'reason' = 'old_version', '⑤ のあとは old_version';
+  assert (select count(*) from top_rpg3('lv') where pid is null) = 0, 'ランキングの行は全部プロフィールつき';
+end $$;
+reset role;
+drop table src, parts;
 
 -- ---- 古い関数（前の版のページ用） ----
 \echo '- old_version_all'
