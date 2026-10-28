@@ -585,3 +585,59 @@ t('earth_last_boss_has_no_next', async page => {
     assert.equal(await page.locator('#bt-nextfloor').count(), 0, `${id} に［つぎのフロアへ］がある`);
   }
 });
+
+// ---- 宇宙（第3章） ----
+const MIRROR_CLEARED = { ...EARTH_CLEARED, msamerica: 5, moceania: 5, mnamerica: 5, meurope: 5, masia: 5, mafrica: 5, mworld: 5 };
+const SPACE_SAVE = saveWith({ lv: 50, floors: { ...MIRROR_CLEARED } });
+// 月 F1 を始めて、日本(jp)・国旗→国名を出す
+const moonJp = async page => {
+  await writeSave(page, SPACE_SAVE);
+  await startBattle(page, 'moon', 1);
+  assert.equal(await page.evaluate(() => RPG_BATTLE.force('jp', 'f2n')), true);
+};
+
+t('space_theme_choices', async page => {
+  await moonJp(page);
+  const as = await page.$$eval('#bt-q .choice', els => els.map(e => e.dataset.a));
+  assert.equal(as.length, 4);
+  assert.ok(as.includes('jp'));
+  const isl = await page.evaluate(() => RPG_CORE.THEMES.island.a);
+  for (const a of as) assert.ok(isl.includes(a), `${a} が島国じゃない`);
+});
+
+t('space_reveal_theme_note', async page => {
+  await moonJp(page);
+  await battleGuard(page);
+  await page.locator('#bt-q .choice:not([data-a="jp"])').first().click();
+  await page.waitForSelector('#bt-reveal');
+  assert.ok((await text(page, '#bt-reveal')).includes('日本は島国だよ'));
+});
+
+t('space_first_question_is_map', async page => {
+  await writeSave(page, SPACE_SAVE);
+  await startBattle(page, 'moon', 1);
+  assert.equal(await page.locator('#bt-q svg, #bt-q .qmap, #bt-q [class*=map]').count() > 0, true);
+  assert.ok((await label(page)).length > 0);
+  const mode = await page.evaluate(() => RPG_BATTLE.state().mode);
+  assert.equal(mode, 'm2f');
+});
+
+t('space_party_bonus_mark', async page => {
+  await writeSave(page, saveWith({ lv: 50, floors: { ...MIRROR_CLEARED }, cards: { jp: [1, 0], fr: [1, 0] } }));
+  await page.evaluate(() => RPG_BATTLE.start('moon', 1));
+  const tags = await page.$$eval('#bt-intro .rpg-pc', els => els.map(e => [e.querySelector('img').alt, !!e.querySelector('.rpg-tag')]));
+  assert.equal(tags.length, 2);
+  for (const [alt, has] of tags) assert.equal(has, alt.includes('日本'), `${alt}: ${has}`);
+});
+
+t('space_last_boss_share', async page => {
+  await writeSave(page, saveWith({ lv: 50, floors: { ...MIRROR_CLEARED, moon: 5, mercury: 5, venus: 5, mars: 5, jupiter: 5, saturn: 5, blackhole: 4 } }));
+  await startBattle(page, 'blackhole', 5);
+  await winBattle(page);
+  assert.equal(await page.locator('#bt-nextfloor').count(), 0);
+  await page.evaluate(() => { window.__shared = null; navigator.share = o => { window.__shared = o.text; return Promise.resolve(); }; });
+  await page.click('#bt-share');
+  const s = await page.evaluate(() => window.__shared);
+  assert.ok(s.includes('星喰いをたおして、宇宙を取りもどした！'), s);
+  assert.equal((await events(page, 'rpg:share')).at(-1).kind, 'final3');
+});
