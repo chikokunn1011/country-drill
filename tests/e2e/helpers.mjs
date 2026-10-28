@@ -343,9 +343,9 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
   if (count) await page.click(`#counts .chip[data-c="${count}"]`);
 }
 
-// タイムアタックと今日の難問は問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
-// （timed が無い変更前のコードではタイムアタックだけ）
-export const settle = page => page.waitForFunction(() => !(typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS);
+// タイムアタック・今日の難問と、設定「正解したらすぐ次の問題へ」の練習・挑戦は、問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
+// （quick・timed が無い変更前のコードではタイムアタックだけ）
+export const settle = page => page.waitForFunction(() => !(typeof quick === 'function' ? quick() : typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS);
 // 結果画面も出した直後（TA_GUARD_MS の間）は結果のボタンを押せない。その間が過ぎるまで待つ
 // （resultAt が無い変更前のコードでは待たない。GEOM_BASE の比較で clearTimeAttack を古いコードにも使うため）
 export const settleResult = page => page.waitForFunction(() => typeof resultAt === 'undefined' || performance.now() - resultAt >= TA_GUARD_MS);

@@ -83,7 +83,7 @@
     const d = RPG.get(), card = d.cards[a], fr = d.fr[a] || 0, g = id ? K.dungeonOf(id) : null;
     let info;
     if (card) {
-      const bonus = !!g && (g.r === 'all' || g.r === c.r), atk = K.cardAtk(card, fr, bonus);
+      const bonus = !!g && K.inDungeon(g, a), atk = K.cardAtk(card, fr, bonus);
       const nw = s => `<span class="rpg-nowrap">${s}</span>`;
       info = `<p>${nw(`★${card[0]} ${STAR_NAME[card[0]]}`)}・${nw(`かさね ${dots(card[1])}`)}・${nw(`なかよし度 ♥${fr}/${T.card.frMax}`)}</p>`
         + `<p class="rpg-cd-pow">${nw(`こうげき ${atk.toFixed(1)}`)}${nw(`（地域ボーナス ${bonus ? 'あり' : 'なし'}）`)}・${nw(`HP ${(atk * T.card.hpMul).toFixed(1)}`)}</p>`
