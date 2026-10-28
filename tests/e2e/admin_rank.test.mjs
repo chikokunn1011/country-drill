@@ -373,6 +373,140 @@ t('delete_all_by_name_cancel_deletes_nothing', async (page, { db }) => {
   assert.equal(db.rows.length, 2);
 });
 
+// 出た知らせ（#adm-toast）を全部ためておく（上書きされた知らせも分かるように）
+const watchToasts = page => page.evaluate(() => {
+  window.__toasts = [];
+  const t = document.getElementById('adm-toast');
+  new MutationObserver(() => { if (t.textContent) window.__toasts.push(t.textContent); }).observe(t, { childList: true, characterData: true, subtree: true });
+});
+const csvText = async page => {
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#r-csv')]);
+  return new Promise((ok, ng) => { const cs = []; dl.createReadStream().then(s => s.on('data', c => cs.push(c)).on('end', () => ok(Buffer.concat(cs).toString())).on('error', ng)); });
+};
+const tbodyHas = (page, re) => page.waitForFunction(src => new RegExp(src).test(document.querySelector('#r-table tbody')?.textContent ?? ''), re.source);
+const tbodyLacks = (page, re) => page.waitForFunction(src => !new RegExp(src).test(document.querySelector('#r-table tbody')?.textContent ?? ''), re.source);
+
+// 途中で消せなくなったら、成功の知らせで上書きせず1つの知らせにまとめ、一覧を読み直す
+t('delete_all_by_name_partial_failure_one_message', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  db.dailyRows.push({ day: '2026-10-26', nickname: 'たろう', correct: 2, total: 20, time_ms: 2, created_at: ago(4) });
+  db.rpgRows.push({ token: 'tk3', nickname: 'たろう', lv: 1, dungeons: 0, floors: 0, created_at: ago(5), at: ago(5) });
+  const orig = db.adminRpc.admin_delete;
+  db.adminRpc.admin_delete = args => args.p_kind === 'daily' ? { ok: false, reason: 'boom' } : orig(args);
+  await login(page);
+  await kind(page, 'scores');
+  await watchToasts(page);
+  await page.locator('#r-table tbody tr', { hasText: 'たろう' }).locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: '1件消したけど、途中で止まった（残りは消してない）' }).waitFor();
+  // 一覧と件数は読み直す
+  await tbodyLacks(page, /たろう/);
+  await page.locator('#r-table[data-kind="scores"][data-ready]').waitFor();
+  await page.locator('#r-dash [data-n="scores"]', { hasText: /^1$/ }).waitFor();
+  await page.waitForTimeout(300);
+  assert.deepEqual(await page.evaluate(() => window.__toasts), ['1件消したけど、途中で止まった（残りは消してない）']);
+  assert.equal(db.rows.some(r => r.nickname === 'たろう'), false);
+  assert.equal(db.dailyRows.some(r => r.nickname === 'たろう'), true);
+  assert.equal(db.rpgRows.some(r => r.nickname === 'たろう'), true, '止まったあとの種類は消さない');
+  assert.deepEqual(db.calls.filter(c => c.name === 'admin_delete').map(c => c.args.p_kind), ['scores', 'daily']);
+});
+
+// 候補（名前にその文字を含む記録）が一度に集められる数（5000件）をこえたら、一部だけ消さずにやめる
+t('delete_all_by_name_refuses_when_too_many_candidates', async (page, { db }) => {
+  const dialogs = [];
+  page.on('dialog', d => { dialogs.push(d.message()); d.accept(); });
+  for (let i = 0; i < 5001; i++) db.rows.push({ board: 'n2f:all:5', nickname: 'たろう', time_ms: 20000 + i, questions: 5, created_at: ago(40 + i / 100) });
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'たろう' }).first().locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: 'タイムアタックで名前に「たろう」を含む記録が 5002件あって、一度に集められる 5000件をこえるので、やめておいた。何も消してない' }).waitFor();
+  assert.deepEqual(dialogs, [], '確かめる前にやめる（「全部」と言わない）');
+  assert.equal(db.calls.some(c => c.name === 'admin_delete'), false);
+  assert.equal(db.rows.length, 5003);
+});
+
+// 確かめる文に出す名前は、改行・タブを空白にする
+t('delete_all_by_name_confirm_flattens_newlines', async (page, { db }) => {
+  let msg;
+  page.on('dialog', d => { msg = d.message(); d.accept(); });
+  db.rows.push({ board: 'f2n:all:5', nickname: 'き\nけ\tん\rだ', time_ms: 5000, questions: 5, created_at: ago(0.5) });
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'け' }).locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: '「き け ん だ」の記録を 1件消したよ' }).waitFor();
+  assert.deepEqual(msg.split('\n'), ['「き け ん だ」の記録を全部（タイムアタック 1件、合わせて 1件）消していい？', '（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）']);
+  assert.equal(db.rows.some(r => r.nickname.startsWith('き')), false);
+});
+
+// CSV は今出ている一覧を作った絞りこみで作る（欄に書いただけで探していない値は使わない）
+t('csv_uses_filter_of_shown_list', async (page, { db }) => {
+  await login(page);
+  await kind(page, 'scores');
+  await page.fill('#r-f-q', 'たろ');   // 探すボタンはまだ押さない
+  let text = await csvText(page);
+  assert.match(text, /たろう/);
+  assert.match(text, /はなこ/);
+  assert.equal(db.calls.filter(c => c.name === 'admin_list').at(-1).args.p_filter.q, '');
+  await page.click('#r-search');
+  await tbodyLacks(page, /はなこ/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  await page.fill('#r-f-q', 'はな');
+  text = await csvText(page);
+  assert.match(text, /たろう/);
+  assert.doesNotMatch(text, /はなこ/);
+  assert.equal(db.calls.filter(c => c.name === 'admin_list').at(-1).args.p_filter.q, 'たろ');
+});
+
+// 絞りこみ（名前・日付）を変えて読めなかったら、前の絞りこみの行（とその日の問題）を消して、もう一回押してねと出す
+t('failed_filter_reload_clears_stale_rows', async (page, { db }) => {
+  const FAIL = '読みこめなかった。もう一回押してね';
+  await login(page);
+  await kind(page, 'scores');
+  await page.fill('#r-f-q', 'たろ');
+  await page.click('#r-search');
+  await tbodyLacks(page, /はなこ/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  db.down = true;
+  await page.fill('#r-f-q', 'はな');
+  await page.click('#r-search');
+  await page.locator('#r-table tbody td', { hasText: FAIL }).waitFor();
+  assert.equal(await rows(page).count(), 0);
+  assert.doesNotMatch(await page.textContent('#r-table'), /たろう/);
+  assert.equal(await page.isDisabled('#r-del'), true);
+  assert.equal(await page.isDisabled('#r-csv'), true);
+  assert.equal((await page.textContent('#r-page')).trim(), '');
+  db.down = false;
+  await page.click('#r-search');
+  await tbodyHas(page, /はなこ/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(await rows(page).count(), 1);
+  // 今日の難問: 日付を変えて読めなかったら、前の日の行とその日の問題も消す
+  await page.fill('#r-f-q', '');
+  await kind(page, 'daily');
+  await page.fill('#r-f-day', '2026-10-27');
+  await page.dispatchEvent('#r-f-day', 'change');
+  await page.locator('#r-daily-qs:not([hidden])').waitFor();
+  await tbodyHas(page, /じろう/);
+  db.down = true;
+  await page.fill('#r-f-day', '2026-10-26');
+  await page.dispatchEvent('#r-f-day', 'change');
+  await page.locator('#r-table tbody td', { hasText: FAIL }).waitFor();
+  assert.equal(await rows(page).count(), 0);
+  assert.equal(await page.isHidden('#r-daily-qs'), true);
+  assert.equal(await page.locator('#r-daily-qs-list li').count(), 0);
+  db.down = false;
+  // 同じ絞りこみでページを動かす・読み直すだけなら、出ている行は残す（pager_stays_when_page_load_fails も）
+  await page.fill('#r-f-day', '2026-10-27');
+  await page.dispatchEvent('#r-f-day', 'change');
+  await tbodyHas(page, /じろう/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  db.down = true;
+  await page.click('#r-reload');
+  await page.locator('#adm-toast', { hasText: 'つながらなかった' }).waitFor();
+  await page.waitForTimeout(200);
+  assert.equal(await rows(page).count(), 1);
+  assert.equal(await page.isHidden('#r-daily-qs'), false);
+});
+
 t('csv_has_all_pages', async (page, { db }) => {
   for (let i = 0; i < 650; i++) db.rows.push({ board: 'n2f:all:5', nickname: `p${i}`, time_ms: 10000 + i, questions: 5, created_at: ago(40 + i) });
   await login(page);

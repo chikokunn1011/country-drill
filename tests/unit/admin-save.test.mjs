@@ -339,6 +339,24 @@ test('auto_snapshots_never_push_out_manual_ones', () => {
   assert.equal(JSON.parse(st.getItem('adminSnaps')).length, 2);
 });
 
+// 前の版で自動で取ったもの（auto の印が無く、名前が「自動 …」）は自動あつかい。印があればそちらに従う
+test('legacy_auto_named_snapshots_count_as_auto', () => {
+  const legacy = [{ name: '自動 全部開く 12:00:00', at: 'a', data: {} },
+    ...[1, 2, 3, 4, 5].map(i => ({ name: `手${i}`, at: 'm', data: {} })),
+    { name: '自動', at: 'b', data: {} }, { name: '自動 手で付けた', at: 'c', auto: false, data: {} }];
+  const { A, st } = load({ adminSnaps: JSON.stringify(legacy) });
+  assert.deepEqual(plain(A.snapList()).map(x => [x.name, x.auto]), [['自動 全部開く 12:00:00', true], ['手1', false], ['手2', false],
+    ['手3', false], ['手4', false], ['手5', false], ['自動', false], ['自動 手で付けた', false]]);
+  // 手動が5個をこえても、前の版の自動のものは手動として押し出されない（古い手動から消える）
+  A.snapSave('手6');
+  const names = JSON.parse(st.getItem('adminSnaps')).map(x => x.name);
+  assert.ok(names.includes('自動 全部開く 12:00:00'), names.join(','));
+  assert.deepEqual(plain(A.snapList()).filter(x => !x.auto).map(x => x.name), ['手4', '手5', '自動', '自動 手で付けた', '手6']);
+  // 自動のものが5個をこえると、前の版の自動のものから押し出される
+  for (let i = 1; i <= 5; i++) A.snapSave(`自動 新${i}`, { auto: true });
+  assert.deepEqual(plain(A.snapList()).filter(x => x.auto).map(x => x.name), ['自動 新1', '自動 新2', '自動 新3', '自動 新4', '自動 新5']);
+});
+
 test('keys_at_only_where_the_save_has_a_time', () => {
   const { A } = load({
     badges: JSON.stringify({ v: 1, got: { 'a@1': Date.UTC(2026, 9, 1), 'b@1': Date.UTC(2026, 9, 3) } }),

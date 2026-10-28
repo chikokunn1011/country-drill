@@ -110,11 +110,13 @@
     // ---- スナップショット（手動・自動それぞれ最大5個。古いものから消える） ----
     // 自動（危ない操作の前に取るもの）は auto:true。自動が増えても手動のものは押し出さない（別々に5個まで）
     const snaps = () => { const p = parse(storage.getItem(SNAPS) ?? '[]'); return p.ok && Array.isArray(p.v) ? p.v.filter(s => isObj(s) && typeof s.name === 'string' && isObj(s.data)) : []; };
-    const snapList = () => snaps().map(({ name, at, auto }) => ({ name, at, auto: auto === true }));
+    // 自動のものか。auto の印が無い前の版のものは、名前が「自動 」で始まれば自動（admin.js が自動で取るときの名前）
+    const isAuto = s => s.auto == null ? s.name.startsWith('自動 ') : s.auto === true;
+    const snapList = () => snaps().map(s => ({ name: s.name, at: s.at, auto: isAuto(s) }));
     const snapSave = (name, { auto = false } = {}) => guard(() => {
       const list = snaps().filter(s => s.name !== name);   // 同じ名前は置きかえ
       list.push({ name, at: iso(), auto: auto === true, data: exportAll().data });
-      const pool = a => list.filter(s => (s.auto === true) === a);
+      const pool = a => list.filter(s => isAuto(s) === a);
       const keep = new Set([...pool(false).slice(-SNAP_MAX), ...pool(true).slice(-SNAP_MAX)]);
       storage.setItem(SNAPS, JSON.stringify(list.filter(s => keep.has(s))));
       return { ok: true };

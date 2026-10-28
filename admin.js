@@ -357,16 +357,18 @@
 
   let API;
   // rowsKind: rows を読んだときの種類。種類を切りかえたら null にして、新しい種類の一覧が来るまで消す・戻す・名前・CSV をしない
-  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false, rowsKind: null };
+  // rowsFilter: rows を読んだときの絞りこみ（CSV はこれを使う。欄に書いただけでまだ探していない値は使わない）
+  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false, rowsKind: null, rowsFilter: null };
   const listReady = () => R.rowsKind === R.kind;
   // 一覧の表をからにする（種類の切りかえ・ログアウトのとき）
   function clearTable() {
-    R.rows = []; R.total = 0; R.rowsKind = null;
+    R.rows = []; R.total = 0; R.rowsKind = null; R.rowsFilter = null;
     const tbl = $('r-table');
     tbl.removeAttribute('data-ready');
     tbl.tHead.replaceChildren(); tbl.tBodies[0].replaceChildren();
     $('r-page').textContent = ''; $('r-picked').textContent = '';
     $('r-prev').disabled = $('r-next').disabled = true;
+    $('r-daily-qs').hidden = true; $('r-daily-qs-list').replaceChildren();
     setActs();
   }
   // 一覧が読めるまでは操作のボタンを押せなくする
@@ -476,16 +478,27 @@
     if (R.kind === 'daily' && $('r-f-day').value) f.day = $('r-f-day').value;
     return f;
   }
+  // 絞りこみのページ以外の部分（同じ絞りこみか比べる用）
+  const filterKey = f => { const { offset, limit, ...k } = f; return JSON.stringify(k); };
   // offset: 読みたいページの始まり。R.offset は読めたときだけ進める（失敗したら今のページのまま）
   async function loadList(offset = R.offset) {
-    const seq = ++R.seq, tbl = $('r-table'), kind = R.kind;
+    const seq = ++R.seq, tbl = $('r-table'), kind = R.kind, f = filter(offset);
     tbl.removeAttribute('data-ready');
-    const r = await rpc('admin_list', { p_kind: kind, p_filter: filter(offset) });
+    const r = await rpc('admin_list', { p_kind: kind, p_filter: f });
     if (seq !== R.seq || kind !== R.kind) return;
-    if (!r) return;
-    if (r.ok === false || !Array.isArray(r.rows)) { toast('一覧が読めなかった', true); return; }
+    if (!r || r.ok === false || !Array.isArray(r.rows)) {
+      if (r) toast('一覧が読めなかった', true);
+      if (!R.loaded) return;   // ログインし直し（showLogin が表を消した）
+      // ページを動かしただけ・読み直しなら、出ている行は今の絞りこみのままなので残す。
+      // 絞りこみ（名前・ボード・日付など）を変えて読めなかったら、前の絞りこみの行を出したままにしない
+      if (R.rowsKind === kind && filterKey(R.rowsFilter) === filterKey(f)) return;
+      clearTable();
+      R.offset = offset;
+      tbl.tBodies[0].replaceChildren(el('tr', {}, el('td', { colSpan: COLS[kind].length + 2, class: 'muted', 'data-fail': '', text: '読みこめなかった。もう一回押してね' })));
+      return;
+    }
     if (!r.rows.length && offset > 0 && r.total > 0) { loadList(Math.max(0, offset - PAGE)); return; }
-    R.rows = r.rows; R.total = +r.total || 0; R.offset = offset; R.rowsKind = kind;
+    R.rows = r.rows; R.total = +r.total || 0; R.offset = offset; R.rowsKind = kind; R.rowsFilter = f;
     renderTable();
     setActs();
     renderDayQs();
@@ -590,24 +603,33 @@
     if (!listReady()) return;
     const row = R.rows.find(r => Number(r.id) === id);
     if (!row) return;
-    const name = str(row.nickname), want = norm(name), found = {};
+    // 見せる名前は改行・タブを空白にする（確かめる文の行がくずれないように）
+    const name = str(row.nickname), want = norm(name), shown = name.replace(/[\r\n\t\v\f\u0085\u2028\u2029]/g, ' '), found = {};
     for (const k of ['scores', 'daily', 'rpg']) {
       const r = await listAll(k, { q: name });
       if (!r) { toast('記録を集められなかった。何も消してない', true); return; }
+      // 候補（名前にこの文字を含む記録）が多すぎて全部は読めなかったら、一部だけ消さずにやめる
+      if (r.total > r.rows.length) {
+        toast(`${KIND_LABEL[k]}で名前に「${shown}」を含む記録が ${r.total}件あって、一度に集められる ${ALL_MAX}件をこえるので、やめておいた。何も消してない`, true);
+        return;
+      }
       found[k] = r.rows.filter(x => norm(x.nickname) === want).map(x => Number(x.id));
     }
     const n = Object.values(found).reduce((a, b) => a + b.length, 0);
     if (!n) { toast('その名前の記録はもう無いよ', true); return; }
     const parts = Object.entries(found).filter(([, ids]) => ids.length).map(([k, ids]) => `${KIND_LABEL[k]} ${ids.length}件`);
-    if (!confirm(`「${name}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）`)) return;
-    let gone = 0;
+    if (!confirm(`「${shown}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）`)) return;
+    let gone = 0, stopped = false;
     for (const [k, ids] of Object.entries(found)) {
       if (!ids.length) continue;
       const r = await rpc('admin_delete', { p_kind: k, p_ids: ids });
-      if (!r || r.ok === false) { toast(`途中で消せなくなった（${gone}件は消した。ゴミ箱から戻せる）`, true); break; }
+      if (!r || r.ok === false) { stopped = true; break; }
       gone += +r.deleted || 0;
     }
-    if (gone) toast(`「${name}」の記録を ${gone}件消したよ（ゴミ箱から戻せる）`);
+    // 途中で止まったら、成功の知らせで上書きせず、1つの知らせにまとめる
+    if (stopped) toast(gone ? `${gone}件消したけど、途中で止まった（残りは消してない）` : '消せなかった（何も消してない）', true);
+    else if (gone) toast(`「${shown}」の記録を ${gone}件消したよ（ゴミ箱から戻せる）`);
+    else toast('その名前の記録はもう無いよ', true);
     await Promise.all([loadList(), loadStats(), loadBoards()]);
   }
   // ---- S13 CSV（今の絞り込みの全部のページ。BOM 付き UTF-8。= + - @ で始まる文字は表計算の式にならないよう ' を前に付ける） ----
@@ -623,7 +645,8 @@
     const kind = R.rowsKind, btn = $('r-csv');
     btn.disabled = true;
     try {
-      const { offset, limit, ...f } = filter(0);
+      // 今出ている一覧を作った絞りこみで（欄に書いただけで、まだ探していない値は使わない）
+      const { offset, limit, ...f } = R.rowsFilter;
       const r = await listAll(kind, f);
       if (!r) return;
       const cols = CSV_COLS[kind];

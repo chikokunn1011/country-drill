@@ -195,6 +195,14 @@ t('auto_snapshots_keep_manual_one', async page => {
   assert.equal(await coins(page), 500);
 }, { storage: { rpg: RPG } });
 
+// 前の版の自動スナップショット（auto の印が無く、名前が「自動 …」）にも「自動」と出る。印が無いふつうの名前は手動
+t('legacy_auto_snapshot_shows_auto_tag', async page => {
+  await open(page, 'd-snaps');
+  await page.locator('#d-snap-list [data-snap="自動 全部開く 12:00:00"]').waitFor();
+  const names = await page.$$eval('#d-snap-list [data-snap]', ls => ls.map(l => [l.dataset.snap, l.querySelector('.tag')?.textContent ?? '']));
+  assert.deepEqual(names.sort(), [['自動 全部開く 12:00:00', '自動'], ['ボス前', '']].sort());
+}, { storage: { adminSnaps: [{ name: 'ボス前', at: '2026-10-01T00:00:00Z', data: {} }, { name: '自動 全部開く 12:00:00', at: '2026-10-02T00:00:00Z', data: {} }] } });
+
 // 全部取る・全部開く・ストーリー既読を消す・今あるキーの保存 も、やめたら何も変えない
 t('more_overwrites_go_through_confirm', async page => {
   page.on('dialog', d => d.dismiss());
