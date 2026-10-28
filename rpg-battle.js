@@ -110,7 +110,8 @@
   const drawTop = () => {
     const { en } = B;
     setBar($('bt-ehp'), B.boss ? B.flags.reduce((s, f) => s + f.hp, 0) : B.ehp, B.boss ? B.flags.length * en.flagHp : en.hp);
-    setBar($('bt-hhp'), B.hp, B.stats.hp);
+    // 塔は B.tower.maxHp（階クリアの画面では、仲間入りで上がったつぎの階の最大 HP）
+    setBar($('bt-hhp'), B.hp, B.tower ? B.tower.maxHp : B.stats.hp);
     $('bt-left').textContent = `のこりミス${Math.max(0, K.missesAllowed({ hp: B.hp }, en))}`;
     $('bt-flags').innerHTML = flagsHTML();
   };

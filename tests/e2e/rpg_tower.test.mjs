@@ -109,6 +109,9 @@ t('tower_heal_uses_next_max', async page => {
   assert.ok(max2 > s1.tower.maxHp, `${max2} > ${s1.tower.maxHp}`);
   const want = await page.evaluate(([hp, max]) => RPG_CORE.towerHeal(hp, max, 1), [s1.tower.hp, max2]);
   assert.ok((await text(page, '#bt-tclear')).includes(`HP ${want}/${max2}`), await text(page, '#bt-tclear'));
+  // 上の列の HP バーも、つぎの階の最大 HP で
+  assert.equal(await page.getAttribute('#bt-hhp', 'aria-valuemax'), String(max2));
+  assert.equal(await page.getAttribute('#bt-hhp', 'aria-valuenow'), String(want));
   await nextFloor(page);
   const s2 = await state(page);
   assert.deepEqual(pick(s2.tower, { f: 0, hp: 0, maxHp: 0 }), { f: 2, hp: want, maxHp: max2 });
@@ -123,7 +126,17 @@ t('tower_midboss_full_heal', async page => {
   assert.deepEqual(pick(s.tower, { f: 0, hp: 0, cleared: 0 }), { f: 10, hp: 1, cleared: 9 });
   assert.equal(await page.locator('#bt-flags .rpg-cloth').count(), 6);
   assert.ok((await text(page, '.rpg-btop')).includes('塔の番人'));
+  // この階で仲間入り → 最大 HP が上がる。全回復は上がった最大 HP まで、上の列のバーも同じ
+  await page.evaluate(() => {
+    const orig = RPG_CORE.settleRun;
+    RPG_CORE.settleRun = (d, ...a) => { const r = orig(d, ...a); d.cards.jp = [3, 0]; return r; };
+  });
   await winTowerFloor(page);
+  const max2 = await page.evaluate(() => RPG_CORE.towerStats(RPG.get()).hp);
+  assert.ok(max2 > s.tower.maxHp, `${max2} > ${s.tower.maxHp}`);
+  assert.ok((await text(page, '#bt-tclear')).includes(`HP ${max2}/${max2}`), await text(page, '#bt-tclear'));
+  assert.equal(await page.getAttribute('#bt-hhp', 'aria-valuemax'), String(max2));
+  assert.equal(await page.getAttribute('#bt-hhp', 'aria-valuenow'), String(max2));
   await nextFloor(page);
   const s2 = await state(page);
   assert.equal(s2.tower.f, 11);
