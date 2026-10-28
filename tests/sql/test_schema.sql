@@ -460,6 +460,8 @@ do $$ begin
 end $$;
 -- 逆: 記録・かざりを送ったすぐあと（updated_at・deco_at は今）でも、塔は通る
 update rpg_players set tower_at = now() - interval '1 minute';
+-- deco_at を少し前にしておき、rpg_set_tower が deco_at を変えないことも見る
+update rpg_players set deco_at = now() - interval '1 minute';
 set role anon;
 do $$ declare r jsonb; begin
   r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 20);
@@ -469,6 +471,7 @@ reset role;
 do $$ begin
   assert (select tower from rpg_players) = 20, 'tower = 20';
   assert (select updated_at from rpg_players) > now() - interval '5 seconds', 'updated_at はそのまま（rpg_update の時刻）';
+  assert (select deco_at from rpg_players) < now() - interval '30 seconds', 'deco_at はそのまま（rpg_set_tower は変えない）';
 end $$;
 update rpg_players set tower_at = now() - interval '1 minute';
 set role anon;

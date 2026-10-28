@@ -350,7 +350,7 @@ t('tower_tab', async (page, app) => {
   assert.equal(await page.getAttribute('#rr-tabs button[data-s="tower"]', 'aria-pressed'), 'true');
   // 自分の記録: 自己ベストと、何位相当か
   assert.ok((await text(page, '#rr-me')).includes('英雄の塔 自己ベスト 20階'), await text(page, '#rr-me'));
-  await page.waitForFunction(() => $('rr-rank').textContent.includes('相当'));
+  await page.waitForFunction(() => $('rr-rank').textContent.startsWith('英雄の塔'));
   assert.equal(await text(page, '#rr-rank'), '英雄の塔 2位 相当');
   assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_tower_rank_of').at(-1).args, { p_tower: 20, p_lv: 30 });
   assert.equal(callsOf(app, 'top_tower').length >= 1, true);
@@ -364,6 +364,25 @@ t('tower_tab', async (page, app) => {
   await page.click('#rr-tabs button[data-s="lv"]');
   await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 4);
   assert.ok(!(await text(page, '#rr-me')).includes('英雄の塔'));
+});
+
+// レベルのタブで頼んだ順位の返事が、塔のタブに切りかえたあとに来ても、塔のタブには書かない
+for (const best of [0, 20]) t(`tower_tab_late_level_rank_${best}`, async page => {
+  await writeSave(page, TOWER_SAVE({ tower: { best } }));
+  await page.evaluate(() => {
+    window.__lvRank = [];
+    const orig = RANKING.rpgRankOf;
+    RANKING.rpgRankOf = want => new Promise((ok, ng) => { window.__lvRank.push(() => orig(want).then(ok, ng)); });
+  });
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => window.__lvRank.length >= 1);
+  await page.click('#rr-tabs button[data-s="tower"]');
+  if (best) await page.waitForFunction(() => $('rr-rank').textContent.startsWith('英雄の塔'));
+  // 遅れていたレベル順の返事をいま返す
+  await page.evaluate(() => Promise.all(window.__lvRank.splice(0).map(f => f())));
+  await page.waitForTimeout(300);
+  const want = best ? '英雄の塔 1位 相当' : '';
+  assert.equal(await page.evaluate(() => $('rr-rank').textContent), want);
 });
 
 t('tower_tab_not_ready', async (page, app) => {

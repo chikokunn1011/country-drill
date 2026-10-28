@@ -120,7 +120,7 @@
       return;
     }
     const want = { ...r };
-    RANKING.rpgRankOf(want).then(x => { if (same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = `${ranks(x)} 相当`; },
+    RANKING.rpgRankOf(want).then(x => { if (R.sort !== 'tower' && same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = `${ranks(x)} 相当`; },
       e => console.warn('ranking rpgRankOf', e));
   };
   // 読み込み中は表を薄くするだけ。返事が前後しても、最後に頼んだ並べ方の表だけを出す
