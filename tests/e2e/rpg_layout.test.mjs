@@ -577,4 +577,4 @@ t('dark_mode', async page => {
   await noHScrollAt(page, 'ダークのガチャ');
   await page.evaluate(() => RPG.open('cards'));
   await noHScrollAt(page, 'ダークの仲間');
-}, { colorScheme: 'dark', timeout: 180_000 });
+}, { colorScheme: 'dark', storage: { settings: { theme: 'auto' } }, timeout: 180_000 });
