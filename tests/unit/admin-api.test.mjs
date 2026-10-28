@@ -137,3 +137,28 @@ test('network_and_http_codes', async () => {
   await assert.rejects(api.call('f', {}), e => e.code === 'network');
   await assert.rejects(api.call('f', {}), e => e.code === 'http');
 });
+
+test('call_after_idle_30min_is_relogin_without_fetch', async () => {
+  const { api, calls, storage, clock } = setup([]); seed(storage);
+  clock.t = NOW + 31 * 60_000;
+  await assert.rejects(api.call('f', {}), e => e.code === 'relogin');
+  assert.equal(calls.length, 0); assert.equal(storage.getItem('adminAuth'), null);
+});
+
+test('refresh_does_not_reset_idle_clock', async () => {
+  const { api, storage, clock } = setup([tok(2), json(200, {})]); seed(storage, { expires_at: NOW + 30_000 });
+  clock.t = NOW + 10 * 60_000; await api.call('f', {});
+  assert.equal(saved(storage).last, NOW + 10 * 60_000); // call 成功で更新
+});
+
+test('refresh_keeps_last_when_it_fails_later', async () => {
+  const { api, storage, clock } = setup([tok(2), json(401, {}), json(401, {})]); seed(storage, { expires_at: NOW + 30_000 });
+  clock.t = NOW + 5 * 60_000;
+  await assert.rejects(api.call('f', {}), e => e.code === 'relogin');
+});
+
+test('401_with_42501_is_denied_without_refresh', async () => {
+  const { api, calls, storage } = setup([json(401, { code: '42501' })]); seed(storage);
+  await assert.rejects(api.call('f', {}), e => e.code === 'denied');
+  assert.equal(calls.length, 1);
+});

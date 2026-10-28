@@ -30,7 +30,7 @@
     const session = (t, email, prev) => ({
       access_token: t.access_token, refresh_token: t.refresh_token,
       expires_at: t.expires_at ? t.expires_at * 1000 : now() + (t.expires_in || 3600) * 1000,
-      last: now(), email: (t.user && t.user.email) || email || (prev && prev.email) || '',
+      last: prev ? prev.last : now(), email: (t.user && t.user.email) || email || (prev && prev.email) || '',
     });
 
     // 合札の更新。失敗したら保存を消して relogin
@@ -59,8 +59,8 @@
     }
 
     async function call(name, args) {
+      if (!loggedIn()) throw err('relogin', 'relogin'); // 30分たっていたら通信せずログインし直し
       let a = read();
-      if (!a) throw err('relogin', 'relogin');
       if (now() >= a.expires_at - SKEW_MS) a = await refresh();
       let res = await rpcOnce(name, args, a), b;
       if (res.status === 401) {
