@@ -458,7 +458,27 @@ reset role;
 do $$ begin
   assert (select tower from rpg_players) = 12, 'rpg_update は tower を変えない';
 end $$;
--- 逆: 記録・かざりを送ったすぐあと（updated_at・deco_at は今）でも、塔は通る
+-- 逆（かざり）: rpg_set_deco のすぐあと（deco_at は今）でも、塔は通る
+update rpg_players set tower_at = now() - interval '1 minute', deco_at = now() - interval '1 minute';
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_deco('00000000-0000-4000-8000-000000000001', array['jp']);
+  assert r->>'ok' = 'true', format('かざり: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select deco_at from rpg_players) > now() - interval '5 seconds', 'deco_at は今';
+end $$;
+set role anon;
+do $$ declare r jsonb; begin
+  r := rpg_set_tower('00000000-0000-4000-8000-000000000001', 15);
+  assert r->>'ok' = 'true', format('rpg_set_deco のすぐあとでも rpg_set_tower は通る（deco_at を見ない）: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select tower from rpg_players) = 15, 'tower = 15';
+end $$;
+-- 逆（記録）: rpg_update を送ったすぐあと（updated_at は今）でも、塔は通る
 update rpg_players set tower_at = now() - interval '1 minute';
 -- deco_at を少し前にしておき、rpg_set_tower が deco_at を変えないことも見る
 update rpg_players set deco_at = now() - interval '1 minute';
