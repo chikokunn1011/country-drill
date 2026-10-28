@@ -223,8 +223,9 @@
     });
     // rpg-rank.js の unregister と同じ: 登録の合言葉を消しに行く列に足してから、送った記録の覚え（rpgSent）といっしょに消す。
     // 前の版の登録（rpgRank.token と rpgRankPending）は rpgRankDel に、いまのプロフィール（profile.token）は rpgUnreg に積む。
-    // 本編が次の起動で、どちらの列の合言葉でも rpg_unregister2 でランキングの行を消しに行く（プロフィールは消さない）
-    const queueRankDel = () => {
+    // 本編が次の起動で、どちらの列の合言葉でも rpg_unregister2 でランキングの行を消しに行く（プロフィールは消さない）。
+    // rpgRank は初回状態に戻すときだけ消す。冒険データを消すときは本編と同じく残す（まだ引っ越していないなら profile.js がプロフィールにする）
+    const queueRankDel = (dropRank = false) => {
       const get = k => { const p = parse(storage.getItem(k) ?? 'null'); return p.ok ? p.v : null; };
       const strs = k => { const v = get(k); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
       const r = get('rpgRank'), pending = get('rpgRankPending'), prof = get('profile'), del = strs(RANK_DEL), unreg = strs(UNREG);
@@ -233,7 +234,8 @@
       const mine = fresh([isObj(prof) && typeof prof.token === 'string' ? prof.token : null], old);
       if (old.length) storage.setItem(RANK_DEL, JSON.stringify([...del, ...old]));
       if (mine.length) storage.setItem(UNREG, JSON.stringify([...unreg, ...mine]));
-      storage.removeItem('rpgRank'); storage.removeItem('rpgRankPending'); storage.removeItem('rpgSent');
+      if (dropRank) storage.removeItem('rpgRank');
+      storage.removeItem('rpgRankPending'); storage.removeItem('rpgSent');
     };
     // 本編の「冒険データを消す」と同じ: 新しい版のデータなら消さない（{ ok:false, reason:'newer' }）。壊れたセーブは写しを取ってから消す
     const rpgWipe = () => guard(() => {
@@ -306,7 +308,7 @@
     const setupGet = () => { const r = guard(() => read('setup')); return r.ok && isObj(r.value) ? r.value : {}; };
     const setupSet = patch => guard(() => { const s = { ...setupGet(), ...patch }; storage.setItem('setup', JSON.stringify(s)); return s; });
     // バックアップは呼ぶ側が先に snapSave する
-    const firstTime = () => guard(() => { queueRankDel(); for (const k of FIRST) storage.removeItem(k); return { ok: true }; });
+    const firstTime = () => guard(() => { queueRankDel(true); for (const k of FIRST) storage.removeItem(k); return { ok: true }; });
 
     // ---- データ点検（countries.js） ----
     const checkData = () => {

@@ -141,7 +141,7 @@ test('rpg_coins_pity_card_story', () => {
 test('rpg_wipe_keeps_rankdel', () => {
   const { A, st } = load({ rpg: '{"v":1}', rpgRank: '1', rpgRankPending: '2', rpgRankDel: '["3"]', other: 'o' });
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
-  assert.deepEqual(st.dump(), { rpgRankDel: '["3"]', other: 'o' });
+  assert.deepEqual(st.dump(), { rpgRank: '1', rpgRankDel: '["3"]', other: 'o' });
 });
 
 test('badges_all_marks_sent', () => {
@@ -291,7 +291,8 @@ test('rpg_wipe_queues_rank_tokens', () => {
   st.setItem('rpgRankDel', JSON.stringify(['tok-old', 'tok-a']));
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
   assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-old', 'tok-a', 'tok-b'], '重ならないように足す');
-  for (const k of ['rpg', 'rpgRank', 'rpgRankPending']) assert.equal(st.getItem(k), null, k);
+  for (const k of ['rpg', 'rpgRankPending']) assert.equal(st.getItem(k), null, k);
+  assert.equal(JSON.parse(st.getItem('rpgRank')).token, 'tok-a', 'rpgRank は残す（本編と同じ）');
 });
 
 test('rpg_wipe_on_broken_save_backs_up_first', () => {
@@ -331,7 +332,7 @@ test('rpg_wipe_queues_profile_token_to_unreg', () => {
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
   assert.deepEqual(JSON.parse(st.getItem('rpgUnreg')), ['tok-x', 'tok-p'], '文字列でないものは落として、後ろに足す');
   assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
-  for (const k of ['rpg', 'rpgSent', 'rpgRank']) assert.equal(st.getItem(k), null, k);
+  for (const k of ['rpg', 'rpgSent']) assert.equal(st.getItem(k), null, k);
   assert.equal(JSON.parse(st.getItem('profile')).token, 'tok-p', 'プロフィールは残す');
   // もう列にある合言葉は重ねない（rpgRankDel にあるものも）
   st.setItem('rpg', v1(R));
@@ -339,6 +340,26 @@ test('rpg_wipe_queues_profile_token_to_unreg', () => {
   st.removeItem('rpgUnreg');
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
   assert.equal(st.getItem('rpgUnreg'), null, 'rpgRankDel にある合言葉は rpgUnreg に積まない');
+});
+
+// 冒険データを消しても rpgRank は残す（本編の rpg-rank.js unregister と同じ）。まだ引っ越していない端末でも
+// profile.js の引っ越しでサーバーのプロフィールにつながれるように。合言葉は列に積むので、ランキングの行は消える
+test('rpg_wipe_keeps_unmigrated_rpgrank_for_profile_migrate', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  const rank = JSON.stringify({ name: 'チコ', token: 'tok-a' });
+  st.setItem('rpgRank', rank);
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.equal(st.getItem('rpgRank'), rank, 'さわらずに残す');
+  assert.equal(st.getItem('profile'), null);
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+  // 2回目は同じ合言葉を重ねない。初回状態に戻すときは消す
+  st.setItem('rpg', v1(R));
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+  assert.deepEqual(plain(A.firstTime()), { ok: true });
+  assert.equal(st.getItem('rpgRank'), null);
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
 });
 
 test('rpg_wipe_same_token_in_profile_and_rpgrank_once', () => {
