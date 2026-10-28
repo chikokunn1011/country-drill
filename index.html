@@ -29,6 +29,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色（設定の theme）を描く前に当てる。'auto' や未設定なら data-theme を付けず、端末の設定に合わせる
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
 <style>
 /* Layout: 地図帳の1ページ。ホーム→モード選択→出題カード。地図は選んだ地域に合わせて切り出す */
 :root {
@@ -369,6 +373,11 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div class="panel">
       <h2>設定</h2>
       <div class="field">
+        <span class="lbl">画面の色</span>
+        <div class="chips" id="set-theme"></div>
+        <p class="hint">「端末に合わせる」は、スマホやPCのライト／ダークの設定と同じ色になるよ。</p>
+      </div>
+      <div class="field">
         <span class="lbl">音</span>
         <label class="switch"><input type="checkbox" id="set-sound"> 効果音を鳴らす</label>
         <div class="row vol-row" id="set-vol-row"><label class="hint" for="set-vol">音量</label><input type="range" id="set-vol" min="10" max="100" step="10"><span class="hint" id="set-vol-n"></span></div>
@@ -555,7 +564,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70 }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'auto' }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -762,7 +771,9 @@ $('to-settings').onclick = () => show('settings');
 $('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="">`).join('');
 
 /* ---------- 設定 ---------- */
+const THEMES = [['auto', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']];
 function renderSettings() {
+  $('set-theme').innerHTML = THEMES.map(([v, l]) => `<button class="chip" aria-pressed="${v === S.theme}" data-th="${v}">${l}</button>`).join('');
   $('set-dopa').checked = S.dopa;
   $('set-sound').checked = S.sound;
   $('set-vol').value = S.vol ?? 70;
@@ -772,6 +783,12 @@ function renderSettings() {
   $('set-record').textContent = n ? `まちがえた記録: ${n}か国` : 'まちがえた記録はまだない';
   $('set-reset').hidden = !n;
 }
+// 'light' / 'dark' は <html data-theme> で色を固定、'auto' は外して prefers-color-scheme に任せる（head の先読みと同じ）
+const applyTheme = () => { if (S.theme === 'light' || S.theme === 'dark') document.documentElement.dataset.theme = S.theme; else delete document.documentElement.dataset.theme; };
+$('set-theme').onclick = e => {
+  const b = e.target.closest('[data-th]'); if (!b) return;
+  S.theme = b.dataset.th; store.set('settings', S); applyTheme(); renderSettings();
+};
 const applyDopa = () => document.body.classList.toggle('dopa', S.dopa);
 $('set-dopa').onchange = e => {
   S.dopa = e.target.checked; store.set('settings', S); applyDopa(); renderSettings();
@@ -1332,6 +1349,7 @@ $('grid').onclick = e => {
 $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 
 /* ---------- 起動 ---------- */
+applyTheme();
 applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 show(start);
