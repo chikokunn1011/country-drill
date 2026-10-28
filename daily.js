@@ -171,26 +171,37 @@
     startDaily(questions(day), sid);
   }
 
-  // 結果の「載せる」箱（profile.js の postBox）。プロフィールがあって自動 ON なら、出したときにすぐ送る
+  // 結果の「載せる」箱（profile.js の postBox）。プロフィールがあって自動 ON なら、出したときにすぐ送る。
+  // 送っている途中に画面を開き直すと新しい箱ができる（r.sent はまだ無い）ので、同じ日・同じ合言葉の送信は posting の返事を待って同じ答えにする（二重に送らない）
+  let posting = null;   // { day, token, done: Promise }
   function post(r) {
-    const dayWord = r.day === today() ? '今日' : '昨日';
-    P().postBox($('dl-post'), { label: 'ランキングに載せる？', send: async token => {
-      const res = await RANKING.dailySubmit2({ token, day: r.day, correct: r.correct, total: N, timeMs: r.timeMs });
-      // 前に送ったときに載っていて、返事だけ届かなかった（1日1回なので2回目は already）: 載せたことにする
-      if (!res.ok && res.reason !== 'already') return res;
-      const name = P().get()?.name ?? '', rank = res.ok ? res.rank : null;
-      const now = rec();
-      if (now?.day === r.day) save({ ...now, sent: { name, rank } });
-      // 箱の外（順位・表）だけ新しくする。箱は postBox が「載せたよ」に描きかえる
-      if (!sec.hidden) {
-        if (rank && $('dl-rank')) $('dl-rank').textContent = `${dayWord}${rank}位`;
-        V.tab = r.day === today() ? 'today' : 'yday';
-        for (const b of $('dl-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === V.tab));
-        load();
-      }
-      return { ok: true, text: res.ok ? `「${name}」で載せたよ！${rank ? ` ${dayWord}${rank}位` : ''}` : RANKING.message('already') };
+    P().postBox($('dl-post'), { label: 'ランキングに載せる？', send: token => {
+      if (posting?.day === r.day && posting.token === token) return posting.done;
+      const done = sendDaily(r, token).finally(() => { if (posting?.done === done) posting = null; });
+      posting = { day: r.day, token, done };
+      return done;
     } });
   }
+  async function sendDaily(r, token) {
+    const dayWord = r.day === today() ? '今日' : '昨日';
+    const res = await RANKING.dailySubmit2({ token, day: r.day, correct: r.correct, total: N, timeMs: r.timeMs });
+    // 前に送ったときに載っていて、返事だけ届かなかった（1日1回なので2回目は already）: 載せたことにする
+    if (!res.ok && res.reason !== 'already') return res;
+    const name = P().get()?.name ?? '', rank = res.ok ? res.rank : null;
+    const now = rec();
+    if (now?.day === r.day) save({ ...now, sent: { name, rank } });
+    // 箱の外（順位・表）だけ新しくする。箱は postBox が「載せたよ」に描きかえる
+    if (!sec.hidden) {
+      if (rank && $('dl-rank')) $('dl-rank').textContent = `${dayWord}${rank}位`;
+      V.tab = r.day === today() ? 'today' : 'yday';
+      for (const b of $('dl-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === V.tab));
+      load();
+    }
+    return { ok: true, text: res.ok ? `「${name}」で載せたよ！${rank ? ` ${dayWord}${rank}位` : ''}` : RANKING.message('already') };
+  }
+  // 画面を離れたら箱を外す（隠れた箱が、あとでプロフィールを作った・自動を ON にしたときに載せないままにした記録を送らないように。
+  // postBox は箱が DOM から外れると聞くのをやめる。開き直せば render が作り直す）
+  document.addEventListener('drill:screen', e => { if (e.detail?.name !== 'daily') $('dl-post')?.remove(); });
 
   function share(r) {
     const text = `国旗マスター 今日の難問 ${mdShort(r.day)}\n${bar(r)}\n${r.correct >= N ? `全問正解！ ${RANKING.formatTime(r.timeMs)}` : `${r.correct} / ${N} 問正解`}\n#国旗マスター`;

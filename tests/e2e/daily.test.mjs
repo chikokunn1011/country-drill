@@ -238,6 +238,34 @@ t('manual_when_auto_off', async (page, app) => {
   assert.equal(app.db.dailyRows.length, 1);
 });
 
+// 送っている途中に開き直しても、送るのは1回。新しい箱にも順位つきの「載せたよ！」が出る
+t('reopen_while_sending_sends_once', async (page, app) => {
+  await page.route('**/rest/v1/rpc/submit_daily2', async route => { await new Promise(ok => setTimeout(ok, 1500)); await route.fallback(); });
+  await openWithProfile(page, app.db);
+  await failAt3(page);
+  await page.locator('#dl-post .tamsg', { hasText: '送信中' }).waitFor();
+  await page.click('#brand');
+  await page.click('#home-daily');
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.match(await text(page, '#dl-post'), /「チコ」で載せたよ！ 今日1位/);
+  assert.equal(app.db.calls.filter(c => c.name === 'submit_daily2').length, 1);
+  assert.equal(app.db.dailyRows.length, 1);
+  assert.deepEqual((await rec(page)).sent, { name: 'チコ', rank: 1 });
+});
+
+// 今日の難問の画面を離れたら「載せる」箱を外す。あとで自動を ON にしても、載せないままにした記録は送らない
+t('left_daily_box_stays_quiet', async (page, app) => {
+  await openWithProfile(page, app.db, { auto: false });
+  await failAt3(page);
+  await page.locator('#dl-post [data-pf="send"]').waitFor();
+  await page.click('#brand');
+  assert.equal(await page.locator('#dl-post').count(), 0);
+  await page.evaluate(() => PROFILE.setAuto(true));
+  await page.waitForTimeout(300);
+  assert.equal(app.db.calls.filter(c => c.name === 'submit_daily2').length, 0);
+  assert.equal(app.db.dailyRows.length, 0);
+});
+
 // 前に送ったのに返事が届かなかった（サーバーにはもう今日の行がある）: 「もう載せてあるよ」で、載せたことにする
 t('already', async (page, app) => {
   await openWithProfile(page, app.db);
