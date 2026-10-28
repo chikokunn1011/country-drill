@@ -188,6 +188,13 @@ export async function settleLayout(page) {
       .map(i => new Promise(ok => { i.addEventListener('load', ok, { once: true }); i.addEventListener('error', ok, { once: true }); }));
     await Promise.race([Promise.all(loading), t(3000)]);
     await Promise.all(document.getAnimations().filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+    // なめらかなスクロール（scrollIntoView の smooth など）が止まるまで待つ。止まる前に測ると position: fixed の要素の y が毎回ずれる
+    const frame = () => new Promise(ok => requestAnimationFrame(ok));
+    for (let still = 0, last = scrollY, end = performance.now() + 3000; still < 5 && performance.now() < end;) {
+      await frame();
+      still = scrollY === last ? still + 1 : 0;
+      last = scrollY;
+    }
     await new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok)));
   });
 }
