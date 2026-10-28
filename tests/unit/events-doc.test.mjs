@@ -15,7 +15,7 @@ const spans = s => [...s.matchAll(/`([^`\n]+)`/g)].map(m => m[1]);
 
 const DRILL = ['drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
 const FEATURES = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer',
-  'rpg:battle', 'rpg:clear', 'rpg:overcome', 'rpg:bounty', 'rpg:share', 'badge:earned', 'badge:title'];
+  'rpg:battle', 'rpg:clear', 'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:tower', 'rpg:tower-end', 'badge:earned', 'badge:title'];
 // drill:* の detail のキー
 const KEYS = ['sid', 'mode', 'kind', 'region', 'n', 'hint', 'a', 'right', 'first', 'missesBefore', 'missesAfter', 'streak',
   'outcome', 'done', 'firstTry', 'wrongs', 'attempts', 'best', 'timeMs', 'missed', 'name'];
@@ -56,4 +56,16 @@ test('events_doc_rpg_answer_timing', () => {
   for (const s of ['`rpg:battle`', '`pagehide`', '`visibilitychange`', '次の起動', 'そのあとの判定（次に判定するイベントか、次の起動時）'])
     assert.ok(line.includes(s), `10章の rpg:answer の行に ${s} がない: ${line}`);
   assert.ok(!line.includes('次の起動時の判定で判定する'), `visibilitychange のあとも次の起動で判定すると書いてある: ${line}`);
+});
+
+test('events_doc_badges_rpg_tower', () => {
+  // 10章の badges.js の表: badges.js は rpg:tower で英雄の塔のバッジを判定し直す（RPG.snapshot().tower）。
+  // 「使わない」の行には rpg:tower-end だけを残し、rpg:tower は入れない
+  const sec = doc().split(/^## /m).find(s => s.startsWith('10.')) ?? '';
+  const rows = sec.split('\n').filter(l => l.startsWith('| '));
+  const unused = rows.find(l => l.endsWith('| 使わない |')) ?? '';
+  assert.ok(unused.includes('`rpg:tower-end`'), `使わないの行に rpg:tower-end がない: ${unused}`);
+  assert.ok(!unused.includes('`rpg:tower`'), `使わないの行に rpg:tower がある: ${unused}`);
+  const row = rows.find(l => l.startsWith('| `rpg:tower` |')) ?? '';
+  assert.ok(row.includes('英雄の塔') && row.includes('RPG.snapshot().tower'), `rpg:tower の行がない: ${row}`);
 });

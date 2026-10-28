@@ -27,6 +27,8 @@
   const MODES = new Set(['f2n', 'n2f', 'm2f']);
   const ONGOING = new Set(['question', 'reveal']);   // バトルが続いている（にげたら数える）
   const FLEE_ASK = 'にげる？（報酬はなし）';
+  const FLEE_ASK_TOWER = 'にげる？（この階の報酬はなし。塔はここで終わり）';
+  const TT = T.tower;
   const todayStr = () => K.today(new Date());
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
   const missesNow = () => (misses && typeof misses === 'object') ? misses : {};
@@ -80,7 +82,7 @@
   const stageHTML = () => {
     const { dg, floor, mon, boss, d } = B;
     return `<div class="rpg-stage" data-phase="${B.phase}" style="--rpg-c: var(--rpg-r-${dg.id}, ${dg.color})"><div class="rpg-btop">`
-      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${boss ? 'ボス' : `F${floor}`} ${esc(dg.name)}</span></div>`
+      + `<div class="rpg-bhead"><button type="button" class="linkbtn" id="bt-flee">← にげる</button><span class="rpg-bwhere">${B.tower ? `${esc(dg.name)} ${floor}階${boss ? ' 中ボス' : ''}` : `${boss ? 'ボス' : `F${floor}`} ${esc(dg.name)}`}</span></div>`
       + `<div class="rpg-mon${boss ? ' rpg-boss' : ''}" id="bt-mon"><span class="rpg-mon-e" aria-hidden="true">${mon.e}</span>${boss ? '<span class="rpg-bosstag">BOSS</span>' : ''}</div>`
       + `<div class="rpg-hpl"><b class="rpg-hpname">${esc(mon.n)}</b>${barHTML('bt-ehp', `${mon.n}のHP`)}</div>`
       + `<div class="rpg-hpl"><span class="rpg-hpname" aria-hidden="true">${K.AVATARS[d.av] ?? K.AVATARS[0]}</span>${barHTML('bt-hhp', '旅人のHP')}<span class="rpg-left" id="bt-left"></span></div>`
@@ -108,7 +110,8 @@
   const drawTop = () => {
     const { en } = B;
     setBar($('bt-ehp'), B.boss ? B.flags.reduce((s, f) => s + f.hp, 0) : B.ehp, B.boss ? B.flags.length * en.flagHp : en.hp);
-    setBar($('bt-hhp'), B.hp, B.stats.hp);
+    // 塔は B.tower.maxHp（階クリアの画面では、仲間入りで上がったつぎの階の最大 HP）
+    setBar($('bt-hhp'), B.hp, B.tower ? B.tower.maxHp : B.stats.hp);
     $('bt-left').textContent = `のこりミス${Math.max(0, K.missesAllowed({ hp: B.hp }, en))}`;
     $('bt-flags').innerHTML = flagsHTML();
   };
@@ -132,7 +135,7 @@
       + `<b class="rpg-tname" id="bt-tname">${esc(tm?.n ?? '編成1')}</b>`
       + (many ? '<button type="button" class="linkbtn rpg-tsw" id="bt-tnext" aria-label="次の編成">▶</button>' : '')
       + (tb.bonus ? `<span class="rpg-bteam-b"><span class="rpg-bteam-bk">チーム </span>${esc(tb.group)}×${tb.n} <b>＋${Math.round(tb.bonus * 100)}%</b></span>` : '')
-      + (typeof RPG.openTeam === 'function' ? '<button type="button" class="btn ghost rpg-tedit" id="bt-team">へんせい</button>' : '')
+      + (typeof RPG.openTeam === 'function' && !B.tower ? '<button type="button" class="btn ghost rpg-tedit" id="bt-team">へんせい</button>' : '')   // 塔は編成の画面へ行くと回が終わるので出さない
       + '</div>';
   };
   const introHTML = () => {
@@ -144,7 +147,8 @@
       + (stats.party.length ? partyHTML(true)
         : hasCards && !tm.auto ? '<p class="hint">この編成には仲間がいないよ</p>'
           : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p>`)
-      + `<p class="rpg-bline">倒すのに必要な正解: 約${K.hitsNeeded(stats, en)}回 ／ まちがえてOK: ${K.missesAllowed(stats, en)}回まで</p>`
+      + `<p class="rpg-bline">倒すのに必要な正解: 約${K.hitsNeeded(stats, en)}回 ／ まちがえてOK: ${K.missesAllowed({ hp: B.hp }, en)}回まで</p>`
+      + (B.tower ? `<p class="rpg-bline">HP はつぎの階に持ちこし（階を上がると${Math.round(TT.healPct * 100)}%回復、${TT.bossEvery}階ごとの中ボスをたおすと全回復）</p>` : '')
       + (g ? `<p class="rpg-bline">がんばりゲージ +${Math.round(TB.gaugeStep * 100 * g)}%</p>` : '')
       + (boss ? '<p class="rpg-bline">旗1枚につき正解1回で取りもどせる（Lv が足りないと2回かかることも）。旗を全部取りもどしたら勝ち！</p>' : '')
       + (id === DG[0].id && floor === 1 && !(d.floors[id] > 0) ? '<p class="rpg-bline">正解すると攻撃！ まちがえると反撃されるよ</p>' : '')
@@ -183,6 +187,10 @@
     $('bt-fight')?.focus({ preventScroll: true });
     return true;
   };
+  // いまのバトルの強さ（塔は全員に地域ボーナス・ゲージなし）
+  const statsOf = d => B.tower ? K.towerStats(d) : K.battleStats(d, B.id, B.floor);
+  // 塔の HP: hp が数なら 1..maxHp におさめる。無ければ maxHp
+  const towerHp = (hp, maxHp) => hp === null || hp === undefined || !Number.isFinite(+hp) ? maxHp : Math.max(1, Math.min(maxHp, Math.round(+hp)));
   // 登場画面で使う編成を切り替える（step は +1 / -1、端で回る）。tsel を書いて、強さ・必要な正解の数・上の列を描き直す。
   // フォーカスは押したボタン（キーなら［たたかう］）に戻す。新しい版のデータのあいだは何もしない
   const switchTeam = (step, focusId) => {
@@ -192,8 +200,9 @@
     const cur = B.stats.team?.slot ?? 0, to = ((cur + step) % n + n) % n;
     if (RPG.tx(x => { x.tsel = to; return true; }) !== true) return;
     B.d = RPG.get();
-    B.stats = K.battleStats(B.d, B.id, B.floor);
-    B.hp = B.stats.hp;
+    B.stats = statsOf(B.d);
+    B.hp = B.tower ? towerHp(B.tower.hp0, B.stats.hp) : B.stats.hp;
+    if (B.tower) B.tower.maxHp = B.stats.hp;
     if (!B.boss) B.need = K.hitsNeeded(B.stats, B.en);
     drawParty();
     drawTop();
@@ -202,7 +211,7 @@
   };
   // 編成画面へ（drill:screen でバトルは片付く。［← バトルにもどる］で同じフロアの登場画面を start が作り直す）
   const editTeam = () => {
-    if (!B || B.phase !== 'intro' || typeof RPG.openTeam !== 'function') return;
+    if (!B || B.phase !== 'intro' || B.tower || typeof RPG.openTeam !== 'function') return;
     RPG.openTeam({ id: B.id, floor: B.floor });
   };
   // 始めていない画面（RPG.open を通らずに開いた・始めるのに失敗した）
@@ -225,6 +234,10 @@
   // 画面（screenRender.battle）。RPG.open('battle', {id, floor}) のときだけ始める
   const render = () => {
     const o = RPG.opts || {};
+    if (o.tower) {   // RPG.open('battle', {tower: true})（冒険ホームの英雄の塔の［挑戦］）
+      RPG.opts = {};
+      if (tryTower(1, null, 0, true)) return;
+    }
     if (o.id !== undefined && o.floor !== undefined) {
       RPG.opts = {};
       if (tryStart(o.id, o.floor)) return;
@@ -238,12 +251,13 @@
     setPhase('question');
     nextQ();
   };
-  const refill = () => K.refillBag(B.id, B.floor, B.last, Math.random);
+  const refill = () => B.tower ? K.towerRefill(B.floor, B.last, Math.random) : K.refillBag(B.id, B.floor, B.last, Math.random);
   const nextQ = () => {
     if (B.boss) {
       // 新しい旗（後ろに回した旗がもう一度来たときも）は bossMode、旗が残ったときの同じ国のもう1問は前の形式の次
       const f = B.flags[B.order[0]];
-      const mode = B.again ? K.nextMode(B.q.mode, BOSS, K.chapterOf(B.id)) : K.bossMode(B.k, K.chapterOf(B.id));
+      const mode = B.tower ? (B.again ? K.towerNextMode(B.q.mode, B.floor) : K.towerBossMode(B.k, B.floor))
+        : B.again ? K.nextMode(B.q.mode, BOSS, K.chapterOf(B.id)) : K.bossMode(B.k, K.chapterOf(B.id));
       B.k++;
       B.q = { a: f.a, mode };
     } else {
@@ -271,8 +285,10 @@
     if (mode === 'm2f') box.append(zoomableMap(c, '出題中の国の位置', { region: B.dg.r }));
     const byName = mode === 'f2n', ch = document.createElement('div');
     ch.className = 'choices' + (byName ? ' textc' : '');
-    // 鏡の地球は似た旗の4択（おとり選びは rpg-core の similarChoices）、宇宙のテーマのある星はテーマの国だけの4択（themeChoices）
-    const opts = K.chapterOf(B.id) === 2 ? K.similarChoices(a, Math.random).map(x => byA.get(x))
+    // 鏡の地球は似た旗の4択（おとり選びは rpg-core の similarChoices）、宇宙のテーマのある星はテーマの国だけの4択（themeChoices）。
+    // 塔は similarFrom 階から、1問ごとに similarRate で似た旗の4択（ストーリーでは乱数を引かない）
+    B.similar = !!B.tower && K.towerSimilar(B.floor, Math.random);
+    const opts = K.chapterOf(B.id) === 2 || B.similar ? K.similarChoices(a, Math.random).map(x => byA.get(x))
       : B.dg.t ? K.themeChoices(a, B.dg, Math.random).map(x => byA.get(x)) : makeQuestion(c).opts;
     opts.forEach((o, k) => {
       const b = document.createElement('button');
@@ -362,7 +378,7 @@
     if (B.boss) { B.order.push(B.order.shift()); B.again = false; }   // いまの旗は後ろに回す
     else {   // 2問あとに同じ国を別の形式で
       if (!B.queue.length) B.queue = refill();
-      B.queue.splice(1, 0, { a: q.a, mode: K.nextMode(q.mode, B.floor, K.chapterOf(B.id)) });
+      B.queue.splice(1, 0, { a: q.a, mode: B.tower ? K.towerNextMode(q.mode, B.floor) : K.nextMode(q.mode, B.floor, K.chapterOf(B.id)) });
     }
     drawTop();
     say(`${B.mon.n}の反撃！ ${B.en.atk}ダメージ`);
@@ -373,8 +389,8 @@
     rv.className = 'reveal rpg-reveal'; rv.id = 'bt-reveal';
     rv.innerHTML = `<p class="verdict ng">ざんねん。正解は「${esc(c.n)}」</p>${factsHTML(c)}`;
     if (B.dg.t) rv.querySelector('.verdict').insertAdjacentHTML('afterend', `<p class="rpg-rv-theme">${esc(c.n)}は${esc(K.THEMES[B.dg.t].n)}だよ</p>`);   // 宇宙: テーマの一言
-    const pc = K.chapterOf(B.id) === 2 && picked !== q.a ? byA.get(picked) : null;
-    if (pc) {   // 鏡の地球: 押した国と正解の国旗を並べて見比べる
+    const pc = (K.chapterOf(B.id) === 2 || B.similar) && picked !== q.a ? byA.get(picked) : null;
+    if (pc) {   // 鏡の地球（と塔の似た旗の問題）: 押した国と正解の国旗を並べて見比べる
       const f = (x, cap) => `<figure><img src="${flag(x.a)}" alt="${esc(cap)}の国旗"><figcaption>${esc(cap)}</figcaption></figure>`;
       rv.querySelector('.verdict').insertAdjacentHTML('afterend', `<p class="rpg-rv-pick">えらんだのは「${esc(pc.n)}」</p><div class="rpg-rv-pair">${f(pc, pc.n)}${f(c, c.n)}</div>`);
     }
@@ -406,6 +422,7 @@
     return g ? { id: g.id, floor: 1 } : null;
   };
   const finish = win => {
+    if (B.tower) return finishTower(win);
     stopTimer();
     setPhase('end');
     B.win = win;
@@ -499,16 +516,181 @@
     show('setup');
   };
 
+  /* ---------- 英雄の塔（B.tower があるときだけ通る道。設計書 §6） ---------- */
+  // f 階を hp（無ければ最大）で始める。cleared はこの回で勝った階。intro なら「あらわれた」画面、ほかはすぐ問題。
+  // dungeonOf・unlocked・floors は見ない。地図喰いを倒していない・新しい版のデータのあいだは何もしないで false
+  const startTowerFloor = (f, hp, cleared, intro) => {
+    if (!Number.isInteger(f) || f < 1 || f > TT.maxFloor || RPG.status === 'readOnly' || !K.towerOpen(RPG.get())) return false;
+    const m = missesNow(), t = todayStr();
+    let d = null;
+    RPG.tx(x => { K.ensureDay(x, m, t, Math.random); d = x; });
+    if (RPG.status === 'readOnly') return false;   // いま読んだら新しい版のデータだった（別のタブが書いた）
+    d = d || RPG.get();
+    stopTimer();
+    const en = K.towerEnemy(f), stats = K.towerStats(d), boss = en.boss;
+    const flags = boss ? K.towerFlags(d, m, f, Math.random).map(a => ({ a, hp: en.flagHp, got: false })) : [];
+    B = {
+      id: K.TOWER.id, floor: f, dg: K.TOWER, en, boss, stats, d, mon: K.towerMonster(f),
+      run: K.newRun({ sid: `bt-${Date.now().toString(36)}`, kind: 'battle', mode: 'f2n', region: 'all', n: 0, hint: false }, d),
+      hp: towerHp(hp, stats.hp), ehp: boss ? 0 : en.hp,
+      queue: boss ? [] : K.towerBag(d, m, f, Math.random), last: {},
+      flags, order: flags.map((_, i) => i), k: 0, again: false,
+      need: boss ? flags.length : K.hitsNeeded(stats, en), got: [],
+      phase: intro ? 'intro' : 'question', q: null, shownAt: 0, answered: false, waiting: false, timer: 0, win: null, next: null,
+      combo: 0, maxCombo: 0, rights: 0, mistakes: [], missed: new Set(),
+      // hp0: 登場画面で編成を切り替えたときの HP（最初の階だけ）。ended: rpg:tower-end を出したか
+      tower: { maxHp: stats.hp, cleared, hp0: intro ? hp : null, ended: false }, similar: false,
+    };
+    sec.innerHTML = stageHTML();
+    drawTop();
+    if (intro) $('bt-col').innerHTML = introHTML();
+    if (sec.hidden) { RPG.opts = {}; show('battle'); }
+    // 階を始めるたび（2階から先と［もう一度］はバトル画面のままで drill:screen が出ない）。badges.js はバトル中としてトーストを保留する
+    emit('rpg:tower-floor', { floor: f });
+    if (intro) $('bt-fight')?.focus({ preventScroll: true });
+    else nextQ();
+    return true;
+  };
+  // startTowerFloor を呼ぶ（tryStart と同じく、例外は console.error('[rpg]') にして始めていない画面を出す）。
+  // 片付ける前に、その回（始めかけた階の B、まだなら前の階の B）を終わりにする（rpg:tower-end は回で1回だけ）
+  const tryTower = (f, hp, cleared, intro) => {
+    const prev = B;
+    try { return startTowerFloor(f, hp, cleared, intro); } catch (e) {
+      console.error('[rpg]', e);
+      const r = B && B.tower ? B : prev;
+      if (r && r.tower) { try { endTower(r); } catch (err) { console.error('[rpg]', err); } }
+      drop();
+      idle();
+      return false;
+    }
+  };
+  // その回の終わり（負け・やめる・にげる・画面を離れる）。1回の回で1回だけ rpg:tower-end
+  const endTower = b => {
+    if (b.tower.ended) return;
+    b.tower.ended = true;
+    emit('rpg:tower-end', { cleared: b.tower.cleared, best: RPG.get().tower?.best ?? 0 });
+  };
+  // 1階の終わり（1回の RPG.tx で全部書く）。勝てば塔のごほうびと best、負けは st.lose だけ。
+  // floors・ゲージ・bossWins・nodmg・combo・rpg:clear はさわらない
+  const finishTower = win => {
+    stopTimer();
+    const b = B, f = b.floor, t = todayStr(), mistakes = b.mistakes.length;
+    b.win = win;
+    setPhase('end');
+    const res = RPG.tx(d => {
+      const owned0 = Object.keys(d.cards);
+      const receipt = K.settleRun(d, b.run, null, t);
+      const shares = RPG.milestones(owned0, Object.keys(d.cards));
+      const best0 = d.tower.best, r = win ? K.towerReward(f, best0) : { coins: 0, bonus: 0 }, coins = r.coins + r.bonus;
+      d.coins = Math.min(K.BIG, d.coins + coins);
+      d.earned = Math.min(K.BIG, d.earned + coins);
+      if (win) d.tower.best = Math.max(best0, f);
+      d.st[win ? 'win' : 'lose'] = Math.min(K.BIG, d.st[win ? 'win' : 'lose'] + 1);
+      return { receipt, coins, base: r.coins, bonus: r.bonus, newBest: d.tower.best > best0, d, shares };
+    });
+    // 勝っても保存できなかった（新しい版のデータ）なら、クリアに数えず回を終える
+    const saved = win && !!res;
+    if (saved) {
+      setPhase('tclear');
+      b.tower.cleared = Math.max(b.tower.cleared, f);
+      // 回復はつぎの階の最大 HP で（この階で仲間入りすると、おまかせ編成の最大 HP が上がる）
+      b.tower.maxHp = K.towerStats(res.d).hp;
+      b.hp = K.towerHeal(b.hp, b.tower.maxHp, f);
+    }
+    if (res) {
+      const { receipt: rc, d } = res;
+      emit('rpg:battle', { dungeon: b.id, floor: f, boss: b.boss, win, first: res.newBest, mistakes,
+        gauge: 0, maxCombo: b.maxCombo, lv: d.lv, recLv: b.en.recLv });
+      RPG.emitCoins(d, res.coins, 'tower');
+      RPG.emitCoins(d, rc.overcome.length * T.overcome, 'overcome');
+      RPG.emitCoins(d, rc.bounty.length * T.bounty + (rc.bountyAll ? T.bountyAll : 0), 'bounty');
+      RPG.announce(rc, d);
+      emit('rpg:tower', { floor: f, win, best: d.tower.best, newBest: res.newBest, coins: res.coins });
+    }
+    if (!saved) endTower(b);
+    if (B !== b) return;   // イベントを受けた側が画面を変えた
+    const r = res || { receipt: null, coins: 0, base: 0, bonus: 0, shares: [] };
+    if (saved) drawTowerClear(r); else drawTowerEnd(r);
+  };
+  // 仲間・昇格・克服・手配書の行（drawEnd と同じ文）
+  const receiptLines = rc => rc ? [
+    rc.joined.length && `🤝 ${names(rc.joined)}が仲間になった！`,
+    rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
+    rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(T.overcome * rc.overcome.length)}`,
+    rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(T.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(T.bountyAll)}）` : ''}`,
+  ].filter(Boolean) : [];
+  // 階クリアの画面（phase 'tclear'）: もらったコイン・はじめて勝った階のボーナス・回復したあとの HP。［やめる］［つぎの階へ］
+  const drawTowerClear = ({ receipt: rc, base, bonus, shares }) => {
+    const b = B, f = b.floor;
+    $('bt-flee').hidden = true;
+    $('bt-mon')?.classList.add('rpg-dead');
+    drawTop();   // 回復した HP を上の列にも
+    $('bt-col').innerHTML = '<div class="rpg-bend rpg-tclear" id="bt-tclear">'
+      + `<p class="rpg-bend-h">${fmt(f)}階クリア！ ${COIN}+${fmt(base)}</p>`
+      + (bonus ? `<p class="rpg-bend-x">はじめて勝った階 ${COIN}+${fmt(bonus)}</p>` : '')
+      + `<p class="rpg-bline">HP ${fmt(b.hp)}/${fmt(b.tower.maxHp)}${b.boss ? '（中ボスをたおして全回復！）' : `（${Math.round(TT.healPct * 100)}%回復）`}</p>`
+      + receiptLines(rc).map(l => `<p class="rpg-bline">${l}</p>`).join('')
+      + '<div class="rpg-shares" id="bt-shares" hidden></div>'
+      + '<div class="row center"><button type="button" class="btn ghost" id="bt-tquit">やめる</button>'
+      + `<button type="button" class="btn" id="bt-tnext">つぎの階へ（${fmt(f + 1)}階）</button></div></div>`;
+    RPG.drawShares($('bt-shares'), shares || []);
+    RPG.fx('win', $('bt-tclear'));
+    clearTop($('bt-tclear'));
+    $('bt-tclear').scrollIntoView({ block: 'nearest' });
+    $('bt-tnext').focus({ preventScroll: true });
+  };
+  // 回の終わりの画面（phase 'end'。負け・やめる）: 「英雄の塔 n階まで（自己ベスト m階）」。［冒険へ］［もう一度（1階から）］
+  const drawTowerEnd = ({ receipt: rc, shares }) => {
+    const b = B, cl = b.tower.cleared, best = RPG.get().tower?.best ?? 0, lost = b.win === false;
+    $('bt-flee').hidden = true;
+    const missed = lost ? [...new Set(b.mistakes.map(x => x.a))].map(a => byA.get(a)).filter(Boolean) : [];
+    $('bt-col').innerHTML = '<div class="rpg-bend rpg-tend" id="bt-end">'
+      + `<p class="rpg-bend-h">${lost ? 'やられた…！' : 'おつかれさま！'}</p>`
+      + (RPG.status === 'readOnly' ? `<p class="rpg-warn" role="status">${RPG.warn}</p>` : '')   // 保存できなかった（新しい版のデータ）
+      + `<p class="rpg-bend-x">英雄の塔 ${cl ? `${fmt(cl)}階まで` : lost ? '1階でたおれた' : 'クリアした階なし'}${best ? `<small>（自己ベスト ${fmt(best)}階）</small>` : ''}</p>`
+      + (missed.length ? '<p class="rpg-lbl">まちがえた国</p><ul class="misslist">'
+        + missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('') + '</ul>' : '')
+      + receiptLines(rc).map(l => `<p class="rpg-bline">${l}</p>`).join('')
+      + '<div class="rpg-shares" id="bt-shares" hidden></div>'
+      + '<div class="row center"><button type="button" class="btn ghost" id="bt-home">冒険へ</button>'
+      + '<button type="button" class="btn" id="bt-tretry">もう一度（1階から）</button></div></div>';
+    RPG.drawShares($('bt-shares'), shares || []);
+    if (lost) SND.play('lose');
+    clearTop($('bt-end'));
+    $('bt-end').scrollIntoView({ block: 'nearest' });
+    $('bt-tretry').focus({ preventScroll: true });
+  };
+  // ［つぎの階へ］: HP を持ちこして、すぐ問題。始められなかったら（新しい版のデータなど）その回はここまで
+  // （例外のときは tryTower が回を終えて片付けている）
+  const towerNext = () => {
+    if (!B || !B.tower || B.phase !== 'tclear') return;
+    const b = B;
+    if (tryTower(b.floor + 1, b.hp, b.tower.cleared, false) || B !== b) return;
+    setPhase('end');
+    endTower(b);
+    if (B === b) drawTowerEnd({ receipt: null, shares: [] });
+  };
+  // ［やめる］: その回はここまで（best は勝ったときにもう書いてある）
+  const towerQuit = () => {
+    if (!B || !B.tower || B.phase !== 'tclear') return;
+    const b = B;
+    setPhase('end');
+    endTower(b);
+    if (B === b) drawTowerEnd({ receipt: null, shares: [] });
+  };
+
   // ---- にげる（ペナルティなし・報酬なし・ゲージも増えない） ----
   // バトルが続いていれば st.flee を数える。それから片付ける（run は捨てる。misses はもう書いてある）
+  // 塔は st.flee を数えず、その回をそこで終わりにする（rpg:tower-end）
   const flee = () => {
     if (!B) return;
-    if (ONGOING.has(B.phase)) RPG.tx(d => { d.st.flee = Math.min(K.BIG, d.st.flee + 1); });
+    if (B.tower) endTower(B);
+    else if (ONGOING.has(B.phase)) RPG.tx(d => { d.st.flee = Math.min(K.BIG, d.st.flee + 1); });
     drop();
   };
   // ［← にげる］と Esc。先に片付けてから冒険ホームへ（show が出す drill:screen では、もう数えない）
   const askFlee = () => {
-    if (!B || B.phase === 'end' || !confirm(FLEE_ASK)) return;
+    if (!B || B.phase === 'end' || B.phase === 'tclear' || !confirm(B.tower ? FLEE_ASK_TOWER : FLEE_ASK)) return;
     flee();
     show('rpg');
   };
@@ -532,7 +714,10 @@
         const b = B;
         ({
           'bt-flee': askFlee, 'bt-fight': fight, 'bt-next': next, 'bt-practice': practice,
-          'bt-tprev': () => switchTeam(-1, 'bt-tprev'), 'bt-tnext': () => switchTeam(1, 'bt-tnext'), 'bt-team': editTeam,
+          'bt-tprev': () => switchTeam(-1, 'bt-tprev'), 'bt-team': editTeam,
+          // 'bt-tnext' は登場画面では次の編成、塔の階クリアの画面ではつぎの階へ（同時には出ない）
+          'bt-tnext': () => b.phase === 'tclear' ? towerNext() : switchTeam(1, 'bt-tnext'),
+          'bt-tquit': towerQuit, 'bt-tretry': () => tryTower(1, null, 0, true),
           'bt-nextfloor': () => b.next && tryStart(b.next.id, b.next.floor),
           'bt-again': () => tryStart(b.id, b.floor),
           'bt-home': () => show('rpg'),
@@ -572,7 +757,16 @@
     start: tryStart,   // 外から呼んでも、例外のときは片付けてから始めていない画面を出す
     // いまの問題の国コード（問題・答え合わせのあいだ。ほかは null）
     cur: () => B && B.q && B.phase !== 'intro' && B.phase !== 'end' ? B.q.a : null,
-    state: () => ({ phase: B ? B.phase : null, mode: B && B.q ? B.q.mode : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null }),
+    state: () => ({
+      phase: B ? B.phase : null, mode: B && B.q ? B.q.mode : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null,
+      // 塔: いまの階・HP・最大 HP・この回で勝った階（塔でなければ null）。similar はいまの問題が似た旗の4択か
+      tower: B && B.tower ? { f: B.floor, hp: B.hp, maxHp: B.tower.maxHp, cleared: B.tower.cleared } : null,
+      similar: !!(B && B.similar),
+    }),
+    // 英雄の塔を1階から（地図喰いを倒していなければ false）
+    startTower: () => tryTower(1, null, 0, true),
+    // 開発用: 塔の f 階から（hp を渡せばその HP で。f − 1 階まで勝ったことにする）。開いていないセーブでは false
+    debugTower: (f, hp) => { f = +f; return tryTower(f, hp, Number.isInteger(f) ? f - 1 : 0, true); },
     // テストと開発用: いまの問題をその国・形式に置きかえる（ボスはいまの旗の国も入れかえる）。置きかえたら true
     force(a, mode) {
       if (!B || !byA.has(a) || !MODES.has(mode) || B.phase !== 'question') return false;

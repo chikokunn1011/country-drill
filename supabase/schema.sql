@@ -2,6 +2,7 @@
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
 -- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と、
+-- 英雄の塔の rpg_set_tower / top_tower / rpg_tower_rank_of と、
 -- 今日の難問の submit_daily / top_daily / daily_rank_of だけ。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
@@ -328,6 +329,50 @@ begin
 end $$;
 revoke all on function top_rpg2(text) from public;
 grant execute on function top_rpg2(text) to anon;
+
+-- ---- 英雄の塔（地図喰いを倒すと開く、終わりのない塔）の最高記録 ----
+-- tower は勝った（クリアした）いちばん上の階。記録（rpg_update）・かざり（rpg_set_deco）とは別に rpg_set_tower で送る。
+-- 10秒の連投よけは tower_at で数える（updated_at・deco_at とは取り合わない）。サーバーは小さい値で上書きしない（2026-10-28）
+alter table rpg_players add column if not exists tower int not null default 0;   -- 最高記録の階（0〜100000）
+alter table rpg_players add column if not exists tower_at timestamptz;          -- 最後に塔の記録を送った時刻（連投よけ・ランキングの日付）
+create index if not exists rpg_players_tower on rpg_players (tower desc, lv desc);
+
+-- 自分より上の人数＋1（塔 → レベル）。同じ記録は数えない
+create or replace function rpg_tower_rank_of(p_tower int, p_lv int) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select jsonb_build_object('rank', (select count(*) + 1 from rpg_players where (tower, lv) > (p_tower, p_lv)))
+$$;
+revoke all on function rpg_tower_rank_of(int, int) from public;
+grant execute on function rpg_tower_rank_of(int, int) to anon;
+
+-- 塔の最高記録を送る。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank_tower":n}
+create or replace function rpg_set_tower(p_token text, p_tower int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+  v_row rpg_players;
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  if p_tower is null or p_tower not between 0 and 100000 then return jsonb_build_object('ok', false, 'reason', 'bad_record'); end if;
+  select * into v_row from rpg_players where token_hash = v_hash for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if v_row.tower_at > now() - interval '10 seconds' then return jsonb_build_object('ok', false, 'reason', 'too_soon'); end if;
+  update rpg_players set tower = greatest(tower, p_tower), tower_at = now() where id = v_row.id returning * into v_row;
+  return jsonb_build_object('ok', true, 'rank_tower', rpg_tower_rank_of(v_row.tower, v_row.lv)->'rank');
+end $$;
+revoke all on function rpg_set_tower(text, int) from public;
+grant execute on function rpg_set_tower(text, int) to anon;
+
+-- 塔の上位50人（かざりつき）。塔が 0 の人は出さない。塔 → レベル → 先に着いた順。created_at は最後に塔の記録を送った時刻
+create or replace function top_tower()
+returns table(nickname text, tower int, lv int, deco jsonb, created_at timestamptz)
+language sql stable security definer set search_path = public, pg_temp as $$
+  select p.nickname, p.tower, p.lv, to_jsonb(p.deco), coalesce(p.tower_at, p.updated_at) from rpg_players p
+    where p.tower > 0
+    order by p.tower desc, p.lv desc, coalesce(p.tower_at, p.updated_at) limit 50
+$$;
+revoke all on function top_tower() from public;
+grant execute on function top_tower() to anon;
 
 -- PostgREST に関数が増えたことを知らせる
 notify pgrst, 'reload schema';
