@@ -141,7 +141,7 @@ t('earth_last_boss_has_no_next', async page => {
   - `showQ`: `K.chapterOf(B.id) === 2` なら `makeQuestion(c).opts` のかわりに `K.similarChoices(a, Math.random).map(x => byA.get(x))`
   - 答え合わせ（まちがえたとき）: 鏡の地球では、押した国の名前と、押した国・正解の国旗を並べて出す（`.rpg-rv-pair`、`rpg.css` に2列の小さい国旗）。`answer(a)` から押した国コードを渡す
   - `nextOf`: `CHAPTERS` の `last` のボスのあとは `null`
-  - `bossShareText`: 鏡の地図喰いは「国旗クエストで鏡の地図喰いをたおして、ふたつの地球をつないだ！ ${mates}」、kind は `'final2'`。ほかの鏡のボスは今の文の `dg.land` がそのまま入る
+  - `bossShareText`: 鏡の地図喰いは「国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}」、kind は `'final2'`。ほかの鏡のボスは今の文の `dg.land` がそのまま入る
 - [ ] **Step 4: 通るのを確かめる** — Run: `node --test tests/e2e/rpg_battle.test.mjs tests/e2e/rpg.test.mjs` / Expected: PASS
 - [ ] **Step 5: Commit** — `git commit -m "国旗クエスト: 鏡の地球のバトル（似た旗の選択肢・押した旗との見比べ）"`
 

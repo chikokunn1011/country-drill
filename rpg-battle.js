@@ -469,7 +469,7 @@
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
     const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
-    if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球をつないだ！ ${mates}`;
+    if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
   const drawEnd = ({ receipt: rc, coins, first, gauge, d, shares }) => {

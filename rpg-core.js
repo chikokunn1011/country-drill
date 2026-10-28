@@ -685,7 +685,7 @@
   const similarChoices = (a, rng) => {
     const sim = globalThis.DAILY_CORE?.SIMILAR || [], g = groupOf(a), r = REGION.get(a);
     const tiers = [
-      sim.filter(set => set.includes(a)).flat(),
+      sim.filter(set => set.includes(a)).flat().filter(x => REGION.has(x)),   // 知らない国コードは落とす
       C.filter(c => g && groupOf(c.a) === g).map(c => c.a),
       C.filter(c => c.r === r).map(c => c.a),
       C.map(c => c.a),

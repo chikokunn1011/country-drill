@@ -27,6 +27,7 @@
     --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
     --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
   }
+  :root:not([data-theme="light"]) .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }   /* ダークは --rpg-c がすでに白を混ぜてあるので、重ねて白くしない */
 }
 :root[data-theme="dark"] {
   --rpg-r-samerica: color-mix(in srgb, #6fa86a 70%, #fff); --rpg-r-oceania: color-mix(in srgb, #4fa3c7 70%, #fff);
@@ -39,6 +40,7 @@
   --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
+:root[data-theme="dark"] .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }
 
 /* コイン: 金色の丸（文字の大きさに合わせる）。🪙 は使わない */
 .coin {

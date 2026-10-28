@@ -567,6 +567,11 @@ t('wipe_needs_two', async page => {
 
 /* ---------- 章の終わりのストーリー（#rpg-story-dlg） ---------- */
 const storyOpen = page => page.evaluate(() => !!$('rpg-story-dlg')?.open);
+// 閉じたあとの close イベントで story が書かれるので、書けるまで待つ
+const storySaved = async (page, want) => {
+  for (let i = 0; i < 50 && JSON.stringify((await readSave(page)).story) !== JSON.stringify(want); i++) await page.waitForTimeout(40);
+  assert.deepEqual((await readSave(page)).story, want);
+};
 t('story_once_for_old_clear', async page => {
   // 地図喰いを前に倒していて、ストーリーをまだ読んでいないセーブ
   await home(page, saveWith({ floors: { world: 5 } }));
@@ -576,8 +581,8 @@ t('story_once_for_old_clear', async page => {
   assert.ok(!s.includes('星喰い'), s);   // 第2章クリアの文はまだ
   assert.equal(await page.locator('#rpg-story-dlg').count(), 1);
   await page.click('#rpg-story-dlg .close');
-  assert.equal(await storyOpen(page), false);
-  assert.deepEqual((await readSave(page)).story, ['ch1']);
+  await page.waitForFunction(() => !$('rpg-story-dlg').open);
+  await storySaved(page, ['ch1']);
   // 読み込み直しても出ない
   await page.reload();
   await page.waitForFunction(() => document.readyState === 'complete');
@@ -591,12 +596,27 @@ t('story_once_for_old_clear', async page => {
   const s2 = await text(page, '#rpg-story-dlg');
   assert.ok(s2.includes('地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。'), s2);
   await page.click('#rpg-story-dlg .close');
-  assert.deepEqual((await readSave(page)).story, ['ch1', 'ch2']);
+  await storySaved(page, ['ch1', 'ch2']);
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   assert.equal(await storyOpen(page), false);
   // 新しい版のデータ（読み取り専用）のときは出さない
   await home(page, { v: 99, intro: true, floors: { world: 5 } });
   assert.equal(await storyOpen(page), false);
+});
+
+t('story_button_chains_next', async page => {
+  // ch1・ch2 とも読んでいない: ［閉じる］ボタンで閉じても、すぐ次の章のストーリーが出る（次の描き直しを待たない）
+  await home(page, saveWith({ floors: ALL_CLEAR, story: [] }));
+  assert.ok((await text(page, '#rpg-story-dlg')).includes('鏡のような裂け目'));
+  // ボタンで閉じ（close イベントが来て）、そのすぐあとの次の tick で、次の章のが開いているか見る（別の描き直しを待たない）
+  const chained = await page.evaluate(() => new Promise(res => {
+    const g = $('rpg-story-dlg');
+    g.addEventListener('close', () => setTimeout(() => res(g.open && g.textContent.includes('母さま、あとはたのむ')), 0), { once: true });
+    g.querySelector('.close').click();
+  }));
+  assert.equal(chained, true);
+  await page.click('#rpg-story-ok');
+  await storySaved(page, ['ch1', 'ch2']);
 });
 
 t('all_clear_after_mirror', async page => {

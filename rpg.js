@@ -647,9 +647,9 @@
   };
   // 章タブ（冒険マップの上）。開いていない章は 🔒 で押せない
   const chtabsHTML = (d, ch) => `<div class="rpg-chtabs" id="rpg-chtabs" role="group" aria-label="章">${CH.map(c => {
-    const open = chOpen(d, c.ch);
-    return `<button type="button" class="chip" id="rpg-ch${c.ch}" data-ch="${c.ch}" aria-pressed="${c.ch === ch}"${open ? '' : ' disabled'}>`
-      + `<span aria-hidden="true">${open ? c.e : '🔒'}</span> ${c.name}</button>`;
+    const isOpen = chOpen(d, c.ch);
+    return `<button type="button" class="chip" id="rpg-ch${c.ch}" data-ch="${c.ch}" aria-pressed="${c.ch === ch}"${isOpen ? '' : ' disabled'}>`
+      + `<span aria-hidden="true">${isOpen ? c.e : '🔒'}</span> ${c.name}</button>`;
   }).join('')}</div>`;
   // いま見せる章: タブで選んだ章（開いていれば）→ 次に挑むフロアの章 → 全部クリアなら最後の章
   const chNow = (d, nf) => CH.some(c => c.ch === chSel) && chOpen(d, chSel) ? chSel : nf ? K.chapterOf(nf.id) : CH[CH.length - 1].ch;
@@ -748,14 +748,14 @@
       dlg.id = 'rpg-story-dlg';
       dlg.className = 'rpg-story-dlg';
       dlg.setAttribute('aria-labelledby', 'rpg-story-h');
-      dlg.addEventListener('close', () => storyRead(dlg));   // Esc（close は後から来るので、ボタンでは先に storyRead を呼ぶ）
+      dlg.addEventListener('close', () => storyRead(dlg));   // ［閉じる］・下のボタン・Esc のどれで閉じても、close で読んだことにする
       document.body.append(dlg);
     }
     dlg.dataset.story = id;
     dlg.innerHTML = '<div class="inner"><button type="button" class="close">閉じる</button>'
       + STORY_END[id].map((x, i) => `<h2 class="rpg-story-h"${i ? '' : ' id="rpg-story-h"'}>${x.h}</h2><div class="rpg-story">${x.p.map(s => `<p>${s}</p>`).join('')}</div>`).join('')
       + '<button type="button" class="btn" id="rpg-story-ok">冒険をつづける</button></div>';
-    dlg.querySelector('.close').onclick = $('rpg-story-ok').onclick = () => { storyRead(dlg); dlg.close(); };
+    dlg.querySelector('.close').onclick = $('rpg-story-ok').onclick = () => dlg.close();
     dlg.showModal();
   };
   // スマホは上から 旅人・レベルアップ・つぎにやること・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
@@ -824,7 +824,7 @@
     // 章タブ: その章のマップと図版に描き直す（選んでいたダンジョンは忘れる）
     $('rpg-chtabs').onclick = e => {
       const b = e.target.closest('button[data-ch]');
-      if (!b || b.disabled || +b.dataset.ch === chSel) return;
+      if (!b || +b.dataset.ch === chSel) return;
       chSel = +b.dataset.ch; dgSel = '';
       renderHome();
     };

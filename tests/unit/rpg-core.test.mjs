@@ -1417,6 +1417,13 @@ test('similar_choices_always_four', () => {
   // 組に無い国は同じ細かい地域（13グループ）から
   const o = K.similarChoices('mn', rng).filter(a => a !== 'mn');
   assert.ok(o.every(a => K.groupOf(a) === '東アジア'));
+  // 似た旗の組に知らない国コードが混じっても、選択肢は知っている国の4つ
+  ctx.DAILY_CORE = { SIMILAR: [['td', 'zz', 'ro', 'qq']] };
+  for (let i = 0; i < 20; i++) {
+    const o2 = K.similarChoices('td', rng);
+    assert.equal(o2.length, 4); assert.equal(new Set(o2).size, 4);
+    assert.ok(o2.every(x => C.some(c => c.a === x)), `知らない国: ${o2}`);
+  }
 });
 test('old_save_keeps_and_levels_past_50', () => {
   const K = loadCore();
