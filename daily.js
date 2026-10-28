@@ -256,6 +256,8 @@
   markHome();
   document.addEventListener('drill:screen', e => { if (e.detail?.name === 'home') markHome(); });
   settle();
+  // 直リンク（index.html の起動処理は #daily を知らないので、画面を作ったあとでここから開く。管理ページの D11 から）
+  if (location.hash === '#daily') { V.tab = 'today'; show('daily'); }
 
   window.DAILY = { questions, today, rec };
 })();
