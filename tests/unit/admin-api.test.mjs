@@ -203,3 +203,23 @@ test('timeout_covers_stalled_headers', async () => {
   const { api, storage } = setup([() => new Promise(() => {})], { timeout: 5 }); seed(storage);
   await assert.rejects(api.call('f', {}), e => e.code === 'network');
 });
+
+test('login_429_is_rate_limited_not_bad_login', async () => {
+  const { api, storage } = setup([json(429, { code: 'over_request_rate_limit' })]);
+  assert.equal((await api.login('a', 'b')).reason, 'rate_limited');
+  assert.equal(storage.getItem('adminAuth'), null);
+});
+
+test('session_keeps_user_id_for_ops_log', async () => {
+  const { api, storage } = setup([tok(1), json(200, { ok: true, user_id: 'u' })]);
+  await api.login('me@x.jp', 'pw');
+  assert.equal(saved(storage).uid, 'u');
+  assert.equal(api.uid(), 'u');
+});
+
+test('exports_url_and_key', () => {
+  const ctx = { console, setTimeout, clearTimeout, AbortController }; ctx.globalThis = ctx; vm.createContext(ctx);
+  vm.runInContext(src, ctx);
+  assert.equal(ctx.ADMIN_API.URL, 'https://vgdkklvhtvcamtxwjpke.supabase.co');
+  assert.equal(ctx.ADMIN_API.KEY, 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV');
+});

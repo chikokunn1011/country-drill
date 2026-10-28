@@ -40,6 +40,7 @@
       access_token: t.access_token, refresh_token: t.refresh_token,
       expires_at: t.expires_at ? t.expires_at * 1000 : now() + (t.expires_in || 3600) * 1000,
       last: prev ? prev.last : now(), email: (t.user && t.user.email) || email || (prev && prev.email) || '',
+      uid: (t.user && typeof t.user.id === 'string' && t.user.id) || (prev && prev.uid) || '',   // 操作ログの「だれが」を自分と見分ける用
     });
 
     // 合札の更新。断られた（429 以外の 4xx）ときだけ保存を消して relogin。
@@ -98,7 +99,8 @@
       let res;
       try { res = await send('/auth/v1/token?grant_type=password', { body: { email, password } }); }
       catch { return { ok: false, reason: 'network' }; }
-      if (!res.ok) return { ok: false, reason: res.status >= 500 ? 'network' : 'bad_login' };
+      // 429 は試しすぎ（GoTrue の回数制限）。パスワードちがいとは分けて知らせる
+      if (!res.ok) return { ok: false, reason: res.status >= 500 ? 'network' : res.status === 429 ? 'rate_limited' : 'bad_login' };
       const s = session(res.body || {}, email);
       if (!s.access_token) return { ok: false, reason: 'bad_login' };
       write(s);
@@ -113,8 +115,9 @@
       clear();
     }
 
-    return { login, logout, loggedIn, call, email: () => (read() || {}).email || '' };
+    return { login, logout, loggedIn, call, email: () => (read() || {}).email || '', uid: () => (read() || {}).uid || '' };
   }
 
-  globalThis.ADMIN_API = { create };
+  // URL・KEY は admin.js（D12 のつながるか）も使う。ここだけに書く
+  globalThis.ADMIN_API = { create, URL: DEFAULT_URL, KEY: DEFAULT_KEY };
 })();
