@@ -105,7 +105,8 @@
     function loggedIn() {
       const a = read();
       if (!a) return false;
-      if (!(now() - a.last < IDLE_MS)) { clear(); revoke(a); return false; }   // 30分: 待たずに消し、サーバーの合札も無効にしに行く
+      const d = now() - a.last;
+      if (!(d >= 0 && d < IDLE_MS)) { clear(); revoke(a); return false; }   // 30分（時計が戻ったときも）: 待たずに消し、サーバーの合札も無効にしに行く
       return true;
     }
 

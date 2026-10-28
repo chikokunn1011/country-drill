@@ -283,7 +283,7 @@
     $('d-daily-reset').disabled = day !== DAILY_CORE.jstDay();
     const rec = SAVE.read('daily');
     $('d-daily-rec').textContent = rec.ok && rec.value
-      ? `この端末の記録: ${rec.value.day ?? '?'}（${DAILY_STATUS[rec.value.status] ?? str(rec.value.status ?? '?')}${rec.value.correct != null ? `・${rec.value.correct}問正解` : ''}）`
+      ? `この端末の記録: ${rec.value.day ?? '?'}（${Object.hasOwn(DAILY_STATUS, rec.value.status ?? '') ? DAILY_STATUS[rec.value.status] : str(rec.value.status ?? '?')}${rec.value.correct != null ? `・${rec.value.correct}問正解` : ''}）`
       : 'この端末の記録: まだない';
   }
 

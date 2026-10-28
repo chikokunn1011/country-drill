@@ -129,6 +129,13 @@ test('idle_30min_logs_out', async () => {
   assert.equal(storage.getItem('adminAuth'), null);
 });
 
+test('clock_moved_back_logs_out', async () => {
+  // 端末の時計を戻すと 30分の判定がずっと通ってしまうので、戻ったらログアウトにする
+  const { api, storage, clock } = setup([]); seed(storage);
+  clock.t = NOW - 60_000; assert.equal(api.loggedIn(), false);
+  assert.equal(storage.getItem('adminAuth'), null);
+});
+
 test('denied_maps_to_code', async () => {
   const { api, storage } = setup([json(403, { code: '42501', message: 'denied' })]); seed(storage);
   await assert.rejects(api.call('f', {}), e => e.code === 'denied');
