@@ -15,7 +15,8 @@ function mem() {
 const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
 const tok = (n, over = {}) => json(200, { access_token: `a${n}`, refresh_token: `r${n}`, expires_in: 3600, expires_at: Math.floor(NOW / 1000) + 3600, user: { id: 'u', email: 'me@x.jp' }, ...over });
 // handlers: 順に返す応答の配列（関数なら呼ぶ）。呼ばれた記録は calls に残る
-function setup(replies, { now = NOW, storage = mem() } = {}) {
+// timeout: 8秒の打ち切りを待たないように、setTimeout の待ち時間をこの ms にする（テスト用）
+function setup(replies, { now = NOW, storage = mem(), timeout } = {}) {
   const calls = [], q = [...replies];
   const fetch = async (u, init) => {
     calls.push({ url: u, init, body: init.body ? JSON.parse(init.body) : null });
@@ -23,7 +24,8 @@ function setup(replies, { now = NOW, storage = mem() } = {}) {
     if (r instanceof Error) throw r;
     return typeof r === 'function' ? r() : r;
   };
-  const ctx = { console, setTimeout, clearTimeout, AbortController }; ctx.globalThis = ctx; vm.createContext(ctx);
+  const st = timeout === undefined ? setTimeout : (fn, _ms) => setTimeout(fn, timeout);
+  const ctx = { console, setTimeout: st, clearTimeout, AbortController }; ctx.globalThis = ctx; vm.createContext(ctx);
   vm.runInContext(src, ctx);
   const clock = { t: now };
   const api = ctx.ADMIN_API.create({ fetch, storage, now: () => clock.t, url: URL0, key: KEY });
@@ -161,4 +163,43 @@ test('401_with_42501_is_denied_without_refresh', async () => {
   const { api, calls, storage } = setup([json(401, { code: '42501' })]); seed(storage);
   await assert.rejects(api.call('f', {}), e => e.code === 'denied');
   assert.equal(calls.length, 1);
+});
+
+// ---- 監査の直し ----
+test('refresh_5xx_or_429_is_network_and_keeps_session', async () => {
+  for (const status of [500, 502, 503, 429]) {
+    const { api, storage } = setup([json(status, { msg: 'later' })]); seed(storage, { expires_at: NOW + 30_000 });
+    const before = storage.getItem('adminAuth');
+    await assert.rejects(api.call('f', {}), e => e.code === 'network' && e.status === status, `HTTP ${status}`);
+    assert.equal(storage.getItem('adminAuth'), before, `HTTP ${status} では保存を消さない`);
+    assert.equal(api.loggedIn(), true);
+  }
+});
+
+test('refresh_4xx_other_than_429_is_relogin', async () => {
+  for (const status of [400, 401, 403]) {
+    const { api, storage } = setup([json(status, { error: 'invalid_grant' })]); seed(storage, { expires_at: NOW + 30_000 });
+    await assert.rejects(api.call('f', {}), e => e.code === 'relogin', `HTTP ${status}`);
+    assert.equal(storage.getItem('adminAuth'), null);
+  }
+});
+
+test('refresh_after_401_with_503_keeps_session', async () => {
+  const { api, storage } = setup([json(401, { code: 'PGRST301' }), json(503, {})]); seed(storage);
+  await assert.rejects(api.call('f', {}), e => e.code === 'network');
+  assert.notEqual(storage.getItem('adminAuth'), null);
+});
+
+test('timeout_covers_stalled_body', async () => {
+  // ヘッダーは来たが本文が来ない（text も json も終わらない）
+  const stall = { ok: true, status: 200, json: () => new Promise(() => {}), text: () => new Promise(() => {}) };
+  const { api, storage } = setup([stall, stall], { timeout: 5 }); seed(storage);
+  await assert.rejects(api.call('f', {}), e => e.code === 'network');
+  assert.notEqual(storage.getItem('adminAuth'), null, '本文が止まっても保存は残す');
+  assert.deepEqual({ ...(await api.login('a', 'b')) }, { ok: false, reason: 'network' });
+});
+
+test('timeout_covers_stalled_headers', async () => {
+  const { api, storage } = setup([() => new Promise(() => {})], { timeout: 5 }); seed(storage);
+  await assert.rejects(api.call('f', {}), e => e.code === 'network');
 });
