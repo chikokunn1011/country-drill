@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# supabase/schema.sql を使い捨ての PostgreSQL 16 に流して、tests/sql/test_schema.sql を実行する
+# supabase/schema.sql と supabase/admin.sql を使い捨ての PostgreSQL 16 に流して、tests/sql/test_schema.sql・test_admin.sql を実行する
 # 使い方: bash tests/sql/run.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -39,4 +39,12 @@ SQL
 # 2回流しても壊れないことも確認する
 sql -f supabase/schema.sql
 sql -f supabase/schema.sql
+# Supabase の auth.uid() の代わり（ログインした人の id。admin.sql には書かない）
+sql <<'SQL'
+create schema if not exists auth;
+create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+SQL
+sql -f supabase/admin.sql
+sql -f supabase/admin.sql
 sql -f tests/sql/test_schema.sql
+sql -f tests/sql/test_admin.sql
