@@ -139,9 +139,9 @@ test('rpg_coins_pity_card_story', () => {
 });
 
 test('rpg_wipe_keeps_rankdel', () => {
-  const { A, st } = load({ rpg: '{}', rpgRank: '1', rpgRankPending: '2', rpgRankDel: '[3]', other: 'o' });
-  A.rpgWipe();
-  assert.deepEqual(st.dump(), { rpgRankDel: '[3]', other: 'o' });
+  const { A, st } = load({ rpg: '{"v":1}', rpgRank: '1', rpgRankPending: '2', rpgRankDel: '["3"]', other: 'o' });
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual(st.dump(), { rpgRankDel: '["3"]', other: 'o' });
 });
 
 test('badges_all_marks_sent', () => {
@@ -232,4 +232,89 @@ test('import_rolls_back_when_storage_throws', () => {
   assert.equal(r.reason, 'storage');
   assert.deepEqual(plain(r.backup.data), before);
   assert.deepEqual(st.dump(), before);
+});
+
+// ---- 監査の直し ----
+const T0 = Date.UTC(2026, 9, 28, 3);
+const v1 = (R, over = {}) => JSON.stringify({ ...R.fresh(R.today(new Date(T0))), ...over });
+
+test('give_card_stops_at_stack_max', () => {
+  const { A, R } = load({}, () => T0);
+  const max = R.TUNING.card.stackMax;
+  assert.deepEqual(plain(A.rpgGiveCard('af', 10).cards.af), [1, max], '新しい国に10枚でも消えない');
+  assert.deepEqual(plain(A.rpgGiveCard('af').cards.af), [1, max], '上限でもう1枚あげても消えない');
+  A.rpgEdit(x => { x.cards.jp = [3, max - 1]; });
+  assert.deepEqual(plain(A.rpgGiveCard('jp', 3).cards.jp), [3, max], '★はそのまま');
+  assert.deepEqual(plain(A.read('rpg').value.cards.af), [1, max], '保存も上限');
+});
+
+test('rpg_edit_refuses_broken_json_save', () => {
+  const { A, st } = load({ rpg: '{broken' }, () => T0);
+  assert.deepEqual(plain(A.rpgCoins(10)), { ok: false, reason: 'not_json' });
+  assert.deepEqual(plain(A.rpgGiveCard('jp')), { ok: false, reason: 'not_json' });
+  assert.equal(st.getItem('rpg'), '{broken', '壊れたセーブは上書きしない');
+  for (const bad of ['[1,2]', '{"v":"x"}', '{"v":0}', '5']) {
+    const { A: A2, st: st2 } = load({ rpg: bad }, () => T0);
+    assert.deepEqual(plain(A2.rpgSetLv(5)), { ok: false, reason: 'not_json' }, bad);
+    assert.equal(st2.getItem('rpg'), bad, bad);
+  }
+});
+
+test('rpg_edit_refuses_newer_version_save', () => {
+  const { A, R, st } = load({}, () => T0);
+  const raw = v1(R, { v: R.VERSION + 1, coins: 7, future: { x: 1 } });
+  st.setItem('rpg', raw);
+  for (const f of [() => A.rpgCoins(10), () => A.rpgSetLv(9), () => A.rpgUnlockAll(), () => A.rpgGiveCard('jp'), () => A.rpgStoryReset(), () => A.rpgSetPity(1)]) {
+    assert.deepEqual(plain(f()), { ok: false, reason: 'newer' });
+  }
+  assert.equal(st.getItem('rpg'), raw, '新しい版のセーブは書きかえない');
+  assert.deepEqual(plain(A.rpgWipe()), { ok: false, reason: 'newer' }, '本編と同じく、新しい版は消さない');
+  assert.equal(st.getItem('rpg'), raw);
+  assert.equal(A.rpgGet().coins, 7, '見るのはできる');
+});
+
+test('rpg_edit_without_v_backs_up_like_the_game', () => {
+  const { A, R, st } = load({}, () => T0);
+  const f = JSON.parse(v1(R, { coins: 5 })); delete f.v;
+  st.setItem('rpg', JSON.stringify(f));
+  assert.equal(A.rpgCoins(1).coins, 6, 'v の無いセーブは v1 として直す（本編と同じ）');
+  const ks = Object.keys(st.dump()).filter(k => k.startsWith('rpg-broken-'));
+  assert.equal(ks.length, 1, '本編と同じく元の文字列の写しを取る');
+  assert.equal(st.getItem(ks[0]), JSON.stringify(f));
+});
+
+test('rpg_wipe_queues_rank_tokens', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  st.setItem('rpgRank', JSON.stringify({ name: 'チコ', token: 'tok-a' }));
+  st.setItem('rpgRankPending', JSON.stringify('tok-b'));
+  st.setItem('rpgRankDel', JSON.stringify(['tok-old', 'tok-a']));
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-old', 'tok-a', 'tok-b'], '重ならないように足す');
+  for (const k of ['rpg', 'rpgRank', 'rpgRankPending']) assert.equal(st.getItem(k), null, k);
+});
+
+test('rpg_wipe_on_broken_save_backs_up_first', () => {
+  const { A, st } = load({ rpg: '{broken', rpgRank: JSON.stringify({ name: 'x', token: 't1' }) }, () => T0);
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.equal(st.getItem('rpg'), null);
+  assert.equal(st.getItem(`rpg-broken-${T0}-0`), '{broken', '壊れた文字列の写しを取る（本編の tx と同じ）');
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['t1']);
+});
+
+test('broken_backups_keep_newest_three', () => {
+  let t = T0;
+  const { A, st } = load({}, () => t);
+  for (let i = 0; i < 5; i++) { st.setItem('rpg', '{broken' + i); A.rpgWipe(); t += 1000; }
+  const ks = Object.keys(st.dump()).filter(k => k.startsWith('rpg-broken-')).sort();
+  assert.deepEqual(ks.map(k => st.getItem(k)), ['{broken2', '{broken3', '{broken4']);
+});
+
+test('first_time_queues_rank_tokens_and_keeps_backups', () => {
+  const { A, st } = load({
+    rpg: '{}', settings: '{}', rpgRank: JSON.stringify({ name: 'チコ', token: 'tok-a' }), rpgRankPending: JSON.stringify('tok-b'),
+    'rpg-broken-1-0': 'x', 'badges-broken': 'y',
+  }, () => T0);
+  assert.deepEqual(plain(A.firstTime()), { ok: true });
+  assert.deepEqual(st.dump(), { rpgRankDel: JSON.stringify(['tok-a', 'tok-b']), 'rpg-broken-1-0': 'x', 'badges-broken': 'y' });
 });

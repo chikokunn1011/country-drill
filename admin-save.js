@@ -7,7 +7,10 @@
   const OWN = new Set([SNAPS, ERRORS]);
   const SNAP_MAX = 5;
   const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
-  // 初めて使う人に戻すとき消すキー
+  const BROKEN = 'rpg-broken-', KEEP_BROKEN = 3;   // rpg.js と同じ（壊れたセーブの写しは新しいものから3つ）
+  const RANK_DEL = 'rpgRankDel';                      // rpg-rank.js が次の起動でランキングの行を消しに行く合言葉の列
+  // 初めて使う人に戻すとき消すキー。rpgRankDel（消しに行く途中の合言葉）と、rpg-broken-* / badges-broken（壊れたセーブの写し）は残す。
+  // 写しは本編が状態として読まないので「初めて」のふるまいは変わらず、壊れたセーブの唯一の写しを消さずにすむ
   const FIRST = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'rpgRank', 'rpgRankPending', 'bview', 'bdgcat'];
 
   const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -104,14 +107,39 @@
     const snapDelete = name => guard(() => { storage.setItem(SNAPS, JSON.stringify(snaps().filter(s => s.name !== name))); return { ok: true }; });
 
     // ---- 冒険（rpg） ----
-    const rpgGet = () => {
-      const r = read('rpg');
-      if (r.reason === 'storage') throw new Error('storage');   // 読めないときに新品で上書きしない
-      return RC.sanitize(r.ok ? r.value : RC.fresh(rpgToday()), rpgToday());
+    // 本編（rpg.js の load）と同じ読み方。RPG_CORE.migrate を通し、{ d, readOnly, backup, broken, raw } を返す。
+    // broken = JSON でない・形が壊れていて新品に置きかわる。readOnly = 新しい版（v > VERSION）のデータ。backup = 本編なら写しを取る
+    const rpgLoad = () => {
+      const raw = storage.getItem('rpg'), t = rpgToday();   // storage の例外はそのまま外へ（読めないときに新品で上書きしない）
+      if (raw == null) return { ...RC.migrate(null, t), broken: false, raw };
+      const p = parse(raw);
+      if (!p.ok) return { d: RC.sanitize(RC.fresh(t), t), readOnly: false, backup: true, broken: true, raw };
+      const m = RC.migrate(p.v, t);
+      const v = isObj(p.v) ? p.v.v : null;
+      return { ...m, broken: m.backup && !(isObj(p.v) && (v === undefined || (Number.isInteger(v) && v >= 1))), raw };
     };
-    // 今の rpg（無ければ新品）を fn で変えて、sanitize して書く。書いた値を返す
+    // rpg.js の backupRaw と同じ: rpg-broken-<時刻>-<k> に写し、新しい順に3つだけ残す
+    const backupRaw = str => {
+      if (typeof str !== 'string') return;
+      const t = now();
+      let k = 0;
+      while (storage.getItem(`${BROKEN}${t}-${k}`) !== null) k++;
+      storage.setItem(`${BROKEN}${t}-${k}`, str);
+      const order = key => (/^(\d+)-(\d+)$/.exec(key.slice(BROKEN.length)) || [0, -1, -1]).slice(1).map(Number);
+      const ks = allKeys().filter(key => key.startsWith(BROKEN));
+      ks.sort((x, y) => { const [t1, k1] = order(x), [t2, k2] = order(y); return t2 - t1 || k2 - k1; });
+      for (const key of ks.slice(KEEP_BROKEN)) storage.removeItem(key);
+    };
+    const rpgGet = () => rpgLoad().d;
+    // 今の rpg（無ければ新品）を fn で変えて、sanitize して書く。書いた値を返す。
+    // 壊れたセーブ（JSON でない など）は { ok:false, reason:'not_json' }、新しい版のセーブは { ok:false, reason:'newer' } で、どちらも書かない
+    // （本編も新しい版は書かない。壊れたものは上書きせず、書き出し・入れかえで直してもらう）
     const rpgEdit = fn => guard(() => {
-      const x = rpgGet();
+      const r = rpgLoad();
+      if (r.readOnly) return { ok: false, reason: 'newer' };
+      if (r.broken) return { ok: false, reason: 'not_json' };
+      if (r.backup) backupRaw(r.raw);   // v の無い v1 など、本編が写しを取ってから直すもの
+      const x = r.d;
       fn(x);
       const s = RC.sanitize(x, rpgToday());
       storage.setItem('rpg', JSON.stringify(s));
@@ -125,15 +153,33 @@
     const rpgClearAll = () => rpgEdit(x => { for (const g of RC.DUNGEONS) x.floors[g.id] = 5; });
     const rpgStoryReset = () => rpgEdit(x => { x.story = []; });
     const rpgSetPity = n => rpgEdit(x => { x.pity = Math.max(0, Math.round(+n) || 0); });
-    // 仲間カードを n 枚。初めては ★1、あとは重ねる（上限は sanitize が切る）
+    // 仲間カードを n 枚。初めては ★1、あとは重ねる。重ねは stackMax で止める（越えると sanitize がカードごと消すので）
     const rpgGiveCard = (code, n = 1) => rpgEdit(x => {
       for (let i = 0; i < Math.max(1, Math.round(+n) || 1); i++) {
         const c = x.cards[code];
-        x.cards[code] = c ? [c[0], c[1] + 1] : [1, 0];
+        x.cards[code] = c ? [c[0], Math.min(c[1] + 1, RC.TUNING.card.stackMax)] : [1, 0];
       }
     });
-    // rpgRankDel は残す（本編がランキングの行を消しに行く）
-    const rpgWipe = () => guard(() => { for (const k of ['rpg', 'rpgRank', 'rpgRankPending']) storage.removeItem(k); return { ok: true }; });
+    // rpg-rank.js の unregister と同じ: 登録の合言葉（rpgRank.token と rpgRankPending）を rpgRankDel に足してから消す。
+    // 本編が次の起動で rpgRankDel の合言葉でランキングの行を消しに行く
+    const queueRankDel = () => {
+      const get = k => { const p = parse(storage.getItem(k) ?? 'null'); return p.ok ? p.v : null; };
+      const r = get('rpgRank'), pending = get('rpgRankPending'), cur = get(RANK_DEL);
+      const list = Array.isArray(cur) ? cur.filter(x => typeof x === 'string') : [];
+      const tokens = [isObj(r) && typeof r.token === 'string' ? r.token : null, typeof pending === 'string' ? pending : null]
+        .filter((x, i, a) => x && !list.includes(x) && a.indexOf(x) === i);
+      if (tokens.length) storage.setItem(RANK_DEL, JSON.stringify([...list, ...tokens]));
+      storage.removeItem('rpgRank'); storage.removeItem('rpgRankPending');
+    };
+    // 本編の「冒険データを消す」と同じ: 新しい版のデータなら消さない（{ ok:false, reason:'newer' }）。壊れたセーブは写しを取ってから消す
+    const rpgWipe = () => guard(() => {
+      const r = rpgLoad();
+      if (r.readOnly) return { ok: false, reason: 'newer' };
+      if (r.backup) backupRaw(r.raw);
+      storage.removeItem('rpg');
+      queueRankDel();
+      return { ok: true };
+    });
 
     // ---- バッジ ----
     const badgesRead = () => {
@@ -171,7 +217,7 @@
     const settingsGet = () => { const r = guard(() => read('settings')); return r.ok && isObj(r.value) ? r.value : {}; };
     const settingsSet = patch => guard(() => { const s = { ...settingsGet(), ...patch }; storage.setItem('settings', JSON.stringify(s)); return s; });
     // バックアップは呼ぶ側が先に snapSave する
-    const firstTime = () => guard(() => { for (const k of FIRST) storage.removeItem(k); return { ok: true }; });
+    const firstTime = () => guard(() => { queueRankDel(); for (const k of FIRST) storage.removeItem(k); return { ok: true }; });
 
     // ---- データ点検（countries.js） ----
     const checkData = () => {
