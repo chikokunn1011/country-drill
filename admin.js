@@ -223,7 +223,7 @@
       return;
     }
     const sum = [['セーブ', RPG_STATUS[st] ?? RPG_STATUS.ok], ['コイン', x.coins.toLocaleString('ja-JP')], ['Lv', x.lv],
-      ['仲間', `${Object.keys(x.cards).length}か国`], ['天井カウンター', x.pity], ['ストーリー既読', `${x.story.length}話`]];
+      ['仲間', `${Object.keys(x.cards).length}か国`], ['天井カウンター', x.pity], ['ストーリー既読', `${x.story.length}話`], ['英雄の塔', `最高 ${x.tower?.best ?? 0}階`]];
     $('d-rpg-sum').replaceChildren(...sum.flatMap(([k, v], i) => [el('dt', { text: k }), el('dd', { class: i === 0 && st === 'newer' ? 'ng' : 'mono', text: String(v) })]));
     $('d-rpg-lv').max = RPG_CORE.TUNING.hero.maxLv;
     if (document.activeElement !== $('d-rpg-lv')) $('d-rpg-lv').value = x.lv;
@@ -389,7 +389,7 @@
     daily: [['id', r => str(r.id), 'n'], ['日付', r => str(r.day), 'n'], ['名前', r => str(r.nickname), 'name'], ['正解', r => `${str(r.correct)}/${str(r.total)}`, 'n'],
       ['タイム', r => fmtMs(r.time_ms), 'n'], ['いつ', r => fmtFull(r.created_at), 'n']],
     rpg: [['id', r => str(r.id), 'n'], ['名前', r => str(r.nickname), 'name'], ['Lv', r => str(r.lv), 'n'], ['ダンジョン', r => str(r.dungeons), 'n'],
-      ['フロア', r => str(r.floors), 'n'], ['登録', r => fmtFull(r.created_at), 'n'], ['更新', r => fmtFull(r.updated_at ?? r.at), 'n']],
+      ['フロア', r => str(r.floors), 'n'], ['塔', r => str(r.tower ?? 0), 'n'], ['登録', r => fmtFull(r.created_at), 'n'], ['更新', r => fmtFull(r.updated_at ?? r.at), 'n']],
     trash: [['id', r => str(r.id), 'n'], ['種類', r => KIND_LABEL[r.kind] ?? str(r.kind), ''], ['名前', r => str(r.row_data?.nickname), 'name'],
       ['中身', r => trashSummary(r), 'brk'], ['消した', r => fmtFull(r.at), 'n']],
   };
@@ -397,14 +397,14 @@
   const CSV_COLS = {
     scores: ['id', 'board', 'nickname', 'time_ms', 'questions', 'created_at'],
     daily: ['id', 'day', 'nickname', 'correct', 'total', 'time_ms', 'created_at'],
-    rpg: ['id', 'nickname', 'lv', 'dungeons', 'floors', 'created_at', 'updated_at'],
+    rpg: ['id', 'nickname', 'lv', 'dungeons', 'floors', 'tower', 'created_at', 'updated_at'],
     trash: ['id', 'kind', 'at', 'row_data'],
   };
   function trashSummary(t) {
     const d = t.row_data || {};
     if (t.kind === 'scores') return `id ${str(d.id)}・${str(d.board)}・${fmtMs(d.time_ms)}`;
     if (t.kind === 'daily') return `id ${str(d.id)}・${str(d.day)}・${str(d.correct)}/${str(d.total)}・${fmtMs(d.time_ms)}`;
-    if (t.kind === 'rpg') return `id ${str(d.id)}・Lv ${str(d.lv)}・ダンジョン ${str(d.dungeons)}・フロア ${str(d.floors)}`;
+    if (t.kind === 'rpg') return `id ${str(d.id)}・Lv ${str(d.lv)}・ダンジョン ${str(d.dungeons)}・フロア ${str(d.floors)}・塔 ${str(d.tower ?? 0)}`;
     return '';
   }
   function logDetail(l) {

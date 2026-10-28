@@ -152,6 +152,17 @@ t('rename_rpg_name_taken', async (page, { db }) => {
   await page.locator('#adm-toast', { hasText: 'その名前はもう使われてるよ' }).waitFor();
 });
 
+t('rpg_list_shows_tower', async (page, { db }) => {
+  db.rpgRows[0].tower = 23;
+  await login(page);
+  await kind(page, 'rpg');
+  const heads = await page.locator('#r-table thead th').allTextContents();
+  const i = heads.indexOf('塔');
+  assert.ok(i >= 0, heads.join(','));
+  const row = page.locator('#r-table tbody tr', { hasText: 'ゆうしゃ' });
+  assert.equal((await row.locator('td').nth(i).textContent()).trim(), '23');
+});
+
 t('xss_name_is_text', async (page, { db }) => {
   db.rows.push({ board: XSS, nickname: XSS, time_ms: 5000, questions: 5, created_at: ago(0.5) });
   await login(page);
