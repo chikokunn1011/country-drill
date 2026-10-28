@@ -582,6 +582,8 @@
     });
     if (win) {
       b.tower.cleared = Math.max(b.tower.cleared, f);
+      // 回復はつぎの階の最大 HP で（この階で仲間入りすると、おまかせ編成の最大 HP が上がる）
+      if (res) b.tower.maxHp = K.towerStats(res.d).hp;
       b.hp = K.towerHeal(b.hp, b.tower.maxHp, f);
     }
     if (res) {
@@ -633,7 +635,7 @@
     const missed = lost ? [...new Set(b.mistakes.map(x => x.a))].map(a => byA.get(a)).filter(Boolean) : [];
     $('bt-col').innerHTML = '<div class="rpg-bend rpg-tend" id="bt-end">'
       + `<p class="rpg-bend-h">${lost ? 'やられた…！' : 'おつかれさま！'}</p>`
-      + `<p class="rpg-bend-x">英雄の塔 ${cl ? `${fmt(cl)}階まで` : '1階でたおれた'}${best ? `（自己ベスト ${fmt(best)}階）` : ''}</p>`
+      + `<p class="rpg-bend-x">英雄の塔 ${cl ? `${fmt(cl)}階まで` : '1階でたおれた'}${best ? `<small>（自己ベスト ${fmt(best)}階）</small>` : ''}</p>`
       + (missed.length ? '<p class="rpg-lbl">まちがえた国</p><ul class="misslist">'
         + missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('') + '</ul>' : '')
       + receiptLines(rc).map(l => `<p class="rpg-bline">${l}</p>`).join('')

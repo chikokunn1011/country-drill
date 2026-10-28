@@ -92,6 +92,28 @@ t('tower_hp_carries', async page => {
   assert.equal(+await page.getAttribute('#bt-hhp', 'aria-valuenow'), want);
 });
 
+// 階を勝ったときに仲間が増えて（おまかせ編成）最大 HP が上がったら、回復も画面も新しい最大 HP で
+t('tower_heal_uses_next_max', async page => {
+  await writeSave(page, OPEN({}));
+  await startTower(page);
+  await battleAnswer(page, false);
+  await battleAnswer(page, false);
+  const s1 = await state(page);
+  // この階の精算で仲間入りが起きたことにする（★3 のカードが1枚増える）
+  await page.evaluate(() => {
+    const orig = RPG_CORE.settleRun;
+    RPG_CORE.settleRun = (d, ...a) => { const r = orig(d, ...a); d.cards.jp = [3, 0]; return r; };
+  });
+  await winTowerFloor(page);
+  const max2 = await page.evaluate(() => RPG_CORE.towerStats(RPG.get()).hp);
+  assert.ok(max2 > s1.tower.maxHp, `${max2} > ${s1.tower.maxHp}`);
+  const want = await page.evaluate(([hp, max]) => RPG_CORE.towerHeal(hp, max, 1), [s1.tower.hp, max2]);
+  assert.ok((await text(page, '#bt-tclear')).includes(`HP ${want}/${max2}`), await text(page, '#bt-tclear'));
+  await nextFloor(page);
+  const s2 = await state(page);
+  assert.deepEqual(pick(s2.tower, { f: 0, hp: 0, maxHp: 0 }), { f: 2, hp: want, maxHp: max2 });
+});
+
 t('tower_midboss_full_heal', async page => {
   await writeSave(page, OPEN({}));
   assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10, 1)), true);
@@ -217,3 +239,24 @@ t('tower_no_story_side_effects', async page => {
   for (const id of ['rpg-nodmg@1', 'rpg-underdog@1']) assert.equal(got[id], undefined, `${id} が取れてしまった`);
   assert.equal(typeof got['rpg-first-win@1'], 'number');   // 初勝利は今のまま数える
 }, { blockScripts: [] });
+
+// スマホ幅（360px）でも、終わりの画面の「（自己ベスト 12階）」が数字と「階」のあいだで折り返さない
+t('tower_end_best_nowrap_360', async page => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  await writeSave(page, saveWith({ lv: 1, floors: { world: 5 }, story: ['ch1'], tower: { best: 12 } }));
+  await startTower(page);
+  await loseFloor(page);
+  const r = await page.evaluate(() => {
+    const x = document.querySelector('#bt-end .rpg-bend-x');
+    const w = document.createTreeWalker(x, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const i = n.data.indexOf('自己ベスト 12階');
+      if (i < 0) continue;
+      const rg = document.createRange();
+      rg.setStart(n, i); rg.setEnd(n, i + '自己ベスト 12階'.length);
+      return { lines: new Set([...rg.getClientRects()].map(c => Math.round(c.top))).size, text: x.innerText };
+    }
+    return { lines: -1, text: x.innerText };
+  });
+  assert.equal(r.lines, 1, JSON.stringify(r));
+});

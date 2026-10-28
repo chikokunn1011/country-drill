@@ -451,6 +451,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-bend-h { font: 900 1.4rem/1.35 var(--font-display); text-wrap: balance; word-break: auto-phrase; }
 .rpg-bend-h small { font-size: .65em; white-space: nowrap; }
 .rpg-bend-x { font: 900 1.15rem var(--font-display); color: var(--accent); }
+.rpg-bend-x small { font-size: .8em; white-space: nowrap; }   /* 「（自己ベスト m階）」は1かたまりで折り返す */
 .rpg-bend .misslist { text-align: left; }
 .rpg-bend .row { margin-top: 6px; }
 
