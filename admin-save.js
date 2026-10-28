@@ -8,10 +8,13 @@
   const SNAP_MAX = 5;
   const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
   const BROKEN = 'rpg-broken-', KEEP_BROKEN = 3;   // rpg.js と同じ（壊れたセーブの写しは新しいものから3つ）
-  const RANK_DEL = 'rpgRankDel';                      // rpg-rank.js が次の起動でランキングの行を消しに行く合言葉の列
-  // 初めて使う人に戻すとき消すキー。rpgRankDel（消しに行く途中の合言葉）と、rpg-broken-* / badges-broken（壊れたセーブの写し）は残す。
-  // 写しは本編が状態として読まないので「初めて」のふるまいは変わらず、壊れたセーブの唯一の写しを消さずにすむ
-  const FIRST = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'rpgRank', 'rpgRankPending', 'bview', 'bdgcat'];
+  const RANK_DEL = 'rpgRankDel';                      // rpg-rank.js が次の起動でランキングの行を消しに行く合言葉の列（前の版の登録の分）
+  const UNREG = 'rpgUnreg';                           // 同じく、プロフィールの合言葉の列（rpg-rank.js が rpg_unregister2 で消す。文字列の配列）
+  // 初めて使う人に戻すとき消すキー。rpgRankDel・rpgUnreg（消しに行く途中の合言葉）と、rpg-broken-* / badges-broken / transferBackup
+  // （壊れたセーブ・引き継ぐ前のセーブの写し）は残す。
+  // 写しは本編が状態として読まないので「初めて」のふるまいは変わらず、唯一の写しを消さずにすむ
+  const FIRST = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'rpgRank', 'rpgRankPending', 'bview', 'bdgcat',
+    'profile', 'profilePending', 'transferPending', 'rpgSent'];
 
   const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
   // 本編が読むキーの外側の形（ちがう形だと本編が落ちる。例: misses が null だと答えたときに例外）。
@@ -22,6 +25,8 @@
     settings: isObj, misses: isObj, daily: isObj, rpgRank: isObj,
     setup: v => isObj(v) && (v.mode === undefined || GAME_MODES.includes(v.mode)) && (v.kind === undefined || GAME_KINDS.includes(v.kind)),
     nickname: isStr, rpgRankPending: isStr, bview: isStr, rpgRankDel: Array.isArray,
+    // プロフィール（profile.js・rpg-rank.js が読むもの）
+    profile: isObj, profilePending: isStr, transferPending: isObj, transferBackup: isObj, rpgSent: isObj, rpgUnreg: Array.isArray,
   };
   // __proto__ という名前のキーも、ふつうのキーとして入れられる入れもの（{} だと __proto__ の setter に吸われて消える）
   const dict = () => Object.create(null);
@@ -216,16 +221,19 @@
         x.cards[code] = c ? [c[0], Math.min(c[1] + 1, RC.TUNING.card.stackMax)] : [1, 0];
       }
     });
-    // rpg-rank.js の unregister と同じ: 登録の合言葉（rpgRank.token と rpgRankPending）を rpgRankDel に足してから消す。
-    // 本編が次の起動で rpgRankDel の合言葉でランキングの行を消しに行く
+    // rpg-rank.js の unregister と同じ: 登録の合言葉を消しに行く列に足してから、送った記録の覚え（rpgSent）といっしょに消す。
+    // 前の版の登録（rpgRank.token と rpgRankPending）は rpgRankDel に、いまのプロフィール（profile.token）は rpgUnreg に積む。
+    // 本編が次の起動で、どちらの列の合言葉でも rpg_unregister2 でランキングの行を消しに行く（プロフィールは消さない）
     const queueRankDel = () => {
       const get = k => { const p = parse(storage.getItem(k) ?? 'null'); return p.ok ? p.v : null; };
-      const r = get('rpgRank'), pending = get('rpgRankPending'), cur = get(RANK_DEL);
-      const list = Array.isArray(cur) ? cur.filter(x => typeof x === 'string') : [];
-      const tokens = [isObj(r) && typeof r.token === 'string' ? r.token : null, typeof pending === 'string' ? pending : null]
-        .filter((x, i, a) => x && !list.includes(x) && a.indexOf(x) === i);
-      if (tokens.length) storage.setItem(RANK_DEL, JSON.stringify([...list, ...tokens]));
-      storage.removeItem('rpgRank'); storage.removeItem('rpgRankPending');
+      const strs = k => { const v = get(k); return Array.isArray(v) ? v.filter(x => typeof x === 'string') : []; };
+      const r = get('rpgRank'), pending = get('rpgRankPending'), prof = get('profile'), del = strs(RANK_DEL), unreg = strs(UNREG);
+      const fresh = (xs, list) => xs.filter((x, i, a) => x && !del.includes(x) && !unreg.includes(x) && !list.includes(x) && a.indexOf(x) === i);
+      const old = fresh([isObj(r) && typeof r.token === 'string' ? r.token : null, typeof pending === 'string' ? pending : null], []);
+      const mine = fresh([isObj(prof) && typeof prof.token === 'string' ? prof.token : null], old);
+      if (old.length) storage.setItem(RANK_DEL, JSON.stringify([...del, ...old]));
+      if (mine.length) storage.setItem(UNREG, JSON.stringify([...unreg, ...mine]));
+      storage.removeItem('rpgRank'); storage.removeItem('rpgRankPending'); storage.removeItem('rpgSent');
     };
     // 本編の「冒険データを消す」と同じ: 新しい版のデータなら消さない（{ ok:false, reason:'newer' }）。壊れたセーブは写しを取ってから消す
     const rpgWipe = () => guard(() => {

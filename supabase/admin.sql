@@ -1,5 +1,6 @@
 -- 管理用サイト（admin.html）の関数（Supabase）
 -- 使い方: schema.sql のあとに、Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
+-- 本番ではプロフィールの①②（docs/superpowers/plans/2026-10-28-profile-deploy.md）の後に流す（profiles・profile_id の列・profile_clean_name を使う）。
 -- 中で行を消す（admin_delete）ので、SQL Editor から流す。
 -- 呼べるのは「ログインしていて admins に居る人」だけ。anon は execute 権限が無い。ログインしただけの人は 'admin only'（42501）で断る。
 -- 管理する人を足すとき（user_id は Authentication → Users の UID）:
@@ -101,13 +102,17 @@ revoke all on function admin_stats() from public, anon;
 grant execute on function admin_stats() to authenticated;
 
 -- 一覧。p_kind: 'scores' | 'daily' | 'rpg' | 'trash'
--- p_filter: q（名前の部分一致。NFKC＋小文字）・board・period（'all'|'week'）・day（'YYYY-MM-DD'）・sort（'new'|'best'）・limit（1〜500、既定100）・offset
--- rows は行をまるごと jsonb にして token_hash だけ抜く（列が増えてもそのまま出る）
+-- p_filter: q（名前の部分一致。NFKC＋小文字）・pid（プロフィールの公開用ID。そのプロフィールの行だけ）・board・period（'all'|'week'）・
+--           day（'YYYY-MM-DD'）・sort（'new'|'best'）・limit（1〜500、既定100）・offset
+-- rows は行をまるごと jsonb にして token_hash だけ抜く（列が増えてもそのまま出る）。
+-- プロフィールにつながった行（profile_id がある）には pid と profile_nickname（ランキングに出る名前。表の nickname は古いことがある）も足す。
+-- つながっていない行には足さない（行の中身はゴミ箱の row_data と同じ）。q は表の nickname とプロフィールの名前のどちらに当たってもよい
 create or replace function admin_list(p_kind text, p_filter jsonb) returns jsonb
 language plpgsql stable security definer set search_path = public, pg_temp as $$
 declare
   v_f jsonb;
   v_q text;
+  v_pid text;
   v_best boolean;
   v_limit int;
   v_offset bigint;
@@ -118,17 +123,19 @@ begin
   perform admin_check();
   v_f := coalesce(p_filter, '{}'::jsonb);
   v_q := lower(normalize(coalesce(v_f->>'q', ''), NFKC));
+  v_pid := v_f->>'pid';
   v_best := coalesce(v_f->>'sort' = 'best', false);
   v_limit := least(greatest(coalesce(case when jsonb_typeof(v_f->'limit') = 'number' then floor((v_f->>'limit')::numeric) end, 100), 1), 500);
   v_offset := least(greatest(coalesce(case when jsonb_typeof(v_f->'offset') = 'number' then floor((v_f->>'offset')::numeric) end, 0), 0), 1000000000);
 
   if p_kind = 'scores' then
     with f as (
-      select to_jsonb(s) - 'token_hash' as j,
+      select to_jsonb(s) - 'token_hash' || jsonb_strip_nulls(jsonb_build_object('pid', pf.pid, 'profile_nickname', pf.nickname)) as j,
              row_number() over (order by case when v_best then s.time_ms end, case when v_best then s.created_at end,
                                          case when v_best then s.id end, s.created_at desc, s.id desc) as rn
-      from scores s
-      where strpos(lower(normalize(s.nickname, NFKC)), v_q) > 0
+      from scores s left join profiles pf on pf.id = s.profile_id
+      where (strpos(lower(normalize(s.nickname, NFKC)), v_q) > 0 or strpos(lower(normalize(coalesce(pf.nickname, ''), NFKC)), v_q) > 0)
+        and (v_pid is null or pf.pid = v_pid)
         and (v_f->>'board' is null or s.board = v_f->>'board')
         and (v_f->>'period' is distinct from 'week' or s.created_at >= jst_week_start()))
     select (select count(*) from f),
@@ -137,35 +144,40 @@ begin
   elsif p_kind = 'daily' then
     v_day := daily_day(v_f->>'day');
     with f as (
-      select to_jsonb(d) - 'token_hash' as j,
+      select to_jsonb(d) - 'token_hash' || jsonb_strip_nulls(jsonb_build_object('pid', pf.pid, 'profile_nickname', pf.nickname)) as j,
              row_number() over (order by case when v_best then d.correct end desc, case when v_best then d.time_ms end,
                                          case when v_best then d.created_at end, case when v_best then d.id end,
                                          d.created_at desc, d.id desc) as rn
-      from daily_scores d
-      where strpos(lower(normalize(d.nickname, NFKC)), v_q) > 0
+      from daily_scores d left join profiles pf on pf.id = d.profile_id
+      where (strpos(lower(normalize(d.nickname, NFKC)), v_q) > 0 or strpos(lower(normalize(coalesce(pf.nickname, ''), NFKC)), v_q) > 0)
+        and (v_pid is null or pf.pid = v_pid)
         and (v_day is null or d.day = v_day))
     select (select count(*) from f),
            (select jsonb_agg(j order by rn) from f where rn > v_offset and rn <= v_offset + v_limit)
       into v_total, v_rows;
   elsif p_kind = 'rpg' then
     with f as (
-      select to_jsonb(p) - 'token_hash' as j,
+      select to_jsonb(p) - 'token_hash' || jsonb_strip_nulls(jsonb_build_object('pid', pf.pid, 'profile_nickname', pf.nickname)) as j,
              row_number() over (order by case when v_best then p.lv end desc, case when v_best then p.dungeons end desc,
                                          case when v_best then p.floors end desc, case when v_best then p.created_at end,
                                          case when v_best then p.id end, p.created_at desc, p.id desc) as rn
-      from rpg_players p
-      where strpos(lower(normalize(p.nickname, NFKC)), v_q) > 0)
+      from rpg_players p left join profiles pf on pf.id = p.profile_id
+      where (strpos(lower(normalize(p.nickname, NFKC)), v_q) > 0 or strpos(lower(normalize(coalesce(pf.nickname, ''), NFKC)), v_q) > 0)
+        and (v_pid is null or pf.pid = v_pid))
     select (select count(*) from f),
            (select jsonb_agg(j order by rn) from f where rn > v_offset and rn <= v_offset + v_limit)
       into v_total, v_rows;
   elsif p_kind = 'trash' then
-    -- 30日より古いもの・戻したものは出さない。row_data の token_hash も抜く
+    -- 30日より古いもの・戻したものは出さない。row_data の token_hash も抜く。pid・profile_nickname は row_data の profile_id のプロフィールの
     with f as (
-      select to_jsonb(t) || jsonb_build_object('row_data', t.row_data - 'token_hash') as j,
+      select to_jsonb(t) || jsonb_build_object('row_data', t.row_data - 'token_hash')
+               || jsonb_strip_nulls(jsonb_build_object('pid', pf.pid, 'profile_nickname', pf.nickname)) as j,
              row_number() over (order by t.at desc, t.id desc) as rn
-      from admin_trash t
+      from admin_trash t left join profiles pf on pf.id = (t.row_data->>'profile_id')::bigint
       where t.restored_at is null and t.at > now() - interval '30 days'
-        and strpos(lower(normalize(coalesce(t.row_data->>'nickname', ''), NFKC)), v_q) > 0)
+        and (strpos(lower(normalize(coalesce(t.row_data->>'nickname', ''), NFKC)), v_q) > 0
+             or strpos(lower(normalize(coalesce(pf.nickname, ''), NFKC)), v_q) > 0)
+        and (v_pid is null or pf.pid = v_pid))
     select (select count(*) from f),
            (select jsonb_agg(j order by rn) from f where rn > v_offset and rn <= v_offset + v_limit)
       into v_total, v_rows;
@@ -270,6 +282,9 @@ grant execute on function admin_restore(bigint[]) to authenticated;
 
 -- 名前を変える。ルールは本編と同じ（前後の空白を取って1〜12文字・NGワード無し・rpg はほかの人と同じ名前はだめ）
 -- p_name が null なら「名無しの旅人」＋3桁の数（ぶつかったら振り直す）
+-- プロフィールにつながった行（profile_id がある）は、プロフィールの名前を変える（ランキングに出す名前は profiles から取るので、
+-- その人の記録が全部変わる）。表の nickname は profile_rename と同じくそろえる。ほかのプロフィールと同じ名前（NFKC＋小文字）なら
+-- 'profile_name_taken'。返事と admin_log にはプロフィールの pid も入れる
 create or replace function admin_rename(p_kind text, p_id bigint, p_name text) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
@@ -277,13 +292,16 @@ declare
   v_norm text;
   v_before text;
   v_try int := 0;
+  v_pf bigint;
+  v_pid text;
+  v_why text;
 begin
   perform admin_check();
   if p_kind is null or p_kind not in ('scores', 'daily', 'rpg') then
     return jsonb_build_object('ok', false, 'reason', 'bad_kind');
   end if;
   if p_name is not null then
-    v_name := btrim(p_name, E' \t\n\r\f\u000b\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff');
+    v_name := profile_clean_name(p_name);  -- 前後の空白の落とし方は本編（profile_create / profile_rename）と同じ
     if char_length(v_name) not between 1 and 12 then
       return jsonb_build_object('ok', false, 'reason', 'bad_name');
     end if;
@@ -292,11 +310,47 @@ begin
       return jsonb_build_object('ok', false, 'reason', 'ng_name');
     end if;
   end if;
+  -- まず行がプロフィールにつながっているかを見る（ここでは鍵を取らない）
+  if p_kind = 'scores' then select profile_id into v_pf from scores where id = p_id;
+  elsif p_kind = 'daily' then select profile_id into v_pf from daily_scores where id = p_id;
+  else select profile_id into v_pf from rpg_players where id = p_id;
+  end if;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if v_pf is not null then
+    -- profile_rename と同じ順（名前の鍵 'pfname:' → プロフィールの行の鍵 → 表の行）で取る（同時に同じ名前にしても deadlock にならない）
+    loop
+      if p_name is null then v_name := '名無しの旅人' || lpad(floor(random() * 1000)::int::text, 3, '0'); end if;
+      v_norm := lower(normalize(v_name, NFKC));
+      perform pg_advisory_xact_lock(hashtext('pfname:' || v_norm));  -- profile_create / profile_rename と同じ鍵
+      select nickname, pid into v_before, v_pid from profiles where id = v_pf for update;
+      v_why := profile_name_problem(v_name, v_pf);
+      if v_why is null then
+        begin
+          update profiles set nickname = v_name, updated_at = now() where id = v_pf;
+          exit;
+        exception when unique_violation then
+          v_why := 'name_taken';  -- 鍵を取らずに入った行（引っ越しなど）とぶつかった
+        end;
+      end if;
+      v_try := v_try + 1;
+      if v_why <> 'name_taken' then return jsonb_build_object('ok', false, 'reason', v_why); end if;
+      if p_name is not null or v_try >= 20 then return jsonb_build_object('ok', false, 'reason', 'profile_name_taken'); end if;
+    end loop;
+    -- 表の nickname もそろえる（profile_rename と同じ。名前の unique で古い記録とぶつかる行はそのまま）
+    update scores set nickname = v_name where profile_id = v_pf;
+    update daily_scores d set nickname = v_name where d.profile_id = v_pf
+      and not exists (select 1 from daily_scores o where o.day = d.day and o.id <> d.id and lower(normalize(o.nickname, NFKC)) = v_norm);
+    update rpg_players r set nickname = v_name where r.profile_id = v_pf
+      and not exists (select 1 from rpg_players o where o.id <> r.id and o.nickname = v_name);
+    insert into admin_log (user_id, action, kind, detail)
+      values (auth.uid(), 'rename', p_kind, jsonb_build_object('id', p_id, 'before', v_before, 'after', v_name, 'profile_id', v_pf, 'pid', v_pid));
+    return jsonb_build_object('ok', true, 'nickname', v_name, 'pid', v_pid);
+  end if;
+  -- ここからはプロフィールより前の古い記録（名前だけの行）
   -- rpg は本編の rpg_rename と同じ順（名前の鍵 → 行の鍵）で取る。逆の順だと同時に同じ名前にしたとき deadlock になる。
   -- なので rpg の行の鍵は下のループの中で、名前の鍵のあとに取る
   if p_kind = 'scores' then select nickname into v_before from scores where id = p_id for update;
   elsif p_kind = 'daily' then select nickname into v_before from daily_scores where id = p_id for update;
-  else perform 1 from rpg_players where id = p_id;
   end if;
   if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
   loop

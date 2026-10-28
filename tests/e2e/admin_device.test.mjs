@@ -554,3 +554,27 @@ t('data_check_summary', async page => {
   assert.equal(await page.textContent('#d-check-sum'), `問題なし（${n}か国・6地域）`);
   assert.equal(await page.locator('#d-check-list li').count(), 0);
 });
+
+// 冒険データを消す・初回状態に戻す: プロフィールの合言葉を rpgUnreg に積み（本編の rpg-rank.js が rpg_unregister2 で消しに行く）、rpgSent も消す
+const PROFILE = { token: 'tok-p', pid: 'abc123def456', name: 'チコ', auto: true };
+t('rpg_wipe_queues_profile_token', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-rpg');
+  await page.click('#d-rpg-wipe');
+  await toastHas(page, '冒険データを消したよ');
+  assert.deepEqual(JSON.parse(await ls(page, 'rpgUnreg')), ['tok-old', 'tok-p']);
+  assert.equal(await ls(page, 'rpgSent'), null);
+  assert.equal(await ls(page, 'rpg'), null);
+  assert.deepEqual(JSON.parse(await ls(page, 'profile')), PROFILE, 'プロフィールは残す');
+}, { storage: { rpg: RPG, profile: PROFILE, rpgSent: { pid: 'abc123def456', lv: 3, dungeons: 0, floors: 0 }, rpgUnreg: ['tok-old'] } });
+
+t('first_time_queues_profile_token_and_drops_profile', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-settings');
+  await page.click('#d-first');
+  await toastHas(page, 'はじめての人にしたよ');
+  assert.deepEqual(JSON.parse(await ls(page, 'rpgUnreg')), ['tok-p']);
+  for (const k of ['profile', 'profilePending', 'transferPending', 'rpgSent', 'rpg']) assert.equal(await ls(page, k), null, k);
+  assert.ok(await ls(page, 'transferBackup'), '引き継ぐ前の写しは残す');
+}, { storage: { rpg: RPG, profile: PROFILE, profilePending: 'tok-q', transferPending: { code: 'ABCDEFGHJKLM', token: 'tok-t' },
+  rpgSent: { pid: 'abc123def456' }, transferBackup: { at: 1, keys: {} } } });

@@ -10,6 +10,8 @@
 | ② `-- >>> SQL Editor` 〜 `-- <<< SQL Editor` | `rpg_unregister`・`rpg_unregister2`（中に delete がある） | チコが SQL Editor で Run | ①のすぐ後 |
 | ⑤ `-- >>> old_version` 〜 `-- <<< old_version` | 古い関数を `old_version` を返す中身に入れかえ＋もう一度引っ越し | MCP `apply_migration`（name `profiles_old_version`） | PR マージ（サイト公開）の後 |
 
+- 管理用サイトの `supabase/admin.sql`（#25）は、この①②の後に流す（`profiles`・`profile_id` の列・`profile_clean_name`・`profile_name_problem` を使うので、①②より先だと一覧と名前の変更がエラーになる）。チコが SQL Editor で全部 Run（中に delete がある）
+
 - 戻すときの main: `origin/main` の今のコミット `bb44880d70a5cdcb4fb0a6ed6a4e227ee2047648`（国旗クエスト「英雄の塔」 (#27)）
 - Supabase: `https://vgdkklvhtvcamtxwjpke.supabase.co`（`ranking.js` の先頭と同じプロジェクト）
 

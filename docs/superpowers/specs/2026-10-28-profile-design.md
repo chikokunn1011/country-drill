@@ -180,7 +180,7 @@ create table if not exists profile_transfers (
 
 - localStorage の決まったキーだけ: `settings`・`setup`・`misses`・`nickname`・`rpg`・`badges`・`daily`・`bdgcat`・`bview`（同じ github.io のほかのサイトのデータを持っていかないように、全部ではなくこの一覧）。
 - `{ v: 1, keys: { キー: 中身の文字列 } }` の形で送る。受け取った側はこの一覧のキーだけ書き戻す（一覧に無いキーは無視）。書き戻す前に今の値を `transferBackup` に1つだけ退避する。
-- 単体テストで「コードの中の `store.get/set`・`localStorage` のキーが、この一覧か『預けないキーの一覧』（`profile`・`profilePending`・`rpgRank*`・`transferBackup`・`badges-broken`）のどちらかに入っている」を確かめる（キーを足したのに一覧に入れ忘れるのを防ぐ）。
+- 単体テストで「コードの中の `store.get/set`・`localStorage` のキーが、この一覧か『預けないキーの一覧』（`profile`・`profilePending`・`rpgRank*`・`transferBackup`・`badges-broken`、管理ページの `adminSnaps`・`adminErrors`・`adminAuth`）のどちらかに入っている」を確かめる（キーを足したのに一覧に入れ忘れるのを防ぐ）。
 
 ## 5. 公開の手順と今ある記録
 

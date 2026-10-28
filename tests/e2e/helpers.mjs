@@ -286,7 +286,7 @@ export function fakeDb() {
   };
   // calls: 届いた RPC の記録 { name, args, at }（at は届いた時刻 ms）。down を true にすると通信失敗になる
   const db = { profiles, transfers, rows, rpgRows, dailyRows, calls: [], down: false, rpc };
-  addAdmin(db);
+  addAdmin(db, { byId, nameProblem });
   return db;
 }
 
@@ -294,7 +294,8 @@ export function fakeDb() {
 // db.admin = { email, password, isAdmin }（isAdmin: false なら、ログインはできても admin_ 関数は 42501 で断る）。
 // 行は rows（scores）・dailyRows・rpgRows をそのまま使い、id が無ければ振る。ゴミ箱は db.trash、操作の記録は db.adminLog。
 // db.tokens: 出した access_token → { admin }。db.expireTokens() で今の合札を全部 401 にできる
-function addAdmin(db) {
+// プロフィールにつながった行（profile_id がある）は admin.sql と同じく、一覧に pid・profile_nickname を足し、名前を変えるとプロフィールの名前が変わる
+function addAdmin(db, { byId, nameProblem }) {
   db.admin = { email: 'admin@example.com', password: 'pass-1234', isAdmin: true };
   db.tokens = new Map();
   db.refresh = new Map();
@@ -305,6 +306,9 @@ function addAdmin(db) {
   const KIND = { scores: db.rows, daily: db.dailyRows, rpg: db.rpgRows };
   const ids = () => { for (const a of Object.values(KIND)) for (const r of a) if (r.id == null) r.id = nextId++; else nextId = Math.max(nextId, r.id + 1); };
   const out = r => { const { token, ...rest } = r; return structuredClone(rest); };
+  // 一覧に出す形: プロフィールにつながった行には pid・profile_nickname を足す
+  const withPf = (r, j) => { const p = byId(r.profile_id); return p ? { ...j, pid: p.pid, profile_nickname: p.nickname } : j; };
+  const pfHit = (r, f, q) => { const p = byId(r.profile_id); return (f.pid == null || p?.pid === f.pid) && (lower(r.nickname).includes(q) || (!!p && lower(p.nickname).includes(q))); };
   const issue = () => {
     const access_token = `fake-access-${nextTok}`, refresh_token = `fake-refresh-${nextTok++}`;
     db.tokens.set(access_token, { admin: db.admin.isAdmin });
@@ -342,14 +346,14 @@ function addAdmin(db) {
       const limit = Math.min(Math.max(Number.isFinite(f.limit) ? Math.floor(f.limit) : 100, 1), 500), offset = Math.max(Number.isFinite(f.offset) ? Math.floor(f.offset) : 0, 0);
       const newer = (a, b) => Date.parse(b.created_at ?? b.at) - Date.parse(a.created_at ?? a.at) || b.id - a.id;
       let list;
-      if (p_kind === 'trash') list = db.trash.filter(t => !t.restored_at && lower(t.row_data.nickname).includes(q)).sort(newer)
-        .map(t => ({ ...structuredClone(t), row_data: out(t.row_data) }));
+      if (p_kind === 'trash') list = db.trash.filter(t => !t.restored_at && pfHit(t.row_data, f, q)).sort(newer)
+        .map(t => withPf(t.row_data, { ...structuredClone(t), row_data: out(t.row_data) }));
       else if (KIND[p_kind]) {
-        list = KIND[p_kind].filter(r => lower(r.nickname).includes(q));
+        list = KIND[p_kind].filter(r => pfHit(r, f, q));
         if (p_kind === 'scores') list = list.filter(r => (f.board == null || r.board === f.board) && (f.period !== 'week' || Date.parse(r.created_at) >= weekStart()));
         if (p_kind === 'daily' && f.day) list = list.filter(r => r.day === f.day);
         const cmp = { scores: (a, b) => a.time_ms - b.time_ms, daily: (a, b) => b.correct - a.correct || a.time_ms - b.time_ms, rpg: (a, b) => b.lv - a.lv || b.dungeons - a.dungeons || b.floors - a.floors }[p_kind];
-        list = [...list].sort(best ? (a, b) => cmp(a, b) || -newer(a, b) : newer).map(out);
+        list = [...list].sort(best ? (a, b) => cmp(a, b) || -newer(a, b) : newer).map(r => withPf(r, out(r)));
       } else return { ok: false, reason: 'bad_kind' };
       return { ok: true, total: list.length, rows: list.slice(offset, offset + limit) };
     },
@@ -384,6 +388,15 @@ function addAdmin(db) {
       if (name != null && ([...name].length < 1 || [...name].length > 12)) return { ok: false, reason: 'bad_name' };
       const r = a.find(r => r.id === p_id); if (!r) return { ok: false, reason: 'not_found' };
       if (name == null) name = `名無しの旅人${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+      const p = byId(r.profile_id);
+      if (p) {   // プロフィールの名前を変えて、表の名前もそろえる（ほかのプロフィールと同じ名前なら profile_name_taken）
+        const bad = nameProblem(name, p);
+        if (bad) return { ok: false, reason: bad === 'name_taken' ? 'profile_name_taken' : bad };
+        const before = p.nickname; p.nickname = name;
+        for (const x of Object.values(KIND).flat()) if (x.profile_id === p.id) x.nickname = name;
+        log('rename', p_kind, { id: p_id, before, after: name, profile_id: p.id, pid: p.pid });
+        return { ok: true, nickname: name, pid: p.pid };
+      }
       if (p_kind === 'rpg' && a.some(x => x !== r && lower(x.nickname) === lower(name))) return { ok: false, reason: 'name_taken' };
       const before = r.nickname; r.nickname = name;
       log('rename', p_kind, { id: p_id, before, after: name });
