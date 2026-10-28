@@ -29,11 +29,11 @@ awk '/^-- >>> old_version/{on=1} on{print} /^-- <<< old_version/{on=0}' supabase
 for f in /tmp/step1.sql /tmp/step2.sql /tmp/step5.sql; do printf '%s ' $f; grep -v '^ *--' $f | grep -ci delete; done
 ```
 
-2026-10-28 に実際に切り出した結果（コミット時点の schema.sql、982 行）:
+2026-10-28 に実際に切り出した結果（main #27 を取りこんだ後の schema.sql、1077 行）:
 
-- ①: 919 行・関数 39 個。delete はコメントの3行（10・11・252 行目の説明）にだけ出てきて、SQL の中には 0 件（`delete from` は 0 件）。最後は `notify pgrst, 'reload schema';`
+- ①: 1010 行・関数 44 個。delete はコメントの3行（11・12・253 行目の説明）にだけ出てきて、SQL の中には 0 件（`delete from` は 0 件）。最後は `notify pgrst, 'reload schema';`
 - ②: 31 行・関数 2 個（`rpg_unregister`・`rpg_unregister2`）。`delete from` 2 件
-- ⑤: 32 行・関数 6 個。delete 0 件
+- ⑤: 36 行・関数 7 個（`rpg_set_tower` を含む）。delete 0 件
 - MCP がコメントの「delete」の字でも確認を出すときは、①をコメントの行を除いて渡す: `grep -v '^ *--' /tmp/step1.sql > /tmp/step1-nocomment.sql`
 - 使い捨ての PostgreSQL 16 で「origin/main の schema.sql → ① → ② → ③ → ⑤ → ⑥の古い関数を流し直す」を通して確かめた（①のあと②の前に古いページで登録した人も、③で profile_id が埋まっていた）。手元のテスト `bash tests/sql/run.sh` の `deploy_steps` も同じ切り方で ① に delete が無いことを確かめている
 
