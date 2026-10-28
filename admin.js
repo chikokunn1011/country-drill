@@ -39,6 +39,10 @@
   const fmtAt = iso => { const d = new Date(iso); return Number.isNaN(+d) ? '' : `${d.getMonth() + 1}/${d.getDate()} ${hms(d)}`; };
 
   let SAVE, toastTimer = 0, current = '';   // current: D2 で選んでいるキー
+  // D2 の欄に出した文字（shown）と、そのときのセーブの中身（shownFp）。欄をさわっていなければ、セーブが変わったら出し直す
+  let shown = null, shownFp = null;
+  // 設定（D9）の欄を変えて、まだ「設定を保存」していない
+  let setDirty = false;
 
   function toast(msg, bad = false) {
     const t = $('adm-toast');
@@ -84,18 +88,35 @@
         el('span', { class: 'mono muted', text: fmtBytes(bytes) })));
     }
   }
+  const fpOf = r => r.ok ? JSON.stringify(r.value) : r.raw ?? null;
+  function fillEditor(key) {
+    const r = SAVE.read(key);
+    shown = $('d-json').value = r.ok ? JSON.stringify(r.value, null, 2) : (r.raw ?? '');
+    shownFp = fpOf(r);
+    return r;
+  }
   function pick(key) {
     current = key;
     $('d-key').value = key;
-    const r = SAVE.read(key);
-    $('d-json').value = r.ok ? JSON.stringify(r.value, null, 2) : (r.raw ?? '');
+    const r = fillEditor(key);
     if (!r.ok && r.reason === 'not_json') toast('JSON じゃない値だよ（そのままでは保存できない）', true);
     renderKeys();
+  }
+  // ほかの操作（コイン・バッジ・戻す など）でセーブが変わったら、欄を書きかえていなければ今の中身を出し直す
+  function syncEditor() {
+    if (!current || fpOf(SAVE.read(current)) === shownFp) return;
+    if (document.activeElement !== $('d-json') && $('d-json').value === shown) fillEditor(current);
   }
   function saveJson() {
     const key = $('d-key').value.trim(), text = $('d-json').value;
     if (!key) { toast('キーを入れてね', true); return; }
     try { JSON.parse(text); } catch { toast('JSONが壊れてる。保存しなかったよ', true); return; }   // 壊れていたら確かめる前にやめる
+    // 形が合わなければ確かめる前にやめる（自動のスナップショットを取らない）
+    const c = SAVE.writeCheck(key, text);
+    if (c.ok === false) { toast(REASON[c.reason] ?? 'うまくいかなかった', true); return; }
+    // 欄に読みこんだあとで、ほかの操作がこのキーを変えていたら、古い中身で上書きしていいか先に聞く
+    if (key === current && fpOf(SAVE.read(key)) !== shownFp
+      && !confirm(`${key} は欄に読みこんだあとで変わってるよ。欄の中身で上書きしていい？`)) return;
     const go = () => {
       const r = SAVE.write(key, text);
       if (r.ok === false) { toast(r.reason === 'not_json' ? 'JSONが壊れてる。保存しなかったよ' : REASON[r.reason] ?? 'うまくいかなかった', true); return; }
@@ -109,6 +130,7 @@
   function deleteKey() {
     const key = $('d-key').value.trim();
     if (!key) { toast('キーを選んでね', true); return; }
+    if (SAVE.read(key).reason === 'missing') { toast(REASON.missing, true); return; }   // 無いキーでは確かめもスナップショットもしない
     danger(`${key} を消す`, () => {
       if (!done(SAVE.remove(key), `${key} を消したよ`)) return;
       current = ''; $('d-key').value = ''; $('d-json').value = '';
@@ -135,8 +157,10 @@
     if (!file) return;
     let obj;
     try { obj = JSON.parse(await file.text()); } catch { toast('ファイルが JSON じゃないよ。何も変えてない', true); return; }
-    if (!obj || obj.app !== 'country-drill' || obj.kind !== 'save') { fail({ reason: 'bad_file' }); return; }
-    danger('ファイルから読み戻す', () => done(SAVE.importAll(obj), 'ファイルから読み戻したよ'));
+    // 中身まで全部確かめてから（だめなら自動のスナップショットも取らない）
+    const c = SAVE.importCheck(obj);
+    if (c.ok === false) { fail(c); return; }
+    danger('ファイルから読み戻す', () => { setDirty = false; done(SAVE.importAll(obj), 'ファイルから読み戻したよ'); });
   }
 
   // ---- D4 スナップショット ----
@@ -162,7 +186,9 @@
     // 先に中身を取っておく（自動のスナップショットが5個を超えて、戻したい自動のものが押し出されても戻せるように）
     const all = SAVE.read('adminSnaps'), snap = all.ok && Array.isArray(all.value) ? all.value.find(s => s && s.name === name) : null;
     if (!snap) { fail({ reason: 'missing' }); return; }
-    danger(`「${name}」に戻す`, () => done(SAVE.importAll({ app: 'country-drill', kind: 'save', data: snap.data }), `「${name}」に戻したよ`));
+    const file = { app: 'country-drill', kind: 'save', data: snap.data }, c = SAVE.importCheck(file);
+    if (c.ok === false) { fail(c); return; }
+    danger(`「${name}」に戻す`, () => { setDirty = false; done(SAVE.importAll(file), `「${name}」に戻したよ`); });
   }
   function snapSave() {
     const name = $('d-snap-name').value.trim() || `手動 ${hms()}`;
@@ -238,7 +264,9 @@
   }
 
   // ---- D9 設定 ----
+  // 欄を変えてまだ保存していないあいだは、ほかの操作で描き直しても欄を戻さない
   function renderSettings() {
+    if (setDirty) return;
     const s = SAVE.settingsGet();
     $('d-set-theme').value = ['light', 'dark', 'auto'].includes(s.theme) ? s.theme : 'light';
     const reg = $('d-set-region'), cur = s.region ?? 'all';
@@ -250,10 +278,18 @@
     $('d-set-vol').value = Number.isFinite(+s.vol) ? s.vol : 70;
     $('d-set-vol-n').textContent = $('d-set-vol').value;
     $('d-set-dopa').checked = !!s.dopa;
+    $('d-set-name').checked = !!SAVE.setupGet().name;
   }
+  // 音量は本編の設定画面と同じ 10〜100 の10きざみ（本編の画面で出せない値を書かない）
+  const volOf = v => Math.min(100, Math.max(10, Math.round((+v || 70) / 10) * 10));
   function saveSettings() {
-    const patch = { theme: $('d-set-theme').value, region: $('d-set-region').value, sound: $('d-set-sound').checked, vol: +$('d-set-vol').value, dopa: $('d-set-dopa').checked };
-    if (done(SAVE.settingsSet(patch), '設定を保存したよ')) applyTheme(patch.theme);
+    const patch = { theme: $('d-set-theme').value, region: $('d-set-region').value, sound: $('d-set-sound').checked, vol: volOf($('d-set-vol').value), dopa: $('d-set-dopa').checked };
+    const r = SAVE.settingsSet(patch);
+    if (r && r.ok === false) { fail(r); return; }
+    const r2 = SAVE.setupSet({ name: $('d-set-name').checked });   // 国名表示は本編の setup.name
+    if (r2 && r2.ok === false) { fail(r2); return; }
+    setDirty = false;
+    if (done(r2, '設定を保存したよ')) applyTheme(patch.theme);
   }
 
   // ---- D10 効果音 ----
@@ -309,7 +345,7 @@
     }
   }
   function renderAll() {
-    safe('d-saves', renderKeys); safe('d-snaps', renderSnaps); safe('d-rpg', renderRpg); safe('d-badges', renderBadges);
+    safe('d-saves', renderKeys); safe('d-saves', syncEditor); safe('d-snaps', renderSnaps); safe('d-rpg', renderRpg); safe('d-badges', renderBadges);
     safe('d-daily', renderDaily); safe('d-settings', renderSettings); safe('d-env', () => renderEnv({ ping: lastPing }));
   }
 
@@ -358,10 +394,13 @@
   let API;
   // rowsKind: rows を読んだときの種類。種類を切りかえたら null にして、新しい種類の一覧が来るまで消す・戻す・名前・CSV をしない
   // rowsFilter: rows を読んだときの絞りこみ（CSV はこれを使う。欄に書いただけでまだ探していない値は使わない）
-  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false, rowsKind: null, rowsFilter: null };
+  // epoch: ログアウト・ログインし直しで進める。待っていた返事が、そのあとで画面に出ないように
+  // busy: 消す・戻す・名前を変えるの途中（終わるまで、ほかの操作のボタンを押せなくする）
+  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, epoch: 0, loaded: false, rowsKind: null, rowsFilter: null, busy: false };
   const listReady = () => R.rowsKind === R.kind;
   // 一覧の表をからにする（種類の切りかえ・ログアウトのとき）
   function clearTable() {
+    R.seq++;   // 待っている一覧の返事は捨てる
     R.rows = []; R.total = 0; R.rowsKind = null; R.rowsFilter = null;
     const tbl = $('r-table');
     tbl.removeAttribute('data-ready');
@@ -373,11 +412,19 @@
   }
   // 一覧が読めるまでは操作のボタンを押せなくする
   function setActs() {
-    const ok = listReady();
+    const ok = listReady() && !R.busy;
     $('r-del').disabled = $('r-restore').disabled = $('r-csv').disabled = !ok;
+    for (const b of $('r-table').tBodies[0].querySelectorAll('.acts button')) b.disabled = R.busy;
+  }
+  // 消す・戻す・名前を変えるを1つずつ（返事を待つあいだに2回押されても2回送らない）
+  async function exclusive(fn) {
+    if (R.busy) return;
+    R.busy = true; setActs();
+    try { await fn(); } finally { R.busy = false; setActs(); }
   }
   // ログアウト・30分・ログインし直し: サーバーから来た名前などを画面からもメモリからも消す
   function clearServerData() {
+    R.epoch++;
     clearTable();
     for (const b of $('r-dash').querySelectorAll('[data-n]')) b.textContent = '–';
     for (const b of $('r-dash').querySelectorAll('[data-sub]')) b.textContent = '';
@@ -403,13 +450,15 @@
     setWho();
     if (!$('tab-log').hidden) loadOps();
   }
-  // 管理の関数を呼ぶ。だめなら知らせて null（relogin ならログイン画面へ）
-  async function rpc(name, args) {
+  // 管理の関数を呼ぶ。だめなら知らせて null（relogin ならログイン画面へ）。
+  // how.netMsg: つながらなかったときの知らせ（消すなど、サーバーでは済んでいるかもしれない操作で使う）。
+  // つながらなかった（返事が来なかった）ときは how.lost を true にする
+  async function rpc(name, args, how = {}) {
     try { return await API.call(name, args); }
     catch (e) {
       if (e.code === 'relogin') showLogin('ログインし直してね');
       else if (e.code === 'denied') toast('このアカウントは管理者じゃないよ', true);
-      else if (e.code === 'network') toast('つながらなかった', true);
+      else if (e.code === 'network') { how.lost = true; toast(how.netMsg ?? 'つながらなかった', true); }
       else toast(`うまくいかなかった${e.status ? `（HTTP ${e.status}）` : ''}`, true);
       return null;
     }
@@ -427,8 +476,8 @@
 
   // ---- S1・S14 件数と最後の記録 ----
   async function loadStats() {
-    const s = await rpc('admin_stats', {});
-    if (!s || s.ok === false) return;
+    const ep = R.epoch, s = await rpc('admin_stats', {});
+    if (ep !== R.epoch || !R.loaded || !s || s.ok === false) return;
     for (const k of ['scores', 'daily', 'rpg']) {
       $('r-dash').querySelector(`[data-n="${k}"]`).textContent = str(s.counts?.[k] ?? 0);
       $('r-dash').querySelector(`[data-sub="${k}"]`).textContent = `今日 ${str(s.today?.[k] ?? 0)}・今週 ${str(s.week?.[k] ?? 0)}${k === 'rpg' ? '（登録）' : ''}`;
@@ -449,8 +498,8 @@
       : [el('li', { class: 'muted', text: 'まだないよ' })]));
   }
   async function loadBoards() {
-    const r = await rpc('admin_boards', {});
-    if (!r || !Array.isArray(r.boards)) return;
+    const ep = R.epoch, r = await rpc('admin_boards', {});
+    if (ep !== R.epoch || !R.loaded || !r || !Array.isArray(r.boards)) return;
     const sel = $('r-f-board'), cur = sel.value;
     sel.replaceChildren(el('option', { value: '', text: 'ボード: 全部' }),
       ...r.boards.map(b => el('option', { value: str(b.board), text: `${str(b.board)}（${str(b.n)}）` })));
@@ -481,23 +530,24 @@
   // 絞りこみのページ以外の部分（同じ絞りこみか比べる用）
   const filterKey = f => { const { offset, limit, ...k } = f; return JSON.stringify(k); };
   // offset: 読みたいページの始まり。R.offset は読めたときだけ進める（失敗したら今のページのまま）
-  async function loadList(offset = R.offset) {
-    const seq = ++R.seq, tbl = $('r-table'), kind = R.kind, f = filter(offset);
+  // stale: 出ている行がもうサーバーに無いかもしれない（消した・戻したあと）。読めなかったら行を残さず消す
+  async function loadList(offset = R.offset, { stale = false } = {}) {
+    const seq = ++R.seq, ep = R.epoch, tbl = $('r-table'), kind = R.kind, f = filter(offset);
     tbl.removeAttribute('data-ready');
     const r = await rpc('admin_list', { p_kind: kind, p_filter: f });
-    if (seq !== R.seq || kind !== R.kind) return;
+    if (seq !== R.seq || ep !== R.epoch || kind !== R.kind) return;
     if (!r || r.ok === false || !Array.isArray(r.rows)) {
       if (r) toast('一覧が読めなかった', true);
       if (!R.loaded) return;   // ログインし直し（showLogin が表を消した）
       // ページを動かしただけ・読み直しなら、出ている行は今の絞りこみのままなので残す。
       // 絞りこみ（名前・ボード・日付など）を変えて読めなかったら、前の絞りこみの行を出したままにしない
-      if (R.rowsKind === kind && filterKey(R.rowsFilter) === filterKey(f)) return;
+      if (!stale && R.rowsKind === kind && filterKey(R.rowsFilter) === filterKey(f)) return;
       clearTable();
       R.offset = offset;
       tbl.tBodies[0].replaceChildren(el('tr', {}, el('td', { colSpan: COLS[kind].length + 2, class: 'muted', 'data-fail': '', text: '読みこめなかった。もう一回押してね' })));
       return;
     }
-    if (!r.rows.length && offset > 0 && r.total > 0) { loadList(Math.max(0, offset - PAGE)); return; }
+    if (!r.rows.length && offset > 0 && r.total > 0) { loadList(Math.max(0, offset - PAGE), { stale }); return; }
     R.rows = r.rows; R.total = +r.total || 0; R.offset = offset; R.rowsKind = kind; R.rowsFilter = f;
     renderTable();
     setActs();
@@ -548,12 +598,17 @@
     const ids = picked();
     if (!ids.length) { toast('消す記録を選んでね', true); return; }
     if (!confirm(`${KIND_LABEL[R.kind]}の記録を ${ids.length}件消していい？\n（ゴミ箱に30日のこるよ）`)) return;
-    const r = await rpc('admin_delete', { p_kind: R.kind, p_ids: ids });
+    const how = { netMsg: UNSURE_DEL }, r = await rpc('admin_delete', { p_kind: R.kind, p_ids: ids }, how);
+    // 返事が来なかったときは、サーバーでは消えているかもしれないので読み直す（読み直しの知らせで消えないよう、あとでもう一度出す）
+    if (how.lost) { await reloadAfterChange(); toast(UNSURE_DEL, true); return; }
     if (!r) return;
     if (r.ok === false) { toast('消せなかった', true); return; }
     toast(`${str(r.deleted)}件消したよ（ゴミ箱から戻せる）`);
-    await Promise.all([loadList(), loadStats(), loadBoards()]);
+    await reloadAfterChange();
   }
+  const UNSURE_DEL = '消えたか分からない。一覧を読み直して確かめてね';
+  // 消す・戻すのあと: 出ている行はもう無いかもしれないので、読み直せなかったら行を消す
+  const reloadAfterChange = () => Promise.all([loadList(R.offset, { stale: true }), loadStats(), loadBoards()]);
   async function restorePicked() {
     if (!listReady()) return;
     const ids = picked();
@@ -562,7 +617,7 @@
     if (!r) return;
     if (r.ok === false) { toast('戻せなかった', true); return; }
     toast(`${str(r.restored)}件戻したよ${r.failed ? `・戻せなかった ${str(r.failed)}件（同じ id か同じ名前がもうある）` : ''}`, !!r.failed);
-    await Promise.all([loadList(), loadStats(), loadBoards()]);
+    await reloadAfterChange();
   }
   // ---- S7 名前を変える（空で OK なら「名無しの旅人」＋数字） ----
   async function rename(id, nameless = false) {
@@ -619,18 +674,24 @@
     if (!n) { toast('その名前の記録はもう無いよ', true); return; }
     const parts = Object.entries(found).filter(([, ids]) => ids.length).map(([k, ids]) => `${KIND_LABEL[k]} ${ids.length}件`);
     if (!confirm(`「${shown}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）`)) return;
-    let gone = 0, stopped = false;
+    let gone = 0, stopped = false, lost = false;
     for (const [k, ids] of Object.entries(found)) {
       if (!ids.length) continue;
-      const r = await rpc('admin_delete', { p_kind: k, p_ids: ids });
-      if (!r || r.ok === false) { stopped = true; break; }
+      const how = { netMsg: UNSURE_DEL }, r = await rpc('admin_delete', { p_kind: k, p_ids: ids }, how);
+      if (!r || r.ok === false) { stopped = true; lost = !!how.lost; break; }
       gone += +r.deleted || 0;
     }
-    // 途中で止まったら、成功の知らせで上書きせず、1つの知らせにまとめる
+    // 途中で止まったら、成功の知らせで上書きせず、1つの知らせにまとめる。
+    // 返事が来なかったときは、サーバーでは消えているかもしれない（「消してない」とは言わない）
+    if (lost) {   // 読み直しの知らせで消えないよう、読み直したあとで出す
+      await reloadAfterChange();
+      toast(gone ? `${gone}件消したよ。残りは${UNSURE_DEL}` : UNSURE_DEL, true);
+      return;
+    }
     if (stopped) toast(gone ? `${gone}件消したけど、途中で止まった（残りは消してない）` : '消せなかった（何も消してない）', true);
     else if (gone) toast(`「${shown}」の記録を ${gone}件消したよ（ゴミ箱から戻せる）`);
     else toast('その名前の記録はもう無いよ', true);
-    await Promise.all([loadList(), loadStats(), loadBoards()]);
+    await reloadAfterChange();
   }
   // ---- S13 CSV（今の絞り込みの全部のページ。BOM 付き UTF-8。= + - @ で始まる文字は表計算の式にならないよう ' を前に付ける） ----
   const csvCell = v => {
@@ -669,10 +730,12 @@
       else msg.textContent = LOGIN_MSG[r.reason] ?? 'ログインできなかった';
     } finally { btn.disabled = false; }
   }
+  // API.logout は保存をすぐ消す。サーバーの合札を無効にする返事は待たずに画面を戻す
   async function doLogout() {
-    await API.logout();
+    const out = API.logout();
     showLogin('');
     toast('ログアウトしたよ');
+    await out;
   }
 
   // ======== ログ: 操作ログ（admin_log_list）と端末のエラー記録（D13） ========
@@ -689,8 +752,8 @@
       return;
     }
     msg.textContent = '';
-    const r = await rpc('admin_log_list', { p_limit: PAGE, p_offset: offset });
-    if (!r || !Array.isArray(r.rows)) return;
+    const ep = R.epoch, r = await rpc('admin_log_list', { p_limit: PAGE, p_offset: offset });
+    if (ep !== R.epoch || !r || !Array.isArray(r.rows)) return;
     ops.total = +r.total || 0; ops.offset = offset;
     tb.replaceChildren(...(r.rows.length ? r.rows.map(l => el('tr', {},
       el('td', { class: 'n', text: fmtFull(l.at) }), el('td', { class: 'who', text: who(l) }), el('td', { text: ACTION[l.action] ?? str(l.action) }),
@@ -736,8 +799,8 @@
     for (const id of ['r-f-board', 'r-f-period', 'r-f-day', 'r-f-sort']) $(id).addEventListener('change', () => loadList(0));
     $('r-prev').onclick = () => loadList(Math.max(0, R.offset - PAGE));
     $('r-next').onclick = () => loadList(R.offset + PAGE);
-    $('r-del').onclick = delPicked;
-    $('r-restore').onclick = restorePicked;
+    $('r-del').onclick = () => exclusive(delPicked);
+    $('r-restore').onclick = () => exclusive(restorePicked);
     $('r-csv').onclick = exportCsv;
     $('r-table').addEventListener('change', e => {
       if (e.target.id === 'r-pick-all') for (const b of $('r-table').tBodies[0].querySelectorAll('input[data-pick]')) b.checked = e.target.checked;
@@ -747,7 +810,7 @@
       const b = e.target.closest('[data-rename], [data-nameless], [data-byname]');
       if (!b) return;
       const id = Number(b.closest('tr').dataset.id);
-      if ('byname' in b.dataset) delByName(id); else rename(id, 'nameless' in b.dataset);
+      exclusive(() => 'byname' in b.dataset ? delByName(id) : rename(id, 'nameless' in b.dataset));
     });
     $('l-ops-load').onclick = () => loadOps();
     $('l-ops-prev').onclick = () => loadOps(Math.max(0, ops.offset - PAGE));
@@ -808,8 +871,11 @@
     $('d-daily-reset').onclick = () => danger('この端末の今日の難問の記録を消す', () => done(SAVE.dailyReset(), '今日の難問をもう一回できるようにしたよ'));
 
     $('d-set-vol').addEventListener('input', () => { $('d-set-vol-n').textContent = $('d-set-vol').value; });
+    for (const id of ['d-set-theme', 'd-set-region', 'd-set-sound', 'd-set-vol', 'd-set-dopa', 'd-set-name'])
+      for (const ev of ['input', 'change']) $(id).addEventListener(ev, () => { setDirty = true; });
     $('d-set-save').onclick = saveSettings;
     $('d-first').onclick = () => danger('初回状態に戻す', () => {
+      setDirty = false;
       if (done(SAVE.firstTime(), 'はじめての人にしたよ')) applyTheme('light');
     });
 
@@ -827,7 +893,7 @@
     addEventListener('offline', () => renderEnv({ ping: lastPing }));
 
     // 本編の別タブがセーブを書いたら描き直す
-    addEventListener('storage', () => { renderAll(); safe('l-err', renderErrs); if (current && document.activeElement !== $('d-json')) pick(current); });
+    addEventListener('storage', () => { renderAll(); safe('l-err', renderErrs); });
 
     initRank();
     safe('d-sound', renderSounds); safe('d-check', renderCheck); renderAll(); safe('l-err', renderErrs);

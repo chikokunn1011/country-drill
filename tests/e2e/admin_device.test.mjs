@@ -289,3 +289,89 @@ for (const [label, viewport] of [['phone', PHONE], ['pc', PC]]) {
     await page.screenshot({ path: `${SHOTS}/final-device-${label}.png`, fullPage: true });
   }, { viewport, colorScheme: 'light', storage: { rpg: RPG, settings: { theme: 'light' }, daily: { day: '2026-10-26', status: 'done', correct: 18 } } });
 }
+
+// ---- 1回目のレビューの直し ----
+// D2 の欄を出したまま、ほかの操作でセーブが変わったら、欄も今の中身になる（保存しても古い中身に戻さない）
+t('json_editor_follows_other_actions', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-saves'); await open(page, 'd-rpg');
+  await page.click('#d-saves [data-key="rpg"]');
+  assert.match(await page.inputValue('#d-json'), /"coins": 500/);
+  await page.click('#d-rpg [data-coins="10000"]');
+  assert.equal(await coins(page), 10500);
+  assert.match(await page.inputValue('#d-json'), /"coins": 10500/);
+  await page.click('#d-json-save');
+  assert.equal(await coins(page), 10500);
+}, { storage: { rpg: RPG } });
+
+// 欄を書きかえたあとでセーブが変わったら、欄はそのまま。保存のときに「変わってる」と聞いて、やめたら書かない
+t('json_editor_edited_then_changed_asks_before_overwrite', async page => {
+  const msgs = [];
+  page.on('dialog', d => { msgs.push(d.message()); if (/変わってる/.test(d.message())) d.dismiss(); else d.accept(); });
+  await open(page, 'd-saves'); await open(page, 'd-rpg');
+  await page.click('#d-saves [data-key="rpg"]');
+  const edited = (await page.inputValue('#d-json')).replace('"lv": 3', '"lv": 4');
+  await page.fill('#d-json', edited);
+  await page.click('#d-rpg [data-coins="10000"]');
+  assert.equal(await page.inputValue('#d-json'), edited, '書きかけの欄は消さない');
+  await page.click('#d-json-save');
+  assert.ok(msgs.some(m => /変わってる/.test(m)), msgs.join('|'));
+  assert.equal(await coins(page), 10500);
+}, { storage: { rpg: RPG } });
+
+t('unsaved_settings_survive_other_actions', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-rpg'); await open(page, 'd-settings');
+  await page.selectOption('#d-set-theme', 'dark');
+  await page.click('#d-rpg [data-coins="1000"]');
+  assert.equal(await coins(page), 1500);
+  assert.equal(await page.inputValue('#d-set-theme'), 'dark', '保存していない選択を戻さない');
+  await page.click('#d-set-save');
+  assert.equal(JSON.parse(await ls(page, 'settings')).theme, 'dark');
+}, { storage: { rpg: RPG, settings: { theme: 'light' } } });
+
+t('delete_missing_key_does_nothing', async page => {
+  let dialogs = 0;
+  page.on('dialog', d => { dialogs++; d.accept(); });
+  await open(page, 'd-saves');
+  await page.fill('#d-key', 'nosuch');
+  await page.click('#d-json-del');
+  await page.locator('#adm-toast', { hasText: '見つからなかった' }).waitFor();
+  assert.equal(dialogs, 0);
+  assert.equal(await ls(page, 'adminSnaps'), null);
+});
+
+// 形がちがうファイル・形がちがう JSON は、確かめる前にやめる（自動のスナップショットも取らない）
+t('rejected_file_or_shape_takes_no_snapshot', async page => {
+  let dialogs = 0;
+  page.on('dialog', d => { dialogs++; d.accept(); });
+  await open(page, 'd-saves');
+  const before = await ls(page, 'rpg');
+  await page.setInputFiles('#d-file', { name: 'x.json', mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ app: 'country-drill', kind: 'save', data: { rpg: 'garbage' } })) });
+  await page.locator('#adm-toast', { hasText: 'セーブファイルじゃないよ' }).waitFor();
+  await page.click('#d-saves [data-key="rpg"]');
+  await page.fill('#d-json', '[1]');
+  await page.click('#d-json-save');
+  await page.locator('#adm-toast', { hasText: '本編のセーブの形じゃないよ' }).waitFor();
+  await page.click('#d-saves [data-key="misses"]');
+  await page.fill('#d-json', 'null');
+  await page.click('#d-json-save');
+  await page.locator('#adm-toast', { hasText: '本編のセーブの形じゃないよ' }).waitFor();
+  assert.equal(dialogs, 0);
+  assert.equal(await ls(page, 'adminSnaps'), null);
+  assert.equal(await ls(page, 'rpg'), before);
+  assert.equal(await ls(page, 'misses'), '{}');
+}, { storage: { rpg: RPG, misses: {} } });
+
+// D9: 国名表示（本編の setup.name）も切りかえられる。音量は本編と同じ 10〜100 の10きざみ
+t('settings_name_toggle_and_game_volume_range', async page => {
+  await open(page, 'd-settings');
+  assert.equal(await page.isChecked('#d-set-name'), false);
+  assert.deepEqual(await page.$eval('#d-set-vol', e => [e.min, e.max, e.step]), ['10', '100', '10']);
+  await page.check('#d-set-name');
+  await page.$eval('#d-set-vol', e => { e.value = '0'; e.dispatchEvent(new Event('input')); });
+  await page.click('#d-set-save');
+  assert.deepEqual(JSON.parse(await ls(page, 'setup')), { mode: 'm2f', name: true });
+  assert.equal(JSON.parse(await ls(page, 'settings')).vol, 10);
+}, { storage: { setup: { mode: 'm2f' } } });

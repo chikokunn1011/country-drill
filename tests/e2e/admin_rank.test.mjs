@@ -559,6 +559,10 @@ t('malformed_error_record_does_not_stop_ops_log', async page => {
   await login(page);
   await page.click('#adm-tabs [data-tab="log"]');
   await page.locator('#l-ops-table tbody tr').first().waitFor();
+  // 変な形の記録があっても、エラー記録の区画は出せて、ふつうの記録は見える
+  await page.locator('#l-err-list li', { hasText: 'ふつう' }).waitFor();
+  assert.equal(await page.locator('#l-err p[data-err]').count(), 0);
+  assert.equal(await page.locator('#l-err-list li').count(), 2);
 }, { storage: { adminErrors: [{ msg: { toString: 1 }, src: { toString: 1 }, at: { toString: 1 }, line: {} }, { msg: 'ふつう', at: '2026-10-28T00:00:00Z' }] } });
 
 t('row_actions_visible_on_phone', async page => {
@@ -635,3 +639,133 @@ for (const [label, viewport] of [['phone', PHONE], ['pc', PC]]) {
     await page.screenshot({ path: `${SHOTS}/final-rank-${label}.png`, fullPage: true });
   }, { viewport, colorScheme: 'light' });
 }
+
+// ---- 1回目のレビューの直し ----
+// ログアウトのあとで届いた一覧の返事は出さない。ログインし直して新しい一覧を待つあいだも、前の行を出さない
+t('late_list_after_logout_is_dropped', async (page, { db }) => {
+  await login(page);
+  await page.locator('#r-table[data-ready]').waitFor();
+  const orig = db.adminRpc.admin_list;
+  let release;
+  const hold = () => { const g = new Promise(ok => { release = ok; }); db.adminRpc.admin_list = args => g.then(() => orig(args)); };
+  hold();
+  await page.click('#r-reload');
+  await page.waitForTimeout(100);
+  await page.click('#adm-logout');
+  await page.locator('#r-login').waitFor();
+  release();
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#r-table tbody tr').count(), 0);
+  assert.doesNotMatch(await page.evaluate(() => document.body.textContent), /たろう|はなこ/);
+  // ログインし直す（一覧は止めておく）
+  db.rows.length = 0;
+  hold();
+  await login(page);
+  await page.waitForTimeout(200);
+  assert.equal(await rows(page).count(), 0, '前の行を出さない');
+  assert.equal(await page.isDisabled('#r-del'), true);
+  release();
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(await rows(page).count(), 0);
+});
+
+// 消す返事を待つあいだは、もう一度押せない（2回送らない）
+t('delete_button_locked_while_request_runs', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  const orig = db.adminRpc.admin_delete;
+  let release;
+  const g = new Promise(ok => { release = ok; });
+  db.adminRpc.admin_delete = args => g.then(() => orig(args));
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await page.waitForTimeout(150);
+  assert.equal(await page.isDisabled('#r-del'), true);
+  assert.equal(await rows(page).first().locator('[data-rename]').isDisabled(), true);
+  release();
+  await page.locator('#adm-toast', { hasText: '1件消したよ' }).waitFor();
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(db.calls.filter(c => c.name === 'admin_delete').length, 1);
+  assert.equal(await page.isDisabled('#r-del'), false);
+});
+
+// 30分さわらないと、開いたままでもログイン画面に戻って、サーバーの名前を画面から消す
+test('idle_30min_logs_out_page', { timeout: 60_000 }, async () => {
+  const app = await openApp(browser, { path: 'admin.html' });
+  seed(app.db);
+  const { page, context } = app;
+  try {
+    await context.clock.install();
+    await page.reload();
+    await login(page);
+    await page.locator('#r-table[data-ready]').waitFor();
+    assert.match(await page.evaluate(() => document.body.textContent), /たろう/);
+    await page.clock.fastForward('31:00');
+    await page.locator('#r-login-msg', { hasText: 'ログインし直してね' }).waitFor();
+    assert.equal(await page.isVisible('#r-login'), true);
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('adminAuth')), null);
+    assert.doesNotMatch(await page.evaluate(() => document.body.textContent), /たろう|はなこ|じろう|ゆうしゃ/);
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});
+
+// 消す返事が来なかった（つながらなかった）: サーバーでは消えているかもしれないので「消えたか分からない」と言って読み直す
+const UNSURE = '消えたか分からない。一覧を読み直して確かめてね';
+// admin_delete だけ、偽DBでは消してから返事を切る（サーバーでは消えたのに返事が届かない）
+const deleteThenDrop = (page, db) => page.route(u => new URL(u).pathname.endsWith('/rpc/admin_delete'), async route => {
+  let args; try { args = route.request().postDataJSON() ?? {}; } catch { args = {}; }
+  db.calls.push({ name: 'admin_delete', args, at: Date.now() });
+  await db.adminRpc.admin_delete(args);
+  return route.abort();
+});
+
+t('delete_network_failure_says_unsure_and_reloads', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await tbodyHas(page, /たろう/);
+  await deleteThenDrop(page, db);
+  const lists = db.calls.filter(c => c.name === 'admin_list').length;
+  await rows(page).filter({ hasText: 'たろう' }).locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await page.locator('#adm-toast', { hasText: UNSURE }).waitFor();
+  await tbodyLacks(page, /たろう/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.ok(db.calls.filter(c => c.name === 'admin_list').length > lists, '読み直す');
+  assert.match(await page.textContent('#adm-toast'), new RegExp(UNSURE));
+  assert.doesNotMatch(await page.textContent('#adm-toast'), /消してない/);
+});
+
+t('delete_by_name_network_failure_says_unsure', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await tbodyHas(page, /たろう/);
+  await deleteThenDrop(page, db);
+  await rows(page).filter({ hasText: 'たろう' }).locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: UNSURE }).waitFor();
+  await tbodyLacks(page, /たろう/);
+  assert.doesNotMatch(await page.textContent('#adm-toast'), /何も消してない/);
+});
+
+// 消せたあとで読み直せなかったら、消したはずの行を出したままにしない
+t('reload_failure_after_delete_clears_rows', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await tbodyHas(page, /たろう/);
+  const orig = db.adminRpc.admin_delete;
+  db.adminRpc.admin_delete = async args => { const r = await orig(args); db.down = true; return r; };   // 消したあとは切れる
+  await rows(page).filter({ hasText: 'たろう' }).locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await page.locator('#r-table tbody td', { hasText: '読みこめなかった。もう一回押してね' }).waitFor();
+  assert.equal(await rows(page).count(), 0);
+  assert.doesNotMatch(await page.textContent('#r-table'), /たろう|はなこ/);
+  assert.equal(await page.isDisabled('#r-del'), true);
+  db.down = false;
+  await page.click('#r-reload');
+  await tbodyHas(page, /はなこ/);
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(await rows(page).count(), 1);
+});
