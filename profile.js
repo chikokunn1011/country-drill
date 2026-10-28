@@ -231,27 +231,41 @@
   // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。箱を描いた時点でプロフィールがあって自動 ON ならすぐ送る、そうでなければ［載せる］、
   // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す。
   // 自動で送るのは描いた時点だけ。あとでほかの場所でプロフィールを作った・自動を ON にしたときは描き直すだけ（載せないままにした記録を、見ていないところで送らない）
-  const postBox = (el, { label = 'ランキングに載せる？', send }) => {
+  // next() は載せたあとにフォーカスを移す先（TA の［ランキングを見る］など。無い・隠れていれば状態の文）
+  const postBox = (el, { label = 'ランキングに載せる？', send, next }) => {
     // state: idle（まだ）・busy（作っている・送っている）・fail（失敗。msg にわけ）・done（載せた。msg に文）
     const st = { state: 'idle', msg: '', input: null };
     const say = (text, cls = '') => { st.msg = text; st.cls = cls; };
+    // 外枠と状態の文（role=status）は1回だけ作り、あとは文だけ書きかえる（差し込み直した live region は読み上げられないことがあるので）。
+    // 中身は状態の文の前（body: 入力や［載せる］）と後ろ（tail: ヒント）。どちらも display: contents なので並びは外枠の flex のまま
+    el.innerHTML = '<div class="tabox pf-post"><div class="pf-post-body"></div><p class="tamsg" role="status" tabindex="-1"></p><div class="pf-post-tail"></div></div>';
+    const body = el.querySelector('.pf-post-body'), msg = el.querySelector('[role=status]'), tail = el.querySelector('.pf-post-tail');
+    let shown = null;   // いま body に出している形（同じなら作り直さない。入力の途中を消さない）
     const draw = () => {
-      const p = get(), m = `<p class="tamsg ${st.cls ?? ''}" role="status">${esc(st.msg)}</p>`;
-      if (st.state === 'done' || st.state === 'busy') { el.innerHTML = `<div class="tabox pf-post">${m}</div>`; return; }
-      if (st.state === 'fail' && p) {
-        el.innerHTML = `<div class="tabox pf-post">${m}<button type="button" class="btn" data-pf="retry">もう一回送る</button></div>`;
-        return;
+      const p = get();
+      // 押したボタン・入力欄が箱の中にあったか（描き直しで消える前に見る）
+      const had = el.contains(document.activeElement);
+      msg.className = `tamsg ${st.cls ?? ''}`;
+      if (msg.textContent !== st.msg) msg.textContent = st.msg;
+      const kind = st.state === 'done' || st.state === 'busy' ? 'none' : st.state === 'fail' && p ? 'retry' : !p ? 'form' : `send:${p.name}`;
+      if (kind !== shown) {
+        shown = kind;
+        if (kind === 'none') body.innerHTML = '';
+        else if (kind === 'retry') body.innerHTML = '<button type="button" class="btn" data-pf="retry">もう一回送る</button>';
+        else if (kind === 'form') {
+          const v = st.input ?? store.get('nickname', '');
+          body.innerHTML = `<form class="field" novalidate><label>${esc(label)}</label>`
+            + `<div class="row"><input type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）" aria-label="ニックネーム" value="${esc(v)}">`
+            + '<button class="btn">プロフィールを作って載せる</button></div></form>';
+        } else body.innerHTML = `<p class="pf-post-q">${esc(label)}</p><button type="button" class="btn" data-pf="send">${esc(p.name)} で載せる</button>`;
+        tail.innerHTML = kind === 'form' ? '<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p>' : '';
       }
-      if (!p) {
-        const v = st.input ?? store.get('nickname', '');
-        el.innerHTML = `<div class="tabox pf-post"><form class="field" novalidate><label>${esc(label)}</label>`
-          + `<div class="row"><input type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）" aria-label="ニックネーム" value="${esc(v)}">`
-          + '<button class="btn">プロフィールを作って載せる</button></div></form>'
-          + `${m}<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p></div>`;
-        return;
-      }
-      el.innerHTML = `<div class="tabox pf-post"><p class="pf-post-q">${esc(label)}</p>`
-        + `<button type="button" class="btn" data-pf="send">${esc(p.name)} で載せる</button>${m}</div>`;
+      // フォーカスが箱の中にあったときだけ移す（自動 ON で描いたとき・ほかの場所を触っているときは動かさない）。
+      // 次に押せるもの（fail は［もう一回送る］、done は next）があればそこへ。無ければ、消えた要素に残って <body> に落ちたときだけ状態の文へ
+      if (!had) return;
+      const to = st.state === 'fail' ? body.querySelector('button') : st.state === 'done' ? next?.() : null;
+      if (to?.isConnected && !to.hidden) to.focus({ preventScroll: true });
+      else if (!el.contains(document.activeElement)) msg.focus({ preventScroll: true });
     };
     const go = async () => {
       const p = get();

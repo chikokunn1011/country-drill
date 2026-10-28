@@ -38,7 +38,9 @@
 .pf-tr-box p { margin: 0; }
 .pf-tr-code { font: 700 1.6rem var(--font-mono); letter-spacing: .06em; color: var(--ink); user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; }
 #pf-tr-in { font-family: var(--font-mono); letter-spacing: .04em; }
-/* 結果画面の「載せる」箱。自動 OFF のときの問いかけ */
+/* 結果画面の「載せる」箱。中身の入れ物（状態の文の前と後ろ）は並びに出さず、中の要素が外枠の flex に並ぶ。自動 OFF のときの問いかけ */
+.pf-post-body, .pf-post-tail { display: contents; }
+.pf-post .tamsg:focus { outline: none; } /* 状態の文は描き直しでフォーカスを置くだけ（押せるものではないので枠は出さない） */
 .pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
 .pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }
 /* ホームの［プロフィール］: 横に並ぶホーム（900〜1279）で［冒険］もあって6つのときは、rpg.css の1行の均等割りだと1つ 130px ほどになり

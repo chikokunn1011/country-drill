@@ -231,6 +231,71 @@ t('postBox does not send on later change', async (page, { db }) => {
   assert.equal(await page.evaluate(() => window.__sent.length), 1);
 });
 
+// キーボードで押したとき: 箱を描き直してもフォーカスは消さない（busy・done は状態の文、fail は［もう一回送る］、next があれば done でそこへ）。
+// 状態の <p role=status> は同じ要素のまま文だけ変わる（差し込み直すと読み上げられないことがあるので）
+const focusInfo = page => page.evaluate(() => {
+  const a = document.activeElement;
+  return { id: a?.id ?? '', tag: a?.tagName ?? '', text: a?.textContent ?? '', sameStatus: document.querySelector('#box [role=status]') === window.__status };
+});
+const markStatus = page => page.evaluate(() => { window.__status = document.querySelector('#box [role=status]'); });
+t('postBox keeps focus and status', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  db.down = true;
+  await drawBox(page);
+  await markStatus(page);
+  assert.ok(await page.evaluate(() => window.__status));   // 押す前から状態の文の場所はある（中は空）
+  await page.focus('#box button:has-text("チコ で載せる")');
+  await page.keyboard.press('Enter');
+  await page.locator('#box button', { hasText: 'もう一回送る' }).waitFor();
+  let f = await focusInfo(page);
+  assert.equal(f.text, 'もう一回送る');
+  assert.ok(f.sameStatus);
+  db.down = false;
+  await page.keyboard.press('Enter');
+  await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
+  f = await focusInfo(page);
+  assert.equal(f.tag, 'P');
+  assert.equal(f.text, 'チコ で載せたよ！');
+  assert.ok(f.sameStatus);
+});
+t('postBox focuses next after done', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.setAuto(false));
+  // TA の結果画面と同じ形: 載せたら隠れていた［ランキングを見る］を出して、そこへ移る
+  await page.evaluate(() => {
+    const el = document.createElement('div'); el.id = 'box'; document.body.append(el);
+    const open = document.createElement('button'); open.id = 'nx'; open.hidden = true; open.textContent = 'ランキングを見る'; document.body.append(open);
+    PROFILE.postBox(el, { send: async () => { open.hidden = false; return { ok: true }; }, next: () => open });
+  });
+  await page.focus('#box button:has-text("チコ で載せる")');
+  await page.keyboard.press('Enter');
+  await page.locator('#box', { hasText: '載せたよ！' }).waitFor();
+  assert.equal((await focusInfo(page)).id, 'nx');
+});
+t('postBox create by keyboard keeps focus', async (page, { db }) => {
+  await page.evaluate(() => localStorage.setItem('nickname', JSON.stringify('ハチ')));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await drawBox(page);
+  await markStatus(page);
+  await page.focus('#box input');
+  await page.keyboard.press('Enter');
+  await page.locator('#box', { hasText: 'ハチ で載せたよ！' }).waitFor();
+  const f = await focusInfo(page);
+  assert.equal(f.tag, 'P');
+  assert.ok(f.sameStatus);
+  assert.equal(db.profiles.length, 1);
+});
+// 自動 ON で描いたときは、箱の外にあるフォーカスを動かさない
+t('postBox auto does not steal focus', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => { const b = document.createElement('button'); b.id = 'outside'; b.textContent = 'x'; document.body.append(b); b.focus(); });
+  await drawBox(page);
+  await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
+  assert.equal((await focusInfo(page)).id, 'outside');
+});
+
 // lost(token) は、いまのプロフィールがその合言葉のときだけ消す（遅れて届いた古い合言葉の not_found で、新しいプロフィールを消さない）。
 // 引数なしは今までどおり消す
 t('lost checks token', async (page, { db }) => {
