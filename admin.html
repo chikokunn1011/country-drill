@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://vgdkklvhtvcamtxwjpke.supabase.co; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex, nofollow">
+<title>国旗マスター 管理</title>
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<!-- 外のスクリプトは読まない。admin.js は最初に settings.theme を見て data-theme を付けるので head で読む（画面は DOMContentLoaded で作る） -->
+<script src="countries.js"></script>
+<script src="daily-core.js"></script>
+<script src="rpg-core.js"></script>
+<script src="badges.js"></script>
+<script src="sound.js"></script>
+<script src="admin-save.js"></script>
+<script src="admin-api.js"></script>
+<script src="admin.js"></script>
+<style>
+/* 本編（index.html）と同じ色の決まり。フォントは CSP で外から読めないので端末のものだけ */
+:root {
+  --bg: #eef2f1; --surface: #ffffff; --ink: #1b2a33; --muted: #5b6b73; --line: #d3dcdc;
+  --accent: #1f5f8b; --accent-ink: #ffffff; --hl: #e39b2d; --ok: #2e8b57; --ok-soft: #e1f2e8; --ng: #c43d3d; --ng-soft: #f8e3e3;
+  --grain: #2b3a33; --grain-op: .1;
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif;
+  --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171c; --surface: #18232a; --ink: #e5edf0; --muted: #93a4ac; --line: #2c3a42;
+    --accent: #6fb3e0; --accent-ink: #0c1820; --hl: #f0b04a; --ok: #5cc48a; --ok-soft: #173326; --ng: #ec7a7a; --ng-soft: #3a1d1f;
+    --grain: #ffffff; --grain-op: .045;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171c; --surface: #18232a; --ink: #e5edf0; --muted: #93a4ac; --line: #2c3a42;
+  --accent: #6fb3e0; --accent-ink: #0c1820; --hl: #f0b04a; --ok: #5cc48a; --ok-soft: #173326; --ng: #ec7a7a; --ng-soft: #3a1d1f;
+  --grain: #ffffff; --grain-op: .045;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.6; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 48px; overflow-x: clip;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--grain); opacity: var(--grain-op);
+  -webkit-mask: url("textures/paper.svg") repeat; mask: url("textures/paper.svg") repeat;
+}
+.wrap { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:is(button, a, select, input, textarea, summary):focus-visible { outline: 3px solid var(--hl); outline-offset: 2px; }
+.mono { font-family: var(--font-mono); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.hint { font-size: .82rem; color: var(--muted); margin: 0; }
+
+/* 上の帯 */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+.brand { font-family: var(--font-display); font-weight: 900; font-size: 1.1rem; margin: 0; }
+.brand small { display: block; font-family: var(--font-mono); font-weight: 400; font-size: .62rem; color: var(--muted); letter-spacing: .12em; }
+.who { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); min-width: 0; }
+#adm-who { overflow-wrap: anywhere; }
+
+/* タブ */
+#adm-tabs { display: flex; gap: 4px; border-bottom: 1.5px solid var(--line); }
+#adm-tabs button {
+  flex: 1 1 0; background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -1.5px; padding: 10px 4px;
+  font: 700 .95rem var(--font-display); color: var(--muted); cursor: pointer;
+}
+#adm-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* 区画（たためる） */
+.tab { display: flex; flex-direction: column; gap: 10px; }
+details.sec { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+details.sec > summary {
+  cursor: pointer; padding: 12px 16px; font: 900 1rem var(--font-display); list-style: none; display: flex; align-items: baseline; gap: 8px;
+}
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::before { content: "▸"; color: var(--accent); transition: transform .15s; }
+details.sec[open] > summary::before { transform: rotate(90deg); }
+details.sec > summary small { font: 400 .72rem var(--font-mono); color: var(--muted); letter-spacing: .08em; }
+.body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sh { font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; margin: 0; }
+
+/* 部品 */
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn {
+  background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 10px; padding: 8px 14px;
+  font: 700 .9rem var(--font-display); cursor: pointer;
+}
+.btn.ghost { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+.btn.danger { background: transparent; color: var(--ng); border: 1.5px solid var(--ng); }
+.btn.sm { padding: 4px 10px; font-size: .82rem; border-radius: 8px; }
+.btn:disabled { opacity: .5; cursor: default; }
+a.btn { text-decoration: none; display: inline-block; }
+input[type=text], input[type=number], input[type=date], select, textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; min-width: 0; max-width: 100%;
+}
+input[type=number] { width: 7em; }
+input[type=checkbox], input[type=range] { accent-color: var(--accent); }
+textarea { width: 100%; min-height: 220px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5; resize: vertical; }
+label.inl { display: inline-flex; align-items: center; gap: 6px; }
+
+/* 一覧・表 */
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.list > li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.list > li > .grow { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.keybtn { background: none; border: 0; padding: 0; color: var(--accent); font: 700 .9rem var(--font-mono); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.keybtn[aria-pressed="true"] { color: var(--ink); text-decoration: underline 2px var(--hl); }
+.scroll { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: .75rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+dl.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: .88rem; }
+dl.kv dt { color: var(--muted); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.floor { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: .85rem; min-width: 0; }
+.floor span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badges { max-height: 340px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px 12px; }
+.badges label { display: flex; gap: 6px; align-items: baseline; font-size: .85rem; min-width: 0; }
+.badges label span { overflow-wrap: anywhere; }
+.ok { color: var(--ok); font-weight: 700; }
+.ng { color: var(--ng); font-weight: 700; }
+.jump a { color: var(--accent); font-weight: 700; }
+.jump li { padding: 4px 0; }
+
+/* トースト */
+#adm-toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); max-width: calc(100vw - 32px);
+  background: var(--ink); color: var(--bg); padding: 10px 18px; border-radius: 12px; font-weight: 700; font-size: .9rem;
+  box-shadow: 0 6px 20px rgb(0 0 0 / .2); z-index: 10;
+}
+#adm-toast.bad { background: var(--ng); color: #fff; }
+#adm-toast:empty { display: none; }
+
+@media (min-width: 900px) {
+  body { padding-block: 28px 64px; }
+  .brand { font-size: 1.3rem; }
+}
+</style>
+</head>
+<body data-snd-off>
+<div class="wrap">
+  <header class="topbar">
+    <h1 class="brand">国旗マスター 管理<small>ADMIN · COUNTRY-DRILL</small></h1>
+    <div class="who"><span id="adm-who">ログインしてない</span><button class="btn ghost sm" id="adm-logout" hidden>ログアウト</button></div>
+  </header>
+
+  <nav id="adm-tabs" role="tablist" aria-label="管理のタブ">
+    <button role="tab" data-tab="device" aria-selected="true" aria-controls="tab-device">端末</button>
+    <button role="tab" data-tab="rank" aria-selected="false" aria-controls="tab-rank">ランキング</button>
+    <button role="tab" data-tab="log" aria-selected="false" aria-controls="tab-log">ログ</button>
+  </nav>
+
+  <!-- 端末: この端末のセーブ（localStorage）。ログインなしで使える -->
+  <section id="tab-device" class="tab" role="tabpanel">
+    <p class="hint">この端末（このブラウザ）のセーブをさわるよ。ログインはいらない。危ない操作の前は自動でスナップショットを取るよ。</p>
+
+    <details class="sec" id="d-saves">
+      <summary>セーブ一覧<small>D1・D2</small></summary>
+      <div class="body">
+        <ul class="list" id="d-keys"></ul>
+        <div class="row"><label class="inl">キー <input type="text" id="d-key" autocomplete="off" spellcheck="false"></label></div>
+        <textarea id="d-json" spellcheck="false" aria-label="選んだキーの中身（JSON）"></textarea>
+        <div class="row">
+          <button class="btn" id="d-json-save">保存</button>
+          <button class="btn danger" id="d-json-del">消す</button>
+          <button class="btn ghost" id="d-json-copy">コピー</button>
+        </div>
+        <p class="hint">rpg と badges は本編と同じ形に直してから保存するよ。JSON が壊れてたら保存しない。</p>
+      </div>
+    </details>
+
+    <details class="sec" id="d-backup">
+      <summary>バックアップ<small>D3</small></summary>
+      <div class="body">
+        <div class="row"><a class="btn" id="d-dl" href="#" download="country-drill-save-00000000.json">ぜんぶダウンロード</a></div>
+        <div class="row"><label class="inl">ファイルから読み戻す <input type="file" id="d-file" accept=".json,application/json"></label></div>
+        <p class="hint">読み戻すと、今のセーブはファイルの中身にまるごと入れかわるよ（前に自動でスナップショットを取る）。</p>
+      </div>
+    </details>
+
+    <details class="sec" id="d-snaps">
+      <summary>スナップショット<small>D4</small></summary>
+      <div class="body">
+        <div class="row">
+          <input type="text" id="d-snap-name" placeholder="名前（例: ボス前）" aria-label="スナップショットの名前">
+          <button class="btn" id="d-snap-save">今の状態を保存</button>
+        </div>
+        <ul class="list" id="d-snap-list"></ul>
+        <p class="hint">5個まで。古いものから消えるよ。</p>
+      </div>
+    </details>
+
+    <details class="sec" id="d-rpg">
+      <summary>冒険<small>D5</small></summary>
+      <div class="body">
+        <dl class="kv" id="d-rpg-sum"></dl>
+        <p class="sh">コイン</p>
+        <div class="row">
+          <button class="btn ghost sm" data-coins="-10000">−10000</button>
+          <button class="btn ghost sm" data-coins="-1000">−1000</button>
+          <button class="btn ghost sm" data-coins="1000">＋1000</button>
+          <button class="btn ghost sm" data-coins="10000">＋10000</button>
+        </div>
+        <div class="row">
+          <label class="inl">Lv <input type="number" id="d-rpg-lv" min="1"></label><button class="btn sm" id="d-rpg-lv-set">決める</button>
+          <label class="inl">天井カウンター <input type="number" id="d-rpg-pity" min="0"></label><button class="btn sm" id="d-rpg-pity-set">決める</button>
+        </div>
+        <p class="sh">ダンジョンのフロア（0〜5。5＝ボスを倒した）</p>
+        <div class="grid" id="d-rpg-floors"></div>
+        <div class="row">
+          <button class="btn ghost" id="d-rpg-unlock">全部開く</button>
+          <button class="btn danger" id="d-rpg-clear">全部クリア</button>
+          <button class="btn ghost" id="d-rpg-story">ストーリー既読を消す</button>
+        </div>
+        <div class="row">
+          <label class="inl">カードをあげる <input type="text" id="d-rpg-card" placeholder="国コード（jp など）" size="12" autocomplete="off" spellcheck="false"></label>
+          <button class="btn sm" id="d-rpg-card-give">あげる</button>
+        </div>
+        <div class="row"><button class="btn danger" id="d-rpg-wipe">冒険データを消す</button></div>
+      </div>
+    </details>
+
+    <details class="sec" id="d-badges">
+      <summary>バッジ<small>D7</small></summary>
+      <div class="body">
+        <p class="hint" id="d-badges-sum"></p>
+        <div class="row">
+          <button class="btn ghost" id="d-badges-all">全部取る</button>
+          <button class="btn danger" id="d-badges-none">全部消す</button>
+        </div>
+        <div class="badges" id="d-badges-list"></div>
+      </div>
+    </details>
+
+    <details class="sec" id="d-daily">
+      <summary>今日の難問<small>D8</small></summary>
+      <div class="body">
+        <div class="row">
+          <label class="inl">日付 <input type="date" id="d-daily-day"></label>
+          <button class="btn danger" id="d-daily-reset">今日をやり直す</button>
+        </div>
+        <p class="hint" id="d-daily-rec"></p>
+        <div class="scroll"><table>
+          <thead><tr><th>#</th><th>国旗の国</th><th>形式</th><th>答え</th></tr></thead>
+          <tbody id="d-daily-body"></tbody>
+        </table></div>
+      </div>
+    </details>
+
+    <details class="sec" id="d-settings">
+      <summary>設定<small>D9</small></summary>
+      <div class="body">
+        <div class="row">
+          <label class="inl">テーマ <select id="d-set-theme"><option value="light">ライト</option><option value="dark">ダーク</option><option value="auto">端末に合わせる</option></select></label>
+          <label class="inl">地域 <select id="d-set-region"></select></label>
+        </div>
+        <div class="row">
+          <label class="inl"><input type="checkbox" id="d-set-sound"> 効果音</label>
+          <label class="inl">音量 <input type="range" id="d-set-vol" min="0" max="100" step="5"> <span class="mono" id="d-set-vol-n"></span></label>
+          <label class="inl"><input type="checkbox" id="d-set-dopa"> ドパガキ</label>
+        </div>
+        <div class="row">
+          <button class="btn" id="d-set-save">設定を保存</button>
+          <button class="btn danger" id="d-first">初回状態に戻す</button>
+        </div>
+        <p class="hint">初回状態: 設定・苦手・ニックネーム・冒険・バッジ・今日の難問を消して、はじめての人にするよ。</p>
+      </div>
+    </details>
+
+    <details class="sec" id="d-sound">
+      <summary>効果音を鳴らす<small>D10</small></summary>
+      <div class="body">
+        <div class="row" id="d-sound-list"></div>
+        <p class="hint">ここでは本編の「効果音オフ」に関係なく音量70で鳴るよ。紙吹雪・ガチャの演出は本編で試してね（下のジャンプから）。</p>
+      </div>
+    </details>
+
+    <details class="sec" id="d-jump">
+      <summary>本編へジャンプ<small>D11</small></summary>
+      <div class="body">
+        <ul class="list jump">
+          <li><a href="./" target="_blank" rel="noopener">ホーム</a></li>
+          <li><a href="./#play" target="_blank" rel="noopener">モード選択</a></li>
+          <li><a href="./#settings" target="_blank" rel="noopener">設定</a></li>
+          <li><a href="./#book" target="_blank" rel="noopener">国旗図鑑</a></li>
+          <li><a href="./#rpg" target="_blank" rel="noopener">冒険</a></li>
+          <li><a href="./#badges" target="_blank" rel="noopener">バッジ</a></li>
+          <li><a href="./?rpgdebug=1#rpg" target="_blank" rel="noopener">冒険（開発用パネルつき）</a></li>
+        </ul>
+      </div>
+    </details>
+
+    <details class="sec" id="d-env">
+      <summary>端末の情報<small>D12</small></summary>
+      <div class="body">
+        <dl class="kv" id="d-env-list"></dl>
+        <div class="row">
+          <button class="btn ghost" id="d-env-refresh">しらべ直す</button>
+          <button class="btn ghost" id="d-env-ping">Supabase につながるか</button>
+        </div>
+      </div>
+    </details>
+
+    <details class="sec" id="d-check">
+      <summary>データ点検<small>D14</small></summary>
+      <div class="body">
+        <p id="d-check-sum"></p>
+        <ul class="list" id="d-check-list"></ul>
+        <p class="hint">countries.js の国の数・コードの重複・国名・地域・緯度経度を見るよ（国旗の絵と地図はこのページでは読まない）。</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="tab-rank" class="tab" role="tabpanel" hidden>
+    <p class="hint">ランキングの管理はここに入るよ（準備中）。</p>
+  </section>
+
+  <section id="tab-log" class="tab" role="tabpanel" hidden>
+    <p class="hint">操作ログとエラー記録はここに入るよ（準備中）。</p>
+  </section>
+</div>
+<div id="adm-toast" role="status" aria-live="polite"></div>
+</body>
+</html>

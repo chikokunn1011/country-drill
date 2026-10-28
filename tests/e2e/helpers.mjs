@@ -175,7 +175,8 @@ async function supabaseRoute(route, db) {
 // init: 読み込むたびにページのスクリプトより前に走らせる関数か文字列（context.addInitScript に渡す）
 // 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字、
 // consoleErrors は console.error の文字（再読み込みをまたいで積む）
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init } = {}) {
+// path: url からの相対で開くページ（'admin.html' など。省略時は url そのもの＝index.html）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
   const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
@@ -205,7 +206,7 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (m.type() === 'warning') warnings.push(m.text());
     if (m.type() === 'error') consoleErrors.push(m.text());
   });
-  await page.goto(url);
+  await page.goto(new URL(path, url).href);
   return { page, context, db, errors, warnings, consoleErrors, close: () => context.close() };
 }
 
