@@ -2,7 +2,9 @@
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
 -- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と、
--- 今日の難問の submit_daily / top_daily / daily_rank_of だけ。
+-- 今日の難問の submit_daily / top_daily / daily_rank_of と、
+-- サイト共通のプロフィールの profile_create / profile_me / profile_rename / profile_set / profile_card /
+-- profile_transfer_start / profile_transfer_claim だけ。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -441,3 +443,267 @@ begin
 end $$;
 revoke all on function top_daily(text) from public;
 grant execute on function top_daily(text) to anon;
+
+-- ---- サイト共通のプロフィール ----
+-- 1つの端末に1つ。タイムアタック・今日の難問・冒険のランキングはこのプロフィールで載せる（2026-10-28）
+-- はじめて作るとき（profile_create）に端末が作った合言葉（p_token）を送り、DB にはそのハッシュ（rpg_hash）だけ残す。
+-- ランキングに出すのは公開用の pid（12文字の英数字、合言葉とは別）だけで、名前を押すと profile_card で窓の中身を返す。
+-- 名前は全角半角・大文字小文字をそろえて、ほかのプロフィールと同じものは使えない。
+-- 引き継ぎ: 前の端末が profile_transfer_start でデータを預けてコードをもらい、新しい端末が profile_transfer_claim でコードを入れると
+-- 合言葉が新しい端末のものに入れかわる（前の端末は not_found になる）。コードは24時間・1回だけ
+create table if not exists profiles (
+  id bigint generated always as identity primary key,
+  pid text not null unique default substr(replace(gen_random_uuid()::text, '-', ''), 1, 12),  -- 公開用のID
+  token_hash bytea not null unique,      -- sha256(合言葉)
+  nickname text not null,                -- 前後空白を除いた1〜12文字
+  is_public boolean not null default true,
+  title text not null default '',        -- いまつけている称号（40文字まで）
+  deco text[] not null default '{}',     -- かざり（rpg_codes() の国コード、3つまで、重なり無し）
+  badges int not null default 0,         -- 取ったバッジの数
+  badges_total int not null default 0,   -- バッジの全部の数（表示用）
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+-- ほかのプロフィールと同じ名前は使えない。全角半角・大文字小文字のちがいも同じ名前とみなす
+create unique index if not exists profiles_name on profiles (lower(normalize(nickname, NFKC)));
+alter table profiles enable row level security;
+revoke all on profiles from anon, authenticated;
+
+create table if not exists profile_transfers (
+  id bigint generated always as identity primary key,
+  code_hash bytea not null unique,       -- sha256(コード。ハイフン抜き・大文字)
+  profile_id bigint not null references profiles(id),
+  data jsonb,                            -- 預けたデータ。使ったら・出し直したら null にする
+  expires_at timestamptz not null,       -- 出してから24時間
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists profile_transfers_profile on profile_transfers (profile_id, created_at);
+alter table profile_transfers enable row level security;
+revoke all on profile_transfers from anon, authenticated;
+
+-- 今の表にプロフィールの列を足す（null = プロフィールより前の古い記録）
+alter table scores add column if not exists profile_id bigint references profiles(id);
+create index if not exists scores_board_profile on scores (board, profile_id);
+alter table daily_scores add column if not exists profile_id bigint references profiles(id);
+create unique index if not exists daily_scores_day_profile on daily_scores (day, profile_id) where profile_id is not null;
+alter table rpg_players add column if not exists profile_id bigint unique references profiles(id);
+
+-- 名前の前後の空白を落とす（JS の trim() と同じ文字。submit_score と同じ並び）
+create or replace function profile_clean_name(p_name text) returns text
+language sql immutable set search_path = public, pg_temp as $$
+  select btrim(p_name, E' \t\n\r\f\u000b                 　﻿')
+$$;
+revoke all on function profile_clean_name(text) from public, anon, authenticated;
+
+-- 名前の確認。だめなら理由、よければ null（p_id のプロフィールが今使っている名前はよい）
+create or replace function profile_name_problem(p_name text, p_id bigint) returns text
+language plpgsql stable set search_path = public, pg_temp as $$
+declare
+  v_norm text := lower(normalize(p_name, NFKC));
+begin
+  if p_name is null or char_length(p_name) not between 1 and 12 then return 'bad_name'; end if;
+  if exists (select 1 from unnest(ng_words()) w where strpos(v_norm, w) > 0) then return 'ng_name'; end if;
+  if exists (select 1 from profiles where lower(normalize(nickname, NFKC)) = v_norm and id is distinct from p_id) then return 'name_taken'; end if;
+  return null;
+end $$;
+revoke all on function profile_name_problem(text, bigint) from public, anon, authenticated;
+
+-- 合言葉のプロフィール。無ければ全部の列が null の行
+create or replace function profile_by_token(p_token text) returns profiles
+language sql stable set search_path = public, pg_temp as $$
+  select * from profiles where token_hash = rpg_hash(p_token)
+$$;
+revoke all on function profile_by_token(text) from public, anon, authenticated;
+
+-- プロフィールを作る。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"pid":...,"nickname":...}
+create or replace function profile_create(p_token text, p_nickname text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+  v_name text := profile_clean_name(p_nickname);
+  v_why text;
+  v_pid text;
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  -- 同じ名前・同じ合言葉の同時送信が両方通らないように順番待ち
+  perform pg_advisory_xact_lock(hashtext('pfname:' || coalesce(lower(normalize(v_name, NFKC)), '')));
+  perform pg_advisory_xact_lock(hashtext('pftoken:' || p_token));
+  if exists (select 1 from profiles where token_hash = v_hash) then return jsonb_build_object('ok', false, 'reason', 'already'); end if;
+  v_why := profile_name_problem(v_name, null);
+  if v_why is not null then return jsonb_build_object('ok', false, 'reason', v_why); end if;
+  insert into profiles (token_hash, nickname) values (v_hash, v_name) returning pid into v_pid;
+  return jsonb_build_object('ok', true, 'pid', v_pid, 'nickname', v_name);
+end $$;
+revoke all on function profile_create(text, text) from public;
+grant execute on function profile_create(text, text) to anon;
+
+-- 自分のプロフィール。無ければ not_found（別の端末に引き継がれた・消された）
+create or replace function profile_me(p_token text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare
+  v_p profiles;
+begin
+  if rpg_hash(p_token) is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  v_p := profile_by_token(p_token);
+  if v_p.id is null then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  return jsonb_build_object('ok', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'is_public', v_p.is_public,
+                            'title', v_p.title, 'deco', to_jsonb(v_p.deco));
+end $$;
+revoke all on function profile_me(text) from public;
+grant execute on function profile_me(text) to anon;
+
+-- 名前を変える。表示は profiles から取るが、Table Editor で見やすいように今の表のこの人の行の nickname もそろえる
+-- （daily_scores と rpg_players は名前に unique があるので、古い記録とぶつかる行はそのままにする）
+create or replace function profile_rename(p_token text, p_nickname text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+  v_name text := profile_clean_name(p_nickname);
+  v_norm text := lower(normalize(v_name, NFKC));
+  v_id bigint;
+  v_why text;
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  perform pg_advisory_xact_lock(hashtext('pfname:' || coalesce(v_norm, '')));
+  select id into v_id from profiles where token_hash = v_hash for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  v_why := profile_name_problem(v_name, v_id);
+  if v_why is not null then return jsonb_build_object('ok', false, 'reason', v_why); end if;
+  update profiles set nickname = v_name, updated_at = now() where id = v_id;
+  update scores set nickname = v_name where profile_id = v_id;
+  update daily_scores d set nickname = v_name where d.profile_id = v_id
+    and not exists (select 1 from daily_scores o where o.day = d.day and o.id <> d.id and lower(normalize(o.nickname, NFKC)) = v_norm);
+  update rpg_players r set nickname = v_name where r.profile_id = v_id
+    and not exists (select 1 from rpg_players o where o.id <> r.id and o.nickname = v_name);
+  return jsonb_build_object('ok', true, 'nickname', v_name);
+end $$;
+revoke all on function profile_rename(text, text) from public;
+grant execute on function profile_rename(text, text) to anon;
+
+-- 公開・称号・かざり・バッジの数を一度に変える。null の引数は変えない
+create or replace function profile_set(p_token text, p_is_public boolean, p_title text, p_deco text[], p_badges int, p_badges_total int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  -- かざりの確かめ方は rpg_set_deco と同じ（3つまで・重なり無し・rpg_codes() のどれか）
+  if p_deco is not null and (cardinality(p_deco) > 3 or coalesce(array_ndims(p_deco), 1) <> 1
+     or array_position(p_deco, null) is not null
+     or not (p_deco <@ rpg_codes())
+     or (select count(distinct x) from unnest(p_deco) x) <> cardinality(p_deco)) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_deco');
+  end if;
+  if char_length(p_title) > 40 or p_badges not between 0 and 500 or p_badges_total not between 0 and 500 then
+    return jsonb_build_object('ok', false, 'reason', 'bad_record');
+  end if;
+  update profiles set is_public = coalesce(p_is_public, is_public), title = coalesce(p_title, title), deco = coalesce(p_deco, deco),
+                      badges = coalesce(p_badges, badges), badges_total = coalesce(p_badges_total, badges_total), updated_at = now()
+    where token_hash = v_hash;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke all on function profile_set(text, boolean, text, text[], int, int) from public;
+grant execute on function profile_set(text, boolean, text, text[], int, int) to anon;
+
+-- ランキングの名前を押したときの窓の中身。非公開なら名前とかざりだけ。無ければ not_found
+-- ta はタイムアタックの board ごとの自己ベストのうち順位（歴代）が良い3つ（同じ順位は速い順）
+-- since は作った時刻（日本時間の日付にするのはブラウザ側。日本時間の区切りは jst_week_start と daily_day_open にだけ書く）
+create or replace function profile_card(p_pid text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare
+  v_p profiles;
+begin
+  select * into v_p from profiles where pid = p_pid;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if not v_p.is_public then
+    return jsonb_build_object('ok', true, 'private', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'deco', to_jsonb(v_p.deco));
+  end if;
+  return jsonb_build_object('ok', true, 'private', false, 'pid', v_p.pid, 'nickname', v_p.nickname, 'title', v_p.title,
+    'deco', to_jsonb(v_p.deco), 'badges', v_p.badges, 'badges_total', v_p.badges_total,
+    'rpg', (select jsonb_build_object('lv', r.lv, 'dungeons', r.dungeons) from rpg_players r where r.profile_id = v_p.id),
+    'ta', coalesce((select jsonb_agg(jsonb_build_object('board', t.board, 'time_ms', t.time_ms, 'rank', t.rank) order by t.rank, t.time_ms, t.board)
+      from (select b.board, b.time_ms, (rank_of(b.board, b.time_ms)->>'rank_all')::int as rank
+            from (select s.board, min(s.time_ms) as time_ms from scores s where s.profile_id = v_p.id group by s.board) b
+            order by 3, 2, 1 limit 3) t), '[]'::jsonb),
+    'daily', (select jsonb_build_object('plays', count(*), 'perfect', count(*) filter (where d.correct = d.total))
+      from daily_scores d where d.profile_id = v_p.id),
+    'since', v_p.created_at);
+end $$;
+revoke all on function profile_card(text) from public;
+grant execute on function profile_card(text) to anon;
+
+-- 引き継ぎコードを出す。前のコードは使えなくしてから、新しいコード（ハイフン無し12文字）を作って返す
+-- 文字は 0/O/1/I を除いた32文字。gen_random_uuid() のバイトの下5ビットを使う（拡張なしで動くように。
+-- 7バイトめは下5ビットにバージョンの決まったビットが入るので飛ばす）
+create or replace function profile_transfer_start(p_token text, p_data jsonb) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_hash bytea := rpg_hash(p_token);
+  v_id bigint;
+  v_bytes bytea := uuid_send(gen_random_uuid());
+  v_code text := '';
+  v_expires timestamptz := now() + interval '24 hours';
+begin
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  select id into v_id from profiles where token_hash = v_hash for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'not_found'); end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' then return jsonb_build_object('ok', false, 'reason', 'bad_record'); end if;
+  if octet_length(p_data::text) > 524288 then return jsonb_build_object('ok', false, 'reason', 'too_big'); end if;
+  if exists (select 1 from profile_transfers where profile_id = v_id and created_at > now() - interval '1 minute') then
+    return jsonb_build_object('ok', false, 'reason', 'too_soon');
+  end if;
+  for i in 0..12 loop
+    continue when i = 6;
+    v_code := v_code || substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', get_byte(v_bytes, i) % 32 + 1, 1);
+  end loop;
+  update profile_transfers set data = null, expires_at = least(expires_at, now())
+    where profile_id = v_id and used_at is null and expires_at > now();
+  insert into profile_transfers (code_hash, profile_id, data, expires_at)
+    values (sha256(convert_to(v_code, 'UTF8')), v_id, p_data, v_expires);
+  return jsonb_build_object('ok', true, 'code', v_code, 'expires_at', v_expires);
+end $$;
+revoke all on function profile_transfer_start(text, jsonb) from public;
+grant execute on function profile_transfer_start(text, jsonb) to anon;
+
+-- 引き継ぎコードを使う。ハイフン・空白・小文字は許す。使えるコード（期限内・未使用）なら合言葉を新しい端末のものに入れかえて、預けたデータを返す
+create or replace function profile_transfer_claim(p_code text, p_new_token text) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_code text := upper(regexp_replace(coalesce(p_code, ''), '[\s-]', '', 'g'));
+  v_hash bytea := rpg_hash(p_new_token);
+  v_t profile_transfers;
+  v_p profiles;
+begin
+  if v_code !~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{12}$' then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
+  if v_hash is null then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  select * into v_t from profile_transfers
+    where code_hash = sha256(convert_to(v_code, 'UTF8')) and used_at is null and expires_at > now() and data is not null for update;
+  if not found then return jsonb_build_object('ok', false, 'reason', 'bad_code'); end if;
+  -- 新しい合言葉がもうほかのプロフィールのものなら入れかえられない（端末は合言葉を作り直して送る）
+  if exists (select 1 from profiles where token_hash = v_hash) then return jsonb_build_object('ok', false, 'reason', 'bad_token'); end if;
+  update profiles set token_hash = v_hash, updated_at = now() where id = v_t.profile_id returning * into v_p;
+  update profile_transfers set used_at = now(), data = null where id = v_t.id;
+  return jsonb_build_object('ok', true, 'pid', v_p.pid, 'nickname', v_p.nickname, 'data', v_t.data);
+end $$;
+revoke all on function profile_transfer_claim(text, text) from public;
+grant execute on function profile_transfer_claim(text, text) to anon;
+
+-- 引っ越し: プロフィールより前に冒険ランキングに載っていた人を、同じ合言葉・名前・かざりのプロフィールにする（何度呼んでも増えない）
+-- 名前がほかのプロフィールとぶつかる行は作らない（その人は冒険ランキングに残るがプロフィールは無いまま）
+create or replace function profile_migrate_rpg() returns void
+language plpgsql volatile set search_path = public, pg_temp as $$
+begin
+  insert into profiles (token_hash, nickname, deco, created_at)
+    select r.token_hash, r.nickname, r.deco, r.created_at from rpg_players r
+    where r.profile_id is null and not exists (select 1 from profiles p where p.token_hash = r.token_hash)
+    order by r.created_at
+    on conflict do nothing;
+  update rpg_players r set profile_id = p.id from profiles p
+    where r.profile_id is null and p.token_hash = r.token_hash;
+end $$;
+revoke all on function profile_migrate_rpg() from public, anon, authenticated;
+do $$ begin perform profile_migrate_rpg(); end $$;
+
+notify pgrst, 'reload schema';

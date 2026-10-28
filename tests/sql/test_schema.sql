@@ -482,4 +482,282 @@ set role anon;
 do $$ begin assert (select count(*) from top_daily(to_char(current_date, 'YYYY-MM-DD'))) = 50, '50件まで'; end $$;
 reset role;
 
+-- ---- サイト共通のプロフィール ----
+-- 合言葉: a1=チコ、a2=2人目、a9=引き継ぎ先の端末
+\echo '- profile_create_ok'
+reset role; truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade; set role anon;
+do $$ declare r jsonb := profile_create('00000000-0000-4000-8000-0000000000a1', ' チコ '); begin
+  assert (r->>'ok')::boolean, format('create: %s', r);
+  assert r->>'nickname' = 'チコ', format('前後空白を除く: %s', r);
+  assert r->>'pid' ~ '^[0-9a-f]{12}$', format('pid: %s', r);
+  assert profile_create('00000000-0000-4000-8000-0000000000a1', 'ミケ')->>'reason' = 'already', '同じ合言葉で2つめはだめ';
+  assert profile_create('00000000-0000-4000-8000-0000000000a1', 'チコ')->>'reason' = 'already', '同じ合言葉・同じ名前も already';
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from profiles) = 1, '1行だけ';
+  assert (select token_hash from profiles) = sha256(convert_to('00000000-0000-4000-8000-0000000000a1', 'UTF8')), '合言葉はハッシュで残す';
+  assert (select row(is_public, title, deco, badges, badges_total)::text from profiles) = '(t,"",{},0,0)', 'はじめの値';
+end $$;
+
+\echo '- profile_name_taken'
+set role anon;
+do $$ begin
+  assert profile_create('00000000-0000-4000-8000-0000000000a2', 'ﾁｺ')->>'reason' = 'name_taken', '全角半角をそろえると同じ';
+  assert profile_create('00000000-0000-4000-8000-0000000000a2', 'チコ ')->>'reason' = 'name_taken', '前後空白を除くと同じ';
+  assert (profile_create('00000000-0000-4000-8000-0000000000a2', 'ＣＨＩＫＯ')->>'ok')::boolean, 'ＣＨＩＫＯ は作れる';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', 'chiko')->>'reason' = 'name_taken', 'ＣＨＩＫＯ と chiko は同じ';
+end $$;
+
+\echo '- profile_bad'
+do $$ begin
+  assert profile_create(null, 'ミケ')->>'reason' = 'bad_token', 'null の合言葉';
+  assert profile_create('', 'ミケ')->>'reason' = 'bad_token', '空の合言葉';
+  assert profile_create('abc', 'ミケ')->>'reason' = 'bad_token', '短い合言葉';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', '')->>'reason' = 'bad_name', '空の名前';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', '　')->>'reason' = 'bad_name', '全角空白だけ';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', null)->>'reason' = 'bad_name', 'null の名前';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', 'あいうえおかきくけこさしす')->>'reason' = 'bad_name', '13文字';
+  assert profile_create('00000000-0000-4000-8000-0000000000a3', 'うんこ')->>'reason' = 'ng_name', 'NG';
+  assert profile_me('00000000-0000-4000-8000-0000000000a3')->>'reason' = 'not_found', 'どれも作られていない';
+  assert profile_me(null)->>'reason' = 'bad_token', 'profile_me も null は bad_token';
+end $$;
+
+\echo '- profile_me'
+do $$ declare r jsonb := profile_me('00000000-0000-4000-8000-0000000000a1'); begin
+  assert r - 'pid' = '{"ok":true,"nickname":"チコ","is_public":true,"title":"","deco":[]}'::jsonb, format('me: %s', r);
+  assert r->>'pid' ~ '^[0-9a-f]{12}$', 'pid も返す';
+end $$;
+
+\echo '- profile_rename_syncs'
+reset role;
+insert into scores (board, nickname, time_ms, questions, profile_id) select 'f2n:asia:10', 'チコ', 9000, 10, id from profiles where nickname = 'チコ';
+insert into daily_scores (day, nickname, correct, total, time_ms, profile_id) select current_date, 'チコ', 20, 20, 30000, id from profiles where nickname = 'チコ';
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, profile_id) select token_hash, 'チコ', 5, 1, 5, id from profiles where nickname = 'チコ';
+-- ほかの人の古い記録は変えない
+insert into scores (board, nickname, time_ms, questions) values ('f2n:asia:10', 'チコ', 9500, 10);
+set role anon;
+do $$ declare r jsonb; begin
+  assert profile_rename('00000000-0000-4000-8000-0000000000a1', 'chiko')->>'reason' = 'name_taken', 'ほかの人の名前にはできない';
+  assert profile_rename('00000000-0000-4000-8000-0000000000a1', 'ＦＵＣＫ')->>'reason' = 'ng_name', 'NG';
+  assert profile_rename('00000000-0000-4000-8000-0000000000a1', '')->>'reason' = 'bad_name', '空';
+  assert profile_rename('00000000-0000-4000-8000-0000000000a3', 'タマ')->>'reason' = 'not_found', '作っていない';
+  assert profile_rename(null, 'タマ')->>'reason' = 'bad_token', 'null の合言葉';
+  r := profile_rename('00000000-0000-4000-8000-0000000000a1', 'ﾁｺ');
+  assert r = '{"ok":true,"nickname":"ﾁｺ"}'::jsonb, format('自分の名前の書き方を変えるのはよい: %s', r);
+  r := profile_rename('00000000-0000-4000-8000-0000000000a1', ' タマ ');
+  assert r = '{"ok":true,"nickname":"タマ"}'::jsonb, format('rename: %s', r);
+  assert (profile_create('00000000-0000-4000-8000-0000000000a3', 'チコ')->>'ok')::boolean, '前の名前はあく';
+end $$;
+reset role;
+do $$ begin
+  assert (select nickname from profiles where token_hash = sha256(convert_to('00000000-0000-4000-8000-0000000000a1', 'UTF8'))) = 'タマ', 'profiles';
+  assert (select nickname from scores where profile_id is not null) = 'タマ', 'scores';
+  assert (select nickname from scores where profile_id is null) = 'チコ', '古い記録はそのまま';
+  assert (select nickname from daily_scores) = 'タマ', 'daily_scores';
+  assert (select nickname from rpg_players) = 'タマ', 'rpg_players';
+end $$;
+
+\echo '- profile_set_ranges'
+set role anon;
+do $$ declare t text := '00000000-0000-4000-8000-0000000000a1'; r jsonb; begin
+  assert profile_set(t, null, null, '{jp,jp}', null, null)->>'reason' = 'bad_deco', '重複';
+  assert profile_set(t, null, null, '{zz}', null, null)->>'reason' = 'bad_deco', '無い国';
+  assert profile_set(t, null, null, '{jp,fr,br,cl}', null, null)->>'reason' = 'bad_deco', '4つ';
+  assert profile_set(t, null, null, array['jp', null], null, null)->>'reason' = 'bad_deco', 'null 入り';
+  assert profile_set(t, null, repeat('あ', 41), null, null, null)->>'reason' = 'bad_record', '称号41文字';
+  assert profile_set(t, null, null, null, 501, null)->>'reason' = 'bad_record', 'バッジ501';
+  assert profile_set(t, null, null, null, -1, null)->>'reason' = 'bad_record', 'バッジ-1';
+  assert profile_set(t, null, null, null, null, 501)->>'reason' = 'bad_record', '全部の数501';
+  assert profile_set('00000000-0000-4000-8000-0000000000a5', true, null, null, null, null)->>'reason' = 'not_found', '作っていない';
+  assert profile_set(null, true, null, null, null, null)->>'reason' = 'bad_token', 'null の合言葉';
+  r := profile_set(t, false, repeat('あ', 40), '{jp,fr,br}', 12, 80);
+  assert r = '{"ok":true}'::jsonb, format('set: %s', r);
+  r := profile_set(t, null, null, null, null, null);
+  assert r = '{"ok":true}'::jsonb, format('全部 null: %s', r);
+  r := profile_me(t);
+  assert r->'is_public' = 'false' and r->>'title' = repeat('あ', 40) and r->'deco' = '["jp","fr","br"]', format('前の値のまま: %s', r);
+  assert (profile_set(t, null, '', '{}', 0, null)->>'ok')::boolean, '空にもできる';
+end $$;
+reset role;
+do $$ begin
+  assert (select row(is_public, title, deco, badges, badges_total)::text from profiles where nickname = 'タマ') = '(f,"",{},0,80)', '保存値';
+end $$;
+
+\echo '- profile_card_private'
+reset role; update profiles set title = '旅人', deco = '{jp,br}' where nickname = 'タマ'; set role anon;
+do $$ declare
+  v_pid text := profile_me('00000000-0000-4000-8000-0000000000a1')->>'pid';
+  r jsonb := profile_card(v_pid);
+begin
+  assert r = jsonb_build_object('ok', true, 'private', true, 'pid', v_pid, 'nickname', 'タマ', 'deco', '["jp","br"]'::jsonb), format('private: %s', r);
+  assert profile_card('nothing12345')->>'reason' = 'not_found', '無い pid';
+  assert profile_card(null)->>'reason' = 'not_found', 'null の pid';
+end $$;
+
+\echo '- profile_card_public'
+reset role; truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade; set role anon;
+do $$ begin
+  assert (profile_create('00000000-0000-4000-8000-0000000000a1', 'チコ')->>'ok')::boolean, 'チコ';
+  assert (profile_create('00000000-0000-4000-8000-0000000000a2', 'ミケ')->>'ok')::boolean, 'ミケ';
+  assert (profile_set('00000000-0000-4000-8000-0000000000a1', null, '旅人', '{jp}', 12, 80)->>'ok')::boolean, 'set';
+end $$;
+reset role;
+-- チコ: asia:10 は 8000（ミケが 7000 なので2位）、europe:5 は 5000（1位）、africa:5 は 6000（ミケが 3000・4000 の2行なので2位）、oceania:5 は 9000（3位）
+insert into scores (board, nickname, time_ms, questions, profile_id)
+  select b, 'チコ', t, q, (select id from profiles where nickname = 'チコ') from (values
+    ('f2n:asia:10', 8000, 10), ('f2n:asia:10', 9000, 10), ('f2n:europe:5', 5000, 5), ('f2n:africa:5', 6000, 5), ('f2n:oceania:5', 9000, 5)) v(b, t, q);
+insert into scores (board, nickname, time_ms, questions, profile_id)
+  select b, 'ミケ', t, q, (select id from profiles where nickname = 'ミケ') from (values
+    ('f2n:asia:10', 7000, 10), ('f2n:africa:5', 3000, 5), ('f2n:africa:5', 4000, 5), ('f2n:oceania:5', 2000, 5)) v(b, t, q);
+insert into scores (board, nickname, time_ms, questions) values ('f2n:oceania:5', 'ポチ', 2500, 5);
+insert into daily_scores (day, nickname, correct, total, time_ms, profile_id)
+  select d, 'チコ', c, 20, 30000, (select id from profiles where nickname = 'チコ') from (values
+    (current_date, 20), (current_date - 1, 12)) v(d, c);
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, profile_id)
+  select token_hash, nickname, 14, 3, 17, id from profiles where nickname = 'チコ';
+update profiles set created_at = '2026-10-01 00:00:00+00' where nickname = 'チコ';
+set role anon;
+do $$ declare
+  v_pid text := profile_me('00000000-0000-4000-8000-0000000000a1')->>'pid';
+  r jsonb := profile_card(v_pid);
+begin
+  assert r->'ok' = 'true' and r->'private' = 'false' and r->>'pid' = v_pid, format('ok: %s', r);
+  assert r->>'nickname' = 'チコ' and r->>'title' = '旅人' and r->'deco' = '["jp"]', format('名前・称号・かざり: %s', r);
+  assert r->'badges' = '12' and r->'badges_total' = '80', format('バッジ: %s', r);
+  assert r->'rpg' = '{"lv":14,"dungeons":3}', format('冒険: %s', r);
+  assert r->'ta' = '[{"board":"f2n:europe:5","time_ms":5000,"rank":1},{"board":"f2n:africa:5","time_ms":6000,"rank":2},{"board":"f2n:asia:10","time_ms":8000,"rank":2}]',
+    format('TA は順位の良い順（同じ順位は速い順）で3件: %s', r->'ta');
+  assert r->'daily' = '{"plays":2,"perfect":1}', format('今日の難問: %s', r->'daily');
+  assert (r->>'since')::timestamptz = '2026-10-01 00:00:00+00', format('はじめた時刻: %s', r->>'since');
+  r := profile_card(profile_me('00000000-0000-4000-8000-0000000000a2')->>'pid');
+  assert r->'rpg' = 'null' and r->'daily' = '{"plays":0,"perfect":0}' and jsonb_array_length(r->'ta') = 3, format('冒険なし・難問なし: %s', r);
+end $$;
+
+\echo '- transfer_flow'
+do $$ declare
+  r jsonb := profile_transfer_start('00000000-0000-4000-8000-0000000000a1', '{"v":1,"keys":{"rpg":"{\"lv\":14}"}}');
+  c jsonb;
+begin
+  assert (r->>'ok')::boolean, format('start: %s', r);
+  assert r->>'code' ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{12}$', format('code: %s', r);
+  assert (r->>'expires_at')::timestamptz between now() + interval '23 hours 59 min' and now() + interval '24 hours 1 min', format('24時間: %s', r);
+  c := profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000a9');
+  assert c->'ok' = 'true' and c->>'nickname' = 'チコ' and c->>'pid' ~ '^[0-9a-f]{12}$', format('claim: %s', c);
+  assert c->'data' = '{"v":1,"keys":{"rpg":"{\"lv\":14}"}}', format('data が同じ: %s', c);
+  assert profile_me('00000000-0000-4000-8000-0000000000a1')->>'reason' = 'not_found', '前の端末は not_found';
+  assert profile_me('00000000-0000-4000-8000-0000000000a9')->>'nickname' = 'チコ', '新しい端末で使える';
+  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000b9')->>'reason' = 'bad_code', '2回目はだめ';
+  assert profile_transfer_start('00000000-0000-4000-8000-0000000000a1', '{}')->>'reason' = 'not_found', '前の端末はもう出せない';
+end $$;
+reset role;
+do $$ begin
+  assert (select data from profile_transfers) is null and (select used_at from profile_transfers) is not null, '使ったら data は null';
+  assert (select code_hash from profile_transfers) <> '\x'::bytea and octet_length((select code_hash from profile_transfers)) = 32, 'コードはハッシュで残す';
+end $$;
+
+\echo '- transfer_reissue'
+set role anon;
+do $$ declare r1 jsonb; r2 jsonb; begin
+  r1 := profile_transfer_start('00000000-0000-4000-8000-0000000000a2', '{"v":1,"keys":{}}');
+  assert (r1->>'ok')::boolean, format('1つめ: %s', r1);
+  reset role;
+  update profile_transfers set created_at = now() - interval '2 min';
+  set role anon;
+  r2 := profile_transfer_start('00000000-0000-4000-8000-0000000000a2', '{"v":1,"keys":{"a":"2"}}');
+  assert (r2->>'ok')::boolean and r2->>'code' <> r1->>'code', format('2つめ: %s', r2);
+  assert profile_transfer_claim(r1->>'code', '00000000-0000-4000-8000-0000000000a8')->>'reason' = 'bad_code', '1つめは使えない';
+  assert profile_transfer_claim(r2->>'code', '00000000-0000-4000-8000-0000000000a8')->'data' = '{"v":1,"keys":{"a":"2"}}', '2つめは使える';
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from profile_transfers where data is not null) = 0, '出し直した前のコードの data も null';
+end $$;
+
+\echo '- transfer_expired'
+set role anon;
+do $$ declare r jsonb := profile_transfer_start('00000000-0000-4000-8000-0000000000a9', '{"v":1,"keys":{}}'); begin
+  assert (r->>'ok')::boolean, format('start: %s', r);
+  reset role;
+  update profile_transfers set expires_at = now() - interval '1 second' where used_at is null;
+  set role anon;
+  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000b1')->>'reason' = 'bad_code', '期限切れ';
+  assert profile_me('00000000-0000-4000-8000-0000000000a9')->>'nickname' = 'チコ', '期限切れなら前の端末のまま';
+end $$;
+
+\echo '- transfer_limits'
+reset role; update profile_transfers set created_at = now() - interval '2 min'; set role anon;
+do $$ declare
+  t text := '00000000-0000-4000-8000-0000000000a9';
+  r jsonb;
+  c jsonb;
+begin
+  assert profile_transfer_start(t, jsonb_build_object('v', 1, 'keys', jsonb_build_object('rpg', repeat('x', 600000))))->>'reason' = 'too_big', '600KB';
+  assert profile_transfer_start(t, null)->>'reason' = 'bad_record', 'data が null';
+  assert profile_transfer_start(t, '[1]')->>'reason' = 'bad_record', 'data が配列';
+  assert profile_transfer_start(null, '{}')->>'reason' = 'bad_token', 'null の合言葉';
+  r := profile_transfer_start(t, jsonb_build_object('v', 1, 'keys', jsonb_build_object('rpg', repeat('x', 500000))));
+  assert (r->>'ok')::boolean, format('500KB は通る: %s', r->>'reason');
+  assert profile_transfer_start(t, '{"v":1,"keys":{}}')->>'reason' = 'too_soon', '1分以内はだめ';
+  assert profile_transfer_claim('ABCD-EFGH-JKMN', '00000000-0000-4000-8000-0000000000b1')->>'reason' = 'bad_code', '無いコード';
+  assert profile_transfer_claim(null, '00000000-0000-4000-8000-0000000000b1')->>'reason' = 'bad_code', 'null のコード';
+  assert profile_transfer_claim('0O1I0O1I0O1I', '00000000-0000-4000-8000-0000000000b1')->>'reason' = 'bad_code', '使わない文字';
+  assert profile_transfer_claim(r->>'code', null)->>'reason' = 'bad_token', 'null の新しい合言葉';
+  assert profile_transfer_claim(r->>'code', '00000000-0000-4000-8000-0000000000a8')->>'reason' = 'bad_token', 'ほかのプロフィール（ミケ）の合言葉';
+  -- 小文字・ハイフン・空白入り
+  c := profile_transfer_claim(lower(substr(r->>'code', 1, 4) || '-' || substr(r->>'code', 5, 4) || ' ' || substr(r->>'code', 9, 4)), '00000000-0000-4000-8000-0000000000b1');
+  assert (c->>'ok')::boolean and c->>'nickname' = 'チコ', format('小文字・ハイフン入り: %s', c - 'data');
+end $$;
+
+\echo '- migrate_rpg'
+reset role; truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, deco) values
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000c1', 'UTF8')), 'ポチ', 10, 1, 6, '{fr}'),
+  (sha256(convert_to('00000000-0000-4000-8000-0000000000c2', 'UTF8')), 'タマ', 3, 0, 1, '{}');
+set role anon;
+do $$ begin
+  begin perform profile_migrate_rpg(); raise exception 'anon が profile_migrate_rpg を呼べた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+-- schema.sql を2回流したときと同じく2回呼ぶ
+do $$ begin perform profile_migrate_rpg(); perform profile_migrate_rpg(); end $$;
+do $$ begin
+  assert (select count(*) from profiles) = 2, format('2行: %s', (select count(*) from profiles));
+  assert (select count(*) from rpg_players r join profiles p on p.id = r.profile_id
+          where p.token_hash = r.token_hash and p.nickname = r.nickname and p.deco = r.deco) = 2, '同じ合言葉・名前・かざりでつながる';
+end $$;
+set role anon;
+do $$ declare r jsonb := profile_me('00000000-0000-4000-8000-0000000000c1'); begin
+  assert r->>'nickname' = 'ポチ' and r->'deco' = '["fr"]', format('引っ越した人の me: %s', r);
+end $$;
+
+\echo '- profile_permissions'
+reset role;
+do $$ declare f record; begin
+  for f in select p.oid::regprocedure::text as name, p.proconfig, p.prosecdef from pg_proc p
+           where p.pronamespace = 'public'::regnamespace and p.proname like 'profile\_%' loop
+    assert f.proconfig = array['search_path=public, pg_temp'], format('%s: %s', f.name, f.proconfig);
+  end loop;
+  assert (select relrowsecurity from pg_class where oid = 'public.profiles'::regclass), 'profiles の RLS';
+  assert (select relrowsecurity from pg_class where oid = 'public.profile_transfers'::regclass), 'profile_transfers の RLS';
+  assert (select count(*) from pg_policies where tablename in ('profiles', 'profile_transfers')) = 0, 'ポリシーは作らない';
+end $$;
+set role anon;
+do $$ begin
+  begin perform * from profiles; raise exception 'anon が profiles を読めた';
+  exception when insufficient_privilege then null; end;
+  begin perform * from profile_transfers; raise exception 'anon が profile_transfers を読めた';
+  exception when insufficient_privilege then null; end;
+  begin update profiles set nickname = 'x'; raise exception 'anon が profiles を書けた';
+  exception when insufficient_privilege then null; end;
+  begin perform profile_name_problem('x', null); raise exception 'anon が profile_name_problem を呼べた';
+  exception when insufficient_privilege then null; end;
+  begin perform profile_by_token('00000000-0000-4000-8000-0000000000c1'); raise exception 'anon が profile_by_token を呼べた';
+  exception when insufficient_privilege then null; end;
+  begin perform profile_clean_name('x'); raise exception 'anon が profile_clean_name を呼べた';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
 \echo 'ALL SQL TESTS PASSED'
