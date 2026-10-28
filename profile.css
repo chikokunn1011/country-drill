@@ -1,0 +1,18 @@
+/* サイト共通のプロフィール（profile.js の #scr-profile と、結果画面の「載せる」箱 .pf-post）。色は index.html の変数だけ使う */
+.pf-main { display: flex; flex-direction: column; gap: 18px; }
+.pf .field { min-width: 0; }
+.pf-lead { margin: 0; }
+.pf-form { width: 100%; }
+.pf-form input { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
+.pf-form input::placeholder { font-size: .85rem; } /* スマホ幅でも「12文字まで」まで見えるように */
+.pf-form .row { gap: 8px; } .pf-form .btn { padding-inline: 16px; }
+.pf .tamsg { text-align: left; }
+.pf .switch { align-self: flex-start; }
+.pf-deco { align-self: flex-start; padding-inline: 0; }
+/* 自分のカード（名前・かざり・称号・バッジの数） */
+.pf-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pf-card-name { margin: 0; font: 900 1.3rem var(--font-display); overflow-wrap: anywhere; }
+.pf-card-title { margin: 0; color: var(--accent); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+/* 結果画面の「載せる」箱。自動 OFF のときの問いかけ */
+.pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }

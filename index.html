@@ -348,6 +348,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <link rel="stylesheet" href="rpg.css?v=17">
 <link rel="stylesheet" href="badges.css?v=1">
 <link rel="stylesheet" href="daily.css?v=1">
+<link rel="stylesheet" href="profile.css?v=1">
 </head>
 <body>
 <div class="wrap">
@@ -365,6 +366,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div class="menu">
       <button class="btn" id="home-play">プレイ</button>
       <button class="btn ghost" id="home-rank">ランキング</button>
+      <button class="btn ghost" id="home-profile" hidden>プロフィール</button>
       <button class="btn ghost" id="home-settings">設定</button>
     </div>
     <button class="linkbtn" id="home-book">国旗図鑑を見る</button>
@@ -1388,6 +1390,7 @@ applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 show(start);
 </script>
+<script src="profile.js?v=1"></script>
 <script src="rpg-core.js?v=8"></script>
 <script src="rpg.js?v=8"></script>
 <script src="rpg-cards.js?v=5"></script>
