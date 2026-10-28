@@ -14,6 +14,17 @@
   const FIRST = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'rpgRank', 'rpgRankPending', 'bview', 'bdgcat'];
 
   const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  // 本編が読むキーの外側の形（ちがう形だと本編が落ちる。例: misses が null だと答えたときに例外）。
+  // setup の mode・kind は本編の MODES・KINDS のどれか（ちがうと本編が問題を作れない）
+  const GAME_MODES = ['f2n', 'n2f', 'm2f', 'f2m'], GAME_KINDS = ['practice', 'challenge', 'ta'];
+  const isStr = v => typeof v === 'string';
+  const GAME_SHAPE = {
+    settings: isObj, misses: isObj, daily: isObj, rpgRank: isObj,
+    setup: v => isObj(v) && (v.mode === undefined || GAME_MODES.includes(v.mode)) && (v.kind === undefined || GAME_KINDS.includes(v.kind)),
+    nickname: isStr, rpgRankPending: isStr, bview: isStr, rpgRankDel: Array.isArray,
+  };
+  // __proto__ という名前のキーも、ふつうのキーとして入れられる入れもの（{} だと __proto__ の setter に吸われて消える）
+  const dict = () => Object.create(null);
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   const bytesOf = s => { let n = 0; for (const ch of s) { const c = ch.codePointAt(0); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4; } return n; };
   const parse = s => { try { return { ok: true, v: JSON.parse(s) }; } catch { return { ok: false }; } };
@@ -50,7 +61,9 @@
     });
     const remove = key => guard(() => { storage.removeItem(key); return { ok: true }; });
 
-    // 本編の形にそろえた文字列。rpg / badges 以外はそのまま。形が合わなければ null
+    // 新しい版（v > VERSION）の badges。本編は読むだけにするので、ここでも書きかえない
+    const newerBadges = v => isObj(v) && typeof v.v === 'number' && v.v > BC.VERSION;
+    // 本編の形にそろえた文字列。rpg / badges 以外はそのまま（本編が読むキーは外側の形を見る）。形が合わなければ null
     const shaped = (key, v) => {
       if (key === 'rpg') {
         if (!isObj(v)) return null;
@@ -62,35 +75,54 @@
         const s = BC.sanitize(v, BC.makeX(globalThis.COUNTRIES));
         return s && s.got ? JSON.stringify(s) : null;
       }
+      if (Object.hasOwn(GAME_SHAPE, key) && !GAME_SHAPE[key](v)) return null;
       return JSON.stringify(v);
     };
-    const write = (key, text) => {
+    // write で書く文字列。{ ok:true, out } か { ok:false, reason }。何も書かない（確かめるだけ）
+    const prepWrite = (key, text) => {
       const p = parse(text);
       if (!p.ok) return { ok: false, reason: 'not_json' };
-      const out = key === 'rpg' || key === 'badges' ? shaped(key, p.v) : text;
+      if (key === 'badges' && newerBadges(p.v)) return { ok: false, reason: 'newer' };
+      const out = key === 'rpg' || key === 'badges' ? shaped(key, p.v) : shaped(key, p.v) == null ? null : text;
       if (out == null) return { ok: false, reason: 'bad_shape' };
-      return guard(() => { storage.setItem(key, out); return { ok: true }; });
+      return { ok: true, out };
+    };
+    const writeCheck = (key, text) => { const r = prepWrite(key, text); return r.ok ? { ok: true } : r; };
+    const write = (key, text) => {
+      const r = prepWrite(key, text);
+      if (!r.ok) return r;
+      return guard(() => { storage.setItem(key, r.out); return { ok: true }; });
     };
 
     // ---- 書き出し・読み戻し ----
     const exportAll = () => {
-      const data = {};
+      const data = dict();
       for (const k of allKeys().sort()) if (!OWN.has(k)) data[k] = storage.getItem(k);
       return { app: 'country-drill', kind: 'save', at: iso(), data };
     };
-    const importAll = obj => {
+    // 読み戻す中身を全部確かめる。{ ok:true, put } か { ok:false, reason:'bad_file' }。何も書かない
+    const prepImport = obj => {
       if (!isObj(obj) || obj.app !== 'country-drill' || obj.kind !== 'save' || !isObj(obj.data)) return { ok: false, reason: 'bad_file' };
       if (!Object.values(obj.data).every(v => typeof v === 'string')) return { ok: false, reason: 'bad_file' };
-      // 書く前に全部確かめる。rpg / badges は write と同じ shaped を通した文字列を入れる
-      const put = {};
+      // rpg / badges は write と同じ shaped を通した文字列を入れる。新しい版の badges はそのまま（本編が読むだけにする）
+      const put = dict();
       for (const [k, v] of Object.entries(obj.data)) {
         if (OWN.has(k)) continue;
-        if (k === 'rpg' || k === 'badges') {
-          const p = parse(v), out = p.ok ? shaped(k, p.v) : null;
+        if (k === 'rpg' || k === 'badges' || Object.hasOwn(GAME_SHAPE, k)) {
+          const p = parse(v);
+          if (k === 'badges' && p.ok && newerBadges(p.v)) { put[k] = v; continue; }
+          const out = p.ok ? shaped(k, p.v) : null;
           if (out == null) return { ok: false, reason: 'bad_file' };
-          put[k] = out;
+          put[k] = k === 'rpg' || k === 'badges' ? out : v;
         } else put[k] = v;
       }
+      return { ok: true, put };
+    };
+    const importCheck = obj => { const r = prepImport(obj); return r.ok ? { ok: true } : r; };
+    const importAll = obj => {
+      const pr = prepImport(obj);
+      if (!pr.ok) return pr;
+      const put = pr.put;
       let backup;
       try {
         backup = exportAll();
@@ -203,18 +235,26 @@
     });
 
     // ---- バッジ ----
+    // 新しい版のセーブなら null（本編と同じく書かない。呼ぶ側は { ok:false, reason:'newer' }）
     const badgesRead = () => {
       const r = read('badges');
       if (r.reason === 'storage') throw new Error('storage');
+      if (r.ok && newerBadges(r.value)) return null;
       const X = BC.makeX(globalThis.COUNTRIES);
       return { X, d: BC.sanitize(r.ok ? r.value : BC.fresh(), X) };
     };
+    const NEWER = { ok: false, reason: 'newer' };
     const badgesWrite = (d, X) => { storage.setItem('badges', JSON.stringify(BC.sanitize(d, X))); };
-    const stepKeys = () => BC.makeCatalog(globalThis.COUNTRIES).flatMap(b => b.tiers.map((_, i) => `${b.id}@${i + 1}`));
-    // 全ステップを取ったことにする。sent にも入れて払い出しを起こさない
+    const stepKeys = cat => cat.flatMap(b => b.tiers.map((_, i) => `${b.id}@${i + 1}`));
+    // 全ステップを取ったことにする。sent にも入れて払い出しを起こさない。
+    // 称号が「自動」（eq が null）なら、本編がステップを取ったときと同じく、新しく取った中でいちばん上のものをつける
+    // （本編は新しく取ったときにしか自動で選ばないので、ここで選ばないと全部持っていても称号が出ない）
     const badgesAll = () => guard(() => {
-      const { X, d } = badgesRead(), t = now(), ks = stepKeys();
-      for (const k of ks) if (!(k in d.got)) d.got[k] = t;
+      const b = badgesRead();
+      if (!b) return NEWER;
+      const cat = BC.makeCatalog(globalThis.COUNTRIES), { X, d } = b, t = now(), ks = stepKeys(cat), added = [];
+      for (const k of ks) if (!(k in d.got)) { d.got[k] = t; added.push(k); }
+      if (d.eq === null && added.length) d.eq = BC.bestKey(cat, added);
       d.sent = [...new Set([...d.sent, ...ks])];
       badgesWrite(d, X);
       return { ok: true };
@@ -222,15 +262,20 @@
     const badgesNone = () => remove('badges');
     // つけている称号を決める。null＝本編が自動で選ぶ、''＝つけない、'id@段' ＝そのステップ（取っているものだけ）
     const badgesEq = key => guard(() => {
-      const { X, d } = badgesRead();
+      const b = badgesRead();
+      if (!b) return NEWER;
+      const { X, d } = b;
       if (key !== null && key !== '' && !(typeof key === 'string' && Object.hasOwn(d.got, key))) return { ok: false, reason: 'missing' };
       d.eq = key;
       badgesWrite(d, X);
       return { ok: true };
     });
+    // 外したステップを称号にしていたら、称号は「自動」（null）に戻す（持っていない称号を指したままにしない）
     const badgeToggle = key => guard(() => {
-      const { X, d } = badgesRead();
-      if (key in d.got) delete d.got[key]; else d.got[key] = now();
+      const b = badgesRead();
+      if (!b) return NEWER;
+      const { X, d } = b;
+      if (key in d.got) { delete d.got[key]; if (d.eq === key) d.eq = null; } else d.got[key] = now();
       badgesWrite(d, X);
       return { ok: true };
     });
@@ -245,6 +290,9 @@
     // ---- 設定 ----
     const settingsGet = () => { const r = guard(() => read('settings')); return r.ok && isObj(r.value) ? r.value : {}; };
     const settingsSet = patch => guard(() => { const s = { ...settingsGet(), ...patch }; storage.setItem('settings', JSON.stringify(s)); return s; });
+    // 本編の setup（国名表示 name など）。ほかの項目は残して patch だけ変える
+    const setupGet = () => { const r = guard(() => read('setup')); return r.ok && isObj(r.value) ? r.value : {}; };
+    const setupSet = patch => guard(() => { const s = { ...setupGet(), ...patch }; storage.setItem('setup', JSON.stringify(s)); return s; });
     // バックアップは呼ぶ側が先に snapSave する
     const firstTime = () => guard(() => { queueRankDel(); for (const k of FIRST) storage.removeItem(k); return { ok: true }; });
 
@@ -264,9 +312,9 @@
     };
 
     return {
-      keys, read, write, remove, exportAll, importAll, snapList, snapSave, snapLoad, snapDelete,
+      keys, read, write, writeCheck, remove, exportAll, importAll, importCheck, snapList, snapSave, snapLoad, snapDelete,
       rpgGet, rpgEdit, rpgCoins, rpgSetLv, rpgSetFloor, rpgUnlockAll, rpgClearAll, rpgStoryReset, rpgSetPity, rpgGiveCard, rpgWipe,
-      badgesAll, badgesNone, badgeToggle, badgesEq, dailyQuestions, dailyReset, settingsGet, settingsSet, firstTime, checkData,
+      badgesAll, badgesNone, badgeToggle, badgesEq, dailyQuestions, dailyReset, settingsGet, settingsSet, setupGet, setupSet, firstTime, checkData,
     };
   }
 

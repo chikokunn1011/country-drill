@@ -385,3 +385,89 @@ test('badges_eq_sets_owned_title_or_none_or_auto', () => {
   assert.equal(JSON.parse(st.getItem('badges')).eq, null);
   assert.equal(A.badgesEq('__proto__').ok, false);
 });
+
+// ---- 1回目のレビューの直し ----
+test('proto_named_key_survives_export_snapshot_and_restore', () => {
+  const { A, st } = load({ ['__proto__']: '"keepme"', x: '1' });   // ['__proto__'] で、ふつうのキーとして入れる
+  assert.equal(st.getItem('__proto__'), '"keepme"');
+  const data = A.exportAll().data;
+  assert.equal(Object.hasOwn(data, '__proto__'), true);
+  assert.match(JSON.stringify(data), /"__proto__":"\\"keepme\\""/);
+  assert.equal(A.snapSave('s').ok, true);
+  assert.equal(A.snapLoad('s').ok, true);
+  assert.equal(st.getItem('__proto__'), '"keepme"', '戻したあとも消えない');
+  // ファイルに __proto__ があれば書く
+  const r = A.importAll(JSON.parse('{"app":"country-drill","kind":"save","data":{"__proto__":"\\"f\\""}}'));
+  assert.equal(r.ok, true);
+  assert.equal(st.getItem('__proto__'), '"f"');
+  assert.equal(({}).polluted, undefined);
+});
+
+test('game_keys_with_wrong_outer_shape_are_not_saved', () => {
+  const { A, st } = load({ misses: '{}', setup: '{"mode":"f2n"}' });
+  const before = st.dump();
+  for (const [k, v] of [['misses', 'null'], ['misses', '[1]'], ['settings', '5'], ['setup', '{"mode":"zzz"}'], ['setup', '{"kind":"nope"}'],
+    ['daily', 'null'], ['nickname', '5'], ['rpgRank', '"x"'], ['rpgRankDel', '{}']]) {
+    assert.deepEqual(plain(A.write(k, v)), { ok: false, reason: 'bad_shape' }, `${k} = ${v}`);
+    assert.deepEqual(plain(A.writeCheck(k, v)), { ok: false, reason: 'bad_shape' }, `${k} = ${v}`);
+    assert.deepEqual(plain(A.importAll({ app: 'country-drill', kind: 'save', data: { [k]: v } })), { ok: false, reason: 'bad_file' }, `import ${k} = ${v}`);
+  }
+  assert.deepEqual(st.dump(), before);
+  assert.deepEqual(plain(A.write('misses', '{"jp":{"gw":1}}')), { ok: true });
+  assert.deepEqual(plain(A.write('setup', '{"mode":"m2f","kind":"ta","name":true}')), { ok: true });
+  assert.deepEqual(plain(A.write('nickname', '"ねこ"')), { ok: true });
+  assert.deepEqual(plain(A.write('anything', 'null')), { ok: true }, '本編が読まないキーはそのまま');
+});
+
+test('checks_do_not_write', () => {
+  const { A, st } = load({ rpg: '{}' });
+  const before = st.dump();
+  assert.deepEqual(plain(A.writeCheck('rpg', '[1]')), { ok: false, reason: 'bad_shape' });
+  assert.deepEqual(plain(A.writeCheck('settings', '{}')), { ok: true });
+  assert.deepEqual(plain(A.importCheck({ app: 'country-drill', kind: 'save', data: { rpg: 'garbage' } })), { ok: false, reason: 'bad_file' });
+  assert.deepEqual(plain(A.importCheck({ app: 'country-drill', kind: 'save', data: { x: '1' } })), { ok: true });
+  assert.deepEqual(st.dump(), before);
+});
+
+test('newer_badges_save_is_not_rewritten', () => {
+  const raw = JSON.stringify({ v: 2, got: { 'first-clear@1': 1 }, eq: '', sent: [], future: { x: 1 } });
+  const { A, st } = load({ badges: raw });
+  for (const r of [A.badgeToggle('answers@1'), A.badgesAll(), A.badgesEq(''), A.write('badges', raw)])
+    assert.deepEqual(plain(r), { ok: false, reason: 'newer' });
+  assert.equal(st.getItem('badges'), raw);
+  // 読み戻し（スナップショット）では、そのまま戻す（v1 に下げない）
+  assert.equal(A.snapSave('s').ok, true);
+  st.removeItem('badges');
+  assert.equal(A.snapLoad('s').ok, true);
+  assert.equal(st.getItem('badges'), raw);
+});
+
+test('badge_toggle_off_equipped_resets_title_to_auto', () => {
+  const { A, st } = load();
+  assert.equal(A.badgeToggle('first-clear@1').ok, true);
+  assert.equal(A.badgesEq('first-clear@1').ok, true);
+  assert.equal(A.badgeToggle('first-clear@1').ok, true);
+  const o = JSON.parse(st.getItem('badges'));
+  assert.equal(Object.hasOwn(o.got, 'first-clear@1'), false);
+  assert.equal(o.eq, null);
+});
+
+test('setup_set_merges', () => {
+  const { A, st } = load({ setup: '{"mode":"m2f","count":20}' });
+  A.setupSet({ name: true });
+  assert.deepEqual(JSON.parse(st.getItem('setup')), { mode: 'm2f', count: 20, name: true });
+  assert.equal(A.setupGet().name, true);
+});
+
+test('badges_all_picks_title_when_auto', () => {
+  const { A, st, ctx } = load();
+  assert.equal(A.badgesAll().ok, true);
+  const o = JSON.parse(st.getItem('badges'));
+  const BC = ctx.BADGES_CORE, cat = BC.makeCatalog(ctx.COUNTRIES);
+  assert.equal(typeof o.eq, 'string', '全部取ったら称号もつける（本編は新しく取ったときにしか選ばない）');
+  assert.equal(o.eq, BC.bestKey(cat, Object.keys(o.got)));
+  // 「つけない」（''）にしてあれば変えない
+  const { A: A2, st: st2 } = load({ badges: JSON.stringify({ v: 1, got: {}, eq: '', sent: [] }) });
+  assert.equal(A2.badgesAll().ok, true);
+  assert.equal(JSON.parse(st2.getItem('badges')).eq, '');
+});
