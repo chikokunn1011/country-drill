@@ -219,6 +219,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .tamsg { margin: 0; font-weight: 700; text-align: center; }
 .tamsg:empty { display: none; }
 .tamsg.ok { color: var(--ok); } .tamsg.ng { color: var(--ng); }
+.ta-post { width: 100%; } .ta-post > .tabox { width: 100%; border-top: 0; padding-top: 0; } /* profile.js の「載せる」箱（.tabox.pf-post）を外の .tabox の中に入れるので、線と間は外のだけ */
 .misslist { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
 .misslist li { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; text-align: left; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .misslist img { width: 48px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
@@ -233,6 +234,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .rklist .top .no { font-size: 1.2rem; color: var(--accent); }
 .rklist .nick { font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .rklist .at { font-size: .75rem; color: var(--muted); }
+.rklist li.me { border-color: var(--accent); border-width: 2px; }
 .rkempty { margin: 0; padding: 20px 0; text-align: center; font: 700 1.05rem var(--font-display); }
 .rkerror { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; text-align: center; }
 .rkerror p { margin: 0; color: var(--ng); font-weight: 700; }
@@ -467,7 +469,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       </div>
       <div class="col">
       <div class="seg" id="rk-tabs" role="group" aria-label="期間"><button type="button" data-p="all">歴代</button><button type="button" data-p="week">今週</button></div>
-      <p class="hint">上位50人まで。同じニックネームは自己ベストだけ。「今週」は月曜0時（日本時間）から。</p>
+      <p class="hint">上位50人まで。同じ人は自己ベストだけ。「今週」は月曜0時（日本時間）から。</p>
       <ol class="rklist" id="rk-list" aria-busy="false"></ol>
       <p class="rkempty" id="rk-empty" hidden>まだ誰もいない。1位のチャンス！</p>
       <div class="rkerror" id="rk-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="rk-retry">再読み込み</button></div>
@@ -503,15 +505,18 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="countries.js"></script>
 <script src="flags.js"></script>
 <script src="world.js"></script>
-<script src="ranking.js?v=3"></script>
+<script src="ranking.js?v=4"></script>
 <script src="daily-core.js?v=1"></script>
 <script src="trivia.js"></script>
 <script src="sound.js?v=1"></script>
 <script>
 /* ---------- データ ---------- */
-// ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ
+// ranking.js が読めなかったとき（配信漏れなど）は、ランキングなしで遊べるようにする。タイムの表示は ranking.js の formatTime と同じ。
+// enabled が false なら結果画面の箱もランキングも出さないので、送る・読むは呼ばれない（念のため失敗を返すだけ）
 window.RANKING ??= {
   enabled: false,
+  submit2: async () => ({ ok: false, reason: 'network' }),
+  top2: async () => { throw new Error('ranking.js が読めていない'); },
   formatTime(ms) {
     const pad2 = n => String(n).padStart(2, '0');
     const cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = pad2(cs % 100);
@@ -1186,9 +1191,7 @@ function showResult() {
   const taForm = G.kind === 'ta' && RANKING.enabled;
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
     <p class="hint">${cond}</p></div>
-    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><form class="field" id="ta-form" novalidate><label for="ta-name">ランキングに載せる？</label>
-      <div class="row"><input id="ta-name" type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）"><button class="btn" id="ta-submit">載せる</button></div></form>
-      <p class="tamsg" id="ta-msg" role="status"></p><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
+    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><div class="ta-post" id="ta-post"></div><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
@@ -1208,30 +1211,24 @@ $('rcard').addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.repeat && !$('scr-result').hidden && e.target.closest?.('#rcard button')) e.preventDefault();
 }, true);
-// タイムアタックの結果画面：何位相当かの問い合わせと、ランキングへの登録。
+// タイムアタックの結果画面：何位相当かの問い合わせと、プロフィールでのランキングへの登録（profile.js の「載せる」箱）。
 // 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
 function taResult(board, timeMs, questions) {
-  const rank = $('ta-rank'), form = $('ta-form'), name = $('ta-name'), btn = $('ta-submit'), msg = $('ta-msg'), open = $('ta-open');
+  const rank = $('ta-rank'), post = $('ta-post'), open = $('ta-open');
   const ranks = r => `歴代${r.rankAll}位・今週${r.rankWeek}位`;
-  const say = (text, cls = '') => { msg.textContent = text; msg.className = `tamsg ${cls}`; };
-  name.value = store.get('nickname', '');
   // 失敗したら画面には何も出さない（原因はコンソールに残す。オフラインと設定ミスを見分けるため）
   RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, e => console.warn('ranking rankOf', e));
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const fail = reason => { say(RANKING.message(reason), 'ng'); btn.textContent = 'もう一回送る'; };
-    const chk = RANKING.checkName(name.value);
-    if (!chk.ok) return fail(chk.reason);
-    btn.disabled = true; say('送信中…'); // 連打・Enter 連打でも1回しか送らない（disabled の間は submit が起きない）
-    const r = await RANKING.submit({ board, nickname: chk.name, timeMs, questions });
-    btn.disabled = false;
-    if (!r.ok) return fail(r.reason);
-    store.set('nickname', chk.name);
-    form.hidden = true;
-    say(`載せたよ！ ${ranks(r)}`, 'ok');
-    open.hidden = false; open.onclick = () => openRanking(board);
-    open.focus({ preventScroll: true }); // フォームを隠すとフォーカスが迷子になるので、出したボタンへ
-  };
+  // profile.js が読めない（配信漏れ・古い ranking.js がキャッシュに残っている）ときは載せられない
+  if (!window.PROFILE) { post.innerHTML = '<p class="tamsg ng" role="status">ページを読み直してね</p>'; return; }
+  // プロフィールがあって自動 ON ならすぐ送る。載せたら「ランキングを見る」を出す
+  PROFILE.postBox(post, {
+    label: 'ランキングに載せる',
+    send: token => RANKING.submit2({ token, board, timeMs, questions }).then(r => {
+      if (!r.ok) return r;
+      open.hidden = false; open.onclick = () => openRanking(board);
+      return { ok: true, text: `載せたよ！ ${ranks(r)}` };
+    }),
+  });
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
@@ -1269,15 +1266,18 @@ async function loadRanking() {
   const seq = ++RK.seq, list = $('rk-list');
   list.setAttribute('aria-busy', true); $('rk-retry').disabled = true;
   let rows = null;
-  try { rows = await RANKING.top({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch (e) { console.warn('ranking top', e); }
+  try { rows = await RANKING.top2({ board: RANKING.boardKey(RK.mode, RK.region, RK.count), period: RK.period }); } catch (e) { console.warn('ranking top', e); }
   if (seq !== RK.seq) return;
   list.setAttribute('aria-busy', false); $('rk-retry').disabled = false;
   $('rk-error').hidden = !!rows;
   $('rk-empty').hidden = !rows || rows.length > 0;
+  // 名前は profile.js の nameHTML（押すとプロフィールの窓・かざり）。profile.js が無ければ名前の文字だけ。自分の行（pid が同じ）は目立たせる
+  const nameOf = window.PROFILE?.nameHTML ?? (r => esc(r.nickname)), myPid = window.PROFILE?.get()?.pid;
   let no = 0;
   list.innerHTML = (rows ?? []).map((r, i) => {
     if (!i || r.timeMs !== rows[i - 1].timeMs) no = i + 1; // 同じタイムは同じ順位（rank_of の「自分より速い人数＋1」とそろえる）
-    return `<li${no <= 3 ? ' class="top"' : ''}><span class="no">${no}</span><span class="nick">${esc(r.nickname)}</span><span class="mono">${RANKING.formatTime(r.timeMs)}</span><span class="mono at">${jstDay(r.at)}</span></li>`;
+    const cls = [no <= 3 && 'top', myPid && r.pid === myPid && 'me'].filter(Boolean).join(' ');
+    return `<li${cls ? ` class="${cls}"` : ''}><span class="no">${no}</span><span class="nick">${nameOf(r)}</span><span class="mono">${RANKING.formatTime(r.timeMs)}</span><span class="mono at">${jstDay(r.at)}</span></li>`;
   }).join('');
 }
 $('rk-modes').onclick = e => { const b = e.target.closest('.chip'); if (!b) return; RK.mode = b.dataset.k; renderRanking(); };

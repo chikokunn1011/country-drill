@@ -21,7 +21,7 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 30_000 }, async () => {
 const B = 'f2n:all:10'; // まっさらな状態のモード選択（国旗→国名・全世界・10問）の board
 const text = (page, sel) => page.locator(sel).innerText();
 const record = (board, nickname, time_ms, created_at = new Date()) => ({ board, nickname, time_ms, questions: 10, created_at: created_at.toISOString() });
-const tops = db => db.calls.filter(c => c.name === 'top_scores').map(c => c.args);
+const tops = db => db.calls.filter(c => c.name === 'top_scores2').map(c => c.args);
 // その並びで押されているボタンの data-* の値
 const picked = (page, id) => page.$$eval(`#${id} [aria-pressed="true"]`, bs => bs.map(b => Object.values(b.dataset)[0]));
 const conds = async page => [await picked(page, 'rk-modes'), await picked(page, 'rk-regions'), await picked(page, 'rk-counts')];
@@ -37,7 +37,7 @@ const wait = ms => new Promise(ok => setTimeout(ok, ms));
 
 // バッジのボタンは設定の前（称号の札も button なので、札が出ない QUIET_BADGES で開く）。いちばん上は今日の難問の帯（daily.js）
 t('home_button_order', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rank', 'home-badges', 'home-settings']);
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rank', 'home-profile', 'home-badges', 'home-settings']);
   assert.equal(await text(page, '#home-rank'), 'ランキング');
   assert.equal(await page.getAttribute('#home-rank', 'class'), 'btn ghost');
   await page.click('#home-rank');
@@ -46,9 +46,9 @@ t('home_button_order', async page => {
   assert.equal(await page.isVisible('#topbar'), true);
 }, { storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
-// 何も止めないとき（本物の rpg.js と badges.js）は プレイ / 冒険 / ランキング / バッジ / 設定（RPG 設計 §3.1「プレイの次に冒険」、バッジ設計 §6.1「設定の直前」）
+// 何も止めないとき（本物の rpg.js と badges.js）は プレイ / 冒険 / ランキング / プロフィール / バッジ / 設定（RPG 設計 §3.1「プレイの次に冒険」、バッジ設計 §6.1「設定の直前」）
 t('home_button_order_with_rpg', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings']);
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rpg', 'home-rank', 'home-profile', 'home-badges', 'home-settings']);
 }, { storage: { badges: QUIET_BADGES } });
 
 t('home_button_hidden_when_disabled', async page => {
@@ -131,11 +131,11 @@ t('tabs_switch', async (page, { db }) => {
 // 返事が遅れて前後しても、最後に選んだ条件の表が残る
 t('latest_choice_wins', async (page, { db }) => {
   db.rows.push(record(B, 'せんしゅう', 5000, new Date(Date.now() - 8 * 864e5))); // 歴代には出て、今週には出ない
-  await page.route('**/rest/v1/rpc/top_scores', async route => {
+  await page.route('**/rest/v1/rpc/top_scores2', async route => {
     if (route.request().postDataJSON().p_period === 'all') await wait(500); // 歴代の返事だけ遅らせる
     await route.fallback();
   });
-  const late = page.waitForResponse(res => res.url().endsWith('/top_scores') && res.request().postDataJSON().p_period === 'all');
+  const late = page.waitForResponse(res => res.url().endsWith('/top_scores2') && res.request().postDataJSON().p_period === 'all');
   await page.click('#home-rank');
   await page.click('#rk-tabs [data-p="week"]');
   await page.locator('#rk-empty').waitFor();
@@ -197,11 +197,20 @@ t('nickname_is_escaped', async (page, { db }) => {
   assert.match(r[1], /^2\s+<img src=x>\s/);
 });
 
-// 結果画面で載せたあとの「ランキングを見る」→ その条件のランキングに自分の名前がある
+// 偽DB と localStorage にプロフィールを入れて開き直す（自動 ON）
+const PID = 'abcdefghjk12';
+async function withProfile(page, db, p = { token: 'tok-1', nickname: 'チコ', pid: PID }) {
+  db.profiles.push(p);
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify({ token: p.token, pid: p.pid, name: p.nickname, auto: true, isPublic: true, sent: { isPublic: true } })), p);
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+}
+
+// 結果画面で（自動で）載せたあとの「ランキングを見る」→ その条件のランキングに自分の名前がある
 t('ta_open_links_board', async (page, { db }) => {
+  await withProfile(page, db);
   await clearTimeAttack(page, { mode: 'n2f', region: 'ヨーロッパ', count: 5 });
-  await page.fill('#ta-name', 'チコ');
-  await page.click('#ta-submit');
   await page.locator('#ta-open').waitFor();
   await page.click('#ta-open');
   assert.equal(await page.isVisible('#scr-ranking'), true);
@@ -210,6 +219,26 @@ t('ta_open_links_board', async (page, { db }) => {
   assert.match(r, /^1\s+チコ\s+\d+\.\d\d秒\s+\d+\/\d+$/);
   assert.equal(r.split(/\s+/)[2], await page.evaluate(() => RANKING.formatTime(Math.floor(G.timeMs))));
   assert.deepEqual(tops(db), [{ p_board: 'n2f:europe:5', p_period: 'all' }]);
+  // 自分の行は目立たせる
+  assert.equal(await page.locator('#rk-list li.me').count(), 1);
+});
+
+// プロフィールの記録は名前の横にかざり（称号は出さない）、名前を押すとプロフィールの窓。古い記録（pid なし）は押せない
+t('ranking_shows_deco_and_opens_card', async (page, { db }) => {
+  db.profiles.push({ id: 1, token: 'tok-m', nickname: 'ミケ', pid: 'mikemikemike', deco: ['jp', 'fr', 'zz'], title: 'すごい称号' });
+  db.rows.push({ ...record(B, 'ミケ', 7000), profile_id: 1 }, record(B, 'むかし', 8000));
+  await page.click('#home-rank');
+  await rows(page, 2);
+  const [mike, old] = await page.locator('#rk-list li').all();
+  assert.equal(await mike.locator('.nick button.pf-name').innerText(), 'ミケ');
+  assert.equal(await mike.locator('.nick .rr-deco img').count(), 2); // 知らない国（zz）は出さない
+  assert.doesNotMatch(await mike.innerText(), /すごい称号/);
+  assert.equal(await old.locator('button').count(), 0);
+  assert.equal(await page.locator('#rk-list li.me').count(), 0);
+  await mike.locator('.pf-name').click();
+  await page.locator('#pf-card[open]').waitFor();
+  await page.locator('#pf-card', { hasText: 'ミケ' }).waitFor();
+  assert.ok(db.calls.some(c => c.name === 'profile_card' && c.args.p_pid === 'mikemikemike'));
 });
 
 // 長い名前で50件並べても横にはみ出さない

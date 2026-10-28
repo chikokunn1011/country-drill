@@ -18,7 +18,15 @@ const t = (name, fn) => test(name, { timeout: 30_000 }, async () => {
   } finally { await app.close(); }
 });
 const text = (page, sel) => page.locator(sel).innerText();
-const submits = db => db.calls.filter(c => c.name === 'submit_score');
+const submits = db => db.calls.filter(c => c.name === 'submit_score2');
+// 偽DB と localStorage にプロフィール（自動 OFF）を入れて開き直す。結果画面に［チコ で載せる］が出る
+async function withManualProfile(page, db) {
+  db.profiles.push({ token: 'tok-1', nickname: 'チコ', pid: 'abcdefghjk12' });
+  await page.evaluate(() => localStorage.setItem('profile', JSON.stringify({ token: 'tok-1', pid: 'abcdefghjk12', name: 'チコ', auto: false, isPublic: true, sent: { isPublic: true } })));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+}
 
 // タイムアタック 国旗→国名・全世界・5問を4問解き、最後の問題を押せるようになるまで待つ
 async function toLastQuestion(page) {
@@ -48,17 +56,18 @@ t('click_guard_after_last_answer', async page => {
 });
 
 t('submit_guard', async (page, { db }) => {
+  await withManualProfile(page, db);
   await toLastQuestion(page);
   await page.evaluate(() => {
     document.querySelector(`.choice[data-a="${G.cur.c.a}"]`).click();
-    $('ta-name').value = 'チコ'; $('ta-submit').click();
+    document.querySelector('#ta-post [data-pf="send"]').click();
   });
   await page.waitForTimeout(300);
   assert.equal(submits(db).length, 0);
-  assert.equal(await text(page, '#ta-msg'), '');
+  assert.equal(await page.locator('#ta-post .tamsg').textContent(), '');
   await settleResult(page);
-  await page.click('#ta-submit');
-  await page.locator('#ta-msg', { hasText: '載せたよ！' }).waitFor();
+  await page.click('#ta-post [data-pf="send"]');
+  await page.locator('#ta-post .tamsg', { hasText: '載せたよ！' }).waitFor();
   assert.equal(submits(db).length, 1);
 });
 
@@ -83,9 +92,9 @@ t('held_enter_on_result', async page => {
 // 入力欄の押しっぱなしは止めない
 t('typing_in_name_not_blocked', async page => {
   await clearTimeAttack(page);
-  await page.focus('#ta-name');
+  await page.focus('#ta-post input');
   await page.keyboard.down('a');
   await page.keyboard.down('a'); // 2回目は repeat
   await page.keyboard.up('a');
-  assert.equal(await page.inputValue('#ta-name'), 'aa');
+  assert.equal(await page.inputValue('#ta-post input'), 'aa');
 });
