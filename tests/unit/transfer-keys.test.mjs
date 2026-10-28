@@ -30,7 +30,7 @@ const usedKeys = () => {
 test('transfer_keys_lists', () => {
   // Global Constraints の2つの一覧
   assert.deepEqual([...list('TRANSFER_KEYS')].sort(), ['badges', 'bdgcat', 'bview', 'daily', 'misses', 'nickname', 'rpg', 'settings', 'setup'].sort());
-  for (const k of ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'badges-broken'])
+  for (const k of ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'transferPending', 'badges-broken'])
     assert.ok(list('LOCAL_KEYS').includes(k), `LOCAL_KEYS に ${k} がない`);
   const both = list('TRANSFER_KEYS').filter(k => list('LOCAL_KEYS').includes(k));
   assert.deepEqual(both, [], '両方の一覧に入っているキー');

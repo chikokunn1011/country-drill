@@ -70,7 +70,7 @@
     const chk = RANKING.checkName(name);
     if (!chk.ok) return chk;
     const r = await RANKING.profileRename({ token: p.token, nickname: chk.name });
-    if (!r.ok) { if (r.reason === 'not_found') lost(); return { ok: false, reason: r.reason }; }
+    if (!r.ok) { if (r.reason === 'not_found') lost(p.token); return { ok: false, reason: r.reason }; }
     if (!update(p.token, { name: r.nickname })) return { ok: false, reason: 'not_found' };
     store.set('nickname', r.nickname);
     changed();
@@ -81,9 +81,12 @@
   // 公開はサーバーにも送る（すぐ。失敗したら次のきっかけでまた送る）
   const setPublic = on => { const p = read(); if (p && update(p.token, { isPublic: !!on })) { last = get(); redraw(); sync(); } };
 
-  // サーバーが not_found を返した（別の端末に引き継がれた・消された）: プロフィールを消して1回だけ知らせる。端末のゲームのデータはそのまま
-  const lost = () => {
-    if (!read()) return;
+  // サーバーが not_found を返した（別の端末に引き継がれた・消された）: プロフィールを消して1回だけ知らせる。端末のゲームのデータはそのまま。
+  // token は not_found をもらった合言葉。いまのプロフィールがそれでなければ消さない（古い合言葉の返事が、引き継いだばかりのプロフィールを消さないように）。
+  // 引数なしは、いまのプロフィールを消す（前からの呼び方）
+  const lost = token => {
+    const p = read();
+    if (!p || (token !== undefined && p.token !== token)) return;
     drop(KEY);
     toast('このプロフィールは別の端末に引き継がれたよ', 5000);
     changed();
@@ -131,7 +134,7 @@
       r = await RANKING.profileSet({ token: p.token, ...only });
       if (r.ok) { const now = read(); if (now?.token === p.token) update(p.token, { sent: { ...now.sent, ...only } }); }
       syncing = false;
-      if (r.reason === 'not_found') lost();
+      if (r.reason === 'not_found') lost(p.token);
       else if (!r.ok) console.warn('[profile] profile_set', r.reason);
       return;   // 断られたほうは次のきっかけまで待つ
     }
@@ -140,7 +143,7 @@
       const now = read();
       if (now?.token === p.token) update(p.token, { sent: { ...now.sent, ...d } });
       scheduleSync();   // 送っているあいだにまた変わっていたら
-    } else if (r.reason === 'not_found') lost();
+    } else if (r.reason === 'not_found') lost(p.token);
     else console.warn('[profile] profile_set', r.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
   for (const type of ['badge:title', 'badge:earned', 'rpg:deco']) document.addEventListener(type, scheduleSync);
@@ -149,15 +152,16 @@
   // 預けるキー（同じ github.io のほかのサイトのデータを持っていかないよう、全部ではなくこの一覧）と、預けないキー（端末ごとのもの）。
   // localStorage のキーを足したらどちらかに入れる（tests/unit/transfer-keys.test.mjs がコードの中のキーと文字で比べる）
   const TRANSFER_KEYS = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'bdgcat', 'bview'];
-  const LOCAL_KEYS = ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'badges-broken'];
+  const LOCAL_KEYS = ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'transferPending', 'badges-broken'];
   const rawGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
-  // { v: 1, keys: { キー: 中身の文字列 } }。一覧のキーで、この端末にあるものだけ（JSON にせず生の文字列のまま）
+  // { v: 1, keys: { キー: 中身の文字列 }, profile: { auto, isPublic } }。keys は一覧のキーで、この端末にあるものだけ（JSON にせず生の文字列のまま）。
+  // profile は自動で載せる・公開の設定（profile キーは預けないので、ここだけ持っていく。無い古いデータでも読めるよう v は 1 のまま）
   const pack = () => {
-    const keys = {};
+    const keys = {}, p = read();
     for (const k of TRANSFER_KEYS) { const v = rawGet(k); if (typeof v === 'string') keys[k] = v; }
-    return { v: 1, keys };
+    return p ? { v: 1, keys, profile: { auto: p.auto !== false, isPublic: p.isPublic !== false } } : { v: 1, keys };
   };
-  // 受け取ったデータを書き戻す。一覧のキーの文字列だけ（一覧に無いキー・文字列でない値は無視）。
+  // 受け取ったデータを書き戻す。一覧のキーの文字列だけ（一覧に無いキー・文字列でない値は無視）。一覧のキーで data に無いもの（前の端末に無かった）は消す。
   // 書く前に、いまの一覧のキーの値を transferBackup に1つだけ退避する。v や形がちがえば何もしないで false
   const unpack = data => {
     const keys = data?.keys;
@@ -166,7 +170,8 @@
     for (const k of TRANSFER_KEYS) { const v = rawGet(k); if (v != null) backup[k] = v; }
     store.set('transferBackup', { at: Date.now(), keys: backup });
     for (const k of TRANSFER_KEYS) {
-      if (!Object.hasOwn(keys, k) || typeof keys[k] !== 'string') continue;
+      if (!Object.hasOwn(keys, k)) { drop(k); continue; }
+      if (typeof keys[k] !== 'string') continue;
       try { localStorage.setItem(k, keys[k]); } catch (e) { console.warn('[profile] unpack', k, e); }
     }
     return true;
@@ -174,6 +179,8 @@
   // コードは12文字（0/O/1/I なし）。表示は XXXX-XXXX-XXXX、入力は全角・小文字・ハイフン・空白まじりでもよい（ranking.js の transferClaim と同じそろえ方）
   const normCode = c => String(c ?? '').normalize('NFKC').replace(/[\s\-\u2010-\u2015\u2212\u30fc]/g, '').toUpperCase();
   const codeOk = c => /^[A-HJ-NP-Z2-9]{12}$/.test(c);
+  // かな入力のまま打った・全角で打った（全角英数字・かな・半角カナが入っている）のに、そろえても表に無い字が残る: 英字に切りかえる案内を出す
+  const wideCode = raw => /[\u3040-\u30ff\uff01-\uff5e\uff66-\uff9f]/.test(String(raw ?? '')) && /[^A-HJ-NP-Z2-9]/.test(normCode(raw));
   const fmtCode = c => c.match(/.{1,4}/g).join('-');
   // 日本時間の「10/29 16:05」
   const jstTime = d => {
@@ -186,30 +193,44 @@
     const p = read();
     if (!p) return { ok: false, reason: 'not_found' };
     const r = await RANKING.transferStart({ token: p.token, data: pack() });
-    if (!r.ok) { if (r.reason === 'not_found') lost(); return { ok: false, reason: r.reason }; }
+    if (!r.ok) { if (r.reason === 'not_found') lost(p.token); return { ok: false, reason: r.reason }; }
     issued = { token: p.token, code: r.code, expiresAt: r.expiresAt };
     return { ok: true, code: r.code, expiresAt: r.expiresAt };
   };
-  // 新しい端末: 新しい合言葉とコードを送って、プロフィールとデータを受け取る。データを書き戻して profile を新しい合言葉で書く（読み直しは呼ぶ側）。
-  // 公開・称号・かざりは profile_me で取りなおす（取れなければ公開のまま送らない。非公開をこちらから公開に戻さないように）
+  // 新しい端末: 新しい合言葉とコードを送って、プロフィールとデータを受け取る。profile を新しい合言葉ですぐ書いてから、データを書き戻す（読み直しは呼ぶ側）。
+  // 新しい合言葉は送る前に transferPending（{ code, token }）に覚え、返事が届かなかったら同じコードには同じ合言葉で送り直す
+  // （サーバーは同じコード・同じ合言葉の2回目にも同じ答えを返す。届かなかった1回目でコードが使われ、合言葉も入れかわっているので）。
+  // 自動・公開は前の端末の設定（data.profile。無い古いデータなら自動 ON・公開はサーバーの値）。
+  // 称号・かざりは profile_me で取りなおす（取れなければ送ったことにしない。公開はサーバーの値を送ったことにするので、前の端末とちがえば次の同期で送る）
   const claimTransfer = async code => {
-    const token = newToken();
+    const pend = store.get('transferPending', null);
+    const token = pend?.code === code && typeof pend.token === 'string' && pend.token ? pend.token : newToken();
+    store.set('transferPending', { code, token });
     const r = await RANKING.transferClaim({ code, newToken: token });
-    if (!r.ok) return { ok: false, reason: r.reason };
-    if (!unpack(r.data)) console.warn('[profile] 引き継ぎのデータの形がちがうので、データは移さなかった');
-    const me = await RANKING.profileMe({ token }).catch(() => ({ ok: false }));
-    const isPublic = me.ok ? me.isPublic !== false : true;
-    const sent = me.ok ? { isPublic, title: me.title, deco: me.deco } : { isPublic };
+    if (!r.ok) { if (r.reason !== 'network') drop('transferPending'); return { ok: false, reason: r.reason }; }
+    const prev = r.data?.profile ?? {}, auto = typeof prev.auto === 'boolean' ? prev.auto : true;
+    // 先に profile を書く（このあとの書き戻しや profile_me の途中で閉じても、プロフィールは使える）。
     // claimed: 読み直したあとに「◯◯ のプロフィールを引き継いだよ」を1回出す印
-    store.set(KEY, { token, pid: r.pid, name: r.nickname, auto: true, isPublic, sent, claimed: true });
-    store.set('nickname', r.nickname);   // データの nickname より、プロフィールの名前が本物
+    // 公開の設定が無い古いデータは、公開のまま送ったことにしておく（profile_me が取れないまま、非公開をこちらから公開に戻さないように）
+    const keep = typeof prev.isPublic === 'boolean';
+    const first = { token, pid: r.pid, name: r.nickname, auto, isPublic: keep ? prev.isPublic : true, sent: keep ? {} : { isPublic: true }, claimed: true };
+    store.set(KEY, first);
     drop(PENDING);
+    if (!unpack(r.data)) console.warn('[profile] 引き継ぎのデータの形がちがうので、データは移さなかった');
+    store.set('nickname', r.nickname);   // データの nickname より、プロフィールの名前が本物
+    const me = await RANKING.profileMe({ token }).catch(() => ({ ok: false }));
+    if (me.ok) {
+      const server = me.isPublic !== false;
+      update(token, { isPublic: keep ? prev.isPublic : server, sent: { isPublic: server, title: me.title, deco: me.deco } });
+    }
+    drop('transferPending');
     return { ok: true, name: r.nickname };
   };
 
   // ---- 結果画面の「載せる」箱 ----
-  // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。プロフィールがあって自動 ON ならすぐ送る、自動 OFF なら［載せる］、
-  // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す
+  // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。箱を描いた時点でプロフィールがあって自動 ON ならすぐ送る、そうでなければ［載せる］、
+  // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す。
+  // 自動で送るのは描いた時点だけ。あとでほかの場所でプロフィールを作った・自動を ON にしたときは描き直すだけ（載せないままにした記録を、見ていないところで送らない）
   const postBox = (el, { label = 'ランキングに載せる？', send }) => {
     // state: idle（まだ）・busy（作っている・送っている）・fail（失敗。msg にわけ）・done（載せた。msg に文）
     const st = { state: 'idle', msg: '', input: null };
@@ -229,7 +250,6 @@
           + `${m}<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p></div>`;
         return;
       }
-      if (p.auto && st.state === 'idle') { go(); return; }
       el.innerHTML = `<div class="tabox pf-post"><p class="pf-post-q">${esc(label)}</p>`
         + `<button type="button" class="btn" data-pf="send">${esc(p.name)} で載せる</button>${m}</div>`;
     };
@@ -240,7 +260,7 @@
       let r;
       try { r = await send(p.token); } catch (e) { console.warn('[profile] send', e); r = { ok: false, reason: 'network' }; }
       if (r.ok) { st.state = 'done'; say(r.text ?? '載せたよ！', 'ok'); draw(); return; }
-      if (r.reason === 'not_found') { st.state = 'idle'; say(''); lost(); draw(); return; }   // lost が描き直しを呼ぶが、箱は自分で
+      if (r.reason === 'not_found') { st.state = 'idle'; say(''); lost(p.token); draw(); return; }   // lost が描き直しを呼ぶが、箱は自分で
       st.state = 'fail'; say(RANKING.message(r.reason), 'ng'); draw();
     };
     el.addEventListener('click', e => {
@@ -257,13 +277,13 @@
       st.state = 'idle';
       go();
     });
-    // ほかのタブでプロフィールを作った・消えたら描き直す（箱が画面から外れたら聞くのをやめる）
+    // プロフィールを作った・消えた・自動を切りかえたら描き直す（送らない。箱が DOM から外れたら聞くのをやめる）
     const onChange = () => {
       if (!el.isConnected) { document.removeEventListener('profile:change', onChange); return; }
       if (st.state === 'idle' || st.state === 'fail') draw();
     };
     document.addEventListener('profile:change', onChange);
-    draw();
+    if (get()?.auto) go(); else draw();
     return { retry: go };
   };
 
@@ -369,7 +389,7 @@
   const checkMe = async p => {
     let r;
     try { r = await RANKING.profileMe({ token: p.token }); } catch { return; }
-    if (!r.ok && r.reason === 'not_found' && read()?.token === p.token) lost();
+    if (!r.ok && r.reason === 'not_found') lost(p.token);
   };
   // 出したコード（無い・期限切れ・別のプロフィールのものなら消す）
   const drawIssued = () => {
@@ -409,8 +429,12 @@
     // confirm してから claim する（先に claim するとコードが使われてしまう）。名前は読み直したあとのトーストに出す
     $('pf-tr-form').onsubmit = async e => {
       e.preventDefault();
-      const btn = $('pf-tr-claim'), msg = $('pf-tr-msg'), code = normCode($('pf-tr-in').value);
-      if (!codeOk(code)) { msg.className = 'tamsg ng'; msg.textContent = RANKING.message('bad_code'); return; }
+      const btn = $('pf-tr-claim'), msg = $('pf-tr-msg'), raw = $('pf-tr-in').value, code = normCode(raw);
+      if (!codeOk(code)) {
+        msg.className = 'tamsg ng';
+        msg.textContent = wideCode(raw) ? '英字と数字で入れてね（0・O・1・I は使わない）' : RANKING.message('bad_code');
+        return;
+      }
       const now = read();
       if (!confirm('コードのプロフィールとデータをこの端末に移すよ。この端末の今のデータ（冒険・バッジ・設定など）は上書きされる'
         + (now ? `。この端末のプロフィール「${now.name}」は使えなくなる` : ''))) return;
@@ -485,21 +509,25 @@
 
   // ---- 起動時: rpgRank（冒険のランキングに登録ずみの前の版）からの引っ越しと、同期 ----
   // rpgRank の合言葉は、サーバーで同じ合言葉のプロフィールになっている。通れば profile にして rpgRank を消す。
-  // not_found なら rpgRank を消すだけ、つながらなければ次の起動でまた試す
+  // not_found なら rpgRank を消すだけ、つながらなければ次の起動でまた試す。
+  // rpgRank が無くて rpgRankPending（前の版で登録の返事が届かなかった合言葉）があれば、それでも試す（登録が通っていればプロフィールになっている）。
+  // 通れば profile にして rpgRankPending を消す。通らなければ残す（冒険のデータを消すときに rpg-rank.js が使う）
   const migrate = async () => {
     if (read()) return;
-    const old = store.get('rpgRank', null);
-    if (!old || typeof old.token !== 'string' || !old.token) return;
-    const me = await RANKING.profileMe({ token: old.token });
+    const old = store.get('rpgRank', null), pending = store.get('rpgRankPending', null);
+    const [token, from] = old && typeof old.token === 'string' && old.token ? [old.token, 'rpgRank']
+      : typeof pending === 'string' && pending ? [pending, 'rpgRankPending'] : [];
+    if (!token) return;
+    const me = await RANKING.profileMe({ token });
     if (me.ok) {
       if (!read()) {
-        store.set(KEY, { token: old.token, pid: me.pid, name: me.nickname, auto: true, isPublic: me.isPublic !== false,
+        store.set(KEY, { token, pid: me.pid, name: me.nickname, auto: true, isPublic: me.isPublic !== false,
           sent: { isPublic: me.isPublic !== false, title: me.title, deco: me.deco } });
         store.set('nickname', me.nickname);
       }
-      drop('rpgRank');
+      drop(from);
       changed();
-    } else if (me.reason === 'not_found') drop('rpgRank');
+    } else if (me.reason === 'not_found' && from === 'rpgRank') drop('rpgRank');
   };
   const ready = migrate().catch(e => console.warn('[profile] migrate', e));
   // badges.js・rpg.js はこの後に読むので、全部読み終わってから比べる

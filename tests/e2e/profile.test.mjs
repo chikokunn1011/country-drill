@@ -105,6 +105,30 @@ t('migrate rpgRank not_found', async page => {
   assert.equal(await stored(page, 'profile'), null);
 });
 
+// 前の版で冒険の登録の返事が届かなかった人（rpgRankPending だけある）: その合言葉のプロフィールが通れば profile にする
+t('migrate rpgRankPending', async (page, { db }) => {
+  db.profiles.push({ token: 'pend', nickname: 'ミケ' });
+  await page.evaluate(() => localStorage.setItem('rpgRankPending', JSON.stringify('pend')));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+  const p = await stored(page, 'profile');
+  assert.equal(p.token, 'pend');
+  assert.equal(p.name, 'ミケ');
+  assert.equal(p.pid, db.profiles[0].pid);
+  assert.equal(await stored(page, 'rpgRankPending'), null);
+});
+
+// 通らなければ rpgRankPending は残す（冒険のデータを消すときに rpg-rank.js が使う）
+t('migrate rpgRankPending not_found', async page => {
+  await page.evaluate(() => localStorage.setItem('rpgRankPending', JSON.stringify('gone')));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+  assert.equal(await stored(page, 'profile'), null);
+  assert.equal(await stored(page, 'rpgRankPending'), 'gone');
+});
+
 t('toggles', async (page, { db }) => {
   await openWithProfile(page, db);
   await openProfile(page);
@@ -185,6 +209,58 @@ t('postBox not_found', async (page, { db }) => {
   assert.equal(await page.locator('.toast', { hasText: '引き継がれた' }).count(), 1);
 });
 
+// 箱を描いたあとに、ほかの場所でプロフィールを作った・自動を ON にしたときは、描き直すだけで勝手に送らない（載せなかった前の記録が載らないように）
+t('postBox does not send on later change', async (page, { db }) => {
+  await drawBox(page);
+  await page.locator('#box button', { hasText: 'プロフィールを作って載せる' }).waitFor();
+  assert.deepEqual(await page.evaluate(() => PROFILE.create('チコ')), { ok: true });
+  await page.locator('#box button', { hasText: 'チコ で載せる' }).waitFor();
+  await page.waitForTimeout(300);
+  assert.deepEqual(await page.evaluate(() => window.__sent), []);
+  // 自動 OFF で描いた箱は、自動を ON にしても送らない
+  await page.evaluate(() => { PROFILE.setAuto(false); document.querySelector('#box').remove(); });
+  await drawBox(page);
+  await page.locator('#box button', { hasText: 'チコ で載せる' }).waitFor();
+  await page.evaluate(() => PROFILE.setAuto(true));
+  await page.waitForTimeout(300);
+  assert.deepEqual(await page.evaluate(() => window.__sent), []);
+  assert.equal(await page.locator('#box button', { hasText: 'チコ で載せる' }).count(), 1);
+  // 押せば送る
+  await page.click('#box button:has-text("チコ で載せる")');
+  await page.locator('#box', { hasText: 'チコ で載せたよ！' }).waitFor();
+  assert.equal(await page.evaluate(() => window.__sent.length), 1);
+});
+
+// lost(token) は、いまのプロフィールがその合言葉のときだけ消す（遅れて届いた古い合言葉の not_found で、新しいプロフィールを消さない）。
+// 引数なしは今までどおり消す
+t('lost checks token', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await page.evaluate(() => PROFILE.lost('tok-old'));
+  assert.equal((await stored(page, 'profile')).token, 'tok-1');
+  assert.equal(await page.locator('.toast', { hasText: '引き継がれた' }).count(), 0);
+  // 古い合言葉で送っているあいだに、プロフィールが新しい合言葉に変わった（引き継いだ）→ 返ってきた not_found では消さない
+  await page.evaluate(() => {
+    const el = document.createElement('div'); el.id = 'box'; document.body.append(el);
+    window.__go = null;
+    PROFILE.postBox(el, { send: () => new Promise(ok => { window.__go = ok; }) });
+  });
+  await page.waitForFunction(() => window.__go);
+  await page.evaluate(() => {
+    localStorage.setItem('profile', JSON.stringify({ ...JSON.parse(localStorage.getItem('profile')), token: 'tok-2' }));
+    window.__go({ ok: false, reason: 'not_found' });
+  });
+  await page.waitForTimeout(200);
+  assert.equal((await stored(page, 'profile')).token, 'tok-2');
+  assert.equal(await page.locator('.toast', { hasText: '引き継がれた' }).count(), 0);
+  await page.evaluate(() => PROFILE.lost('tok-2'));
+  assert.equal(await stored(page, 'profile'), null);
+  assert.equal(await page.locator('.toast', { hasText: '引き継がれた' }).count(), 1);
+  // 引数なし
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify(p)), PROFILE_SAVE);
+  await page.evaluate(() => PROFILE.lost());
+  assert.equal(await stored(page, 'profile'), null);
+});
+
 t('storage sync', async (page, { db, context }) => {
   await openWithProfile(page, db);
   await openProfile(page);
@@ -214,7 +290,8 @@ t('sync title and badges', async (page, { db }) => {
   });
   await page.click('body > [data-bdg-equip="rpg-final@1"]');
   await until(() => db.profiles[0].title === '世界を取りもどした者', 'title');
-  assert.equal((await stored(page, 'profile')).sent.title, '世界を取りもどした者');
+  // sent は返事が届いてから書くので、偽DB が変わった直後にはまだ前の値のことがある。書かれるまで待つ
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('profile')).sent.title === '世界を取りもどした者');
 });
 
 // 称号・バッジの数などが断られても（bad_record）、公開の切りかえだけは送り直して届ける
@@ -390,6 +467,14 @@ async function secondDevice(a, opts = {}) {
   await b.page.waitForFunction(() => window.PROFILE);
   return b;
 }
+// 出た知らせ（.toast）の文を全部 window.__toasts に覚える（知らせは数秒で消えるので、あとから数えられるように）
+const watchToasts = page => page.evaluate(() => {
+  window.__toasts = [];
+  new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains('toast')) window.__toasts.push(n.textContent); })
+    .observe(document.body, { childList: true, subtree: true });
+});
+// db.transfers にコードを1つ入れる（profile_id 1 のプロフィールの分）
+const seedTransfer = (db, data, code = 'ABCDEFGHJKLM') => db.transfers.push({ code, profile_id: 1, data, expires_at: new Date(Date.now() + 864e5).toISOString(), used_at: null });
 // プロフィール画面でコードを入れて、読み直しが終わるまで待つ
 async function claim(page, code) {
   await openProfile(page);
@@ -404,6 +489,7 @@ t('transfer moves data', async (page, app) => {
   const dialogs = acceptDialogs(page);
   await openWithProfile(page, db);
   await page.evaluate(() => { localStorage.setItem('rpg', '{"v":1,"coins":123}'); localStorage.setItem('evil', '"x"'); });
+  await watchToasts(page);
   await openProfile(page);
   await page.click('#pf-tr-start');
   await page.locator('#pf-tr-code').waitFor();
@@ -417,6 +503,7 @@ t('transfer moves data', async (page, app) => {
   assert.equal(db.transfers[0].data.keys.rpg, '{"v":1,"coins":123}');
   assert.equal(db.transfers[0].data.keys.evil, undefined);
   assert.equal(db.transfers[0].data.keys.profile, undefined);
+  assert.deepEqual(db.transfers[0].data.profile, { auto: true, isPublic: true });   // 自動・公開の設定も持っていく
   // 新しい端末: 小文字・空白まじりでも入れられる
   const b = await secondDevice(app);
   try {
@@ -436,10 +523,11 @@ t('transfer moves data', async (page, app) => {
     assert.deepEqual(b.errors.map(String), []);
   } finally { await b.close(); }
   // 前の端末: 次にサーバーとやりとりしたとき not_found → 知らせて、作るフォームになる（ゲームのデータはそのまま）
+  // （B を見ているあいだに A の同期が not_found をもらって、知らせがもう消えていることもある）
   await page.click('#brand');
   await openProfile(page);
-  await page.locator('.toast', { hasText: 'このプロフィールは別の端末に引き継がれたよ' }).waitFor();
-  await page.locator('#pf-form').waitFor();
+  await page.locator('#pf-form').waitFor({ timeout: 15_000 });
+  assert.deepEqual(await page.evaluate(() => window.__toasts.filter(x => x.includes('引き継がれた'))), ['このプロフィールは別の端末に引き継がれたよ']);
   assert.equal(await stored(page, 'profile'), null);
   assert.equal(await page.evaluate(() => localStorage.getItem('rpg')), '{"v":1,"coins":123}');
 }, { blockScripts: RPG_FILES });
@@ -497,4 +585,90 @@ t('claim over own profile and reissue', async (page, { db }) => {
   await page.click('#pf-tr-claim');
   await page.locator('#pf-tr-msg', { hasText: 'コードがちがうか' }).waitFor();
   assert.match(dialogs.at(-1), /この端末のプロフィール「チコ」は使えなくなる/);
+});
+
+// 引き継ぎで、前の端末の「自動で載せる」「公開」の設定も持ってくる（サーバーがまだ公開のままでも、前の端末の非公開を送る）
+t('claim keeps auto and public', async (page, { db }) => {
+  db.profiles.push({ id: 1, token: 'old', nickname: 'ミケ' });
+  seedTransfer(db, { v: 1, keys: {}, profile: { auto: false, isPublic: false } });
+  acceptDialogs(page);
+  await claim(page, 'ABCD-EFGH-JKLM');
+  const p = await stored(page, 'profile');
+  assert.equal(p.auto, false);
+  assert.equal(p.isPublic, false);
+  await until(() => db.profiles[0].is_public === false, 'is_public false');
+}, { blockScripts: RPG_FILES });
+
+// 前の端末に無かったキーは、新しい端末からも消す（退避はする）
+t('claim removes keys missing from data', async (page, { db }) => {
+  db.profiles.push({ id: 1, token: 'old', nickname: 'ミケ' });
+  seedTransfer(db, { v: 1, keys: { rpg: '"new"' } });
+  acceptDialogs(page);
+  await page.evaluate(() => { localStorage.setItem('daily', '{"x":1}'); localStorage.setItem('misses', '{"jp":2}'); localStorage.setItem('evil', '"keep"'); });
+  await claim(page, 'ABCD-EFGH-JKLM');
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpg')), '"new"');
+  assert.equal(await page.evaluate(() => localStorage.getItem('daily')), null);
+  assert.equal(await page.evaluate(() => localStorage.getItem('misses')), null);
+  assert.equal(await page.evaluate(() => localStorage.getItem('evil')), '"keep"');   // 一覧に無いキーはさわらない
+  const bk = await stored(page, 'transferBackup');
+  assert.equal(bk.keys.daily, '{"x":1}');
+  assert.equal(bk.keys.misses, '{"jp":2}');
+}, { blockScripts: RPG_FILES });
+
+// claim の返事が届かなかった（サーバーでは通った）: 同じコードをもう一回入れると、同じ合言葉で送り直して受け取れる
+t('claim retries after lost reply', async (page, { db }) => {
+  db.profiles.push({ id: 1, token: 'old', nickname: 'ミケ' });
+  seedTransfer(db, { v: 1, keys: { bview: '"list"' } });
+  // 本番のサーバーと同じく、同じコード・同じ合言葉の2回目は同じ答えを返す
+  const orig = db.rpc.profile_transfer_claim, done = new Map();
+  db.rpc.profile_transfer_claim = a => {
+    const prev = done.get(a.p_code);
+    if (prev && prev.token === a.p_new_token) return prev.r;
+    const r = orig(a);
+    if (r.ok) done.set(a.p_code, { token: a.p_new_token, r });
+    return r;
+  };
+  // 1回目はサーバーで通したうえで、返事だけ落とす
+  let drop = true;
+  await page.route(u => u.hostname.endsWith('.supabase.co') && u.pathname.endsWith('/profile_transfer_claim'), async route => {
+    if (!drop || route.request().method() !== 'POST') return route.fallback();
+    drop = false;
+    db.rpc.profile_transfer_claim(JSON.parse(route.request().postData()));
+    return route.abort();
+  });
+  acceptDialogs(page);
+  await openProfile(page);
+  await page.fill('#pf-tr-in', 'ABCD-EFGH-JKLM');
+  await page.click('#pf-tr-claim');
+  await page.locator('#pf-tr-msg', { hasText: 'ランキングに接続できなかった' }).waitFor();
+  const pend = await stored(page, 'transferPending');
+  assert.equal(pend.code, 'ABCDEFGHJKLM');
+  assert.equal(db.profiles[0].token, pend.token);   // サーバーはもう新しい合言葉
+  await Promise.all([page.waitForEvent('load'), page.click('#pf-tr-claim')]);
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+  const p = await stored(page, 'profile');
+  assert.equal(p.token, pend.token);
+  assert.equal(p.name, 'ミケ');
+  assert.equal(await page.evaluate(() => localStorage.getItem('bview')), '"list"');
+  assert.equal(await stored(page, 'transferPending'), null);
+}, { blockScripts: RPG_FILES });
+
+// かな入力のまま打った・全角: 全角英数字はそろえて使う。それでも英字と数字の表に無い字があれば、英字に切りかえる案内を出す（送らない）
+t('code with kana', async (page, { db }) => {
+  const dialogs = acceptDialogs(page);
+  await openProfile(page);
+  for (const bad of ['あbcd-EFGH-JKLM', 'ＡＢＣＯ－ＥＦＧＨ－ＪＫＬＭ']) {
+    await page.fill('#pf-tr-in', bad);
+    await page.click('#pf-tr-claim');
+    await page.locator('#pf-tr-msg', { hasText: '英字と数字で入れてね（0・O・1・I は使わない）' }).waitFor();
+    await page.evaluate(() => { document.querySelector('#pf-tr-msg').textContent = ''; });
+  }
+  assert.equal(dialogs.length, 0);
+  assert.ok(!db.calls.some(c => c.name === 'profile_transfer_claim'));
+  // 全角でも表の字だけなら送る
+  await page.fill('#pf-tr-in', 'ＡＡＡＡ－ＢＢＢＢ－ＣＣＣＣ');
+  await page.click('#pf-tr-claim');
+  await page.locator('#pf-tr-msg', { hasText: 'コードがちがうか' }).waitFor();
+  assert.equal(dialogs.length, 1);
 });
