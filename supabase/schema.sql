@@ -122,9 +122,9 @@ create table if not exists rpg_players (
   id bigint generated always as identity primary key,
   token_hash bytea not null unique,      -- sha256(合言葉)
   nickname text not null unique,         -- 前後空白を除いた1〜12文字
-  lv int not null,                       -- 旅人のレベル（1〜50）
-  dungeons int not null,                 -- ボスを倒したダンジョンの数（0〜7）
-  floors int not null,                   -- クリアしたフロアの合計（0〜35。ダンジョン1つは5フロア）
+  lv int not null,                       -- 旅人のレベル（1〜99）
+  dungeons int not null,                 -- ボスを倒したダンジョンの数（0〜21）
+  floors int not null,                   -- クリアしたフロアの合計（0〜105。ダンジョン1つは5フロア）
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -154,9 +154,10 @@ end $$;
 revoke all on function rpg_name_problem(text, bytea) from public, anon, authenticated;
 
 -- ダンジョンはボスまで5フロア。クリアしたダンジョンの数はフロアの合計の 1/5 以下
+-- 上限は第3章（21ダンジョン・105フロア）まで先に広げてある
 create or replace function rpg_record_ok(p_lv int, p_dungeons int, p_floors int) returns boolean
 language sql immutable set search_path = public, pg_temp as $$
-  select coalesce(p_lv between 1 and 50 and p_dungeons between 0 and 7 and p_floors between 0 and 35 and p_dungeons * 5 <= p_floors, false)
+  select coalesce(p_lv between 1 and 99 and p_dungeons between 0 and 21 and p_floors between 0 and 105 and p_dungeons * 5 <= p_floors, false)
 $$;
 revoke all on function rpg_record_ok(int, int, int) from public, anon, authenticated;
 
