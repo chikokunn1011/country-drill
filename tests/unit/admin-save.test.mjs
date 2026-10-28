@@ -30,7 +30,7 @@ function load(init = {}, now) {
 
 test('keys_lists_sorted_with_bytes', () => {
   const { A } = load({ rpg: '{}', a: '1' });
-  assert.deepEqual(plain(A.keys()), [{ key: 'a', bytes: 1 }, { key: 'rpg', bytes: 2 }]);
+  assert.deepEqual(plain(A.keys()), [{ key: 'a', bytes: 1, at: null }, { key: 'rpg', bytes: 2, at: null }]);
 });
 
 test('write_rejects_broken_json', () => {
@@ -317,4 +317,53 @@ test('first_time_queues_rank_tokens_and_keeps_backups', () => {
   }, () => T0);
   assert.deepEqual(plain(A.firstTime()), { ok: true });
   assert.deepEqual(st.dump(), { rpgRankDel: JSON.stringify(['tok-a', 'tok-b']), 'rpg-broken-1-0': 'x', 'badges-broken': 'y' });
+});
+
+test('auto_snapshots_never_push_out_manual_ones', () => {
+  let t = 0;
+  const { A } = load({ a: '1' }, () => ++t * 1000);
+  A.snapSave('ボス前');
+  for (let i = 1; i <= 7; i++) A.snapSave('自動' + i, { auto: true });
+  let l = plain(A.snapList());
+  assert.deepEqual(l.filter(x => !x.auto).map(x => x.name), ['ボス前']);
+  assert.deepEqual(l.filter(x => x.auto).map(x => x.name), ['自動3', '自動4', '自動5', '自動6', '自動7']);
+  // 手動も別に5個まで
+  for (let i = 1; i <= 6; i++) A.snapSave('手' + i);
+  l = plain(A.snapList());
+  assert.deepEqual(l.filter(x => !x.auto).map(x => x.name), ['手2', '手3', '手4', '手5', '手6']);
+  assert.equal(l.filter(x => x.auto).length, 5);
+  // 前の版のスナップショット（auto が無い）は手動あつかい
+  const { A: B, st } = load({ adminSnaps: JSON.stringify([{ name: 'old', at: 'x', data: {} }]) });
+  assert.deepEqual(plain(B.snapList()), [{ name: 'old', at: 'x', auto: false }]);
+  B.snapSave('自動', { auto: true });
+  assert.equal(JSON.parse(st.getItem('adminSnaps')).length, 2);
+});
+
+test('keys_at_only_where_the_save_has_a_time', () => {
+  const { A } = load({
+    badges: JSON.stringify({ v: 1, got: { 'a@1': Date.UTC(2026, 9, 1), 'b@1': Date.UTC(2026, 9, 3) } }),
+    rpg: JSON.stringify({ v: 1, day: { d: '2026-10-27' } }),
+    daily: JSON.stringify({ day: '2026-10-26', status: 'done' }),
+    adminErrors: JSON.stringify([{ at: '2026-10-20T00:00:00.000Z' }, { at: '2026-10-21T00:00:00.000Z' }, 'junk']),
+    settings: '{"theme":"dark"}', misses: '{', nickname: '"x"',
+  });
+  const at = Object.fromEntries(plain(A.keys()).map(k => [k.key, k.at]));
+  assert.deepEqual(at, {
+    adminErrors: '2026-10-21T00:00:00.000Z', badges: '2026-10-03T00:00:00.000Z', daily: '2026-10-26',
+    misses: null, nickname: null, rpg: '2026-10-27', settings: null,
+  });
+});
+
+test('badges_eq_sets_owned_title_or_none_or_auto', () => {
+  const { A, st, ctx } = load();
+  const key = ctx.BADGES_CORE.makeCatalog(ctx.COUNTRIES)[0].id + '@1';
+  assert.deepEqual(plain(A.badgesEq(key)), { ok: false, reason: 'missing' }, '取っていない称号はつけない');
+  A.badgeToggle(key);
+  assert.deepEqual(plain(A.badgesEq(key)), { ok: true });
+  assert.equal(JSON.parse(st.getItem('badges')).eq, key);
+  A.badgesEq('');
+  assert.equal(JSON.parse(st.getItem('badges')).eq, '');
+  A.badgesEq(null);
+  assert.equal(JSON.parse(st.getItem('badges')).eq, null);
+  assert.equal(A.badgesEq('__proto__').ok, false);
 });

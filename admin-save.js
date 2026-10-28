@@ -18,6 +18,21 @@
   const bytesOf = s => { let n = 0; for (const ch of s) { const c = ch.codePointAt(0); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4; } return n; };
   const parse = s => { try { return { ok: true, v: JSON.parse(s) }; } catch { return { ok: false }; } };
 
+  // セーブの中にある一番新しい時刻（ISO 文字列か 'YYYY-MM-DD'）。badges は got の時刻（ms）、rpg は遊んだ日、daily は挑戦した日、
+  // adminSnaps・adminErrors は at。どれも無い・読めないなら null
+  const DAY = /^\d{4}-\d{2}-\d{2}$/;
+  function savedAt(key, raw) {
+    const p = parse(raw);
+    if (!p.ok) return null;
+    const v = p.v, isoOf = t => { const d = new Date(t); return Number.isFinite(+d) && +d > 0 ? d.toISOString() : null; };
+    const newest = ts => { const ms = ts.map(t => typeof t === 'number' ? t : Date.parse(t)).filter(n => Number.isFinite(n) && n > 0); return ms.length ? isoOf(Math.max(...ms)) : null; };
+    if (key === 'badges') return isObj(v) && isObj(v.got) ? newest(Object.values(v.got)) : null;
+    if (key === 'rpg') return isObj(v) && isObj(v.day) && typeof v.day.d === 'string' && DAY.test(v.day.d) ? v.day.d : null;
+    if (key === 'daily') return isObj(v) && typeof v.day === 'string' && DAY.test(v.day) ? v.day : null;
+    if (key === SNAPS || key === ERRORS) return Array.isArray(v) ? newest(v.filter(isObj).map(x => x.at).filter(x => typeof x === 'string')) : null;
+    return null;
+  }
+
   function create(storage, now = () => Date.now()) {
     const iso = () => new Date(now()).toISOString();
     const rpgToday = () => RC.today(new Date(now()));
@@ -25,7 +40,8 @@
     const guard = f => { try { return f(); } catch { return { ok: false, reason: 'storage' }; } };
     const allKeys = () => { const ks = []; for (let i = 0; i < storage.length; i++) { const k = storage.key(i); if (k != null) ks.push(k); } return ks; };
 
-    const keys = () => guard(() => allKeys().sort().map(key => ({ key, bytes: bytesOf(storage.getItem(key) ?? '') })));
+    // D1: at は「セーブの中に時刻が書いてあるもの」だけ（localStorage には更新時刻が無い）。無ければ null
+    const keys = () => guard(() => allKeys().sort().map(key => { const raw = storage.getItem(key) ?? ''; return { key, bytes: bytesOf(raw), at: savedAt(key, raw) }; }));
     const read = key => guard(() => {
       const raw = storage.getItem(key);
       if (raw == null) return { ok: false, reason: 'missing', raw: null };
@@ -91,13 +107,16 @@
       }
     };
 
-    // ---- スナップショット（最大5個。古いものから消える） ----
+    // ---- スナップショット（手動・自動それぞれ最大5個。古いものから消える） ----
+    // 自動（危ない操作の前に取るもの）は auto:true。自動が増えても手動のものは押し出さない（別々に5個まで）
     const snaps = () => { const p = parse(storage.getItem(SNAPS) ?? '[]'); return p.ok && Array.isArray(p.v) ? p.v.filter(s => isObj(s) && typeof s.name === 'string' && isObj(s.data)) : []; };
-    const snapList = () => snaps().map(({ name, at }) => ({ name, at }));
-    const snapSave = name => guard(() => {
+    const snapList = () => snaps().map(({ name, at, auto }) => ({ name, at, auto: auto === true }));
+    const snapSave = (name, { auto = false } = {}) => guard(() => {
       const list = snaps().filter(s => s.name !== name);   // 同じ名前は置きかえ
-      list.push({ name, at: iso(), data: exportAll().data });
-      storage.setItem(SNAPS, JSON.stringify(list.slice(-SNAP_MAX)));
+      list.push({ name, at: iso(), auto: auto === true, data: exportAll().data });
+      const pool = a => list.filter(s => (s.auto === true) === a);
+      const keep = new Set([...pool(false).slice(-SNAP_MAX), ...pool(true).slice(-SNAP_MAX)]);
+      storage.setItem(SNAPS, JSON.stringify(list.filter(s => keep.has(s))));
       return { ok: true };
     });
     const snapLoad = name => {
@@ -199,6 +218,14 @@
       return { ok: true };
     });
     const badgesNone = () => remove('badges');
+    // つけている称号を決める。null＝本編が自動で選ぶ、''＝つけない、'id@段' ＝そのステップ（取っているものだけ）
+    const badgesEq = key => guard(() => {
+      const { X, d } = badgesRead();
+      if (key !== null && key !== '' && !(typeof key === 'string' && Object.hasOwn(d.got, key))) return { ok: false, reason: 'missing' };
+      d.eq = key;
+      badgesWrite(d, X);
+      return { ok: true };
+    });
     const badgeToggle = key => guard(() => {
       const { X, d } = badgesRead();
       if (key in d.got) delete d.got[key]; else d.got[key] = now();
@@ -237,7 +264,7 @@
     return {
       keys, read, write, remove, exportAll, importAll, snapList, snapSave, snapLoad, snapDelete,
       rpgGet, rpgEdit, rpgCoins, rpgSetLv, rpgSetFloor, rpgUnlockAll, rpgClearAll, rpgStoryReset, rpgSetPity, rpgGiveCard, rpgWipe,
-      badgesAll, badgesNone, badgeToggle, dailyQuestions, dailyReset, settingsGet, settingsSet, firstTime, checkData,
+      badgesAll, badgesNone, badgeToggle, badgesEq, dailyQuestions, dailyReset, settingsGet, settingsSet, firstTime, checkData,
     };
   }
 
