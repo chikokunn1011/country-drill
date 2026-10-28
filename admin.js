@@ -2,6 +2,12 @@
 // 変わる文字（キー名・セーブの中身・国名など）はいつも textContent / value / setAttribute で入れる。innerHTML は使わない。
 // 本編の S（設定）はここでは作らない: sound.js は S が無いと「効果音オン・音量70」で鳴らすので、効果音のテスト（D10）が本編の設定に左右されない。
 (() => {
+  // ---- よそのページの iframe の中では何も出さない（meta の CSP では frame-ancestors が効かないので、ここで止める） ----
+  if (window.top !== window.self) {
+    document.documentElement.style.setProperty('display', 'none', 'important');
+    try { window.top.location = location.href; } catch { /* 抜け出せなくても、隠したまま何も作らない */ }
+    return;
+  }
   // ---- 画面の色（本編の head の先読みと同じ）。DOM ができる前、head で読まれた時点で当てる ----
   try {
     const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light';
@@ -9,8 +15,9 @@
   } catch { /* 読めなければ端末の設定のまま */ }
   const applyTheme = t => { if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
 
-  const SUPABASE = 'https://vgdkklvhtvcamtxwjpke.supabase.co';   // admin-api.js と同じ（D12 のつながるか確かめるだけ）
-  const PUBLIC_KEY = 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV';
+  // D12 のつながるか確かめるだけに使う。admin-api.js が URL/KEY を出していればそれを使い、無ければ同じ値（admin-api.js と ranking.js と同じ）
+  const SUPABASE = globalThis.ADMIN_API?.URL ?? 'https://vgdkklvhtvcamtxwjpke.supabase.co';
+  const PUBLIC_KEY = globalThis.ADMIN_API?.KEY ?? 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV';
   const MODE_LABEL = { f2n: '国旗→国名', n2f: '国名→国旗', m2f: '場所→国旗', f2m: '国旗→場所' };
   const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
 
@@ -41,17 +48,18 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { t.textContent = ''; }, 3500);
   }
-  const REASON = { not_json: 'JSONが壊れてるよ。保存しなかった', bad_shape: '本編のセーブの形じゃないよ。保存しなかった', storage: 'この端末に書けなかった（容量か設定）', bad_file: '国旗マスターのセーブファイルじゃないよ。何も変えてない', missing: '見つからなかった' };
+  const REASON = { not_json: 'JSONが壊れてるよ。保存しなかった', bad_shape: '本編のセーブの形じゃないよ。保存しなかった', storage: 'この端末に書けなかった（容量か設定）', bad_file: '国旗マスターのセーブファイルじゃないよ。何も変えてない', missing: '見つからなかった',
+    newer: '新しい版のセーブなので変えられないよ（ページを読み直してね）' };
   const fail = r => toast(REASON[r?.reason] ?? 'うまくいかなかった', true);
   // ok:false の返事なら知らせて false。rpgEdit などは書いた値そのものを返すので、ok が無ければ成功
   const done = (r, msg) => { if (r && r.ok === false) { fail(r); return false; } if (msg) toast(msg); renderAll(); return true; };
 
-  // 危ない操作: 先に自動でスナップショットを取ってから confirm で確かめる
+  // 危ない操作: confirm で確かめて、OK なら自動でスナップショットを取ってからする（やめたときはスナップショットも取らない）
   function danger(label, fn) {
+    if (!confirm(`「${label}」していい？\n（する前に今の状態をスナップショットに自動で取っておくよ）`)) return;
     const s = SAVE.snapSave(`自動 ${label} ${hms()}`);
     if (!s.ok) { toast('自動のスナップショットが取れなかったので、やめておいたよ', true); return; }
-    renderSnaps();
-    if (!confirm(`「${label}」していい？\n（今の状態はスナップショットに自動で取っておいたよ）`)) return;
+    safe('d-snaps', renderSnaps);
     fn();
   }
 
@@ -59,6 +67,7 @@
   function showTab(name) {
     for (const b of $('adm-tabs').querySelectorAll('[data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === name));
     for (const s of document.querySelectorAll('.tab')) s.hidden = s.id !== `tab-${name}`;
+    onTab(name);
   }
 
   // ---- D1・D2 セーブ一覧と中身 ----
@@ -181,7 +190,7 @@
 
   // ---- D7 バッジ ----
   function renderBadges() {
-    const r = SAVE.read('badges'), got = r.ok && r.value && typeof r.value.got === 'object' ? r.value.got : {};
+    const r = SAVE.read('badges'), got = r.ok && r.value && r.value.got && typeof r.value.got === 'object' ? r.value.got : {};
     const cat = BADGES_CORE.makeCatalog(COUNTRIES), list = $('d-badges-list');
     let n = 0, total = 0;
     list.replaceChildren(...cat.flatMap(b => b.tiers.map((t, i) => {
@@ -204,7 +213,7 @@
       el('td', { class: 'n', text: String(i + 1) }),
       el('td', {}, q.n, ' ', el('span', { class: 'mono muted', text: q.a })),
       el('td', { text: MODE_LABEL[q.mode] ?? q.mode }),
-      el('td', { class: 'n', text: `${q.opts.indexOf(q.a) + 1}番目` }))));
+      el('td', {}, el('span', { class: 'mono', text: `${q.opts.indexOf(q.a) + 1}番目` }), ' ', q.n))));
     const rec = SAVE.read('daily');
     $('d-daily-rec').textContent = rec.ok && rec.value
       ? `この端末の記録: ${rec.value.day ?? '?'}（${rec.value.status ?? '?'}${rec.value.correct != null ? `・${rec.value.correct}問正解` : ''}）`
@@ -271,8 +280,319 @@
     $('d-check-list').replaceChildren(...problems.map(p => el('li', { text: p })));
   }
 
+  // 区画ごとに描く。1つが壊れたセーブで例外を出しても、その区画にだけ1行出して、ほかの区画は描く
+  function safe(secId, fn) {
+    const body = $(secId)?.querySelector('.body') ?? $(secId);
+    let line = body?.querySelector(':scope > p[data-err]');
+    try { fn(); line?.remove(); }
+    catch (e) {
+      if (!body) return;
+      if (!line) { line = el('p', { class: 'ng', 'data-err': '' }); body.prepend(line); }
+      line.textContent = `この区画を出せなかった（${String(e && e.message || e).slice(0, 200)}）`;
+    }
+  }
   function renderAll() {
-    renderKeys(); renderSnaps(); renderRpg(); renderBadges(); renderDaily(); renderSettings(); renderEnv({ ping: lastPing });
+    safe('d-saves', renderKeys); safe('d-snaps', renderSnaps); safe('d-rpg', renderRpg); safe('d-badges', renderBadges);
+    safe('d-daily', renderDaily); safe('d-settings', renderSettings); safe('d-env', () => renderEnv({ ping: lastPing }));
+  }
+
+  // ======== ランキング（S1〜S4・S6・S7・S12〜S14）。サーバーから来た文字は textContent だけで入れる ========
+  const PAGE = 100;
+  const KIND_LABEL = { scores: 'タイムアタック', daily: '今日の難問', rpg: '冒険', trash: 'ゴミ箱' };
+  const ACTION = { delete: '消す', restore: '戻す', rename: '名前を変える' };
+  const LOGIN_MSG = { bad_login: 'メールかパスワードがちがうよ', not_admin: 'このアカウントは管理者じゃないよ', network: 'つながらなかった' };
+  const RENAME_MSG = { bad_name: '名前は1〜12文字だよ', ng_name: '使えない言葉が入ってるよ', name_taken: 'その名前はもう使われてるよ', not_found: 'その記録はもう無いよ' };
+  const fmtMs = ms => Number.isFinite(+ms) ? `${(ms / 1000).toFixed(2)}秒` : '';
+  const fmtFull = iso => { const d = new Date(iso); return iso == null || Number.isNaN(+d) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const str = v => v == null ? '' : String(v);
+  // 表の列: [見出し, 値を文字にする関数, td の class]
+  const COLS = {
+    scores: [['id', r => str(r.id), 'n'], ['ボード', r => str(r.board), 'brk'], ['名前', r => str(r.nickname), 'name'], ['タイム', r => fmtMs(r.time_ms), 'n'],
+      ['問題', r => str(r.questions), 'n'], ['いつ', r => fmtFull(r.created_at), 'n']],
+    daily: [['id', r => str(r.id), 'n'], ['日付', r => str(r.day), 'n'], ['名前', r => str(r.nickname), 'name'], ['正解', r => `${str(r.correct)}/${str(r.total)}`, 'n'],
+      ['タイム', r => fmtMs(r.time_ms), 'n'], ['いつ', r => fmtFull(r.created_at), 'n']],
+    rpg: [['id', r => str(r.id), 'n'], ['名前', r => str(r.nickname), 'name'], ['Lv', r => str(r.lv), 'n'], ['ダンジョン', r => str(r.dungeons), 'n'],
+      ['フロア', r => str(r.floors), 'n'], ['登録', r => fmtFull(r.created_at), 'n'], ['更新', r => fmtFull(r.updated_at ?? r.at), 'n']],
+    trash: [['id', r => str(r.id), 'n'], ['種類', r => KIND_LABEL[r.kind] ?? str(r.kind), ''], ['名前', r => str(r.row_data?.nickname), 'name'],
+      ['中身', r => trashSummary(r), 'brk'], ['消した', r => fmtFull(r.at), 'n']],
+  };
+  // CSV の列（行の生の値。ゴミ箱は row_data を JSON のまま）
+  const CSV_COLS = {
+    scores: ['id', 'board', 'nickname', 'time_ms', 'questions', 'created_at'],
+    daily: ['id', 'day', 'nickname', 'correct', 'total', 'time_ms', 'created_at'],
+    rpg: ['id', 'nickname', 'lv', 'dungeons', 'floors', 'created_at', 'updated_at'],
+    trash: ['id', 'kind', 'at', 'row_data'],
+  };
+  function trashSummary(t) {
+    const d = t.row_data || {};
+    if (t.kind === 'scores') return `id ${str(d.id)}・${str(d.board)}・${fmtMs(d.time_ms)}`;
+    if (t.kind === 'daily') return `id ${str(d.id)}・${str(d.day)}・${str(d.correct)}/${str(d.total)}・${fmtMs(d.time_ms)}`;
+    if (t.kind === 'rpg') return `id ${str(d.id)}・Lv ${str(d.lv)}・ダンジョン ${str(d.dungeons)}・フロア ${str(d.floors)}`;
+    return '';
+  }
+  function logDetail(l) {
+    const d = l.detail || {};
+    if (l.action === 'delete') { const ids = Array.isArray(d.ids) ? d.ids : []; return `${ids.length}件（id ${ids.slice(0, 20).join(', ')}${ids.length > 20 ? ' …' : ''}）`; }
+    if (l.action === 'restore') return `戻した ${str(d.restored)}件・戻せなかった ${str(d.failed)}件`;
+    if (l.action === 'rename') return `id ${str(d.id)}: ${str(d.before)} → ${str(d.after)}`;
+    try { return JSON.stringify(d).slice(0, 300); } catch { return ''; }
+  }
+
+  let API;
+  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false };
+
+  function setWho() {
+    const on = API.loggedIn();
+    $('adm-who').textContent = on ? (API.email() || 'ログイン中') : 'ログインしてない';
+    $('adm-logout').hidden = !on;
+  }
+  function showLogin(msg = '') {
+    R.loaded = false;
+    $('r-login').hidden = false;
+    $('r-dash').hidden = true;
+    $('r-login-msg').textContent = msg;
+    setWho();
+    if (!$('tab-log').hidden) loadOps();
+  }
+  // 管理の関数を呼ぶ。だめなら知らせて null（relogin ならログイン画面へ）
+  async function rpc(name, args) {
+    try { return await API.call(name, args); }
+    catch (e) {
+      if (e.code === 'relogin') showLogin('ログインし直してね');
+      else if (e.code === 'denied') toast('このアカウントは管理者じゃないよ', true);
+      else if (e.code === 'network') toast('つながらなかった', true);
+      else toast(`うまくいかなかった${e.status ? `（HTTP ${e.status}）` : ''}`, true);
+      return null;
+    }
+  }
+  async function showDash() {
+    R.loaded = true;
+    $('r-login').hidden = true;
+    $('r-dash').hidden = false;
+    $('r-login-msg').textContent = '';
+    setWho();
+    setKind(R.kind, false);
+    await Promise.all([loadStats(), loadBoards()]);
+    if (API.loggedIn()) await loadList();
+  }
+
+  // ---- S1・S14 件数と最後の記録 ----
+  async function loadStats() {
+    const s = await rpc('admin_stats', {});
+    if (!s || s.ok === false) return;
+    for (const k of ['scores', 'daily', 'rpg']) {
+      $('r-dash').querySelector(`[data-n="${k}"]`).textContent = str(s.counts?.[k] ?? 0);
+      $('r-dash').querySelector(`[data-sub="${k}"]`).textContent = k === 'rpg' ? '登録している人' : `今日 ${str(s.today?.[k] ?? 0)}・今週 ${str(s.week?.[k] ?? 0)}`;
+    }
+    const last = s.last_at ? Date.parse(s.last_at) : NaN, stale = $('r-stale');
+    $('r-last').textContent = Number.isNaN(last) ? 'まだ記録がないよ' : `最後の記録: ${fmtFull(s.last_at)}`;
+    if (Number.isNaN(last)) { stale.textContent = ''; stale.classList.remove('warn'); }
+    else {
+      const days = Math.max(0, Math.floor((Date.now() - last) / 86400e3));
+      stale.textContent = `最後の記録から ${days}日（7日で Supabase が止まる）`;
+      stale.classList.toggle('warn', days >= 5);
+    }
+    const log = Array.isArray(s.recent_log) ? s.recent_log : [];
+    $('r-recent').replaceChildren(...(log.length ? log.map(l => el('li', {},
+      el('span', { class: 'mono muted', text: fmtAt(l.at) }), el('b', { text: ACTION[l.action] ?? str(l.action) }),
+      el('span', { text: KIND_LABEL[l.kind] ?? '' }), el('span', { class: 'grow', text: logDetail(l) })))
+      : [el('li', { class: 'muted', text: 'まだないよ' })]));
+  }
+  async function loadBoards() {
+    const r = await rpc('admin_boards', {});
+    if (!r || !Array.isArray(r.boards)) return;
+    const sel = $('r-f-board'), cur = sel.value;
+    sel.replaceChildren(el('option', { value: '', text: 'ボード: 全部' }),
+      ...r.boards.map(b => el('option', { value: str(b.board), text: `${str(b.board)}（${str(b.n)}）` })));
+    sel.value = r.boards.some(b => b.board === cur) ? cur : '';
+  }
+
+  // ---- S2〜S4 一覧 ----
+  function setKind(k, load = true) {
+    R.kind = k; R.offset = 0;
+    for (const b of $('r-kind').querySelectorAll('[data-kind]')) b.setAttribute('aria-pressed', String(b.dataset.kind === k));
+    $('r-f-board').hidden = $('r-f-period').hidden = k !== 'scores';
+    $('r-f-day').hidden = k !== 'daily';
+    $('r-f-sort').hidden = k === 'trash';
+    $('r-del').hidden = k === 'trash';
+    $('r-restore').hidden = k !== 'trash';
+    $('r-table').dataset.kind = k;
+    if (load) loadList();
+  }
+  function filter() {
+    const f = { q: $('r-f-q').value.trim(), limit: PAGE, offset: R.offset };
+    if (R.kind !== 'trash') f.sort = $('r-f-sort').value;
+    if (R.kind === 'scores') { if ($('r-f-board').value) f.board = $('r-f-board').value; f.period = $('r-f-period').value; }
+    if (R.kind === 'daily' && $('r-f-day').value) f.day = $('r-f-day').value;
+    return f;
+  }
+  async function loadList() {
+    const seq = ++R.seq, tbl = $('r-table'), kind = R.kind;
+    tbl.removeAttribute('data-ready');
+    const r = await rpc('admin_list', { p_kind: kind, p_filter: filter() });
+    if (seq !== R.seq) return;
+    if (!r) return;
+    if (r.ok === false || !Array.isArray(r.rows)) { toast('一覧が読めなかった', true); return; }
+    if (!r.rows.length && R.offset > 0 && r.total > 0) { R.offset = Math.max(0, R.offset - PAGE); loadList(); return; }
+    R.rows = r.rows; R.total = +r.total || 0;
+    renderTable();
+    tbl.dataset.kind = kind;
+    tbl.dataset.ready = '';
+  }
+  function renderTable() {
+    const cols = COLS[R.kind], tbl = $('r-table'), canRename = R.kind !== 'trash';
+    const all = el('input', { type: 'checkbox', id: 'r-pick-all', 'aria-label': 'このページを全部選ぶ' });
+    tbl.tHead.replaceChildren(el('tr', {}, el('th', { class: 'pick' }, all), ...cols.map(([h]) => el('th', { text: h })), ...(canRename ? [el('th', {})] : [])));
+    const body = tbl.tBodies[0];
+    if (!R.rows.length) body.replaceChildren(el('tr', {}, el('td', { colSpan: cols.length + 2, class: 'muted', text: 'ないよ' })));
+    else body.replaceChildren(...R.rows.map(row => el('tr', { 'data-id': str(row.id) },
+      el('td', { class: 'pick' }, el('input', { type: 'checkbox', 'data-pick': '', 'aria-label': `id ${str(row.id)} を選ぶ` })),
+      ...cols.map(([, f, c]) => el('td', { class: c, text: f(row) })),
+      ...(canRename ? [el('td', {}, el('button', { type: 'button', class: 'btn ghost sm', 'data-rename': '', text: '名前を変える' }))] : []))));
+    const from = R.rows.length ? R.offset + 1 : 0;
+    $('r-page').textContent = R.total ? `${from}〜${R.offset + R.rows.length} / ${R.total}` : '0件';
+    $('r-prev').disabled = R.offset <= 0;
+    $('r-next').disabled = R.offset + PAGE >= R.total;
+    updatePicked();
+  }
+  const picked = () => [...$('r-table').tBodies[0].querySelectorAll('input[data-pick]:checked')].map(b => Number(b.closest('tr').dataset.id));
+  const updatePicked = () => { const n = picked().length; $('r-picked').textContent = n ? `${n}件選んでる` : ''; };
+
+  // ---- S6 消す・戻す ----
+  async function delPicked() {
+    const ids = picked();
+    if (!ids.length) { toast('消す記録を選んでね', true); return; }
+    if (!confirm(`${KIND_LABEL[R.kind]}の記録を ${ids.length}件消していい？\n（ゴミ箱に30日のこるよ）`)) return;
+    const r = await rpc('admin_delete', { p_kind: R.kind, p_ids: ids });
+    if (!r) return;
+    if (r.ok === false) { toast('消せなかった', true); return; }
+    toast(`${str(r.deleted)}件消したよ（ゴミ箱から戻せる）`);
+    await Promise.all([loadList(), loadStats(), loadBoards()]);
+  }
+  async function restorePicked() {
+    const ids = picked();
+    if (!ids.length) { toast('戻す記録を選んでね', true); return; }
+    const r = await rpc('admin_restore', { p_trash_ids: ids });
+    if (!r) return;
+    if (r.ok === false) { toast('戻せなかった', true); return; }
+    toast(`${str(r.restored)}件戻したよ${r.failed ? `・戻せなかった ${str(r.failed)}件（同じ id か同じ名前がもうある）` : ''}`, !!r.failed);
+    await Promise.all([loadList(), loadStats(), loadBoards()]);
+  }
+  // ---- S7 名前を変える（空で OK なら「名無しの旅人」＋数字） ----
+  async function rename(id) {
+    const row = R.rows.find(r => Number(r.id) === id);
+    if (!row) return;
+    const name = prompt('新しい名前（1〜12文字。空にすると「名無しの旅人」＋数字になるよ）', str(row.nickname));
+    if (name == null) return;
+    const r = await rpc('admin_rename', { p_kind: R.kind, p_id: id, p_name: name.trim() === '' ? null : name });
+    if (!r) return;
+    if (r.ok === false) { toast(RENAME_MSG[r.reason] ?? '名前を変えられなかった', true); return; }
+    toast(`「${str(r.nickname)}」にしたよ`);
+    await Promise.all([loadList(), loadStats()]);
+  }
+  // ---- S13 このページを CSV（BOM 付き UTF-8。= + - @ で始まる文字は表計算の式にならないよう ' を前に付ける） ----
+  const csvCell = v => {
+    if (v == null) return '';
+    let s = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    if (typeof v === 'string' && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    return /[",\r\n']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  let csvUrl = '';
+  function prepareCsv() {
+    const cols = CSV_COLS[R.kind], a = $('r-csv');
+    const lines = [cols.join(','), ...R.rows.map(r => cols.map(c => csvCell(c === 'updated_at' ? r.updated_at ?? r.at : r[c])).join(','))];
+    if (csvUrl) URL.revokeObjectURL(csvUrl);
+    csvUrl = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
+    a.href = csvUrl;
+    a.download = `country-drill-${R.kind}-${ymd()}.csv`;
+  }
+
+  async function doLogin(e) {
+    e.preventDefault();
+    const btn = $('r-login-btn'), msg = $('r-login-msg');
+    btn.disabled = true; msg.textContent = '';
+    try {
+      const r = await API.login($('r-email').value.trim(), $('r-pass').value);
+      if (r.ok) { $('r-pass').value = ''; toast('ログインしたよ'); await showDash(); }
+      else msg.textContent = LOGIN_MSG[r.reason] ?? 'ログインできなかった';
+    } finally { btn.disabled = false; }
+  }
+  async function doLogout() {
+    await API.logout();
+    showLogin('');
+    toast('ログアウトしたよ');
+  }
+
+  // ======== ログ: 操作ログ（admin_log_list）と端末のエラー記録（D13） ========
+  const ops = { offset: 0, total: 0 };
+  async function loadOps() {
+    const tb = $('l-ops-table').tBodies[0], msg = $('l-ops-msg');
+    if (!API.loggedIn()) {
+      msg.textContent = 'ログインすると見られるよ（ランキングのタブから）';
+      tb.replaceChildren(); $('l-ops-page').textContent = '';
+      $('l-ops-prev').disabled = $('l-ops-next').disabled = true;
+      return;
+    }
+    msg.textContent = '';
+    const r = await rpc('admin_log_list', { p_limit: PAGE, p_offset: ops.offset });
+    if (!r || !Array.isArray(r.rows)) return;
+    ops.total = +r.total || 0;
+    tb.replaceChildren(...(r.rows.length ? r.rows.map(l => el('tr', {},
+      el('td', { class: 'n', text: fmtFull(l.at) }), el('td', { text: ACTION[l.action] ?? str(l.action) }),
+      el('td', { text: KIND_LABEL[l.kind] ?? str(l.kind) }), el('td', { text: logDetail(l) })))
+      : [el('tr', {}, el('td', { colSpan: 4, class: 'muted', text: 'まだないよ' }))]));
+    $('l-ops-page').textContent = ops.total ? `${ops.offset + 1}〜${ops.offset + r.rows.length} / ${ops.total}` : '';
+    $('l-ops-prev').disabled = ops.offset <= 0;
+    $('l-ops-next').disabled = ops.offset + PAGE >= ops.total;
+  }
+  const readErrs = () => { try { const a = JSON.parse(localStorage.getItem('adminErrors')); return Array.isArray(a) ? a.filter(x => x && typeof x === 'object') : []; } catch { return []; } };
+  function renderErrs() {
+    const list = readErrs().slice().reverse();
+    $('l-err-list').replaceChildren(...(list.length ? list.map(x => el('li', {},
+      el('span', { class: 'mono muted', text: `${fmtFull(x.at)}${x.src ? `・${str(x.src)}${x.line ? `:${str(x.line)}` : ''}` : ''}` }),
+      el('span', { class: 'msg', text: str(x.msg) })))
+      : [el('li', { class: 'muted', text: 'まだないよ' })]));
+  }
+  async function copyErrs() {
+    try { await navigator.clipboard.writeText(JSON.stringify(readErrs(), null, 2)); toast('コピーしたよ'); }
+    catch { toast('コピーできなかった', true); }
+  }
+  function clearErrs() {
+    if (!confirm('エラー記録を消していい？')) return;
+    try { localStorage.removeItem('adminErrors'); toast('消したよ'); } catch { toast('消せなかった', true); }
+    renderErrs();
+  }
+
+  function initRank() {
+    API = ADMIN_API.create({});
+    setWho();
+    $('r-login').addEventListener('submit', doLogin);
+    $('adm-logout').onclick = doLogout;
+    $('r-reload').onclick = () => { loadStats(); loadBoards(); loadList(); };
+    $('r-kind').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) setKind(b.dataset.kind); });
+    $('r-filter').addEventListener('submit', e => { e.preventDefault(); R.offset = 0; loadList(); });
+    for (const id of ['r-f-board', 'r-f-period', 'r-f-day', 'r-f-sort']) $(id).addEventListener('change', () => { R.offset = 0; loadList(); });
+    $('r-prev').onclick = () => { R.offset = Math.max(0, R.offset - PAGE); loadList(); };
+    $('r-next').onclick = () => { R.offset += PAGE; loadList(); };
+    $('r-del').onclick = delPicked;
+    $('r-restore').onclick = restorePicked;
+    $('r-csv').addEventListener('click', prepareCsv);
+    $('r-table').addEventListener('change', e => {
+      if (e.target.id === 'r-pick-all') for (const b of $('r-table').tBodies[0].querySelectorAll('input[data-pick]')) b.checked = e.target.checked;
+      updatePicked();
+    });
+    $('r-table').addEventListener('click', e => { const b = e.target.closest('[data-rename]'); if (b) rename(Number(b.closest('tr').dataset.id)); });
+    $('l-ops-load').onclick = loadOps;
+    $('l-ops-prev').onclick = () => { ops.offset = Math.max(0, ops.offset - PAGE); loadOps(); };
+    $('l-ops-next').onclick = () => { ops.offset += PAGE; loadOps(); };
+    $('l-err-copy').onclick = copyErrs;
+    $('l-err-clear').onclick = clearErrs;
+    // 30分さわらないと admin-api.js がログアウト扱いにする。開いたままでも気づけるように時々見る
+    setInterval(() => { if (R.loaded && !API.loggedIn()) showLogin('ログインし直してね'); }, 30_000);
+  }
+  function onTab(name) {
+    if (name === 'rank') { if (!API.loggedIn()) { if (R.loaded) showLogin('ログインし直してね'); else { $('r-login').hidden = false; $('r-dash').hidden = true; setWho(); } } else if (!R.loaded) showDash(); }
+    if (name === 'log') { renderErrs(); loadOps(); }
   }
 
   function init() {
@@ -324,7 +644,10 @@
 
     $('d-sound-list').addEventListener('click', e => {
       const b = e.target.closest('[data-snd]');
-      if (b && !SND.play(b.dataset.snd)) toast('鳴らせなかった（もう一回押してみて）', true);
+      if (!b) return;
+      // play は40ms以内の連打で null を返す（鳴らさないだけ）ので、返り値ではなく音の名前があるかだけ見る
+      if (!SND.kinds.includes(b.dataset.snd)) toast('鳴らせなかった（その音は無いよ）', true);
+      else SND.play(b.dataset.snd);
     });
 
     $('d-env-refresh').onclick = () => renderEnv({ ping: lastPing });
@@ -333,9 +656,10 @@
     addEventListener('offline', () => renderEnv({ ping: lastPing }));
 
     // 本編の別タブがセーブを書いたら描き直す
-    addEventListener('storage', () => { renderAll(); if (current && document.activeElement !== $('d-json')) pick(current); });
+    addEventListener('storage', () => { renderAll(); renderErrs(); if (current && document.activeElement !== $('d-json')) pick(current); });
 
-    renderSounds(); renderCheck(); renderAll();
+    initRank();
+    safe('d-sound', renderSounds); safe('d-check', renderCheck); renderAll(); renderErrs();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

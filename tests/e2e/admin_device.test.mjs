@@ -82,7 +82,7 @@ t('daily_answers_table', async page => {
   await page.fill('#d-daily-day', '2026-01-01');
   await page.dispatchEvent('#d-daily-day', 'change');
   const first = await page.evaluate(() => COUNTRIES.find(c => c.a === DAILY_CORE.build('2026-01-01', COUNTRIES)[0].a).n);
-  assert.match(await page.textContent('#d-daily tbody tr:first-child'), new RegExp(first));
+  assert.ok((await page.textContent('#d-daily tbody tr:first-child')).includes(first), first);
 });
 
 t('snap_restore', async page => {
@@ -116,3 +116,63 @@ t('theme_from_settings', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(15, 23, 28)');
 }, { viewport: PC, storage: { settings: { theme: 'dark' } } });
+
+// 壊れたセーブ（badges の got が null）でも、ほかの区画はふつうに出る
+t('corrupt_badges_does_not_blank_sections', async (page, app) => {
+  await open(page, 'd-badges');
+  assert.match(await page.textContent('#d-badges-sum'), /^0 \/ \d+ ステップ取ってる$/);
+  assert.equal(await page.locator('#d-daily tbody tr').count(), 20);
+  assert.equal(await page.inputValue('#d-set-theme'), 'light');
+  assert.deepEqual(app.consoleErrors, []);
+}, { storage: { badges: { v: 1, got: null } } });
+
+// 1つの区画で例外が出ても、その区画にだけ1行出して、ほかは描く
+t('section_error_shows_only_in_that_section', async page => {
+  await open(page, 'd-badges');
+  assert.match(await page.textContent('#d-badges p[data-err]'), /この区画を出せなかった（boom-badges）/);
+  assert.equal(await page.locator('p[data-err]').count(), 1);
+  assert.equal(await page.locator('#d-daily tbody tr').count(), 20);
+  assert.ok(await page.locator('#d-keys li').count() > 0);
+}, { init: () => {
+  let core;
+  Object.defineProperty(globalThis, 'BADGES_CORE', { configurable: true, get: () => core,
+    set: v => { core = v; v.makeCatalog = () => { throw new Error('boom-badges'); }; } });
+} });
+
+// 危ない操作で confirm をやめたら、何も変えず、自動のスナップショットも取らない
+t('danger_cancel_keeps_storage_and_no_snapshot', async page => {
+  page.on('dialog', d => d.dismiss());
+  for (const id of ['d-rpg', 'd-badges', 'd-settings', 'd-snaps']) await open(page, id);
+  const before = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))));
+  await page.click('#d-rpg-wipe');
+  await page.click('#d-badges-none');
+  await page.click('#d-first');
+  const after = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))));
+  assert.equal(after, before);
+  assert.equal(await ls(page, 'adminSnaps'), null);
+  assert.doesNotMatch(await page.textContent('#d-snap-list'), /自動/);
+}, { storage: { rpg: RPG } });
+
+// 効果音を続けて押しても（40ms のまとめで play が null を返しても）「鳴らせなかった」は出ない
+t('sound_double_press_no_error_toast', async page => {
+  await open(page, 'd-sound');
+  const b = page.locator('#d-sound-list [data-snd]').first();
+  await page.evaluate(() => { const x = document.querySelector('#d-sound-list [data-snd]'); x.click(); x.click(); });
+  await b.click();
+  assert.doesNotMatch(await page.textContent('#adm-toast'), /鳴らせなかった/);
+});
+
+// D8 の「答え」の列に国名も出る
+t('daily_answer_column_has_country_name', async page => {
+  await open(page, 'd-daily');
+  await page.fill('#d-daily-day', '2026-01-01');
+  await page.dispatchEvent('#d-daily-day', 'change');
+  const name = await page.evaluate(() => COUNTRIES.find(c => c.a === DAILY_CORE.build('2026-01-01', COUNTRIES)[0].a).n);
+  const cell = await page.textContent('#d-daily tbody tr:first-child td:last-child');
+  assert.ok(cell.includes('番目') && cell.includes(name), cell);
+});
+
+t('no_console_errors_on_load', async (page, app) => {
+  await page.waitForTimeout(200);
+  assert.deepEqual(app.consoleErrors, []);
+});

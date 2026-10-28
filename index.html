@@ -32,6 +32,11 @@
 <script>
 // 画面の色（設定の theme、未設定はライト）を描く前に当てる。'auto' なら data-theme を付けず、端末の設定に合わせる
 try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+// 起きたエラーを localStorage adminErrors に新しい50件まで残す（admin.html のログタブで見る）。ここでは例外を出さない
+(() => { const rec = (msg, src, line) => { try { let a; try { a = JSON.parse(localStorage.getItem('adminErrors')); } catch {} a = Array.isArray(a) ? a : [];
+  a.push({ at: new Date().toISOString(), msg: String(msg).slice(0, 500), src: String(src || '').slice(0, 300), line: +line || 0 }); localStorage.setItem('adminErrors', JSON.stringify(a.slice(-50))); } catch {} };
+  addEventListener('error', e => rec(e.message || e.error, e.filename, e.lineno));
+  addEventListener('unhandledrejection', e => { let m; try { m = e.reason && e.reason.message || e.reason; } catch {} rec('unhandledrejection: ' + m, '', 0); }); })();
 </script>
 <style>
 /* Layout: 地図帳の1ページ。ホーム→モード選択→出題カード。地図は選んだ地域に合わせて切り出す */
