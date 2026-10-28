@@ -524,6 +524,7 @@
     const m = missesNow(), t = todayStr();
     let d = null;
     RPG.tx(x => { K.ensureDay(x, m, t, Math.random); d = x; });
+    if (RPG.status === 'readOnly') return false;   // いま読んだら新しい版のデータだった（別のタブが書いた）
     d = d || RPG.get();
     stopTimer();
     const en = K.towerEnemy(f), stats = K.towerStats(d), boss = en.boss;
@@ -550,10 +551,14 @@
     else nextQ();
     return true;
   };
-  // startTowerFloor を呼ぶ（tryStart と同じく、例外は console.error('[rpg]') にして始めていない画面を出す）
+  // startTowerFloor を呼ぶ（tryStart と同じく、例外は console.error('[rpg]') にして始めていない画面を出す）。
+  // 片付ける前に、その回（始めかけた階の B、まだなら前の階の B）を終わりにする（rpg:tower-end は回で1回だけ）
   const tryTower = (f, hp, cleared, intro) => {
+    const prev = B;
     try { return startTowerFloor(f, hp, cleared, intro); } catch (e) {
       console.error('[rpg]', e);
+      const r = B && B.tower ? B : prev;
+      if (r && r.tower) { try { endTower(r); } catch (err) { console.error('[rpg]', err); } }
       drop();
       idle();
       return false;
@@ -571,7 +576,7 @@
     stopTimer();
     const b = B, f = b.floor, t = todayStr(), mistakes = b.mistakes.length;
     b.win = win;
-    setPhase(win ? 'tclear' : 'end');
+    setPhase('end');
     const res = RPG.tx(d => {
       const owned0 = Object.keys(d.cards);
       const receipt = K.settleRun(d, b.run, null, t);
@@ -583,10 +588,13 @@
       d.st[win ? 'win' : 'lose'] = Math.min(K.BIG, d.st[win ? 'win' : 'lose'] + 1);
       return { receipt, coins, base: r.coins, bonus: r.bonus, newBest: d.tower.best > best0, d, shares };
     });
-    if (win) {
+    // 勝っても保存できなかった（新しい版のデータ）なら、クリアに数えず回を終える
+    const saved = win && !!res;
+    if (saved) {
+      setPhase('tclear');
       b.tower.cleared = Math.max(b.tower.cleared, f);
       // 回復はつぎの階の最大 HP で（この階で仲間入りすると、おまかせ編成の最大 HP が上がる）
-      if (res) b.tower.maxHp = K.towerStats(res.d).hp;
+      b.tower.maxHp = K.towerStats(res.d).hp;
       b.hp = K.towerHeal(b.hp, b.tower.maxHp, f);
     }
     if (res) {
@@ -599,10 +607,10 @@
       RPG.announce(rc, d);
       emit('rpg:tower', { floor: f, win, best: d.tower.best, newBest: res.newBest, coins: res.coins });
     }
-    if (!win) endTower(b);
+    if (!saved) endTower(b);
     if (B !== b) return;   // イベントを受けた側が画面を変えた
     const r = res || { receipt: null, coins: 0, base: 0, bonus: 0, shares: [] };
-    if (win) drawTowerClear(r); else drawTowerEnd(r);
+    if (saved) drawTowerClear(r); else drawTowerEnd(r);
   };
   // 仲間・昇格・克服・手配書の行（drawEnd と同じ文）
   const receiptLines = rc => rc ? [
@@ -638,7 +646,8 @@
     const missed = lost ? [...new Set(b.mistakes.map(x => x.a))].map(a => byA.get(a)).filter(Boolean) : [];
     $('bt-col').innerHTML = '<div class="rpg-bend rpg-tend" id="bt-end">'
       + `<p class="rpg-bend-h">${lost ? 'やられた…！' : 'おつかれさま！'}</p>`
-      + `<p class="rpg-bend-x">英雄の塔 ${cl ? `${fmt(cl)}階まで` : '1階でたおれた'}${best ? `<small>（自己ベスト ${fmt(best)}階）</small>` : ''}</p>`
+      + (RPG.status === 'readOnly' ? `<p class="rpg-warn" role="status">${RPG.warn}</p>` : '')   // 保存できなかった（新しい版のデータ）
+      + `<p class="rpg-bend-x">英雄の塔 ${cl ? `${fmt(cl)}階まで` : lost ? '1階でたおれた' : 'クリアした階なし'}${best ? `<small>（自己ベスト ${fmt(best)}階）</small>` : ''}</p>`
       + (missed.length ? '<p class="rpg-lbl">まちがえた国</p><ul class="misslist">'
         + missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('') + '</ul>' : '')
       + receiptLines(rc).map(l => `<p class="rpg-bline">${l}</p>`).join('')
@@ -651,10 +660,15 @@
     $('bt-end').scrollIntoView({ block: 'nearest' });
     $('bt-tretry').focus({ preventScroll: true });
   };
-  // ［つぎの階へ］: HP を持ちこして、すぐ問題
+  // ［つぎの階へ］: HP を持ちこして、すぐ問題。始められなかったら（新しい版のデータなど）その回はここまで
+  // （例外のときは tryTower が回を終えて片付けている）
   const towerNext = () => {
     if (!B || !B.tower || B.phase !== 'tclear') return;
-    tryTower(B.floor + 1, B.hp, B.tower.cleared, false);
+    const b = B;
+    if (tryTower(b.floor + 1, b.hp, b.tower.cleared, false) || B !== b) return;
+    setPhase('end');
+    endTower(b);
+    if (B === b) drawTowerEnd({ receipt: null, shares: [] });
   };
   // ［やめる］: その回はここまで（best は勝ったときにもう書いてある）
   const towerQuit = () => {

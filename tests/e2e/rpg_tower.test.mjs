@@ -295,3 +295,61 @@ t('tower_end_best_nowrap_360', async page => {
   });
   assert.equal(r.lines, 1, JSON.stringify(r));
 });
+
+// 別のタブが新しい版のデータを書いた（RPG.tx が null・RPG.status 'readOnly'）
+const RO_MSG = '新しいバージョンのデータが見つかったよ。ページを再読み込みしてね';
+const makeReadOnly = page => page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem('rpg'));
+  localStorage.setItem('rpg', JSON.stringify({ ...d, v: 99 }));
+});
+
+// 階に勝っても保存できなかったら、クリアに数えず回を終える（「n階クリア！ +0」の画面は出さない）
+t('tower_readonly_win_ends_run', async page => {
+  await writeSave(page, OPEN({}));
+  await startTower(page);
+  await makeReadOnly(page);
+  while ((await state(page)).phase === 'question') await battleAnswer(page, true);
+  const st = await state(page);
+  assert.equal(st.phase, 'end');
+  assert.equal(st.tower.cleared, 0);
+  assert.equal(await page.locator('#bt-tclear').count(), 0);
+  assert.equal(await page.locator('#bt-tnext').count(), 0);
+  const s = await text(page, '#bt-end');
+  assert.ok(s.includes(RO_MSG) && !s.includes('クリア！'), s);
+  assert.equal((await events(page, 'rpg:tower')).length, 0);
+  assert.deepEqual((await events(page, 'rpg:tower-end')).map(e => pick(e, { cleared: 0 })), [{ cleared: 0 }]);
+  assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('rpg'))).v, 99);   // 上書きしない
+});
+
+// 階クリアの画面のあいだに新しい版のデータになったら、［つぎの階へ］で回を終える（何もしないままにしない）
+t('tower_readonly_next_ends_run', async page => {
+  await writeSave(page, OPEN({}));
+  await startTower(page);
+  await winTowerFloor(page);
+  await makeReadOnly(page);
+  await page.click('#bt-tnext');
+  const st = await state(page);
+  assert.equal(st.phase, 'end');
+  assert.deepEqual(pick(st.tower, { f: 0, cleared: 0 }), { f: 1, cleared: 1 });
+  const s = await text(page, '#bt-end');
+  assert.ok(s.includes(RO_MSG) && s.includes('英雄の塔 1階まで'), s);
+  assert.deepEqual((await events(page, 'rpg:tower-end')).map(e => pick(e, { cleared: 0 })), [{ cleared: 1 }]);
+  assert.deepEqual((await events(page, 'rpg:tower-floor')).map(e => e.floor), [1]);
+});
+
+// ［つぎの階へ］で階を始めるのに失敗（例外）しても、前の回の rpg:tower-end は1回だけ出る
+t('tower_next_throw_ends_run_once', async (page, app) => {
+  await writeSave(page, OPEN({}));
+  await startTower(page);
+  await winTowerFloor(page);
+  await page.evaluate(() => { RPG_CORE.towerEnemy = () => { throw new Error('boom'); }; });
+  await page.click('#bt-tnext');
+  assert.equal(await page.evaluate(() => RPG_BATTLE.state().tower), null);
+  assert.ok(await page.isVisible('#bt-home'));
+  assert.deepEqual((await events(page, 'rpg:tower-end')).map(e => pick(e, { cleared: 0 })), [{ cleared: 1 }]);
+  await page.evaluate(() => show('rpg'));   // 画面を離れても2回目は出ない
+  assert.equal((await events(page, 'rpg:tower-end')).length, 1);
+  const errs = app.consoleErrors.splice(0).filter(x => x.startsWith('[rpg]'));
+  assert.equal(errs.length, 1, JSON.stringify(errs));
+  assert.ok(errs[0].includes('boom'), errs[0]);
+});
