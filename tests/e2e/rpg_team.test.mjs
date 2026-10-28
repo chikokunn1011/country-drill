@@ -399,3 +399,19 @@ t('deco_phone_no_overflow', async page => {
   assert.equal(await page.locator('#rpg-deco img').count(), 3);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 }, { viewport: { width: 360, height: 640 } });
+
+// 宇宙の星では地域ボーナスはテーマの国だけ（月は島国）。フランス（★1）より日本（★1・ボーナスあり）が先に並ぶ
+t('space_grid_bonus_theme_only', async page => {
+  const E = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];
+  const floors = Object.fromEntries([...E, ...E.map(id => 'm' + id)].map(id => [id, 5]));
+  await writeSave(page, saveWith({ lv: 50, floors, cards: { fr: [1, 0], jp: [1, 0] } }));
+  await page.evaluate(() => RPG.openTeam({ id: 'moon', floor: 1 }));
+  assert.equal(await page.$eval('#tm-dg', s => s.value), 'moon');
+  assert.deepEqual(await page.$$eval('#tm-grid .rpg-card', els => els.map(e => e.dataset.a)), ['jp', 'fr']);
+  // カードのくわしい情報も同じ: 月では日本はボーナスあり、フランスはなし
+  await page.evaluate(() => RPG.openCard('fr', 'moon'));
+  assert.ok((await text(page, '#detail')).includes('（地域ボーナス なし）'));
+  await page.evaluate(() => $('detail').close());
+  await page.evaluate(() => RPG.openCard('jp', 'moon'));
+  assert.ok((await text(page, '#detail')).includes('（地域ボーナス あり）'));
+});

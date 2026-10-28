@@ -26,9 +26,11 @@ const t = (name, fn, { rpgErrorOk = false, ...opts } = {}) => test(name, { timeo
 
 const STORY1 = '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。';
 const EARTH_CLEAR = { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 };
-// 地球と鏡の地球の14個とも（ストーリーは読んだことにして、章の終わりの dialog を出さない）
-const ALL_CLEAR = { ...EARTH_CLEAR, msamerica: 5, moceania: 5, mnamerica: 5, meurope: 5, masia: 5, mafrica: 5, mworld: 5 };
-const READ_ALL = ['ch1', 'ch2'];
+// 地球と鏡の地球の14個（宇宙は月から）
+const MIRROR_CLEAR = { ...EARTH_CLEAR, msamerica: 5, moceania: 5, mnamerica: 5, meurope: 5, masia: 5, mafrica: 5, mworld: 5 };
+// 宇宙も入れて21個とも（ストーリーは読んだことにして、章の終わりの dialog を出さない）
+const ALL_CLEAR = { ...MIRROR_CLEAR, moon: 5, mercury: 5, venus: 5, mars: 5, jupiter: 5, saturn: 5, blackhole: 5 };
+const READ_ALL = ['ch1', 'ch2', 'ch3start', 'ch3'];
 const text = (page, sel) => page.locator(sel).innerText();
 // save があれば入れて読み込み直してから、冒険ホームを開く
 const home = async (page, save) => {
@@ -588,15 +590,17 @@ t('story_once_for_old_clear', async page => {
   await page.waitForFunction(() => document.readyState === 'complete');
   await page.evaluate(() => show('rpg'));
   assert.equal(await storyOpen(page), false);
-  // 2つとも読んでいなければ古い順に1つずつ（Esc で閉じても読んだことになる）
-  await home(page, saveWith({ floors: ALL_CLEAR }));
+  // 2つとも読んでいなければ古い順に1つずつ（Esc で閉じても読んだことになる）。そのあと第3章のはじまり
+  await home(page, saveWith({ floors: MIRROR_CLEAR }));
   assert.ok((await text(page, '#rpg-story-dlg')).includes('鏡のような裂け目'));
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => $('rpg-story-dlg').open && $('rpg-story-dlg').textContent.includes('母さま、あとはたのむ'));
   const s2 = await text(page, '#rpg-story-dlg');
   assert.ok(s2.includes('地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。'), s2);
   await page.click('#rpg-story-dlg .close');
-  await storySaved(page, ['ch1', 'ch2']);
+  await page.waitForFunction(() => $('rpg-story-dlg').open && $('rpg-story-dlg').textContent.includes('星喰いは、星をひとつずつ'));
+  await page.click('#rpg-story-dlg .close');
+  await storySaved(page, ['ch1', 'ch2', 'ch3start']);
   await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   assert.equal(await storyOpen(page), false);
   // 新しい版のデータ（読み取り専用）のときは出さない
@@ -606,7 +610,7 @@ t('story_once_for_old_clear', async page => {
 
 t('story_button_chains_next', async page => {
   // ch1・ch2 とも読んでいない: ［閉じる］ボタンで閉じても、すぐ次の章のストーリーが出る（次の描き直しを待たない）
-  await home(page, saveWith({ floors: ALL_CLEAR, story: [] }));
+  await home(page, saveWith({ floors: MIRROR_CLEAR, story: ['ch3start'] }));
   assert.ok((await text(page, '#rpg-story-dlg')).includes('鏡のような裂け目'));
   // ボタンで閉じ（close イベントが来て）、そのすぐあとの次の tick で、次の章のが開いているか見る（別の描き直しを待たない）
   const chained = await page.evaluate(() => new Promise(res => {
@@ -616,7 +620,34 @@ t('story_button_chains_next', async page => {
   }));
   assert.equal(chained, true);
   await page.click('#rpg-story-ok');
-  await storySaved(page, ['ch1', 'ch2']);
+  await storySaved(page, ['ch3start', 'ch1', 'ch2']);
+});
+
+t('story_ch3start_for_old_mirror_clear', async page => {
+  // この版より前に鏡の地図喰いを倒して ch2 を読んだセーブ: 第3章のはじまりだけが1回出る
+  await home(page, saveWith({ floors: MIRROR_CLEAR, story: ['ch1', 'ch2'] }));
+  assert.equal(await storyOpen(page), true);
+  const s = await text(page, '#rpg-story-dlg');
+  for (const x of ['第3章 宇宙', '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。', '星には、地球の国のなかまたちの記憶が眠っている。',
+    '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！']) assert.ok(s.includes(x), `${x} が無い: ${s}`);
+  assert.ok(!s.includes('母さま'), s);
+  await page.click('#rpg-story-ok');
+  await storySaved(page, ['ch1', 'ch2', 'ch3start']);
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  assert.equal(await storyOpen(page), false);
+  await page.reload();
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await storyOpen(page), false);
+  // 1つも読んでいない: ch1 → ch2 → ch3start の順に、ボタンでつづけて出る
+  await home(page, saveWith({ floors: MIRROR_CLEAR, story: [] }));
+  for (const [want, saved] of [['鏡のような裂け目', ['ch1']], ['母さま、あとはたのむ', ['ch1', 'ch2']], ['星喰いは、星をひとつずつ', ['ch1', 'ch2', 'ch3start']]]) {
+    await page.waitForFunction(w => $('rpg-story-dlg').open && $('rpg-story-dlg').textContent.includes(w), want);
+    await page.click('#rpg-story-ok');
+    await storySaved(page, saved);
+  }
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  assert.equal(await storyOpen(page), false);
 });
 
 t('all_clear_after_mirror', async page => {
@@ -625,11 +656,33 @@ t('all_clear_after_mirror', async page => {
   let s = await text(page, '#rpg-next');
   assert.ok(s.includes('鏡のアマゾン F1 に挑戦！'), s);
   assert.deepEqual(await page.evaluate(() => RPG.nextFloor(RPG.get())), { id: 'msamerica', floor: 1 });
-  // 14個とも: 全クリア
-  await home(page, saveWith({ pulls: 1, floors: ALL_CLEAR, story: READ_ALL }));
+  // 鏡の地球の14個とも: まだ全クリアではなく、つぎは月 F1
+  await home(page, saveWith({ pulls: 1, lv: 60, floors: MIRROR_CLEAR, story: ['ch1', 'ch2', 'ch3start'] }));
   s = await text(page, '#rpg-next');
+  assert.ok(s.includes('月 F1 に挑戦！'), s);
+  assert.deepEqual(await page.evaluate(() => RPG.nextFloor(RPG.get())), { id: 'moon', floor: 1 });
+});
+
+t('all_clear_after_space', async page => {
+  // 21個とも: 全クリア。エンディングが1回だけ出る
+  await home(page, saveWith({ pulls: 1, floors: ALL_CLEAR, story: ['ch1', 'ch2', 'ch3start'] }));
+  assert.equal(await storyOpen(page), true);
+  const e = await text(page, '#rpg-story-dlg');
+  for (const x of ['星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。', '地球も、鏡の地球も、宇宙も、もう安心だ。',
+    'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――']) assert.ok(e.includes(x), `${x} が無い: ${e}`);
+  await page.click('#rpg-story-ok');
+  await storySaved(page, ['ch1', 'ch2', 'ch3start', 'ch3']);
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  assert.equal(await storyOpen(page), false);
+  const s = await text(page, '#rpg-next');
   assert.ok(s.includes('全クリア！'), s);
   assert.equal(await page.evaluate(() => RPG.nextFloor(RPG.get())), null);
+  // 全クリアの旅人カードは星喰いの巣のボスのときの強さ（例外を出さない）
+  assert.match(await text(page, '#rpg-stats'), /❤️/);
+  await page.reload();
+  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.evaluate(() => show('rpg'));
+  assert.equal(await storyOpen(page), false);
 });
 
 /* ---------- 開発用パネル（?rpgdebug=1） ---------- */
@@ -651,7 +704,7 @@ t('debug_panel', async page => {
   assert.equal((await readSave(page)).lv, 20);
   assert.equal(await page.evaluate(() => RPG.debug.setLv(999)), 99);   // 1..99 におさめる
   await page.click('#rpg-dbg-unlock');
-  assert.deepEqual((await readSave(page)).floors, Object.fromEntries(Object.keys(ALL_CLEAR).map(id => [id, 4])));   // 鏡の地球も
+  assert.deepEqual((await readSave(page)).floors, Object.fromEntries(Object.keys(ALL_CLEAR).map(id => [id, 4])));   // 鏡の地球・宇宙も入れて21個
   await page.waitForFunction(() => document.querySelectorAll('.rpg-fl:disabled').length === 0);   // ボスまで全部押せる
   assert.deepEqual(await page.evaluate(() => [RPG.debug.unlock('asia', 5), RPG.debug.unlock('nowhere', 3), RPG.get().floors.asia]), [5, null, 5]);
   assert.equal((await page.evaluate(() => RPG.debug.save())).lv, 99);

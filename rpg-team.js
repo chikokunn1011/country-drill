@@ -73,7 +73,7 @@
   // 一覧: 持っている仲間だけ。選んだダンジョンでのこうげき（地域ボーナスこみ）が高い順 → ★ → 国コード
   const gridHTML = (d, inSet) => {
     const g = K.dungeonOf(dg), fr = d.fr || {}, ro = stop();
-    const atk = a => K.cardAtk(d.cards[a], fr[a], !!g && (g.r === 'all' || byA.get(a)?.r === g.r));
+    const atk = a => K.cardAtk(d.cards[a], fr[a], !!g && K.inDungeon(g, a));
     return Object.keys(d.cards).filter(a => byA.has(a) && inArea(a, region))
       .map(a => ({ a, atk: atk(a), star: d.cards[a][0] }))
       .sort((x, y) => y.atk - x.atk || y.star - x.star || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0))

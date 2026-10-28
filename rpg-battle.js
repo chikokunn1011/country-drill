@@ -63,7 +63,7 @@
   const partyHTML = tags => {
     const tb = B.stats.team?.bonus || 0;
     return `<ul class="rpg-party">${B.stats.party.filter(({ a }) => byA.has(a)).map(({ a }, i) => {
-      const star = B.d.cards[a]?.[0] || 1, bonus = B.dg.r === 'all' || byA.get(a)?.r === B.dg.r;
+      const star = B.d.cards[a]?.[0] || 1, bonus = K.inDungeon(B.dg, a);
       return `<li class="rpg-pc" style="--i:${i}"><img src="${flag(a)}" alt="${esc(nameOf(a))}"><span class="rpg-stars" role="img" aria-label="★${star}">${'★'.repeat(star)}</span>`
         + `${tags && bonus ? `<span class="rpg-tag">地域ボーナス ×${T.card.regionMul}</span>` : ''}</li>`;
     }).join('')}${!tags && tb ? `<li class="rpg-team-tag"><span role="img" aria-label="チームボーナス ＋${Math.round(tb * 100)}%">＋${Math.round(tb * 100)}%</span></li>` : ''}</ul>`;
@@ -243,7 +243,7 @@
     if (B.boss) {
       // 新しい旗（後ろに回した旗がもう一度来たときも）は bossMode、旗が残ったときの同じ国のもう1問は前の形式の次
       const f = B.flags[B.order[0]];
-      const mode = B.again ? K.nextMode(B.q.mode, BOSS) : K.bossMode(B.k);
+      const mode = B.again ? K.nextMode(B.q.mode, BOSS, K.chapterOf(B.id)) : K.bossMode(B.k, K.chapterOf(B.id));
       B.k++;
       B.q = { a: f.a, mode };
     } else {
@@ -271,8 +271,9 @@
     if (mode === 'm2f') box.append(zoomableMap(c, '出題中の国の位置', { region: B.dg.r }));
     const byName = mode === 'f2n', ch = document.createElement('div');
     ch.className = 'choices' + (byName ? ' textc' : '');
-    // 鏡の地球は似た旗の4択（おとり選びは rpg-core の similarChoices）
-    const opts = K.chapterOf(B.id) === 2 ? K.similarChoices(a, Math.random).map(x => byA.get(x)) : makeQuestion(c).opts;
+    // 鏡の地球は似た旗の4択（おとり選びは rpg-core の similarChoices）、宇宙のテーマのある星はテーマの国だけの4択（themeChoices）
+    const opts = K.chapterOf(B.id) === 2 ? K.similarChoices(a, Math.random).map(x => byA.get(x))
+      : B.dg.t ? K.themeChoices(a, B.dg, Math.random).map(x => byA.get(x)) : makeQuestion(c).opts;
     opts.forEach((o, k) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'choice' + (byName ? '' : ' flagc'); b.dataset.a = o.a;
@@ -361,7 +362,7 @@
     if (B.boss) { B.order.push(B.order.shift()); B.again = false; }   // いまの旗は後ろに回す
     else {   // 2問あとに同じ国を別の形式で
       if (!B.queue.length) B.queue = refill();
-      B.queue.splice(1, 0, { a: q.a, mode: K.nextMode(q.mode, B.floor) });
+      B.queue.splice(1, 0, { a: q.a, mode: K.nextMode(q.mode, B.floor, K.chapterOf(B.id)) });
     }
     drawTop();
     say(`${B.mon.n}の反撃！ ${B.en.atk}ダメージ`);
@@ -371,6 +372,7 @@
     const c = byA.get(q.a), rv = document.createElement('div');
     rv.className = 'reveal rpg-reveal'; rv.id = 'bt-reveal';
     rv.innerHTML = `<p class="verdict ng">ざんねん。正解は「${esc(c.n)}」</p>${factsHTML(c)}`;
+    if (B.dg.t) rv.querySelector('.verdict').insertAdjacentHTML('afterend', `<p class="rpg-rv-theme">${esc(c.n)}は${esc(K.THEMES[B.dg.t].n)}だよ</p>`);   // 宇宙: テーマの一言
     const pc = K.chapterOf(B.id) === 2 && picked !== q.a ? byA.get(picked) : null;
     if (pc) {   // 鏡の地球: 押した国と正解の国旗を並べて見比べる
       const f = (x, cap) => `<figure><img src="${flag(x.a)}" alt="${esc(cap)}の国旗"><figcaption>${esc(cap)}</figcaption></figure>`;
@@ -441,6 +443,8 @@
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
     const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
+    if (dg.id === 'blackhole') return `国旗クエストで星喰いをたおして、宇宙を取りもどした！ ${mates}`;
+    if (dg.ch === 3) { const n = K.MONSTERS[dg.id][4].n; return `国旗クエストで${n.startsWith(dg.land) ? n : `${dg.land}の${n}`}をたおした！ ${mates}`; }   // 月のウサギ大王・金星の炎は星の名前を重ねない
     if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
@@ -478,7 +482,7 @@
     RPG.drawShares($('bt-shares'), shares || []);   // 仲間の節目に届いたら、その場に［シェア］（設計書 §3.7）
     // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
     if (win && b.boss && first && d) {
-      const sb = RPG.shareButton(b.id === 'mworld' ? 'final2' : b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final、鏡の地図喰いは final2
+      const sb = RPG.shareButton(b.id === 'blackhole' ? 'final3' : b.id === 'mworld' ? 'final2' : b.dg.ch === 3 ? `boss-${b.id}` : b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final、鏡の地図喰いは final2、星喰いは final3
       sb.id = 'bt-share';
       $('bt-end').querySelector('.rpg-bend-x').after(sb);
     }
@@ -490,7 +494,7 @@
   };
   // この地域を練習する（S と P を書きかえるのはここだけ）
   const practice = () => {
-    S.region = B.dg.r; store.set('settings', S);
+    S.region = B.dg.ch === 3 ? 'all' : B.dg.r; store.set('settings', S);   // 宇宙は地域で絞らない（前に選んでいた地域ではなく全世界で練習する）
     P.kind = 'practice'; store.set('setup', P);
     show('setup');
   };
@@ -568,7 +572,7 @@
     start: tryStart,   // 外から呼んでも、例外のときは片付けてから始めていない画面を出す
     // いまの問題の国コード（問題・答え合わせのあいだ。ほかは null）
     cur: () => B && B.q && B.phase !== 'intro' && B.phase !== 'end' ? B.q.a : null,
-    state: () => ({ phase: B ? B.phase : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null }),
+    state: () => ({ phase: B ? B.phase : null, mode: B && B.q ? B.q.mode : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null }),
     // テストと開発用: いまの問題をその国・形式に置きかえる（ボスはいまの旗の国も入れかえる）。置きかえたら true
     force(a, mode) {
       if (!B || !byA.has(a) || !MODES.has(mode) || B.phase !== 'question') return false;

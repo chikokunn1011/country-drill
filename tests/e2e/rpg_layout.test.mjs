@@ -578,3 +578,28 @@ t('dark_mode', async page => {
   await page.evaluate(() => RPG.open('cards'));
   await noHScrollAt(page, 'ダークの仲間');
 }, { colorScheme: 'dark', storage: { settings: { theme: 'auto' } }, timeout: 180_000 });
+
+// 章タブ3つ（🌍地球・🪞鏡の地球・🌌宇宙）は 360px でもどれも1行（折り返さない・はみ出さない）で、横にスクロールしない
+t('chtabs_one_line_360', async page => {
+  const E = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];
+  await writeSave(page, saveWith({ lv: 50, floors: Object.fromEntries([...E, ...E.map(id => 'm' + id)].map(id => [id, 5])) }));
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme });
+    for (const vp of [{ width: 360, height: 640 }, { width: 320, height: 640 }]) {
+      await page.setViewportSize(vp);
+      await page.evaluate(() => show('rpg'));
+      const r = await page.$$eval('#rpg-chtabs .chip', els => els.map(e => {
+        const lh = parseFloat(getComputedStyle(e).lineHeight) || parseFloat(getComputedStyle(e).fontSize) * 1.6;
+        const range = document.createRange(); range.selectNodeContents(e);
+        return { t: e.innerText, lines: new Set([...range.getClientRects()].filter(x => x.width > 0).map(x => Math.round(x.top))).size,
+          h: e.getBoundingClientRect().height, sw: e.scrollWidth, cw: e.clientWidth, lh };
+      }));
+      const at = `${colorScheme} ${size(vp)} ${JSON.stringify(r)}`;
+      assert.equal(r.length, 3, at);
+      assert.ok(r.every(x => x.lines === 1), `折り返している: ${at}`);
+      assert.ok(r.every(x => x.sw <= x.cw), `はみ出している: ${at}`);
+      assert.equal(new Set(r.map(x => Math.round(x.h))).size, 1, `高さがそろっていない: ${at}`);
+      assert.ok(await noHScroll(page), `横にスクロールする: ${at}`);
+    }
+  }
+});
