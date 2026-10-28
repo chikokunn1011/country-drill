@@ -1445,7 +1445,13 @@ test('space_dungeons', () => {
 test('themes', () => {
   const K = loadCore();
   const n = k => K.THEMES[k].a.length;
-  assert.deepEqual([n('island'), n('small'), n('equator'), n('landlocked'), n('big'), n('south')], [38, 40, 51, 44, 40, 39]);
+  assert.deepEqual([n('island'), n('small'), n('equator'), n('landlocked'), n('big'), n('south')], [38, 40, 51, 45, 40, 39]);
+  assert.ok(K.THEMES.landlocked.a.includes('bt'));   // ブータン（中国とインドにだけ接する）
+  const { ctx } = loadCtx(), codes = new Set(ctx.COUNTRIES.map(c => c.a));
+  for (const [k, th] of Object.entries(K.THEMES)) {
+    for (const a of th.a) assert.ok(codes.has(a), `${k}: ${a} が countries.js に無い`);
+    assert.equal(new Set(th.a).size, th.a.length, `${k} に重複`);
+  }
   assert.ok(K.THEMES.island.a.includes('jp') && !K.THEMES.island.a.includes('gb'));   // 陸の国境がある国は島国に入れない
   assert.ok(K.THEMES.landlocked.a.includes('ch') && K.THEMES.small.a[0] === 'va' && K.THEMES.big.a.includes('ru'));
   assert.equal(K.THEMES.island.n, '島国');

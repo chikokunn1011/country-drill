@@ -232,7 +232,10 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 /* 冒険マップ（図版の上。世界地図にダンジョン7つと道。開いた地域は地域の色、まだの地域は霧。押したダンジョンの図版だけを下に出す） */
 /* 章タブ（🌍地球・🪞鏡の地球。ボタンは .chip）。冒険マップの上 */
 .rpg-chtabs { display: flex; gap: 8px; }
-.rpg-chtabs .chip { flex: 1 1 0; font-weight: 700; }
+.rpg-chtabs .chip { flex: 1 1 0; min-width: 0; font-weight: 700; white-space: nowrap; }
+/* スマホ（3つで 360px）: 「🪞 鏡の地球」が折り返さないように、すきまと左右の余白を詰める */
+@media (max-width: 399.98px) { .rpg-chtabs { gap: 6px; } .rpg-chtabs .chip { padding-inline: 4px; } }
+@media (max-width: 339.98px) { .rpg-chtabs .chip { font-size: .82rem; } }
 .rpg-amap { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
 .rpg-amap-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; }
 .rpg-amap-h > b { font: 900 1.05rem var(--font-display); }

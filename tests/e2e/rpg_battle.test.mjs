@@ -641,3 +641,34 @@ t('space_last_boss_share', async page => {
   assert.ok(s.includes('星喰いをたおして、宇宙を取りもどした！'), s);
   assert.equal((await events(page, 'rpg:share')).at(-1).kind, 'final3');
 });
+
+// 宇宙のボスのシェアの文: ボスの名前が星の名前で始まるときは「月の月の…」と重ねない。始まらないときは「水星の…」を付ける
+const spaceBossShare = async (page, id, floors) => {
+  await writeSave(page, saveWith({ lv: 99, floors: { ...MIRROR_CLEARED, ...floors, [id]: 4 } }));
+  await startBattle(page, id, 5);
+  await winBattle(page);
+  await page.evaluate(() => { window.__shared = null; navigator.share = o => { window.__shared = o.text; return Promise.resolve(); }; });
+  await page.click('#bt-share');
+  return page.evaluate(() => window.__shared);
+};
+t('space_boss_share_no_double_land', async page => {
+  let s = await spaceBossShare(page, 'moon', {});
+  assert.ok(s.startsWith('国旗クエストで月のウサギ大王をたおした！'), s);
+  assert.equal((await events(page, 'rpg:share')).at(-1).kind, 'boss-moon');
+  s = await spaceBossShare(page, 'venus', { moon: 5, mercury: 5 });
+  assert.ok(s.startsWith('国旗クエストで金星の炎をたおした！'), s);
+  s = await spaceBossShare(page, 'mercury', { moon: 5 });
+  assert.ok(s.startsWith('国旗クエストで水星のほうき星をたおした！'), s);
+});
+
+// 宇宙で負けて［この地域を練習する］: 前に選んでいた地域ではなく全世界（'all'）で練習する
+t('space_lose_practice_all', async page => {
+  await page.evaluate(() => { S.region = 'アジア'; store.set('settings', S); });
+  await writeSave(page, SPACE_SAVE);
+  await startBattle(page, 'moon', 1);
+  while (await phase(page) !== 'end') await battleAnswer(page, false);
+  await page.click('#bt-practice');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+  assert.deepEqual(await page.evaluate(() => [S.region, P.kind, JSON.parse(localStorage.getItem('settings')).region]), ['all', 'practice', 'all']);
+  assert.equal(await page.getAttribute('#regions .chip[data-r="all"]', 'aria-pressed'), 'true');
+});

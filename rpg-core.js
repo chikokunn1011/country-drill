@@ -89,7 +89,7 @@
     island: { n: '島国', a: 'ag bs bb bh cv km cu cy dm fj gd is jm jp ki lk mv mg mh mt mu fm nr nz pw ph lc vc ws st sc sg sb kn to tt tv vu'.split(' ') },
     small: { n: '小さい国', a: byArea.slice(0, SP.small) },
     equator: { n: '赤道の国', a: C.filter(c => Math.abs(c.ll[0]) <= SP.equator).map(c => c.a) },
-    landlocked: { n: '内陸国', a: 'af am at az by bo bw bf bi cf td cz sz et hu kz xk kg la ls li lu mw ml md mn np ne mk py rw sm rs ss sk ch tj tm ug uz va zm zw ad'.split(' ') },
+    landlocked: { n: '内陸国', a: 'af am at az by bt bo bw bf bi cf td cz sz et hu kz xk kg la ls li lu mw ml md mn np ne mk py rw sm rs ss sk ch tj tm ug uz va zm zw ad'.split(' ') },
     big: { n: '大きい国', a: byArea.slice(-SP.big).reverse() },
     south: { n: '南半球の国', a: C.filter(c => c.ll[0] < 0).map(c => c.a) },
   };

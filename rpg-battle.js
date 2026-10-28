@@ -444,7 +444,7 @@
   const bossShareText = (dg, d) => {
     const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
     if (dg.id === 'blackhole') return `国旗クエストで星喰いをたおして、宇宙を取りもどした！ ${mates}`;
-    if (dg.ch === 3) return `国旗クエストで${dg.land}の${K.MONSTERS[dg.id][4].n}をたおした！ ${mates}`;
+    if (dg.ch === 3) { const n = K.MONSTERS[dg.id][4].n; return `国旗クエストで${n.startsWith(dg.land) ? n : `${dg.land}の${n}`}をたおした！ ${mates}`; }   // 月のウサギ大王・金星の炎は星の名前を重ねない
     if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
@@ -494,7 +494,7 @@
   };
   // この地域を練習する（S と P を書きかえるのはここだけ）
   const practice = () => {
-    if (!B.dg.t && B.dg.ch !== 3) { S.region = B.dg.r; store.set('settings', S); }   // 宇宙は地域で絞らない（クイズの地域は 'all' のまま）
+    S.region = B.dg.ch === 3 ? 'all' : B.dg.r; store.set('settings', S);   // 宇宙は地域で絞らない（前に選んでいた地域ではなく全世界で練習する）
     P.kind = 'practice'; store.set('setup', P);
     show('setup');
   };
