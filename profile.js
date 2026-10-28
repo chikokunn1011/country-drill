@@ -2,12 +2,13 @@
   'use strict';
   // サイト共通のプロフィール（window.PROFILE）: 端末ごとに1つ。合言葉（token、端末で作る UUID）で本人確認して、タイムアタック・今日の難問・冒険のランキングに載せる。
   // サーバー側は supabase/schema.sql の profiles と profile_create / profile_me / profile_rename / profile_set（ranking.js の RANKING.profile*）。
-  // ここが持つもの: localStorage の profile・プロフィール画面（#scr-profile）・結果画面の「載せる」箱（postBox）・称号やバッジの数の同期・rpgRank からの引っ越し。
+  // ここが持つもの: localStorage の profile・プロフィール画面（#scr-profile）・結果画面の「載せる」箱（postBox）・称号やバッジの数の同期・rpgRank からの引っ越し・
+  // ランキングの名前のセル（nameHTML）とプロフィールの窓（openCard、<dialog id="pf-card">）。
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   const NEED = {
     store: typeof store, $: typeof $, esc: typeof esc, show: typeof show, toast: typeof toast, emit: typeof emit,
-    registerScreen: typeof registerScreen, byA: typeof byA, flag: typeof flag, RANKING: typeof RANKING,
+    registerScreen: typeof registerScreen, byA: typeof byA, flag: typeof flag, MODES: typeof MODES, RANKING: typeof RANKING,
   };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
   if (missing.length) { console.error(`[profile] 必要なものが読み込めなかったので、プロフィールはお休み: ${missing.join(' ')}`); return; }
@@ -214,13 +215,90 @@
     <div class="row end"><button class="btn" id="pf-done">ホームへ</button></div>
   </div>`;
   ($('scr-ranking') ?? $('scr-home')).after(sec);
-  // 自分のカード（Task 5 で、ランキングから開く窓と同じ見た目にする）
-  const decoHTML = as => as.filter(a => byA.has(a)).slice(0, 3).map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
-  const meHTML = p => {
-    const w = want(p), deco = decoHTML(w.deco ?? []);
-    return `<div class="pf-card" id="pf-me"><p class="pf-card-name"><b>${esc(p.name)}</b>${deco ? `<span class="rr-deco">${deco}</span>` : ''}</p>`
-      + `${w.title ? `<p class="pf-card-title">〈${esc(w.title)}〉</p>` : ''}`
-      + `${w.badges !== undefined ? `<p class="hint">バッジ ${w.badges}個（全${w.badgesTotal}個中）</p>` : ''}</div>`;
+  // ---- ランキングの名前のセル・プロフィールのカード ----
+  // かざり: 知っている国だけ、重なりは1つにして3つまで（rpg-rank.js と同じ見た目・クラス）
+  const decoHTML = as => {
+    const imgs = [...new Set(Array.isArray(as) ? as : [])].filter(a => byA.has(a)).slice(0, 3)
+      .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
+    return imgs ? `<span class="rr-deco">${imgs}</span>` : '';
+  };
+  // ランキングの <span class="nick"> の中身。pid があれば押すとプロフィールの窓が開くボタン、古い記録（pid なし）は文字だけ
+  const nameHTML = ({ nickname, pid, deco } = {}) => {
+    const nm = esc(nickname ?? '');
+    return (pid ? `<button type="button" class="pf-name" data-pid="${esc(pid)}">${nm}</button>` : nm) + decoHTML(deco);
+  };
+  // TA の board（'f2n:asia:10'）→「国旗→国名・アジア・10問」。地域は ranking.js の REGION_KEY の逆
+  const REGION_NAME = { asia: 'アジア', europe: 'ヨーロッパ', africa: 'アフリカ', namerica: '北・中央アメリカ', samerica: '南アメリカ', oceania: 'オセアニア' };
+  const boardLabel = board => {
+    const [m, r, c] = String(board).split(':');
+    const mode = MODES.find(x => x.k === m)?.label.replace(/\s+/g, '') ?? m;
+    return `${mode}・${r === 'all' ? '全世界' : REGION_NAME[r] ?? r}・${c === 'all' ? '全部' : `${c}問`}`;
+  };
+  // 日本時間の日付（2026/10/28）
+  const jstDate = d => { const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCFullYear()}/${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+  // カードの中身（RANKING.profileCard の返事の形）。非公開は名前・かざり・ひとことだけ。無い項目（自分のカードの読みこみ前の TA など）は出さない
+  const cardHTML = card => {
+    const head = `<p class="pf-card-name"><b>${esc(card.nickname ?? '')}</b>${decoHTML(card.deco)}</p>`;
+    if (card.private) return `<div class="pf-card">${head}<p class="hint">このプロフィールは非公開だよ</p></div>`;
+    const line = s => `<p class="pf-card-line">${s}</p>`, dg = globalThis.RPG_CORE?.DUNGEONS?.length ?? 21;
+    let h = head + (card.title ? `<p class="pf-card-title">〈${esc(card.title)}〉</p>` : '');
+    if (card.badges != null) h += line(`バッジ ${card.badges}個（全${card.badgesTotal ?? 0}個中）`);
+    if (card.rpg) h += line(`冒険 Lv${card.rpg.lv}・ダンジョン${card.rpg.dungeons}/${dg}`);
+    if (card.ta?.length) {
+      h += '<p class="pf-card-sub">タイムアタック</p><ul class="pf-card-ta">'
+        + card.ta.map(t => `<li><span>${esc(boardLabel(t.board))}</span> <span class="mono">${RANKING.formatTime(t.timeMs)}（${t.rank}位）</span></li>`).join('') + '</ul>';
+    }
+    if (card.daily) h += line(`今日の難問 参加${card.daily.plays}回（うち全問正解${card.daily.perfect}回）`);
+    if (card.since instanceof Date && !isNaN(card.since)) h += `<p class="hint">はじめた日 ${jstDate(card.since)}</p>`;
+    return `<div class="pf-card">${h}</div>`;
+  };
+
+  // ---- プロフィールの窓（<dialog id="pf-card">。body に1つ） ----
+  let dlg = null, opening = 0;   // opening: 開いた回数（前に開いた分の返事が後から届いても描かない）
+  const dialog = () => {
+    if (dlg) return dlg;
+    dlg = document.createElement('dialog');
+    dlg.id = 'pf-card'; dlg.setAttribute('aria-label', 'プロフィール');
+    dlg.innerHTML = '<div class="inner"><button type="button" class="close" data-pfc="close">閉じる</button><div class="pf-card-body" role="status"></div></div>';
+    dlg.addEventListener('click', e => {
+      if (e.target === dlg || e.target.closest('[data-pfc="close"]')) dlg.close();
+      else if (e.target.closest('[data-pfc="reload"]')) openCard(dlg.dataset.pid);
+    });
+    document.body.append(dlg);
+    return dlg;
+  };
+  const openCard = async pid => {
+    const d = dialog(), body = d.querySelector('.pf-card-body'), n = ++opening;
+    d.dataset.pid = pid;
+    body.innerHTML = '<p class="hint">読みこみ中…</p>';
+    if (!d.open) d.showModal();
+    let r;
+    try { r = await RANKING.profileCard({ pid }); } catch (e) { console.warn('[profile] profile_card', e); r = { ok: false, reason: 'network' }; }
+    if (n !== opening) return;
+    body.innerHTML = r.ok ? cardHTML(r)
+      : '<div class="pf-card-err"><p>読みこめなかった</p><button type="button" class="btn ghost" data-pfc="reload">再読み込み</button></div>';
+  };
+  // ランキングの名前のボタン（3つのランキングで共通）は、ここで1つだけ受ける
+  document.addEventListener('click', e => {
+    const b = e.target.closest?.('.pf-name');
+    if (b?.dataset.pid) openCard(b.dataset.pid);
+  });
+
+  // 自分のカード: 手元の名前・称号・かざり・バッジの数ですぐ描き、サーバーのカード（TA・今日の難問・冒険の記録）が届いたら足して描き直す。
+  // 称号などは同期の前でも手元のほうが新しいので手元を使う。非公開のときサーバーは記録を返さないので、手元の分だけ
+  const myCard = (p, server) => {
+    const w = want(p);
+    return { ...(server && !server.private ? server : {}), private: false, nickname: p.name, title: w.title ?? server?.title ?? '', deco: w.deco ?? server?.deco ?? [],
+      badges: w.badges ?? server?.badges, badgesTotal: w.badgesTotal ?? server?.badgesTotal };
+  };
+  let meLoading = 0;
+  const loadMe = async p => {
+    const n = ++meLoading;
+    let r;
+    try { r = await RANKING.profileCard({ pid: p.pid }); } catch { return; }   // つながらなければ手元の分のまま
+    const box = $('pf-me'), now = read();
+    if (n !== meLoading || !r.ok || !box || now?.token !== p.token) return;
+    box.innerHTML = cardHTML(myCard(now, r));
   };
   // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］
   const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function'; };
@@ -244,7 +322,7 @@
       };
       return;
     }
-    main.innerHTML = meHTML(p)
+    main.innerHTML = `<div id="pf-me">${cardHTML(myCard(p))}</div>`
       + field('<label for="pf-rename-in">名前を変える</label>', '<form class="pf-form" id="pf-rename-form" novalidate><div class="row">'
         + '<input id="pf-rename-in" type="text" autocomplete="nickname" enterkeyhint="done">'
         + '<button class="btn ghost" id="pf-rename">変える</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>'
@@ -255,6 +333,7 @@
         + '<p class="hint">オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ</p>'
         + '<label class="switch"><input type="checkbox" id="pf-auto"> 記録をランキングに自動で載せる</label>'
         + '<p class="hint">オフにすると、結果画面の［載せる］を押したときだけ載るよ</p>');
+    loadMe(p);
     $('pf-rename-in').value = p.name;
     $('pf-public').checked = p.isPublic !== false;
     $('pf-auto').checked = p.auto !== false;
@@ -309,5 +388,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 
-  window.PROFILE = { get, create, rename, setAuto, setPublic, auto: () => !!get()?.auto, lost, postBox, ready };
+  window.PROFILE = { get, create, rename, setAuto, setPublic, auto: () => !!get()?.auto, lost, postBox, nameHTML, cardHTML, openCard, ready };
 })();

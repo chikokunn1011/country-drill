@@ -270,3 +270,112 @@ for (const [label, viewport] of [['phone', PHONE], ['pc', PC], ['narrow', { widt
     }
   }, { viewport });
 }
+
+// ---- ランキングの名前セル（nameHTML）とプロフィールの窓（openCard） ----
+t('nameHTML escapes', async page => {
+  const h = await page.evaluate(() => PROFILE.nameHTML({ nickname: '<b>x</b>', pid: null, deco: [] }));
+  assert.match(h, /&lt;b&gt;x&lt;\/b&gt;/);
+  assert.doesNotMatch(h, /<button|<b>/);
+  // pid があれば押せるボタン。かざりは知っている国だけ3つまで、重なりは1つに
+  const b = await page.evaluate(() => PROFILE.nameHTML({ nickname: 'チコ"', pid: 'p"1', deco: ['jp', 'zz', 'jp', 'br', 'fr', 'de'] }));
+  assert.match(b, /^<button type="button" class="pf-name" data-pid="p&quot;1">チコ&quot;<\/button>/);
+  assert.equal((b.match(/<img /g) ?? []).length, 3);
+  assert.match(b, /<span class="rr-deco">/);
+  assert.doesNotMatch(b, /zz/);
+});
+
+// db に公開のプロフィール（id 1）と、TA 2件・今日の難問2回・冒険の記録を入れる
+const seedCard = (db, extra = {}) => {
+  db.profiles.push({ id: 1, pid: 'cardpid00001', token: 'card', nickname: 'ミケ', title: '旅のはじまり', deco: ['jp', 'br'], badges: 12, badges_total: 80,
+    created_at: '2026-10-01T00:00:00Z', ...extra });
+  const at = new Date().toISOString();
+  db.rows.push({ board: 'f2n:asia:10', profile_id: 1, nickname: 'ミケ', time_ms: 12340, questions: 10, created_at: at },
+    { board: 'n2f:all:all', profile_id: 1, nickname: 'ミケ', time_ms: 95670, questions: 195, created_at: at });
+  db.dailyRows.push({ day: '2026-10-26', profile_id: 1, nickname: 'ミケ', correct: 5, total: 5, time_ms: 30000, created_at: at },
+    { day: '2026-10-27', profile_id: 1, nickname: 'ミケ', correct: 3, total: 5, time_ms: 40000, created_at: at });
+  db.rpgRows.push({ token: 'card', profile_id: 1, nickname: 'ミケ', lv: 17, dungeons: 4, floors: 22, created_at: at, at });
+};
+
+t('card public', async (page, { db }) => {
+  seedCard(db);
+  await page.evaluate(() => PROFILE.openCard('cardpid00001'));
+  const dlg = page.locator('#pf-card');
+  await dlg.locator('.pf-card', { hasText: 'ミケ' }).waitFor();
+  assert.equal(await dlg.evaluate(d => d.open), true);
+  const s = await dlg.innerText();
+  assert.match(s, /〈旅のはじまり〉/);
+  assert.match(s, /バッジ 12個（全80個中）/);
+  assert.match(s, /冒険 Lv17・ダンジョン4\/\d+/);
+  assert.match(s, /国旗→国名・アジア・10問\s*12\.34秒（1位）/);
+  assert.match(s, /国名→国旗・全世界・全部\s*1分35\.67秒（1位）/);
+  assert.match(s, /今日の難問 参加2回（うち全問正解1回）/);
+  assert.match(s, /はじめた日 2026\/10\/1/);
+  assert.equal(await dlg.locator('.rr-deco img').count(), 2);
+  // Esc で閉じる
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#pf-card').open);
+});
+
+t('card private', async (page, { db }) => {
+  seedCard(db, { is_public: false });
+  await page.evaluate(() => PROFILE.openCard('cardpid00001'));
+  const dlg = page.locator('#pf-card');
+  await dlg.locator('.pf-card', { hasText: 'このプロフィールは非公開だよ' }).waitFor();
+  const s = await dlg.innerText();
+  assert.match(s, /ミケ/);
+  assert.doesNotMatch(s, /バッジ|Lv|旅のはじまり|今日の難問|国旗→国名/);
+  assert.equal(await dlg.locator('.rr-deco img').count(), 2);
+  await dlg.locator('button', { hasText: '閉じる' }).click();
+  await page.waitForFunction(() => !document.querySelector('#pf-card').open);
+});
+
+// ランキングの名前（.pf-name）を押すと開く。つながらなければ「読みこめなかった」と［再読み込み］
+t('card from name button and reload', async (page, { db }) => {
+  seedCard(db);
+  db.down = true;
+  await page.evaluate(() => {
+    const d = document.createElement('div'); d.id = 'nm';
+    d.innerHTML = PROFILE.nameHTML({ nickname: 'ミケ', pid: 'cardpid00001', deco: [] });
+    document.querySelector('#scr-home').append(d);
+  });
+  await page.click('#nm .pf-name');
+  const dlg = page.locator('#pf-card');
+  await dlg.locator('text=読みこめなかった').waitFor();
+  db.down = false;
+  await dlg.locator('button', { hasText: '再読み込み' }).click();
+  await dlg.locator('.pf-card', { hasText: 'バッジ 12個' }).waitFor();
+});
+
+t('card not found', async page => {
+  await page.evaluate(() => PROFILE.openCard('nobody'));
+  await page.locator('#pf-card', { hasText: '読みこめなかった' }).waitFor();
+});
+
+// 自分のプロフィール画面のカードも同じ見た目（サーバーの TA などの記録も出す）
+t('own card uses cardHTML', async (page, { db }) => {
+  seedCard(db);
+  await page.evaluate(() => localStorage.setItem('profile', JSON.stringify({ token: 'card', pid: 'cardpid00001', name: 'ミケ', auto: true, isPublic: true, sent: { isPublic: true } })));
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+  await openProfile(page);
+  await page.locator('#pf-me', { hasText: '国旗→国名・アジア・10問' }).waitFor();
+  assert.match(await text(page, '#pf-me'), /ミケ/);
+});
+
+for (const [label, viewport] of [['phone', PHONE], ['narrow', { width: 320, height: 640 }]]) {
+  t(`card layout ${label}`, async (page, { db }) => {
+    seedCard(db, { nickname: 'ながいながいなまえの人だよ', title: 'とても長い称号がここに入るととても長くなるのでおりかえすよね' });
+    db.rows.push({ board: 'f2m:namerica:20', profile_id: 1, nickname: 'x', time_ms: 3599990, questions: 20, created_at: new Date().toISOString() });
+    await page.evaluate(() => PROFILE.openCard('cardpid00001'));
+    await page.locator('#pf-card .pf-card', { hasText: 'バッジ' }).waitFor();
+    await settleLayout(page);
+    const r = await page.evaluate(() => {
+      const d = document.querySelector('#pf-card'), b = d.getBoundingClientRect();
+      const out = [...d.querySelectorAll('*')].filter(el => { const x = el.getBoundingClientRect(); return x.width && (x.left < b.left - 0.5 || x.right > b.right + 0.5); })
+        .map(el => el.className || el.tagName);
+      return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, w: innerWidth, h: innerHeight, out };
+    });
+    assert.ok(r.left >= 0 && r.right <= r.w && r.top >= 0 && r.bottom <= r.h, JSON.stringify(r));
+    assert.deepEqual(r.out, []);
+  }, { viewport });
+}

@@ -1,4 +1,4 @@
-/* サイト共通のプロフィール（profile.js の #scr-profile と、結果画面の「載せる」箱 .pf-post）。色は index.html の変数だけ使う */
+/* サイト共通のプロフィール（profile.js の #scr-profile・結果画面の「載せる」箱 .pf-post・ランキングの名前 .pf-name・窓 #pf-card）。色は index.html の変数だけ使う */
 .pf-main { display: flex; flex-direction: column; gap: 18px; }
 .pf .field { min-width: 0; }
 .pf-lead { margin: 0; }
@@ -9,10 +9,27 @@
 .pf .tamsg { text-align: left; }
 .pf .switch { align-self: flex-start; }
 .pf-deco { align-self: flex-start; padding-inline: 0; }
-/* 自分のカード（名前・かざり・称号・バッジの数） */
+/* プロフィールのカード（自分の画面と、ランキングから開く窓で同じ見た目） */
 .pf-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .pf-card-name { margin: 0; font: 900 1.3rem var(--font-display); overflow-wrap: anywhere; }
 .pf-card-title { margin: 0; color: var(--accent); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.pf-card-line { margin: 0; font-size: .92rem; }
+.pf-card-sub { margin: 6px 0 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.pf-card-ta { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: .88rem; overflow-wrap: anywhere; }
+.pf-card-ta .mono { font-family: var(--font-mono); white-space: nowrap; }
+.pf-card .hint { margin: 0; }
+/* かざり（rpg.css と同じ。冒険の表示が OFF で rpg.css が無くても、TA・今日の難問のランキングで出るように） */
+.rr-deco { display: inline-flex; gap: 3px; margin-left: 6px; white-space: nowrap; vertical-align: -.1em; }
+.rr-deco img { height: 1em; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
+/* ランキングの名前（押すとプロフィールの窓）。見た目は文字のまま、下線で押せるとわかるように */
+.pf-name { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; text-align: inherit; cursor: pointer;
+  text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.pf-name:hover { color: var(--accent); }
+/* プロフィールの窓 */
+#pf-card { width: min(420px, calc(100vw - 32px)); }
+#pf-card .inner { gap: 10px; }
+.pf-card-err { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.pf-card-err p { margin: 0; }
 /* 結果画面の「載せる」箱。自動 OFF のときの問いかけ */
 .pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
 .pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }
