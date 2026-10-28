@@ -39,6 +39,7 @@ t('device_tab_lists_saves', async page => {
 }, { storage: { settings: { theme: 'light', sound: true }, rpg: RPG } });
 
 t('edit_json_saves_and_rejects_broken', async page => {
+  acceptDialogs(page);   // 今あるキーの保存は危ない操作（確かめてスナップショット）
   await open(page, 'd-saves');
   await page.click('#d-saves [data-key="settings"]');
   assert.match(await page.inputValue('#d-json'), /"vol": 30/);
@@ -51,6 +52,8 @@ t('edit_json_saves_and_rejects_broken', async page => {
   await page.fill('#d-json', '{"vol": 10}');
   await page.click('#d-json-save');
   assert.deepEqual(JSON.parse(await ls(page, 'settings')), { vol: 10 });
+  // 壊れた JSON のときは確かめる前にやめるので、自動のスナップショットは保存した1回分だけ
+  assert.equal(JSON.parse(await ls(page, 'adminSnaps')).length, 1);
 }, { storage: { settings: { vol: 30 } } });
 
 t('rpg_coins_and_unlock', async page => {
@@ -176,3 +179,105 @@ t('no_console_errors_on_load', async (page, app) => {
   await page.waitForTimeout(200);
   assert.deepEqual(app.consoleErrors, []);
 });
+
+// 危ない操作の自動スナップショットが増えても、手動で取ったものは押し出されない。自動のものには「自動」と出る
+t('auto_snapshots_keep_manual_one', async page => {
+  acceptDialogs(page);
+  for (const id of ['d-snaps', 'd-rpg', 'd-badges', 'd-settings']) await open(page, id);
+  await page.fill('#d-snap-name', 'ボス前');
+  await page.click('#d-snap-save');
+  for (const id of ['#d-rpg-clear', '#d-badges-none', '#d-rpg-unlock', '#d-rpg-story', '#d-badges-all', '#d-rpg-wipe', '#d-first']) await page.click(id);
+  const names = await page.$$eval('#d-snap-list [data-snap]', ls => ls.map(l => [l.dataset.snap, !!l.querySelector('.tag')]));
+  assert.ok(names.some(([n, auto]) => n === 'ボス前' && !auto), JSON.stringify(names));
+  assert.equal(names.filter(([, auto]) => auto).length, 5);
+  assert.equal(names.length, 6);
+  await page.click('#d-snaps [data-snap="ボス前"] [data-act="load"]');
+  assert.equal(await coins(page), 500);
+}, { storage: { rpg: RPG } });
+
+// 全部取る・全部開く・ストーリー既読を消す・今あるキーの保存 も、やめたら何も変えない
+t('more_overwrites_go_through_confirm', async page => {
+  page.on('dialog', d => d.dismiss());
+  for (const id of ['d-rpg', 'd-badges', 'd-saves']) await open(page, id);
+  const dump = () => page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))));
+  const before = await dump();
+  await page.click('#d-badges-all');
+  await page.click('#d-rpg-unlock');
+  await page.click('#d-rpg-story');
+  await page.click('#d-saves [data-key="rpg"]');
+  await page.fill('#d-json', '{"v":1,"coins":1}');
+  await page.click('#d-json-save');
+  assert.equal(await dump(), before);
+}, { storage: { rpg: { ...RPG, story: ['a'] } } });
+
+t('badge_title_picker', async (page, app) => {
+  await open(page, 'd-badges');
+  const key = await page.evaluate(() => { const b = BADGES_CORE.makeCatalog(COUNTRIES)[0]; return `${b.id}@1`; });
+  assert.deepEqual(await page.$$eval('#d-badges-eq option', o => o.map(x => x.textContent)), ['自動（本編が選ぶ）', 'つけない']);
+  await page.check(`#d-badges-list [data-step="${key}"]`);
+  assert.equal(await page.locator('#d-badges-eq option').count(), 3);
+  await page.selectOption('#d-badges-eq', key);
+  assert.equal(JSON.parse(await ls(page, 'badges')).eq, key);
+  await page.selectOption('#d-badges-eq', '');
+  assert.equal(JSON.parse(await ls(page, 'badges')).eq, '');
+  assert.equal(await page.inputValue('#d-badges-eq'), '');
+});
+
+t('save_list_shows_time_only_when_save_has_one', async page => {
+  await open(page, 'd-saves');
+  const at = k => page.locator(`#d-keys li:has([data-key="${k}"]) [data-at]`);
+  assert.equal(await at('settings').count(), 0);
+  assert.equal(await at('rpg').count(), 0, 'day の無い rpg には出さない');
+  assert.equal((await at('daily').textContent()).trim(), '最終 2026-10-26');
+  assert.match((await at('badges').textContent()).trim(), /^最終 2026\/10\/\d+ \d\d:\d\d$/);
+}, { storage: { settings: { theme: 'light' }, rpg: RPG, daily: { day: '2026-10-26', status: 'done' }, badges: { v: 1, got: { 'x@1': Date.UTC(2026, 9, 3, 3) } } } });
+
+t('daily_reset_only_for_today', async page => {
+  await open(page, 'd-daily');
+  assert.equal(await page.isDisabled('#d-daily-reset'), false);
+  assert.equal((await page.textContent('#d-daily-reset')).trim(), 'この端末の今日の記録を消す');
+  await page.fill('#d-daily-day', '2026-01-01');
+  await page.dispatchEvent('#d-daily-day', 'change');
+  assert.equal(await page.isDisabled('#d-daily-reset'), true);
+});
+
+t('restore_file_label_reads_in_one_line_on_phone', async page => {
+  await open(page, 'd-backup');
+  const h = await page.evaluate(() => {
+    const label = document.getElementById('d-file').closest('label'), r = document.createRange();
+    r.selectNodeContents(label.firstChild); return r.getBoundingClientRect().height;
+  });
+  assert.ok(h < 30, `文字が折れている: ${h}px`);
+}, { viewport: PHONE });
+
+t('jump_links_include_ranking_and_daily', async page => {
+  const hrefs = await page.$$eval('#d-jump a', as => as.map(a => a.getAttribute('href')));
+  for (const h of ['./#ranking', './#daily']) assert.ok(hrefs.includes(h), h);
+});
+
+// 本編は #ranking・#daily で直接その画面を開く（D11 のリンク先）
+for (const [hash, screen] of [['#ranking', 'ranking'], ['#daily', 'daily']]) {
+  test(`main_page_opens_${screen}_from_hash`, { timeout: 60_000 }, async () => {
+    const app = await openApp(browser, { path: hash });
+    try {
+      await app.page.waitForFunction(s => document.body.dataset.screen === s, screen);
+      assert.equal(await app.page.isVisible(`#scr-${screen}`), true);
+      assert.deepEqual(app.errors.map(String), []);
+    } finally { await app.close(); }
+  });
+}
+
+// スクリーンショット（端末タブ）
+const SHOTS = process.env.ADMIN_SHOTS;
+for (const [label, viewport] of [['phone', PHONE], ['pc', PC]]) {
+  if (!SHOTS) continue;
+  t(`shot_device_${label}`, async page => {
+    acceptDialogs(page);
+    await page.evaluate(() => document.querySelectorAll('#tab-device details').forEach(d => { d.open = true; }));
+    await page.fill('#d-snap-name', 'ボス前');
+    await page.click('#d-snap-save');
+    await page.click('#d-rpg-clear');
+    await page.evaluate(() => { document.getElementById('adm-toast').textContent = ''; });
+    await page.screenshot({ path: `${SHOTS}/final-device-${label}.png`, fullPage: true });
+  }, { viewport, colorScheme: 'light', storage: { rpg: RPG, settings: { theme: 'light' }, daily: { day: '2026-10-26', status: 'done', correct: 18 } } });
+}

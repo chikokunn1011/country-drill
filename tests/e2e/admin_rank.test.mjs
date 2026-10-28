@@ -67,7 +67,8 @@ t('login_shows_dashboard_counts', async page => {
   await page.locator('#r-dash [data-n="scores"]', { hasText: '2' }).waitFor();
   assert.equal((await page.textContent('#r-dash [data-n="daily"]')).trim(), '1');
   assert.equal((await page.textContent('#r-dash [data-n="rpg"]')).trim(), '1');
-  assert.match(await page.textContent('#r-stale'), /最後の記録から 0日（7日で Supabase が止まる）/);
+  assert.match(await page.textContent('#r-stale'), /最後の記録から 0日（Supabase は7日アクセスが無いと止まる。見るだけでもアクセスなので、これは記録から数えた目安）/);
+  assert.match(await page.textContent('#r-dash [data-sub="rpg"]'), /^今日 \d+・今週 \d+（登録）$/);
   assert.equal(await page.evaluate(() => document.getElementById('r-stale').classList.contains('warn')), false);
   assert.equal((await page.textContent('#adm-who')).trim(), 'admin@example.com');
   assert.equal(await page.isVisible('#adm-logout'), true);
@@ -248,13 +249,204 @@ t('ops_log_tab', async (page, { db }) => {
   assert.equal(db.adminLog.length, 1);
 });
 
+// 種類を切りかえて一覧が読めなかったら、前の種類の行は消え、名前を変える・消す・CSV は何もしない（ちがう表の同じ id にさわらない）
+t('kind_switch_with_failing_list_leaves_no_stale_rows', async (page, { db }) => {
+  page.on('dialog', d => d.accept('べつの名前'));
+  await login(page);
+  await kind(page, 'scores');
+  assert.equal(await rows(page).count(), 2);
+  await rows(page).first().locator('input[data-pick]').check();
+  db.down = true;
+  await page.click('#r-kind [data-kind="rpg"]');
+  await page.locator('#adm-toast', { hasText: 'つながらなかった' }).waitFor();
+  db.down = false;
+  assert.equal(await rows(page).count(), 0, '前の種類の行は残さない');
+  assert.equal(await page.locator('#r-table [data-rename], #r-table [data-nameless], #r-table [data-byname]').count(), 0);
+  assert.equal(await page.isDisabled('#r-del'), true);
+  assert.equal(await page.isDisabled('#r-csv'), true);
+  const before = db.calls.length;
+  // ボタンが押せなくても、無理に押したとき（click を直接呼ぶ）も何もしない
+  await page.evaluate(() => { document.getElementById('r-del').disabled = false; document.getElementById('r-del').click(); document.getElementById('r-csv').disabled = false; document.getElementById('r-csv').click(); });
+  await page.waitForTimeout(300);
+  assert.deepEqual(db.calls.slice(before).map(c => c.name), []);
+  assert.equal(db.rows.length, 2);
+  assert.deepEqual(db.rpgRows.map(r => r.nickname), ['ゆうしゃ']);
+  assert.equal(db.calls.some(c => c.name === 'admin_rename' || c.name === 'admin_delete'), false);
+  // つながったら、新しい種類の一覧が出て、また押せる
+  await page.click('#r-reload');
+  await page.locator('#r-table[data-kind="rpg"][data-ready]').waitFor();
+  assert.equal(await rows(page).count(), 1);
+  assert.equal(await page.isDisabled('#r-del'), false);
+});
+
+t('kind_switch_in_flight_refuses_actions', async (page, { db }) => {
+  await login(page);
+  await kind(page, 'scores');
+  // admin_list の返事を遅らせる
+  let release;
+  const gate = new Promise(ok => { release = ok; });
+  const orig = db.adminRpc.admin_list;
+  db.adminRpc.admin_list = args => args.p_kind === 'rpg' ? gate.then(() => orig(args)) : orig(args);
+  await page.click('#r-kind [data-kind="rpg"]');
+  await page.waitForTimeout(150);
+  assert.equal(await rows(page).count(), 0);
+  assert.equal(await page.isDisabled('#r-del'), true);
+  release();
+  await page.locator('#r-table[data-kind="rpg"][data-ready]').waitFor();
+  assert.equal(await page.isDisabled('#r-del'), false);
+});
+
+t('login_rate_limited_message', async (page, { db }) => {
+  db.auth = () => [429, { code: 'over_request_rate_limit', msg: 'Request rate limit reached' }];
+  await login(page, { wait: false });
+  await page.locator('#r-login-msg', { hasText: 'ログインを試しすぎ。少し待ってね' }).waitFor();
+});
+
+t('pager_stays_when_page_load_fails', async (page, { db }) => {
+  for (let i = 0; i < 250; i++) db.rows.push({ board: 'n2f:all:5', nickname: `p${i}`, time_ms: 10000 + i, questions: 5, created_at: ago(40 + i) });
+  await login(page);
+  await kind(page, 'scores');
+  db.down = true;
+  await page.click('#r-next');
+  await page.locator('#adm-toast', { hasText: 'つながらなかった' }).waitFor();
+  db.down = false;
+  assert.match(await page.textContent('#r-page'), /^1〜100 \/ 252$/);
+  await page.click('#r-next');
+  await page.locator('#r-page', { hasText: '101〜200 / 252' }).waitFor();
+  assert.equal(db.calls.filter(c => c.name === 'admin_list').at(-1).args.p_filter.offset, 100);
+});
+
+t('logout_clears_server_rows_from_page', async page => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await rows(page).first().locator('[data-nameless]').click();
+  await page.locator('#r-recent li', { hasText: '名前を変える' }).waitFor();
+  await page.click('#adm-logout');
+  await page.locator('#r-login').waitFor();
+  const text = await page.evaluate(() => document.body.textContent);
+  assert.doesNotMatch(text, /たろう|はなこ|名無しの旅人/);
+  assert.equal(await page.locator('#r-table tbody tr').count(), 0);
+  assert.equal(await page.locator('#r-recent li').count(), 0);
+  assert.equal((await page.textContent('#r-dash [data-n="scores"]')).trim(), '–');
+});
+
+t('nameless_button_one_tap', async (page, { db }) => {
+  let msg;
+  page.on('dialog', d => { msg = d.message(); d.accept(); });
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'たろう' }).locator('[data-nameless]').click();
+  await page.locator('#r-table tbody tr', { hasText: '名無しの旅人' }).waitFor();
+  assert.match(msg, /タイムアタックの id \d+「たろう」を「名無しの旅人」＋数字にしていい？/);
+  assert.equal(db.calls.find(c => c.name === 'admin_rename').args.p_name, null);
+});
+
+t('delete_all_records_with_this_name', async (page, { db }) => {
+  let msg;
+  page.on('dialog', d => { msg = d.message(); d.accept(); });
+  for (let i = 0; i < 130; i++) db.rows.push({ board: 'n2f:all:5', nickname: i % 2 ? 'たろう' : 'たろうX', time_ms: 10000 + i, questions: 5, created_at: ago(40 + i) });
+  db.dailyRows.push({ day: '2026-10-26', nickname: 'ﾀﾛｳ', correct: 1, total: 20, time_ms: 1, created_at: ago(3) },
+    { day: '2026-10-26', nickname: 'たろう', correct: 2, total: 20, time_ms: 2, created_at: ago(4) });
+  db.rpgRows.push({ token: 'tk3', nickname: 'たろう', lv: 1, dungeons: 0, floors: 0, created_at: ago(5), at: ago(5) });
+  await login(page);
+  await kind(page, 'scores');
+  const row = page.locator('#r-table tbody tr').filter({ has: page.locator('td.name', { hasText: /^たろう$/ }) }).first();
+  await row.locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: '「たろう」の記録を 68件消したよ' }).waitFor();
+  assert.match(msg, /タイムアタック 66件・今日の難問 1件・冒険 1件、合わせて 68件/);
+  assert.equal(db.rows.filter(r => r.nickname === 'たろう').length, 0);
+  assert.equal(db.rows.filter(r => r.nickname === 'たろうX').length, 65, '部分一致の別の名前は消さない');
+  assert.deepEqual(db.dailyRows.map(r => r.nickname).sort(), ['ﾀﾛｳ', 'じろう'].sort(), 'ひらがなとカタカナは別の名前');
+  assert.deepEqual(db.rpgRows.map(r => r.nickname), ['ゆうしゃ']);
+  assert.equal(db.trash.length, 68);
+});
+
+t('delete_all_by_name_cancel_deletes_nothing', async (page, { db }) => {
+  page.on('dialog', d => d.dismiss());
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'たろう' }).locator('[data-byname]').click();
+  await page.waitForTimeout(400);
+  assert.equal(db.calls.some(c => c.name === 'admin_delete'), false);
+  assert.equal(db.rows.length, 2);
+});
+
+t('csv_has_all_pages', async (page, { db }) => {
+  for (let i = 0; i < 650; i++) db.rows.push({ board: 'n2f:all:5', nickname: `p${i}`, time_ms: 10000 + i, questions: 5, created_at: ago(40 + i) });
+  await login(page);
+  await kind(page, 'scores');
+  const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#r-csv')]);
+  const text = await new Promise((ok, ng) => { const cs = []; dl.createReadStream().then(s => s.on('data', c => cs.push(c)).on('end', () => ok(Buffer.concat(cs).toString())).on('error', ng)); });
+  assert.equal(text.trim().split('\r\n').length, 1 + 652);
+  assert.match(text, /p649/);
+  assert.deepEqual(db.calls.filter(c => c.name === 'admin_list').slice(-2).map(c => [c.args.p_filter.offset, c.args.p_filter.limit]), [[0, 500], [500, 500]]);
+});
+
+t('select_all_box_follows_rows', async page => {
+  await login(page);
+  await kind(page, 'scores');
+  await page.check('#r-pick-all');
+  await rows(page).first().locator('input[data-pick]').uncheck();
+  assert.deepEqual(await page.evaluate(() => { const a = document.getElementById('r-pick-all'); return [a.checked, a.indeterminate]; }), [false, true]);
+  await rows(page).first().locator('input[data-pick]').check();
+  assert.deepEqual(await page.evaluate(() => { const a = document.getElementById('r-pick-all'); return [a.checked, a.indeterminate]; }), [true, false]);
+});
+
+t('daily_list_shows_that_days_questions', async page => {
+  await login(page);
+  await kind(page, 'daily');
+  assert.equal(await page.isHidden('#r-daily-qs'), true);
+  await page.fill('#r-f-day', '2026-10-27');
+  await page.dispatchEvent('#r-f-day', 'change');
+  await page.locator('#r-daily-qs:not([hidden])').waitFor();
+  assert.equal(await page.locator('#r-daily-qs-list li').count(), 20);
+  const first = await page.evaluate(() => COUNTRIES.find(c => c.a === DAILY_CORE.build('2026-10-27', COUNTRIES)[0].a).n);
+  assert.ok((await page.textContent('#r-daily-qs-list li:first-child')).includes(first));
+  await kind(page, 'scores');
+  assert.equal(await page.isHidden('#r-daily-qs'), true);
+});
+
+t('ops_log_shows_who', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await rows(page).first().locator('[data-nameless]').click();
+  await page.locator('#r-recent li', { hasText: '名前を変える' }).waitFor();
+  db.adminLog.push({ id: 99, at: new Date().toISOString(), user_id: '12345678-aaaa-bbbb-cccc-000000000000', action: 'delete', kind: 'scores', detail: { ids: [1] } });
+  await page.click('#adm-tabs [data-tab="log"]');
+  await page.locator('#l-ops-table tbody tr', { hasText: '12345678' }).waitFor();
+  const who = await page.$$eval('#l-ops-table tbody td.who', ts => ts.map(t => t.textContent));
+  assert.deepEqual(who, ['12345678', 'admin@example.com']);
+});
+
+t('malformed_error_record_does_not_stop_ops_log', async page => {
+  await login(page);
+  await page.click('#adm-tabs [data-tab="log"]');
+  await page.locator('#l-ops-table tbody tr').first().waitFor();
+}, { storage: { adminErrors: [{ msg: { toString: 1 }, src: { toString: 1 }, at: { toString: 1 }, line: {} }, { msg: 'ふつう', at: '2026-10-28T00:00:00Z' }] } });
+
+t('row_actions_visible_on_phone', async page => {
+  await login(page);
+  for (const k of ['scores', 'rpg']) {
+    await kind(page, k);
+    const box = await rows(page).first().locator('[data-rename]').boundingBox();
+    assert.ok(box && box.x >= 0 && box.x + box.width <= 390, `${k}: ${JSON.stringify(box)}`);
+  }
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth) <= 390);
+}, { viewport: PHONE });
+
 // D13: 本編で起きた例外は localStorage adminErrors に残り、ログタブ（ログイン不要）で見られる
 test('error_log_records_main_page_errors', { timeout: 60_000 }, async () => {
   const app = await openApp(browser, {});
   try {
     const { page } = app;
-    await page.evaluate(() => { setTimeout(() => { throw new Error('test-boom'); }); Promise.reject(new Error('test-reject')); });
-    await page.waitForFunction(() => (localStorage.getItem('adminErrors') || '').includes('test-reject') && localStorage.getItem('adminErrors').includes('test-boom'));
+    await page.evaluate(() => { setTimeout(() => { throw new Error('test-boom'); }); Promise.reject(new Error('test-reject')); Promise.reject(Symbol('sym')); });
+    await page.waitForFunction(() => (localStorage.getItem('adminErrors') || '').includes('test-reject') && localStorage.getItem('adminErrors').includes('test-boom')
+      && localStorage.getItem('adminErrors').includes('Symbol(sym)'));
+    await page.waitForTimeout(100);
+    // Symbol でも記録の途中で例外を出さない（TypeError が記録されない）
+    assert.doesNotMatch(await page.evaluate(() => localStorage.getItem('adminErrors')), /Cannot convert a Symbol/);
     const recs = await page.evaluate(() => JSON.parse(localStorage.getItem('adminErrors')));
     for (const r of recs) assert.deepEqual(Object.keys(r).sort(), ['at', 'line', 'msg', 'src']);
     // 50件まで
@@ -305,6 +497,6 @@ for (const [label, viewport] of [['phone', PHONE], ['pc', PC]]) {
     await login(page);
     await page.locator('#r-table[data-ready]').waitFor();
     await page.evaluate(() => { document.getElementById('adm-toast').textContent = ''; });
-    await page.screenshot({ path: `${SHOTS}/task-5-rank-${label}.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/final-rank-${label}.png`, fullPage: true });
   }, { viewport, colorScheme: 'light' });
 }

@@ -15,9 +15,8 @@
   } catch { /* 読めなければ端末の設定のまま */ }
   const applyTheme = t => { if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
 
-  // D12 のつながるか確かめるだけに使う。admin-api.js が URL/KEY を出していればそれを使い、無ければ同じ値（admin-api.js と ranking.js と同じ）
-  const SUPABASE = globalThis.ADMIN_API?.URL ?? 'https://vgdkklvhtvcamtxwjpke.supabase.co';
-  const PUBLIC_KEY = globalThis.ADMIN_API?.KEY ?? 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV';
+  // D12 のつながるか確かめるだけに使う。値は admin-api.js にだけ書いてある（admin.html で admin-api.js が先に読まれる）
+  const SUPABASE = globalThis.ADMIN_API.URL, PUBLIC_KEY = globalThis.ADMIN_API.KEY;
   const MODE_LABEL = { f2n: '国旗→国名', n2f: '国名→国旗', m2f: '場所→国旗', f2m: '国旗→場所' };
   const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
 
@@ -57,7 +56,7 @@
   // 危ない操作: confirm で確かめて、OK なら自動でスナップショットを取ってからする（やめたときはスナップショットも取らない）
   function danger(label, fn) {
     if (!confirm(`「${label}」していい？\n（する前に今の状態をスナップショットに自動で取っておくよ）`)) return;
-    const s = SAVE.snapSave(`自動 ${label} ${hms()}`);
+    const s = SAVE.snapSave(`自動 ${label} ${hms()}`, { auto: true });   // 自動は自動どうしで5個まで（手動のものは押し出さない）
     if (!s.ok) { toast('自動のスナップショットが取れなかったので、やめておいたよ', true); return; }
     safe('d-snaps', renderSnaps);
     fn();
@@ -76,9 +75,12 @@
     ul.replaceChildren();
     if (!Array.isArray(r)) { ul.append(el('li', { text: 'この端末のセーブが読めない' })); return; }
     if (!r.length) ul.append(el('li', { class: 'muted', text: 'セーブは何もないよ' }));
-    for (const { key, bytes } of r) {
+    for (const { key, bytes, at } of r) {
+      // 最終更新はセーブの中に時刻（日付）が書いてあるものだけ出す（localStorage 自体は更新時刻を持たない）
+      const when = typeof at === 'string' ? (/^\d{4}-\d{2}-\d{2}$/.test(at) ? at : fmtFull(at)) : '';
       ul.append(el('li', {},
         el('span', { class: 'grow' }, el('button', { class: 'keybtn', 'data-key': key, 'aria-pressed': String(key === current), text: key })),
+        ...(when ? [el('span', { class: 'mono muted', 'data-at': '', text: `最終 ${when}` })] : []),
         el('span', { class: 'mono muted', text: fmtBytes(bytes) })));
     }
   }
@@ -91,13 +93,18 @@
     renderKeys();
   }
   function saveJson() {
-    const key = $('d-key').value.trim();
+    const key = $('d-key').value.trim(), text = $('d-json').value;
     if (!key) { toast('キーを入れてね', true); return; }
-    const r = SAVE.write(key, $('d-json').value);
-    if (r.ok === false) { toast(r.reason === 'not_json' ? 'JSONが壊れてる。保存しなかったよ' : REASON[r.reason] ?? 'うまくいかなかった', true); return; }
-    toast(`${key} を保存したよ`);
-    renderAll();
-    pick(key);
+    try { JSON.parse(text); } catch { toast('JSONが壊れてる。保存しなかったよ', true); return; }   // 壊れていたら確かめる前にやめる
+    const go = () => {
+      const r = SAVE.write(key, text);
+      if (r.ok === false) { toast(r.reason === 'not_json' ? 'JSONが壊れてる。保存しなかったよ' : REASON[r.reason] ?? 'うまくいかなかった', true); return; }
+      toast(`${key} を保存したよ`);
+      renderAll();
+      pick(key);
+    };
+    // 今あるキーを書きかえるときは危ない操作（確かめて、自動のスナップショットを取ってから）。新しいキーはそのまま
+    if (SAVE.read(key).reason === 'missing') go(); else danger(`${key} を書きかえる`, go);
   }
   function deleteKey() {
     const key = $('d-key').value.trim();
@@ -139,7 +146,7 @@
     if (!list.length) ul.append(el('li', { class: 'muted', text: 'まだないよ' }));
     for (const s of list.slice().reverse()) {
       ul.append(el('li', { 'data-snap': s.name },
-        el('span', { class: 'grow' }, el('b', { text: s.name }), ' ', el('span', { class: 'mono muted', text: fmtAt(s.at) })),
+        el('span', { class: 'grow' }, ...(s.auto ? [el('span', { class: 'tag', text: '自動' }), ' '] : []), el('b', { text: s.name }), ' ', el('span', { class: 'mono muted', text: fmtAt(s.at) })),
         el('button', { class: 'btn sm', 'data-act': 'load', text: '戻す' }),
         el('button', { class: 'btn danger sm', 'data-act': 'del', text: '消す' })));
     }
@@ -152,7 +159,7 @@
       if (confirm(`スナップショット「${name}」を消していい？`)) done(SAVE.snapDelete(name), '消したよ');
       return;
     }
-    // 先に中身を取っておく（自動のスナップショットで5個を超えて、戻したいものが押し出されても戻せるように）
+    // 先に中身を取っておく（自動のスナップショットが5個を超えて、戻したい自動のものが押し出されても戻せるように）
     const all = SAVE.read('adminSnaps'), snap = all.ok && Array.isArray(all.value) ? all.value.find(s => s && s.name === name) : null;
     if (!snap) { fail({ reason: 'missing' }); return; }
     danger(`「${name}」に戻す`, () => done(SAVE.importAll({ app: 'country-drill', kind: 'save', data: snap.data }), `「${name}」に戻したよ`));
@@ -200,7 +207,15 @@
       return el('label', {}, box, el('span', { text: `${b.icon} ${b.name}${b.tiers.length > 1 ? ` ${i + 1}段目` : ''}「${t.title}」` }));
     })));
     $('d-badges-sum').textContent = `${n} / ${total} ステップ取ってる`;
+    // 称号を選ぶ: 自動（本編が一番いいものを選ぶ＝eq が null）・つけない（''）・取っているステップ
+    const eq = r.ok && r.value && (r.value.eq === '' || typeof r.value.eq === 'string') ? r.value.eq : null;
+    const owned = cat.flatMap(b => b.tiers.map((t, i) => [`${b.id}@${i + 1}`, `${b.icon} ${t.title}`])).filter(([k]) => Object.hasOwn(got, k));
+    const sel = $('d-badges-eq');
+    sel.replaceChildren(el('option', { value: AUTO_EQ, text: '自動（本編が選ぶ）' }), el('option', { value: '', text: 'つけない' }),
+      ...owned.map(([k, l]) => el('option', { value: k, text: l })));
+    sel.value = eq === null ? AUTO_EQ : owned.some(([k]) => k === eq) || eq === '' ? eq : AUTO_EQ;
   }
+  const AUTO_EQ = '\u0000auto';   // 「自動」の option の値（ステップのキーとぶつからない）
 
   // ---- D8 今日の難問 ----
   function renderDaily() {
@@ -214,6 +229,8 @@
       el('td', {}, q.n, ' ', el('span', { class: 'mono muted', text: q.a })),
       el('td', { text: MODE_LABEL[q.mode] ?? q.mode }),
       el('td', {}, el('span', { class: 'mono', text: `${q.opts.indexOf(q.a) + 1}番目` }), ' ', q.n))));
+    // 「この端末の今日の記録を消す」は今日の日付を選んでいるときだけ（ほかの日の記録はこの端末に無い）
+    $('d-daily-reset').disabled = day !== DAILY_CORE.jstDay();
     const rec = SAVE.read('daily');
     $('d-daily-rec').textContent = rec.ok && rec.value
       ? `この端末の記録: ${rec.value.day ?? '?'}（${rec.value.status ?? '?'}${rec.value.correct != null ? `・${rec.value.correct}問正解` : ''}）`
@@ -300,7 +317,7 @@
   const PAGE = 100;
   const KIND_LABEL = { scores: 'タイムアタック', daily: '今日の難問', rpg: '冒険', trash: 'ゴミ箱' };
   const ACTION = { delete: '消す', restore: '戻す', rename: '名前を変える' };
-  const LOGIN_MSG = { bad_login: 'メールかパスワードがちがうよ', not_admin: 'このアカウントは管理者じゃないよ', network: 'つながらなかった' };
+  const LOGIN_MSG = { bad_login: 'メールかパスワードがちがうよ', not_admin: 'このアカウントは管理者じゃないよ', network: 'つながらなかった', rate_limited: 'ログインを試しすぎ。少し待ってね' };
   const RENAME_MSG = { bad_name: '名前は1〜12文字だよ', ng_name: '使えない言葉が入ってるよ', name_taken: 'その名前はもう使われてるよ', not_found: 'その記録はもう無いよ' };
   const fmtMs = ms => Number.isFinite(+ms) ? `${(ms / 1000).toFixed(2)}秒` : '';
   const fmtFull = iso => { const d = new Date(iso); return iso == null || Number.isNaN(+d) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
@@ -339,7 +356,36 @@
   }
 
   let API;
-  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false };
+  // rowsKind: rows を読んだときの種類。種類を切りかえたら null にして、新しい種類の一覧が来るまで消す・戻す・名前・CSV をしない
+  const R = { kind: 'scores', offset: 0, rows: [], total: 0, seq: 0, loaded: false, rowsKind: null };
+  const listReady = () => R.rowsKind === R.kind;
+  // 一覧の表をからにする（種類の切りかえ・ログアウトのとき）
+  function clearTable() {
+    R.rows = []; R.total = 0; R.rowsKind = null;
+    const tbl = $('r-table');
+    tbl.removeAttribute('data-ready');
+    tbl.tHead.replaceChildren(); tbl.tBodies[0].replaceChildren();
+    $('r-page').textContent = ''; $('r-picked').textContent = '';
+    $('r-prev').disabled = $('r-next').disabled = true;
+    setActs();
+  }
+  // 一覧が読めるまでは操作のボタンを押せなくする
+  function setActs() {
+    const ok = listReady();
+    $('r-del').disabled = $('r-restore').disabled = $('r-csv').disabled = !ok;
+  }
+  // ログアウト・30分・ログインし直し: サーバーから来た名前などを画面からもメモリからも消す
+  function clearServerData() {
+    clearTable();
+    for (const b of $('r-dash').querySelectorAll('[data-n]')) b.textContent = '–';
+    for (const b of $('r-dash').querySelectorAll('[data-sub]')) b.textContent = '';
+    $('r-last').textContent = ''; $('r-stale').textContent = ''; $('r-stale').classList.remove('warn');
+    $('r-recent').replaceChildren();
+    $('r-f-board').replaceChildren(el('option', { value: '', text: 'ボード: 全部' }));
+    $('r-daily-qs').hidden = true; $('r-daily-qs-list').replaceChildren();
+    $('l-ops-table').tBodies[0].replaceChildren(); $('l-ops-page').textContent = '';
+    ops.offset = 0; ops.total = 0;
+  }
 
   function setWho() {
     const on = API.loggedIn();
@@ -348,6 +394,7 @@
   }
   function showLogin(msg = '') {
     R.loaded = false;
+    clearServerData();
     $('r-login').hidden = false;
     $('r-dash').hidden = true;
     $('r-login-msg').textContent = msg;
@@ -382,14 +429,15 @@
     if (!s || s.ok === false) return;
     for (const k of ['scores', 'daily', 'rpg']) {
       $('r-dash').querySelector(`[data-n="${k}"]`).textContent = str(s.counts?.[k] ?? 0);
-      $('r-dash').querySelector(`[data-sub="${k}"]`).textContent = k === 'rpg' ? '登録している人' : `今日 ${str(s.today?.[k] ?? 0)}・今週 ${str(s.week?.[k] ?? 0)}`;
+      $('r-dash').querySelector(`[data-sub="${k}"]`).textContent = `今日 ${str(s.today?.[k] ?? 0)}・今週 ${str(s.week?.[k] ?? 0)}${k === 'rpg' ? '（登録）' : ''}`;
     }
     const last = s.last_at ? Date.parse(s.last_at) : NaN, stale = $('r-stale');
     $('r-last').textContent = Number.isNaN(last) ? 'まだ記録がないよ' : `最後の記録: ${fmtFull(s.last_at)}`;
     if (Number.isNaN(last)) { stale.textContent = ''; stale.classList.remove('warn'); }
     else {
       const days = Math.max(0, Math.floor((Date.now() - last) / 86400e3));
-      stale.textContent = `最後の記録から ${days}日（7日で Supabase が止まる）`;
+      // Supabase は「アクセス」が7日無いと止まる。ランキングを見るだけでもアクセスになるが、ここで分かるのは記録の時刻だけなので目安
+      stale.textContent = `最後の記録から ${days}日（Supabase は7日アクセスが無いと止まる。見るだけでもアクセスなので、これは記録から数えた目安）`;
       stale.classList.toggle('warn', days >= 5);
     }
     const log = Array.isArray(s.recent_log) ? s.recent_log : [];
@@ -409,6 +457,7 @@
 
   // ---- S2〜S4 一覧 ----
   function setKind(k, load = true) {
+    if (k !== R.kind || R.rowsKind !== k) clearTable();   // 前の種類の行を残さない（ちがう表の同じ id を消したり名前を変えたりしないように）
     R.kind = k; R.offset = 0;
     for (const b of $('r-kind').querySelectorAll('[data-kind]')) b.setAttribute('aria-pressed', String(b.dataset.kind === k));
     $('r-f-board').hidden = $('r-f-period').hidden = k !== 'scores';
@@ -417,38 +466,55 @@
     $('r-del').hidden = k === 'trash';
     $('r-restore').hidden = k !== 'trash';
     $('r-table').dataset.kind = k;
-    if (load) loadList();
+    setActs();
+    if (load) loadList(0);
   }
-  function filter() {
-    const f = { q: $('r-f-q').value.trim(), limit: PAGE, offset: R.offset };
+  function filter(offset = R.offset) {
+    const f = { q: $('r-f-q').value.trim(), limit: PAGE, offset };
     if (R.kind !== 'trash') f.sort = $('r-f-sort').value;
     if (R.kind === 'scores') { if ($('r-f-board').value) f.board = $('r-f-board').value; f.period = $('r-f-period').value; }
     if (R.kind === 'daily' && $('r-f-day').value) f.day = $('r-f-day').value;
     return f;
   }
-  async function loadList() {
+  // offset: 読みたいページの始まり。R.offset は読めたときだけ進める（失敗したら今のページのまま）
+  async function loadList(offset = R.offset) {
     const seq = ++R.seq, tbl = $('r-table'), kind = R.kind;
     tbl.removeAttribute('data-ready');
-    const r = await rpc('admin_list', { p_kind: kind, p_filter: filter() });
-    if (seq !== R.seq) return;
+    const r = await rpc('admin_list', { p_kind: kind, p_filter: filter(offset) });
+    if (seq !== R.seq || kind !== R.kind) return;
     if (!r) return;
     if (r.ok === false || !Array.isArray(r.rows)) { toast('一覧が読めなかった', true); return; }
-    if (!r.rows.length && R.offset > 0 && r.total > 0) { R.offset = Math.max(0, R.offset - PAGE); loadList(); return; }
-    R.rows = r.rows; R.total = +r.total || 0;
+    if (!r.rows.length && offset > 0 && r.total > 0) { loadList(Math.max(0, offset - PAGE)); return; }
+    R.rows = r.rows; R.total = +r.total || 0; R.offset = offset; R.rowsKind = kind;
     renderTable();
+    setActs();
+    renderDayQs();
     tbl.dataset.kind = kind;
     tbl.dataset.ready = '';
+  }
+  // S3: 今日の難問で日付を選んでいたら、その日の問題（全員同じ。daily-core.js が日付から作る）も出す
+  function renderDayQs() {
+    const box = $('r-daily-qs'), day = $('r-f-day').value;
+    if (R.kind !== 'daily' || !DAILY_CORE.validDay(day)) { box.hidden = true; $('r-daily-qs-list').replaceChildren(); return; }
+    $('r-daily-qs-day').textContent = day;
+    $('r-daily-qs-list').replaceChildren(...SAVE.dailyQuestions(day).map(q =>
+      el('li', {}, el('span', { text: q.n }), ' ', el('span', { class: 'mono muted', text: `${q.a}・${MODE_LABEL[q.mode] ?? q.mode}` }))));
+    box.hidden = false;
   }
   function renderTable() {
     const cols = COLS[R.kind], tbl = $('r-table'), canRename = R.kind !== 'trash';
     const all = el('input', { type: 'checkbox', id: 'r-pick-all', 'aria-label': 'このページを全部選ぶ' });
-    tbl.tHead.replaceChildren(el('tr', {}, el('th', { class: 'pick' }, all), ...cols.map(([h]) => el('th', { text: h })), ...(canRename ? [el('th', {})] : [])));
+    tbl.tHead.replaceChildren(el('tr', {}, el('th', { class: 'pick' }, all), ...cols.map(([h]) => el('th', { text: h })), ...(canRename ? [el('th', { class: 'acts', text: '操作' })] : [])));
     const body = tbl.tBodies[0];
+    // 操作の列は右はしに貼りつける（スマホで表を横に動かさなくても押せる）
     if (!R.rows.length) body.replaceChildren(el('tr', {}, el('td', { colSpan: cols.length + 2, class: 'muted', text: 'ないよ' })));
     else body.replaceChildren(...R.rows.map(row => el('tr', { 'data-id': str(row.id) },
       el('td', { class: 'pick' }, el('input', { type: 'checkbox', 'data-pick': '', 'aria-label': `id ${str(row.id)} を選ぶ` })),
       ...cols.map(([, f, c]) => el('td', { class: c, text: f(row) })),
-      ...(canRename ? [el('td', {}, el('button', { type: 'button', class: 'btn ghost sm', 'data-rename': '', text: '名前を変える' }))] : []))));
+      ...(canRename ? [el('td', { class: 'acts' }, el('div', { class: 'acts-in' },
+        el('button', { type: 'button', class: 'btn ghost sm', 'data-rename': '', text: '名前を変える' }),
+        el('button', { type: 'button', class: 'btn ghost sm', 'data-nameless': '', text: '名無しにする' }),
+        el('button', { type: 'button', class: 'btn danger sm', 'data-byname': '', text: 'この名前の記録を全部消す' })))] : []))));
     const from = R.rows.length ? R.offset + 1 : 0;
     $('r-page').textContent = R.total ? `${from}〜${R.offset + R.rows.length} / ${R.total}` : '0件';
     $('r-prev').disabled = R.offset <= 0;
@@ -456,10 +522,16 @@
     updatePicked();
   }
   const picked = () => [...$('r-table').tBodies[0].querySelectorAll('input[data-pick]:checked')].map(b => Number(b.closest('tr').dataset.id));
-  const updatePicked = () => { const n = picked().length; $('r-picked').textContent = n ? `${n}件選んでる` : ''; };
+  // 「全部選ぶ」の箱も、全部選んでいれば ✓、いくつかだけなら途中（indeterminate）にそろえる
+  const updatePicked = () => {
+    const n = picked().length, all = $('r-pick-all'), m = $('r-table').tBodies[0].querySelectorAll('input[data-pick]').length;
+    $('r-picked').textContent = n ? `${n}件選んでる` : '';
+    if (all) { all.checked = m > 0 && n === m; all.indeterminate = n > 0 && n < m; }
+  };
 
   // ---- S6 消す・戻す ----
   async function delPicked() {
+    if (!listReady()) return;
     const ids = picked();
     if (!ids.length) { toast('消す記録を選んでね', true); return; }
     if (!confirm(`${KIND_LABEL[R.kind]}の記録を ${ids.length}件消していい？\n（ゴミ箱に30日のこるよ）`)) return;
@@ -470,6 +542,7 @@
     await Promise.all([loadList(), loadStats(), loadBoards()]);
   }
   async function restorePicked() {
+    if (!listReady()) return;
     const ids = picked();
     if (!ids.length) { toast('戻す記録を選んでね', true); return; }
     const r = await rpc('admin_restore', { p_trash_ids: ids });
@@ -479,18 +552,65 @@
     await Promise.all([loadList(), loadStats(), loadBoards()]);
   }
   // ---- S7 名前を変える（空で OK なら「名無しの旅人」＋数字） ----
-  async function rename(id) {
-    const row = R.rows.find(r => Number(r.id) === id);
+  async function rename(id, nameless = false) {
+    if (!listReady()) return;
+    const kind = R.rowsKind, row = R.rows.find(r => Number(r.id) === id);
     if (!row) return;
-    const name = prompt('新しい名前（1〜12文字。空にすると「名無しの旅人」＋数字になるよ）', str(row.nickname));
-    if (name == null) return;
-    const r = await rpc('admin_rename', { p_kind: R.kind, p_id: id, p_name: name.trim() === '' ? null : name });
+    let name;
+    if (nameless) {   // S7 不適切な名前をワンタップで「名無しの旅人」＋数字に
+      if (!confirm(`${KIND_LABEL[kind]}の id ${id}「${str(row.nickname)}」を「名無しの旅人」＋数字にしていい？`)) return;
+      name = '';
+    } else {
+      name = prompt(`${KIND_LABEL[kind]}の id ${id} の新しい名前（1〜12文字。空にすると「名無しの旅人」＋数字になるよ）`, str(row.nickname));
+      if (name == null) return;
+    }
+    const r = await rpc('admin_rename', { p_kind: kind, p_id: id, p_name: name.trim() === '' ? null : name });
     if (!r) return;
     if (r.ok === false) { toast(RENAME_MSG[r.reason] ?? '名前を変えられなかった', true); return; }
     toast(`「${str(r.nickname)}」にしたよ`);
     await Promise.all([loadList(), loadStats()]);
   }
-  // ---- S13 このページを CSV（BOM 付き UTF-8。= + - @ で始まる文字は表計算の式にならないよう ' を前に付ける） ----
+  // admin_list を全部のページ読む（500件ずつ、max 件まで）。だめなら null。{ rows, total }
+  async function listAll(kind, f, max = ALL_MAX) {
+    const rows = [];
+    let total = 0;
+    for (let offset = 0; offset < max; offset += 500) {
+      const r = await rpc('admin_list', { p_kind: kind, p_filter: { ...f, limit: Math.min(500, max - offset), offset } });
+      if (!r || r.ok === false || !Array.isArray(r.rows)) return null;
+      total = +r.total || 0;
+      rows.push(...r.rows);
+      if (!r.rows.length || rows.length >= total) break;
+    }
+    return { rows, total };
+  }
+  const ALL_MAX = 5000;
+  const norm = v => String(v ?? '').normalize('NFKC').toLowerCase();
+  // S6 「この名前の記録を全部」: タイムアタック・今日の難問・冒険の全部のページから、同じ名前（NFKC＋小文字で同じ）の記録を集めて消す
+  async function delByName(id) {
+    if (!listReady()) return;
+    const row = R.rows.find(r => Number(r.id) === id);
+    if (!row) return;
+    const name = str(row.nickname), want = norm(name), found = {};
+    for (const k of ['scores', 'daily', 'rpg']) {
+      const r = await listAll(k, { q: name });
+      if (!r) { toast('記録を集められなかった。何も消してない', true); return; }
+      found[k] = r.rows.filter(x => norm(x.nickname) === want).map(x => Number(x.id));
+    }
+    const n = Object.values(found).reduce((a, b) => a + b.length, 0);
+    if (!n) { toast('その名前の記録はもう無いよ', true); return; }
+    const parts = Object.entries(found).filter(([, ids]) => ids.length).map(([k, ids]) => `${KIND_LABEL[k]} ${ids.length}件`);
+    if (!confirm(`「${name}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）`)) return;
+    let gone = 0;
+    for (const [k, ids] of Object.entries(found)) {
+      if (!ids.length) continue;
+      const r = await rpc('admin_delete', { p_kind: k, p_ids: ids });
+      if (!r || r.ok === false) { toast(`途中で消せなくなった（${gone}件は消した。ゴミ箱から戻せる）`, true); break; }
+      gone += +r.deleted || 0;
+    }
+    if (gone) toast(`「${name}」の記録を ${gone}件消したよ（ゴミ箱から戻せる）`);
+    await Promise.all([loadList(), loadStats(), loadBoards()]);
+  }
+  // ---- S13 CSV（今の絞り込みの全部のページ。BOM 付き UTF-8。= + - @ で始まる文字は表計算の式にならないよう ' を前に付ける） ----
   const csvCell = v => {
     if (v == null) return '';
     let s = typeof v === 'object' ? JSON.stringify(v) : String(v);
@@ -498,13 +618,22 @@
     return /[",\r\n']/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   let csvUrl = '';
-  function prepareCsv() {
-    const cols = CSV_COLS[R.kind], a = $('r-csv');
-    const lines = [cols.join(','), ...R.rows.map(r => cols.map(c => csvCell(c === 'updated_at' ? r.updated_at ?? r.at : r[c])).join(','))];
-    if (csvUrl) URL.revokeObjectURL(csvUrl);
-    csvUrl = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
-    a.href = csvUrl;
-    a.download = `country-drill-${R.kind}-${ymd()}.csv`;
+  async function exportCsv() {
+    if (!listReady()) return;
+    const kind = R.rowsKind, btn = $('r-csv');
+    btn.disabled = true;
+    try {
+      const { offset, limit, ...f } = filter(0);
+      const r = await listAll(kind, f);
+      if (!r) return;
+      const cols = CSV_COLS[kind];
+      const lines = [cols.join(','), ...r.rows.map(x => cols.map(c => csvCell(c === 'updated_at' ? x.updated_at ?? x.at : x[c])).join(','))];
+      if (csvUrl) URL.revokeObjectURL(csvUrl);
+      csvUrl = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' }));
+      const a = el('a', { href: csvUrl, download: `country-drill-${kind}-${ymd()}.csv` });
+      document.body.append(a); a.click(); a.remove();
+      toast(r.total > r.rows.length ? `最初の ${r.rows.length}件だけ CSV にしたよ（全部で ${r.total}件）` : `${r.rows.length}件を CSV にしたよ`, r.total > r.rows.length);
+    } finally { setActs(); }
   }
 
   async function doLogin(e) {
@@ -525,7 +654,10 @@
 
   // ======== ログ: 操作ログ（admin_log_list）と端末のエラー記録（D13） ========
   const ops = { offset: 0, total: 0 };
-  async function loadOps() {
+  // S12 だれが: 自分（今ログインしている人）ならメール、ほかの人は user_id の頭8文字
+  const who = l => { const id = str(l.user_id); return !id ? '' : id === API.uid() ? (API.email() || '自分') : id.slice(0, 8); };
+  // offset: 読みたいページの始まり。ops.offset は読めたときだけ進める
+  async function loadOps(offset = ops.offset) {
     const tb = $('l-ops-table').tBodies[0], msg = $('l-ops-msg');
     if (!API.loggedIn()) {
       msg.textContent = 'ログインすると見られるよ（ランキングのタブから）';
@@ -534,23 +666,30 @@
       return;
     }
     msg.textContent = '';
-    const r = await rpc('admin_log_list', { p_limit: PAGE, p_offset: ops.offset });
+    const r = await rpc('admin_log_list', { p_limit: PAGE, p_offset: offset });
     if (!r || !Array.isArray(r.rows)) return;
-    ops.total = +r.total || 0;
+    ops.total = +r.total || 0; ops.offset = offset;
     tb.replaceChildren(...(r.rows.length ? r.rows.map(l => el('tr', {},
-      el('td', { class: 'n', text: fmtFull(l.at) }), el('td', { text: ACTION[l.action] ?? str(l.action) }),
+      el('td', { class: 'n', text: fmtFull(l.at) }), el('td', { class: 'who', text: who(l) }), el('td', { text: ACTION[l.action] ?? str(l.action) }),
       el('td', { text: KIND_LABEL[l.kind] ?? str(l.kind) }), el('td', { text: logDetail(l) })))
-      : [el('tr', {}, el('td', { colSpan: 4, class: 'muted', text: 'まだないよ' }))]));
+      : [el('tr', {}, el('td', { colSpan: 5, class: 'muted', text: 'まだないよ' }))]));
     $('l-ops-page').textContent = ops.total ? `${ops.offset + 1}〜${ops.offset + r.rows.length} / ${ops.total}` : '';
     $('l-ops-prev').disabled = ops.offset <= 0;
     $('l-ops-next').disabled = ops.offset + PAGE >= ops.total;
   }
-  const readErrs = () => { try { const a = JSON.parse(localStorage.getItem('adminErrors')); return Array.isArray(a) ? a.filter(x => x && typeof x === 'object') : []; } catch { return []; } };
+  // 1件ずつ文字・数だけを取り出す（ほかのページが変な形の記録を書いても、ログのタブが止まらないように）
+  const txt = v => typeof v === 'string' ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : '';
+  const readErrs = () => {
+    try {
+      const a = JSON.parse(localStorage.getItem('adminErrors'));
+      return Array.isArray(a) ? a.filter(x => x && typeof x === 'object').map(x => ({ at: txt(x.at), msg: txt(x.msg), src: txt(x.src), line: txt(x.line) })) : [];
+    } catch { return []; }
+  };
   function renderErrs() {
     const list = readErrs().slice().reverse();
     $('l-err-list').replaceChildren(...(list.length ? list.map(x => el('li', {},
-      el('span', { class: 'mono muted', text: `${fmtFull(x.at)}${x.src ? `・${str(x.src)}${x.line ? `:${str(x.line)}` : ''}` : ''}` }),
-      el('span', { class: 'msg', text: str(x.msg) })))
+      el('span', { class: 'mono muted', text: `${fmtFull(x.at || null)}${x.src ? `・${x.src}${x.line && x.line !== '0' ? `:${x.line}` : ''}` : ''}` }),
+      el('span', { class: 'msg', text: x.msg })))
       : [el('li', { class: 'muted', text: 'まだないよ' })]));
   }
   async function copyErrs() {
@@ -570,21 +709,26 @@
     $('adm-logout').onclick = doLogout;
     $('r-reload').onclick = () => { loadStats(); loadBoards(); loadList(); };
     $('r-kind').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) setKind(b.dataset.kind); });
-    $('r-filter').addEventListener('submit', e => { e.preventDefault(); R.offset = 0; loadList(); });
-    for (const id of ['r-f-board', 'r-f-period', 'r-f-day', 'r-f-sort']) $(id).addEventListener('change', () => { R.offset = 0; loadList(); });
-    $('r-prev').onclick = () => { R.offset = Math.max(0, R.offset - PAGE); loadList(); };
-    $('r-next').onclick = () => { R.offset += PAGE; loadList(); };
+    $('r-filter').addEventListener('submit', e => { e.preventDefault(); loadList(0); });
+    for (const id of ['r-f-board', 'r-f-period', 'r-f-day', 'r-f-sort']) $(id).addEventListener('change', () => loadList(0));
+    $('r-prev').onclick = () => loadList(Math.max(0, R.offset - PAGE));
+    $('r-next').onclick = () => loadList(R.offset + PAGE);
     $('r-del').onclick = delPicked;
     $('r-restore').onclick = restorePicked;
-    $('r-csv').addEventListener('click', prepareCsv);
+    $('r-csv').onclick = exportCsv;
     $('r-table').addEventListener('change', e => {
       if (e.target.id === 'r-pick-all') for (const b of $('r-table').tBodies[0].querySelectorAll('input[data-pick]')) b.checked = e.target.checked;
       updatePicked();
     });
-    $('r-table').addEventListener('click', e => { const b = e.target.closest('[data-rename]'); if (b) rename(Number(b.closest('tr').dataset.id)); });
-    $('l-ops-load').onclick = loadOps;
-    $('l-ops-prev').onclick = () => { ops.offset = Math.max(0, ops.offset - PAGE); loadOps(); };
-    $('l-ops-next').onclick = () => { ops.offset += PAGE; loadOps(); };
+    $('r-table').addEventListener('click', e => {
+      const b = e.target.closest('[data-rename], [data-nameless], [data-byname]');
+      if (!b) return;
+      const id = Number(b.closest('tr').dataset.id);
+      if ('byname' in b.dataset) delByName(id); else rename(id, 'nameless' in b.dataset);
+    });
+    $('l-ops-load').onclick = () => loadOps();
+    $('l-ops-prev').onclick = () => loadOps(Math.max(0, ops.offset - PAGE));
+    $('l-ops-next').onclick = () => loadOps(ops.offset + PAGE);
     $('l-err-copy').onclick = copyErrs;
     $('l-err-clear').onclick = clearErrs;
     // 30分さわらないと admin-api.js がログアウト扱いにする。開いたままでも気づけるように時々見る
@@ -592,7 +736,7 @@
   }
   function onTab(name) {
     if (name === 'rank') { if (!API.loggedIn()) { if (R.loaded) showLogin('ログインし直してね'); else { $('r-login').hidden = false; $('r-dash').hidden = true; setWho(); } } else if (!R.loaded) showDash(); }
-    if (name === 'log') { renderErrs(); loadOps(); }
+    if (name === 'log') { safe('l-err', renderErrs); loadOps(); }
   }
 
   function init() {
@@ -620,13 +764,17 @@
     });
     $('d-rpg-lv-set').onclick = () => done(SAVE.rpgSetLv(+$('d-rpg-lv').value), 'Lv を変えたよ');
     $('d-rpg-pity-set').onclick = () => done(SAVE.rpgSetPity(+$('d-rpg-pity').value), '天井カウンターを変えたよ');
-    $('d-rpg-unlock').onclick = () => done(SAVE.rpgUnlockAll(), '全部のダンジョンを開いたよ');
+    $('d-rpg-unlock').onclick = () => danger('全部開く', () => done(SAVE.rpgUnlockAll(), '全部のダンジョンを開いたよ'));
     $('d-rpg-clear').onclick = () => danger('全部クリア', () => done(SAVE.rpgClearAll(), '全部クリアにしたよ'));
-    $('d-rpg-story').onclick = () => done(SAVE.rpgStoryReset(), 'ストーリー既読を消したよ');
+    $('d-rpg-story').onclick = () => danger('ストーリー既読を消す', () => done(SAVE.rpgStoryReset(), 'ストーリー既読を消したよ'));
     $('d-rpg-card-give').onclick = rpgCard;
     $('d-rpg-wipe').onclick = () => danger('冒険データを消す', () => done(SAVE.rpgWipe(), '冒険データを消したよ'));
 
-    $('d-badges-all').onclick = () => done(SAVE.badgesAll(), '全部のバッジを取ったよ');
+    $('d-badges-all').onclick = () => danger('バッジを全部取る', () => done(SAVE.badgesAll(), '全部のバッジを取ったよ'));
+    $('d-badges-eq').addEventListener('change', e => {
+      const v = e.target.value;
+      done(SAVE.badgesEq(v === AUTO_EQ ? null : v), v === AUTO_EQ ? '称号は本編が自動で選ぶよ' : v === '' ? '称号をはずしたよ' : '称号をつけたよ');
+    });
     $('d-badges-none').onclick = () => danger('バッジを全部消す', () => done(SAVE.badgesNone(), 'バッジを全部消したよ'));
     $('d-badges-list').addEventListener('change', e => {
       const box = e.target.closest('[data-step]');
@@ -634,7 +782,7 @@
     });
 
     $('d-daily-day').addEventListener('change', renderDaily);
-    $('d-daily-reset').onclick = () => danger('今日の難問をやり直す', () => done(SAVE.dailyReset(), '今日の難問をもう一回できるようにしたよ'));
+    $('d-daily-reset').onclick = () => danger('この端末の今日の難問の記録を消す', () => done(SAVE.dailyReset(), '今日の難問をもう一回できるようにしたよ'));
 
     $('d-set-vol').addEventListener('input', () => { $('d-set-vol-n').textContent = $('d-set-vol').value; });
     $('d-set-save').onclick = saveSettings;
@@ -656,10 +804,10 @@
     addEventListener('offline', () => renderEnv({ ping: lastPing }));
 
     // 本編の別タブがセーブを書いたら描き直す
-    addEventListener('storage', () => { renderAll(); renderErrs(); if (current && document.activeElement !== $('d-json')) pick(current); });
+    addEventListener('storage', () => { renderAll(); safe('l-err', renderErrs); if (current && document.activeElement !== $('d-json')) pick(current); });
 
     initRank();
-    safe('d-sound', renderSounds); safe('d-check', renderCheck); renderAll(); renderErrs();
+    safe('d-sound', renderSounds); safe('d-check', renderCheck); renderAll(); safe('l-err', renderErrs);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

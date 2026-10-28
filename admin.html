@@ -155,6 +155,14 @@ input[type=email], input[type=password] { background: var(--bg); border: 1px sol
 #r-table td.brk { overflow-wrap: anywhere; max-width: 14em; }
 #r-table td { white-space: nowrap; }
 #r-table td.name, #r-table td.brk { white-space: normal; }
+/* 操作の列は右はしに貼りつける（スマホでも表を横に動かさずに押せる） */
+#r-table th.acts, #r-table td.acts { position: sticky; right: 0; background: var(--surface); box-shadow: -6px 0 6px -6px rgb(0 0 0 / .25); }
+#r-table .acts-in { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+#r-table .acts-in .btn { white-space: nowrap; }
+@media (max-width: 480px) { #r-table .acts-in .btn { font-size: .72rem; padding: 3px 5px; white-space: normal; width: 7.6em; line-height: 1.3; } }
+#r-daily-qs ol { margin: 0; padding-left: 1.6em; font-size: .85rem; columns: 2 14em; }
+.tag { display: inline-block; font-size: .7rem; font-weight: 700; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 0 5px; }
+#l-ops-table td.who { font-family: var(--font-mono); font-size: .78rem; overflow-wrap: anywhere; }
 #l-ops-table td:last-child { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .78rem; }
 #l-err-list li { flex-direction: column; align-items: flex-start; gap: 0; }
 #l-err-list .msg { overflow-wrap: anywhere; font-family: var(--font-mono); font-size: .8rem; }
@@ -191,7 +199,7 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
 
   <!-- 端末: この端末のセーブ（localStorage）。ログインなしで使える -->
   <section id="tab-device" class="tab" role="tabpanel">
-    <p class="hint">この端末（このブラウザ）のセーブをさわるよ。ログインはいらない。危ない操作の前は自動でスナップショットを取るよ。</p>
+    <p class="hint">この端末（このブラウザ）のセーブをさわるよ。ログインはいらない。まとめて書きかえる操作（キーの保存・消す・読み戻す・全部開く／クリア・既読やバッジを全部・初回状態 など）は、前に確かめて自動でスナップショットを取るよ。コイン・Lv・天井・フロア1つ・カード・バッジ1つ・称号・設定はすぐ変わる。</p>
 
     <details class="sec" id="d-saves">
       <summary>セーブ一覧<small>D1・D2</small></summary>
@@ -212,7 +220,7 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
       <summary>バックアップ<small>D3</small></summary>
       <div class="body">
         <div class="row"><a class="btn" id="d-dl" href="#" download="country-drill-save-00000000.json">ぜんぶダウンロード</a></div>
-        <div class="row"><label class="inl">ファイルから読み戻す <input type="file" id="d-file" accept=".json,application/json"></label></div>
+        <label class="stack">ファイルから読み戻す <input type="file" id="d-file" accept=".json,application/json"></label>
         <p class="hint">読み戻すと、今のセーブはファイルの中身にまるごと入れかわるよ（前に自動でスナップショットを取る）。</p>
       </div>
     </details>
@@ -225,7 +233,7 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
           <button class="btn" id="d-snap-save">今の状態を保存</button>
         </div>
         <ul class="list" id="d-snap-list"></ul>
-        <p class="hint">5個まで。古いものから消えるよ。</p>
+        <p class="hint">手動と「自動」（危ない操作の前に取るもの）はそれぞれ5個まで。古いものから消えるよ。自動のものが増えても手動のものは消えない。</p>
       </div>
     </details>
 
@@ -263,6 +271,7 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
       <summary>バッジ<small>D7</small></summary>
       <div class="body">
         <p class="hint" id="d-badges-sum"></p>
+        <div class="row"><label class="inl">つけている称号 <select id="d-badges-eq"></select></label></div>
         <div class="row">
           <button class="btn ghost" id="d-badges-all">全部取る</button>
           <button class="btn danger" id="d-badges-none">全部消す</button>
@@ -274,15 +283,14 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
     <details class="sec" id="d-daily">
       <summary>今日の難問<small>D8</small></summary>
       <div class="body">
-        <div class="row">
-          <label class="inl">日付 <input type="date" id="d-daily-day"></label>
-          <button class="btn danger" id="d-daily-reset">今日をやり直す</button>
-        </div>
+        <div class="row"><label class="inl">問題を見る日 <input type="date" id="d-daily-day"></label></div>
         <p class="hint" id="d-daily-rec"></p>
         <div class="scroll"><table>
           <thead><tr><th>#</th><th>国旗の国</th><th>形式</th><th>答え</th></tr></thead>
           <tbody id="d-daily-body"></tbody>
         </table></div>
+        <div class="row"><button class="btn danger" id="d-daily-reset">この端末の今日の記録を消す</button></div>
+        <p class="hint">消すと、この端末で今日の難問をもう一回できる（選んだ日ではなく、いつも今日の分。日付が今日のときだけ押せる）。</p>
       </div>
     </details>
 
@@ -322,6 +330,8 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
           <li><a href="./#play" target="_blank" rel="noopener">モード選択</a></li>
           <li><a href="./#settings" target="_blank" rel="noopener">設定</a></li>
           <li><a href="./#book" target="_blank" rel="noopener">国旗図鑑</a></li>
+          <li><a href="./#ranking" target="_blank" rel="noopener">ランキング</a></li>
+          <li><a href="./#daily" target="_blank" rel="noopener">今日の難問</a></li>
           <li><a href="./#rpg" target="_blank" rel="noopener">冒険</a></li>
           <li><a href="./#badges" target="_blank" rel="noopener">バッジ</a></li>
           <li><a href="./?rpgdebug=1#rpg" target="_blank" rel="noopener">冒険（開発用パネルつき）</a></li>
@@ -393,10 +403,11 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
         <div class="row">
           <button class="btn danger sm" id="r-del" type="button">選んだのを消す</button>
           <button class="btn sm" id="r-restore" type="button" hidden>選んだのを戻す</button>
-          <a class="btn ghost sm" id="r-csv" href="#" download="country-drill-scores-00000000.csv">このページを CSV</a>
+          <button class="btn ghost sm" id="r-csv" type="button">CSV（全部のページ）</button>
           <span class="hint" id="r-picked"></span>
         </div>
         <div class="scroll"><table id="r-table" data-kind="scores"><thead></thead><tbody></tbody></table></div>
+        <details id="r-daily-qs" hidden><summary class="sh">この日（<span id="r-daily-qs-day"></span>）の問題<small>S3</small></summary><ol id="r-daily-qs-list"></ol></details>
         <div class="row between">
           <button class="btn ghost sm" id="r-prev" type="button">← 前</button>
           <span class="mono muted" id="r-page"></span>
@@ -412,7 +423,7 @@ p.ng[data-err] { margin: 0; font-size: .85rem; }
     <div class="card" id="l-ops">
       <div class="row between"><p class="sh">操作ログ</p><button class="btn ghost sm" id="l-ops-load" type="button">読み直す</button></div>
       <p class="hint" id="l-ops-msg"></p>
-      <div class="scroll"><table id="l-ops-table"><thead><tr><th>いつ</th><th>操作</th><th>種類</th><th>中身</th></tr></thead><tbody></tbody></table></div>
+      <div class="scroll"><table id="l-ops-table"><thead><tr><th>いつ</th><th>だれが</th><th>操作</th><th>種類</th><th>中身</th></tr></thead><tbody></tbody></table></div>
       <div class="row between">
         <button class="btn ghost sm" id="l-ops-prev" type="button">← 前</button>
         <span class="mono muted" id="l-ops-page"></span>

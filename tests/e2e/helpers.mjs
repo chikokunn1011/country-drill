@@ -175,7 +175,7 @@ function addAdmin(db) {
     const access_token = `fake-access-${nextTok}`, refresh_token = `fake-refresh-${nextTok++}`;
     db.tokens.set(access_token, { admin: db.admin.isAdmin });
     db.refresh.set(refresh_token, true);
-    return { access_token, refresh_token, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { email: db.admin.email } };
+    return { access_token, refresh_token, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'fake-admin', email: db.admin.email } };
   };
   db.auth = (path, query, body) => {
     if (path.endsWith('/logout')) return [204, null];
@@ -278,7 +278,7 @@ async function supabaseRoute(route, db) {
     const tok = db.tokens.get((req.headers().authorization ?? '').replace(/^Bearer /, ''));
     if (!tok) return json(route, 401, { code: 'PGRST301', message: 'JWT expired' });
     if (!tok.admin) return json(route, 403, { code: '42501', message: 'admin only' });
-    return json(route, 200, db.adminRpc[name](args));
+    return json(route, 200, await db.adminRpc[name](args));   // テストが返事を遅らせられるように await
   }
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
