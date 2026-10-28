@@ -375,3 +375,182 @@ t('settings_name_toggle_and_game_volume_range', async page => {
   assert.deepEqual(JSON.parse(await ls(page, 'setup')), { mode: 'm2f', name: true });
   assert.equal(JSON.parse(await ls(page, 'settings')).vol, 10);
 }, { storage: { setup: { mode: 'm2f' } } });
+
+// ---- 2回目のレビューの直し ----
+const toastHas = (page, text) => page.locator('#adm-toast', { hasText: text }).waitFor();
+const dump = page => page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))));
+
+// U1: コインの知らせは押したボタンの数ではなく、本当に変わった数と今のコイン
+t('coin_toast_shows_real_change', async page => {
+  await open(page, 'd-rpg');
+  await page.click('#d-rpg [data-coins="-10000"]');
+  await toastHas(page, 'コイン -500（いま 0）');
+  assert.equal(await coins(page), 0);
+  await page.click('#d-rpg [data-coins="-1000"]');
+  await toastHas(page, 'コインは変わらなかった（いま 0）');
+  await page.click('#d-rpg [data-coins="1000"]');
+  await toastHas(page, 'コイン +1,000（いま 1,000）');
+}, { storage: { rpg: RPG } });
+
+// U2: 断られた操作（新しい版のバッジ）のあと、チェックや称号の選択を書いていない値のままにしない
+t('refused_badge_edit_resets_controls', async page => {
+  await open(page, 'd-badges');
+  const key = await page.evaluate(() => `${BADGES_CORE.makeCatalog(COUNTRIES)[0].id}@1`);
+  const before = await ls(page, 'badges');
+  await page.click(`#d-badges-list [data-step="${key}"]`);
+  await toastHas(page, '新しい版のセーブなので変えられないよ');
+  assert.equal(await page.isChecked(`#d-badges-list [data-step="${key}"]`), false, '書けなかったチェックは戻す');
+  await page.selectOption('#d-badges-eq', '');
+  await toastHas(page, '新しい版のセーブなので変えられないよ');
+  assert.equal(await page.inputValue('#d-badges-eq'), '\u0000auto', '書けなかった称号の選択は戻す');
+  assert.equal(await ls(page, 'badges'), before);
+}, { storage: { badges: { v: 99, got: {}, eq: null } } });
+
+// U3: 冒険のセーブが壊れている・新しい版なら、そう出して、変える操作は押せない（壊れていても「冒険データを消す」は押せる）
+const RPG_EDIT = ['#d-rpg [data-coins="1000"]', '#d-rpg-lv', '#d-rpg-lv-set', '#d-rpg-pity', '#d-rpg-pity-set', '#d-rpg-floors select', '#d-rpg-unlock', '#d-rpg-clear', '#d-rpg-story', '#d-rpg-card', '#d-rpg-card-give'];
+t('broken_rpg_save_is_shown_and_locked', async page => {
+  await open(page, 'd-rpg');
+  assert.match(await page.textContent('#d-rpg-sum'), /セーブ壊れてる/);
+  assert.doesNotMatch(await page.textContent('#d-rpg-sum'), /まだない/);
+  // 中身は読めないので、フロアの欄は出さない（新品の値を出さない）
+  assert.equal(await page.locator('#d-rpg-floors select').count(), 0);
+  for (const s of RPG_EDIT.filter(s => !s.includes('floors'))) assert.equal(await page.isDisabled(s), true, s);
+  assert.equal(await page.isDisabled('#d-rpg-wipe'), false, '壊れたセーブは消して直せる');
+  page.on('dialog', d => d.accept());
+  await page.click('#d-rpg-wipe');
+  await toastHas(page, '冒険データを消したよ');
+  assert.match(await page.textContent('#d-rpg-sum'), /セーブまだない/);
+  assert.equal(await page.isDisabled('#d-rpg-unlock'), false);
+}, { init: () => { try { localStorage.setItem('rpg', '{broken'); } catch {} } });
+
+t('newer_rpg_save_is_shown_and_locked', async page => {
+  await open(page, 'd-rpg');
+  assert.match(await page.textContent('#d-rpg-sum'), /セーブ新しい版/);
+  for (const s of [...RPG_EDIT, '#d-rpg-wipe']) assert.equal(await page.locator(s).first().isDisabled(), true, s);
+}, { storage: { rpg: { v: 99, coins: 5 } } });
+
+t('ok_and_missing_rpg_save_are_editable', async page => {
+  await open(page, 'd-rpg');
+  assert.match(await page.textContent('#d-rpg-sum'), /セーブまだない（さわると新しく作る）/);
+  for (const s of [...RPG_EDIT, '#d-rpg-wipe']) assert.equal(await page.locator(s).first().isDisabled(), false, s);
+  await page.click('#d-rpg [data-coins="1000"]');
+  assert.match(await page.textContent('#d-rpg-sum'), /セーブあり/);
+});
+
+// U4: 同じ名前のスナップショットがあるときは、上書きしていいか聞く。やめたら前のものを残す
+t('same_name_snapshot_asks_before_replacing', async page => {
+  const msgs = [];
+  page.on('dialog', d => { msgs.push(d.message()); d.dismiss(); });
+  await open(page, 'd-snaps'); await open(page, 'd-rpg');
+  await page.fill('#d-snap-name', 'ボス前');
+  await page.click('#d-snap-save');
+  assert.deepEqual(msgs, []);
+  const first = await ls(page, 'adminSnaps');
+  await page.click('#d-rpg [data-coins="1000"]');
+  await page.fill('#d-snap-name', 'ボス前');
+  await page.click('#d-snap-save');
+  assert.deepEqual(msgs, ['「ボス前」はもうあるよ。今の状態で上書きしていい？']);
+  assert.equal(await ls(page, 'adminSnaps'), first, 'やめたら前のスナップショットのまま');
+  assert.equal(await page.inputValue('#d-snap-name'), 'ボス前');
+}, { storage: { rpg: RPG } });
+
+// U7: 今日の難問の記録の状態は日本語で出す
+t('daily_record_status_in_japanese', async page => {
+  await open(page, 'd-daily');
+  assert.equal(await page.textContent('#d-daily-rec'), 'この端末の記録: 2026-10-26（終わった・18問正解）');
+}, { storage: { daily: { day: '2026-10-26', status: 'done', correct: 18 } } });
+
+t('daily_record_status_playing_in_japanese', async page => {
+  await open(page, 'd-daily');
+  assert.equal(await page.textContent('#d-daily-rec'), 'この端末の記録: 2026-10-26（とちゅう・3問正解）');
+}, { storage: { daily: { day: '2026-10-26', status: 'playing', correct: 3 } } });
+
+// T4: ファイルから読み戻す（うまくいく方）。自動のスナップショットを取ってから、ファイルの中身にする
+const saveFile = data => ({ name: 'save.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ app: 'country-drill', kind: 'save', data })) });
+t('restore_from_file_success', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-backup'); await open(page, 'd-rpg');
+  await page.setInputFiles('#d-file', saveFile({ rpg: JSON.stringify({ ...RPG, coins: 777 }), settings: JSON.stringify({ theme: 'light', vol: 50 }) }));
+  await toastHas(page, 'ファイルから読み戻したよ');
+  assert.equal(await coins(page), 777);
+  assert.deepEqual(JSON.parse(await ls(page, 'settings')), { theme: 'light', vol: 50 });
+  assert.equal(await ls(page, 'badges'), null, 'ファイルに無いキーは消す');
+  const snaps = JSON.parse(await ls(page, 'adminSnaps'));
+  assert.equal(snaps.length, 1);
+  assert.equal(snaps[0].auto, true);
+  assert.equal(JSON.parse(snaps[0].data.rpg).coins, 500, '読み戻す前の状態を取っておく');
+  assert.match(await page.textContent('#d-rpg-sum'), /777/);
+}, { storage: { rpg: RPG, badges: { v: 1, got: {} } } });
+
+// F4: 読み戻しが途中で失敗したら、まだ保存していない設定の欄は消さない（そのあとのほかの操作でも）
+t('failed_restore_keeps_unsaved_settings', async page => {
+  acceptDialogs(page);
+  await open(page, 'd-backup'); await open(page, 'd-rpg'); await open(page, 'd-settings');
+  await page.selectOption('#d-set-theme', 'dark');
+  // rpg を 777 にする書きこみだけ失敗させる（容量いっぱいのまね）
+  await page.evaluate(() => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (k, v) { if (k === 'rpg' && String(v).includes('"coins":777')) throw new DOMException('full', 'QuotaExceededError'); return set.call(this, k, v); };
+  });
+  await page.setInputFiles('#d-file', saveFile({ rpg: JSON.stringify({ ...RPG, coins: 777 }), settings: JSON.stringify({ theme: 'light' }) }));
+  await toastHas(page, 'この端末に書けなかった');
+  assert.equal(await coins(page), 500);
+  assert.equal(await page.inputValue('#d-set-theme'), 'dark', '失敗した読み戻しで欄を戻さない');
+  await page.click('#d-rpg [data-coins="1000"]');
+  assert.equal(await coins(page), 1500);
+  assert.equal(await page.inputValue('#d-set-theme'), 'dark', 'そのあとの操作でも欄を戻さない');
+  await page.click('#d-set-save');
+  assert.equal(JSON.parse(await ls(page, 'settings')).theme, 'dark');
+}, { storage: { rpg: RPG, settings: { theme: 'light' } } });
+
+// T6: D5 の Lv・天井カウンター・カードをあげる
+t('rpg_lv_pity_and_card_buttons', async page => {
+  await open(page, 'd-rpg');
+  await page.fill('#d-rpg-lv', '7');
+  await page.click('#d-rpg-lv-set');
+  await toastHas(page, 'Lv を変えたよ');
+  await page.fill('#d-rpg-pity', '42');
+  await page.click('#d-rpg-pity-set');
+  await toastHas(page, '天井カウンターを変えたよ');
+  await page.fill('#d-rpg-card', 'JP');
+  await page.click('#d-rpg-card-give');
+  await toastHas(page, 'のカードをあげたよ');
+  assert.equal(await page.inputValue('#d-rpg-card'), '');
+  await page.fill('#d-rpg-card', 'zz');
+  await page.click('#d-rpg-card-give');
+  await toastHas(page, 'その国コードは無いよ');
+  const x = JSON.parse(await ls(page, 'rpg'));
+  assert.equal(x.lv, 7); assert.equal(x.pity, 42);
+  assert.deepEqual(x.cards.jp, [1, 0]);
+  assert.deepEqual(Object.keys(x.cards), ['jp']);
+}, { storage: { rpg: RPG } });
+
+// T6: D9 の効果音・ドパガキも保存する
+t('settings_sound_and_dopa_saved', async page => {
+  await open(page, 'd-settings');
+  assert.equal(await page.isChecked('#d-set-sound'), true);
+  assert.equal(await page.isChecked('#d-set-dopa'), false);
+  await page.uncheck('#d-set-sound');
+  await page.check('#d-set-dopa');
+  await page.click('#d-set-save');
+  const s = JSON.parse(await ls(page, 'settings'));
+  assert.equal(s.sound, false); assert.equal(s.dopa, true);
+}, { storage: { settings: { theme: 'light', sound: true, dopa: false } } });
+
+// T6: D10 のボタンはその音を SND.play で鳴らす
+t('sound_buttons_call_snd_play', async page => {
+  await open(page, 'd-sound');
+  await page.evaluate(() => { window.__played = []; const play = SND.play; SND.play = (k, ...a) => { window.__played.push(k); return play.call(SND, k, ...a); }; });
+  const kinds = await page.evaluate(() => SND.kinds.slice(0, 2));
+  assert.equal(kinds.length, 2);
+  for (const k of kinds) { await page.click(`#d-sound-list [data-snd="${k}"]`); await page.waitForTimeout(60); }
+  assert.deepEqual(await page.evaluate(() => window.__played), kinds);
+});
+
+// T6: D14 のまとめ（国の数・地域の数。いまの国データでは問題なし）
+t('data_check_summary', async page => {
+  await open(page, 'd-check');
+  const n = await page.evaluate(() => COUNTRIES.length);
+  assert.equal(await page.textContent('#d-check-sum'), `問題なし（${n}か国・6地域）`);
+  assert.equal(await page.locator('#d-check-list li').count(), 0);
+});

@@ -48,24 +48,39 @@
     });
 
     // 合札の更新。断られた（429 以外の 4xx）ときだけ保存を消して relogin。
-    // 5xx・429・つながらない・8秒たった は code 'network' にして保存は残す（あとでやり直せる）
-    let refreshing = null, orphan = null;
+    // 5xx・429・つながらない・8秒たった は code 'network' にして保存は残す（あとでやり直せる）。
+    // 待っているあいだにログアウト・ログインし直しがあったら code 'stale'（今のログインは消さない・画面も戻さない）
+    // refreshing: 今の gen の refresh（同じログインの呼び出しどうしで1つにまとめる。古いログインの refresh は待たない）。
+    // inflight: まだ終わっていない refresh 全部（logout が待って、それがもらった合札も無効にする）
+    let refreshing = null, orphans = [];
+    const inflight = new Set();
     function refresh() {
-      return refreshing ||= (async () => {
-        const a = read(), g = gen;
+      if (refreshing && refreshing.g === gen) return refreshing.p;
+      const g = gen;
+      const p = (async () => {
+        const a = read();
         if (!a || !a.refresh_token) { clear(); throw err('relogin', 'relogin'); }
         const res = await send('/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: a.refresh_token } });
         if (!res.ok) {
-          if (res.status >= 400 && res.status < 500 && res.status !== 429) { if (g === gen) clear(); throw err('relogin', 'relogin', res.status); }   // ログインし直したあとの合札は消さない
+          if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+            if (g !== gen) throw err('stale', 'stale', res.status);   // ログインし直したあとの合札は消さない
+            clear(); throw err('relogin', 'relogin', res.status);
+          }
           throw err(`refresh: HTTP ${res.status}`, 'network', res.status);
         }
         // 待っているあいだにログアウト・ログインし直しがあったら、古い合札で作った新しい合札は書かない
+        // （サーバーには生きている合札なので、logout が無効にできるよう orphans に取っておく）
         const next = session(res.body || {}, a.email, a), cur = read();
-        // （サーバーには生きている合札なので、logout が無効にできるよう orphan に取っておく）
-        if (g !== gen || !cur || cur.refresh_token !== a.refresh_token) { if (next.access_token) orphan = next; throw err('relogin', 'relogin'); }
+        if (g !== gen || !cur || cur.refresh_token !== a.refresh_token) {
+          if (next.access_token) orphans.push(next);
+          throw g !== gen ? err('stale', 'stale') : err('relogin', 'relogin');
+        }
         if (!next.access_token) { clear(); throw err('relogin', 'relogin'); }
         write(next); return next;
-      })().finally(() => { refreshing = null; });
+      })().finally(() => { inflight.delete(p); if (refreshing && refreshing.p === p) refreshing = null; });
+      inflight.add(p);
+      refreshing = { g, p };
+      return p;
     }
 
     // rpc を1回呼ぶ。send の { ok, status, body } を返す
@@ -82,7 +97,8 @@
           if (!res.ok || !res.body || !res.body.access_token) return;
           a = { access_token: res.body.access_token };
         }
-        await send('/auth/v1/logout', { headers: { Authorization: `Bearer ${a.access_token}` } });
+        // scope=local: この合札（このログイン）だけ無効にする。既定の global だと、ほかの端末の管理者のログインまで切れる
+        await send('/auth/v1/logout?scope=local', { headers: { Authorization: `Bearer ${a.access_token}` } });
       } catch { /* 失敗しても進める */ }
     }
 
@@ -95,14 +111,20 @@
 
     async function call(name, args) {
       if (!loggedIn()) throw err('relogin', 'relogin'); // 30分たっていたら通信せずログインし直し
+      // g: 呼びはじめたときのログイン。返事を待つあいだにログアウト・ログインし直しがあったら、今のログインにさわらず 'stale'
+      const g = gen, stale = () => { if (g !== gen) throw err('stale', 'stale'); };
       let a = read();
       if (now() >= a.expires_at - SKEW_MS) a = await refresh();
+      stale();
       let res = await rpcOnce(name, args, a), b;
+      stale();
       if (res.status === 401) {
         b = res.body;
         if (!isDenied(res, b)) {
           a = await refresh();           // 1回だけ更新してやり直し
+          stale();
           res = await rpcOnce(name, args, a);
+          stale();
           if (res.status === 401) {
             b = res.body;
             if (!isDenied(res, b)) { clear(); throw err('relogin', 'relogin', 401); }
@@ -131,14 +153,14 @@
     }
 
     // 先に保存を消して（画面はすぐログアウトにできる）から、サーバーの合札を無効にする。
-    // 途中の refresh があれば終わるのを待ち、その refresh がもらった合札（orphan）も無効にする。どれも失敗しても消す
+    // 途中の refresh があれば終わるのを待ち、その refresh がもらった合札（orphans）も無効にする。どれも失敗しても消す
     async function logout() {
-      const a = read(), pending = refreshing;
+      const a = read(), pending = [...inflight];
       clear();
-      if (pending) await pending.catch(() => {});
-      const fresh = orphan; orphan = null;
-      await revoke(fresh || a);
-      if (fresh && a && fresh.access_token !== a.access_token) await revoke(a);
+      if (pending.length) await Promise.allSettled(pending);
+      const fresh = orphans; orphans = [];
+      for (const o of fresh) await revoke(o);
+      if (a && !fresh.some(o => o.access_token === a.access_token)) await revoke(a);
     }
 
     return { login, logout, loggedIn, call, email: () => (read() || {}).email || '', uid: () => (read() || {}).uid || '' };

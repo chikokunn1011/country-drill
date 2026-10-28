@@ -617,8 +617,9 @@ test('admin_in_foreign_iframe_shows_nothing', { timeout: 60_000 }, async () => {
     const page = await context.newPage();
     await page.goto(evil.url);
     await page.evaluate(src => { document.getElementById('f').src = src; }, target);
-    await page.waitForTimeout(800);
-    if (page.url() === evil.url) {
+    // 決まった時間を待たず、外に抜ける（ページごと admin.html になる）のを待つ。抜けられないブラウザなら iframe の中を見る
+    const escaped = await page.waitForURL(target, { timeout: 15_000 }).then(() => true, () => false);
+    if (!escaped) {
       const frame = page.frames().find(f => f.url() === target);
       assert.ok(frame, `iframe が読まれていない: ${page.frames().map(f => f.url()).join(' ')}`);
       assert.equal(await frame.evaluate(() => getComputedStyle(document.documentElement).display), 'none');
@@ -768,4 +769,224 @@ t('reload_failure_after_delete_clears_rows', async (page, { db }) => {
   await tbodyHas(page, /はなこ/);
   await page.locator('#r-table[data-ready]').waitFor();
   assert.equal(await rows(page).count(), 1);
+});
+
+// ---- 2回目のレビューの直し ----
+// F1: 古いログインの refresh を待っているあいだにログアウトしてすぐログインし直した。あとで古い refresh が
+// 断られても（400）通っても（200）、新しいログインは追い出さない
+for (const status of [400, 200]) t(`stale_refresh_${status}_after_relogin_keeps_new_session`, async (page, { db }) => {
+  await login(page);
+  await page.locator('#r-table[data-ready]').waitFor();
+  await page.evaluate(() => { const a = JSON.parse(sessionStorage.getItem('adminAuth')); a.expires_at = Date.now(); sessionStorage.setItem('adminAuth', JSON.stringify(a)); });
+  let release, n = 0;
+  const held = new Promise(r => { release = r; });
+  await page.route(u => u.search.includes('grant_type=refresh_token'), async route => {
+    n++;
+    await held;
+    if (status === 400) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"error":"invalid_grant"}' });
+    return route.fallback();
+  });
+  await page.click('#r-reload');
+  await expectSoon(() => n === 1, '古い refresh を待っている');
+  await page.click('#adm-logout');
+  await page.locator('#r-login').waitFor();
+  await login(page);
+  await page.locator('#r-table[data-ready]').waitFor();
+  const outs = () => db.calls.filter(c => c.name === 'logout').length;
+  assert.equal(outs(), 0, 'ログアウトは古い refresh を待っている');
+  release();
+  // ログアウトは古い refresh が終わってから、古い合札を無効にしに行く（/logout か、期限切れなら先に refresh）。
+  // そのときには古い呼び出しの返事も済んでいる
+  await expectSoon(() => outs() > 0 || n >= 2, 'ログアウトの続き');
+  await page.waitForTimeout(100);
+  assert.equal(await page.isVisible('#r-dash'), true, '新しいログインのまま');
+  assert.equal(await page.isHidden('#r-login'), true);
+  assert.equal((await page.textContent('#r-login-msg')).trim(), '');
+  assert.match(JSON.parse(await page.evaluate(() => sessionStorage.getItem('adminAuth'))).access_token, /^fake-access-/);
+  assert.equal(await rows(page).count(), 2);
+  // 新しいログインで続けて使える
+  await page.click('#r-reload');
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(await page.isVisible('#r-dash'), true);
+});
+// 条件が true になるまで（最大5秒）待つ
+async function expectSoon(fn, what) {
+  for (let i = 0; i < 250 && !fn(); i++) await new Promise(ok => setTimeout(ok, 20));
+  assert.ok(fn(), what);
+}
+
+// U5: 次・前・読み直すは、今出ている一覧を作った絞りこみで読む（欄に書いただけで探していない名前は使わない）
+t('paging_and_reload_use_searched_filter', async (page, { db }) => {
+  for (let i = 0; i < 120; i++) db.rows.push({ board: 'n2f:all:5', nickname: `p${i}`, time_ms: 10000 + i, questions: 5, created_at: ago(40 + i) });
+  await login(page);
+  await kind(page, 'scores');
+  await page.fill('#r-f-q', 'たろ');   // 探すボタンはまだ押さない
+  await page.click('#r-next');
+  await page.locator('#r-page', { hasText: '101〜122 / 122' }).waitFor();
+  const lastList = () => db.calls.filter(c => c.name === 'admin_list').at(-1).args.p_filter;
+  assert.deepEqual([lastList().q, lastList().offset], ['', 100]);
+  await page.click('#r-prev');
+  await page.locator('#r-page', { hasText: '1〜100 / 122' }).waitFor();
+  assert.deepEqual([lastList().q, lastList().offset], ['', 0]);
+  const n = db.calls.length;
+  await page.click('#r-reload');
+  await expectSoon(() => db.calls.slice(n).some(c => c.name === 'admin_list'), '読み直す');
+  await page.locator('#r-table[data-ready]').waitFor();
+  assert.equal(lastList().q, '');
+  assert.equal(await rows(page).count(), 100);
+});
+
+// U6: CSV を作っているあいだは、CSV も消すも押せない（2回作らない・途中で消さない）
+t('csv_is_exclusive', async (page, { db }) => {
+  await login(page);
+  await kind(page, 'scores');
+  const orig = db.adminRpc.admin_list;
+  let release;
+  const gate = new Promise(ok => { release = ok; });
+  db.adminRpc.admin_list = args => args.p_filter?.limit === 500 ? gate.then(() => orig(args)) : orig(args);
+  const dl = page.waitForEvent('download');
+  await page.click('#r-csv');
+  await expectSoon(() => db.calls.filter(c => c.name === 'admin_list' && c.args.p_filter?.limit === 500).length === 1, 'CSV の読みこみ');
+  assert.equal(await page.isDisabled('#r-csv'), true);
+  assert.equal(await page.isDisabled('#r-del'), true, 'CSV のあいだは消せない');
+  // 種類を切りかえて戻っても押せないまま。無理に押しても2回目は作らない
+  await kind(page, 'daily');
+  await kind(page, 'scores');
+  assert.equal(await page.isDisabled('#r-csv'), true);
+  await page.evaluate(() => { const b = document.getElementById('r-csv'); b.disabled = false; b.click(); });
+  await page.waitForTimeout(200);
+  assert.equal(db.calls.filter(c => c.name === 'admin_list' && c.args.p_filter?.limit === 500).length, 1);
+  release();
+  await dl;
+  await page.locator('#adm-toast', { hasText: 'CSV にしたよ' }).waitFor();
+  assert.equal(await page.isDisabled('#r-csv'), false);
+  assert.equal(await page.isDisabled('#r-del'), false);
+});
+
+// F5: 戻す返事が来なかったら「戻ったか分からない」と言って読み直す
+const UNSURE_RESTORE = '戻ったか分からない。一覧を読み直して確かめてね';
+t('restore_network_failure_says_unsure_and_reloads', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await rows(page).filter({ hasText: 'たろう' }).locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await tbodyLacks(page, /たろう/);
+  await kind(page, 'trash');
+  await page.route(u => new URL(u).pathname.endsWith('/rpc/admin_restore'), async route => {
+    let args; try { args = route.request().postDataJSON() ?? {}; } catch { args = {}; }
+    db.calls.push({ name: 'admin_restore', args, at: Date.now() });
+    await db.adminRpc.admin_restore(args);
+    return route.abort();
+  });
+  const lists = db.calls.filter(c => c.name === 'admin_list').length;
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-restore');
+  await page.locator('#adm-toast', { hasText: UNSURE_RESTORE }).waitFor();
+  await page.locator('#r-table[data-kind="trash"][data-ready]').waitFor();
+  await expectSoon(() => db.calls.filter(c => c.name === 'admin_list').length > lists, '読み直す');
+  await page.locator('#r-table tbody td', { hasText: 'ないよ' }).waitFor();
+  assert.match(await page.textContent('#adm-toast'), new RegExp(UNSURE_RESTORE));
+});
+
+// Q1: ゴミ箱の冒険の記録を戻すときは、名前をふさぐかもしれないと先に知らせる（やめたら戻さない）
+t('restore_rpg_rows_warns_first', async (page, { db }) => {
+  const msgs = [];
+  page.on('dialog', d => { msgs.push(d.message()); if (/冒険の記録/.test(d.message()) && /戻していい/.test(d.message())) d.dismiss(); else d.accept(); });
+  await login(page);
+  await kind(page, 'rpg');
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await page.locator('#adm-toast', { hasText: '1件消したよ' }).waitFor();
+  await kind(page, 'trash');
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-restore');
+  await expectSoon(() => msgs.length === 2, '確かめる');
+  assert.match(msgs[1], /冒険の記録.*1件/);
+  assert.match(msgs[1], /登録をやめていたら/);
+  await page.waitForTimeout(200);
+  assert.equal(db.calls.some(c => c.name === 'admin_restore'), false, 'やめたら戻さない');
+  assert.equal(db.rpgRows.length, 0);
+});
+
+// Q1: 冒険でない記録だけ戻すときは聞かない
+t('restore_non_rpg_rows_does_not_warn', async (page, { db }) => {
+  const msgs = [];
+  page.on('dialog', d => { msgs.push(d.message()); d.accept(); });
+  await login(page);
+  await kind(page, 'scores');
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await page.locator('#adm-toast', { hasText: '1件消したよ' }).waitFor();
+  await kind(page, 'trash');
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-restore');
+  await page.locator('#adm-toast', { hasText: '1件戻したよ' }).waitFor();
+  assert.equal(msgs.length, 1, '消すときの1回だけ');
+});
+
+// T5: 同じ id の行がもうあって戻せなかった件数を知らせる
+t('restore_reports_failed_count', async (page, { db }) => {
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await rows(page).filter({ hasText: 'たろう' }).locator('input[data-pick]').check();
+  await page.click('#r-del');
+  await tbodyLacks(page, /たろう/);
+  db.rows.push({ ...db.trash[0].row_data, nickname: 'べつ' });   // 同じ id の行がもうある
+  await kind(page, 'trash');
+  await rows(page).first().locator('input[data-pick]').check();
+  await page.click('#r-restore');
+  await page.locator('#adm-toast', { hasText: '0件戻したよ・戻せなかった 1件（同じ id か同じ名前がもうある）' }).waitFor();
+  assert.equal(await page.evaluate(() => document.getElementById('adm-toast').classList.contains('bad')), true);
+});
+
+// T5: 操作ログの次・前
+t('ops_log_paging', async (page, { db }) => {
+  for (let i = 0; i < 150; i++) db.adminLog.push({ id: i + 1, at: ago(200 - i), user_id: 'fake-admin', action: 'rename', kind: 'scores', detail: { id: i, before: `b${i}`, after: `a${i}` } });
+  await login(page);
+  await page.click('#adm-tabs [data-tab="log"]');
+  await page.locator('#l-ops-page', { hasText: '1〜100 / 150' }).waitFor();
+  assert.equal(await page.isDisabled('#l-ops-prev'), true);
+  assert.equal(await page.locator('#l-ops-table tbody tr').count(), 100);
+  await page.click('#l-ops-next');
+  await page.locator('#l-ops-page', { hasText: '101〜150 / 150' }).waitFor();
+  assert.equal(db.calls.filter(c => c.name === 'admin_log_list').at(-1).args.p_offset, 100);
+  assert.equal(await page.locator('#l-ops-table tbody tr').count(), 50);
+  assert.equal(await page.isDisabled('#l-ops-next'), true);
+  await page.click('#l-ops-prev');
+  await page.locator('#l-ops-page', { hasText: '1〜100 / 150' }).waitFor();
+  assert.equal(db.calls.filter(c => c.name === 'admin_log_list').at(-1).args.p_offset, 0);
+});
+
+// T2: 期間・並べ方の選択も admin_list に送る
+t('period_and_sort_are_sent', async (page, { db }) => {
+  await login(page);
+  await kind(page, 'scores');
+  const lastList = () => db.calls.filter(c => c.name === 'admin_list').at(-1).args.p_filter;
+  assert.deepEqual([lastList().period, lastList().sort], ['all', 'new']);
+  let n = db.calls.length;
+  await page.selectOption('#r-f-period', 'week');
+  await expectSoon(() => db.calls.slice(n).some(c => c.name === 'admin_list'), '期間で読み直す');
+  assert.equal(lastList().period, 'week');
+  n = db.calls.length;
+  await page.selectOption('#r-f-sort', 'best');
+  await expectSoon(() => db.calls.slice(n).some(c => c.name === 'admin_list'), '並べ方で読み直す');
+  assert.deepEqual([lastList().period, lastList().sort], ['week', 'best']);
+  await page.locator('#r-table[data-ready]').waitFor();
+  // 成績の順: はなこ（9.00秒）が先
+  assert.match(await rows(page).first().textContent(), /はなこ/);
+  await kind(page, 'rpg');
+  assert.equal(lastList().sort, 'best');
+  assert.equal('period' in lastList(), false, '期間はタイムアタックだけ');
+});
+
+// S14: 5日から目立たせる（4日はまだ）
+for (const [days, warn] of [[4, false], [5, true]]) t(`stale_warning_boundary_${days}_days`, async (page, { db }) => {
+  const at = ago(24 * days + 1);
+  for (const r of [...db.rows, ...db.dailyRows]) r.created_at = at;
+  db.rpgRows[0].created_at = db.rpgRows[0].at = at;
+  await login(page);
+  await page.locator('#r-stale', { hasText: `最後の記録から ${days}日` }).waitFor();
+  assert.equal(await page.evaluate(() => document.getElementById('r-stale').classList.contains('warn')), warn);
 });
