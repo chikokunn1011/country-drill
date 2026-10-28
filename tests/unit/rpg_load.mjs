@@ -7,10 +7,11 @@ export const read = p => readFileSync(new URL(`../../${p}`, import.meta.url), 'u
 // vm 側で作られたオブジェクトは prototype が別物なので、比べる前にこちら側の素のオブジェクトにする
 export const plain = x => JSON.parse(JSON.stringify(x));
 
-// 新しい vm に countries.js → rpg-core.js を読み込む。before は countries.js を走らせた直後のグローバルの名前
+// 新しい vm に countries.js → daily-core.js → rpg-core.js を読み込む。before は countries.js を走らせた直後のグローバルの名前
 export function loadCtx() {
   const ctx = vm.createContext({ TextEncoder, TextDecoder, btoa, atob }); ctx.window = ctx;
   vm.runInContext(read('countries.js'), ctx);
+  vm.runInContext(read('daily-core.js'), ctx);   // similarChoices が globalThis.DAILY_CORE.SIMILAR を読む
   const before = Object.keys(ctx);
   vm.runInContext(read('rpg-core.js'), ctx);
   return { ctx, before };

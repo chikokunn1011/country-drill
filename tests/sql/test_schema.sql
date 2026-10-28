@@ -239,13 +239,22 @@ do $$ declare r jsonb := rpg_register('00000000-0000-4000-8000-000000000001', '�
   assert rpg_register('00000000-0000-4000-8000-000000000002', 'あいうえおかきくけこさしす', 1, 0, 0)->>'reason' = 'bad_name', '13文字';
   assert rpg_register('00000000-0000-4000-8000-000000000002', 'ＦＵＣＫ', 1, 0, 0)->>'reason' = 'ng_name', 'NG';
   assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 0, 0, 0)->>'reason' = 'bad_record', 'Lv0';
-  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 51, 0, 0)->>'reason' = 'bad_record', 'Lv51';
-  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 8, 35)->>'reason' = 'bad_record', 'ダンジョン8';
-  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 0, 36)->>'reason' = 'bad_record', 'フロア36';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 100, 0, 0)->>'reason' = 'bad_record', 'Lv100';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 22, 110)->>'reason' = 'bad_record', 'ダンジョン22';
+  assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 0, 106)->>'reason' = 'bad_record', 'フロア106';
   assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', 5, 2, 9)->>'reason' = 'bad_record', 'ダンジョン2なのにフロア9';
   assert rpg_register('00000000-0000-4000-8000-000000000002', 'ミケ', null, 0, 0)->>'reason' = 'bad_record', 'null';
 end $$;
 reset role;
+-- 鏡の地球（14ダンジョン・70フロア）を全部、第3章の分（21・105）まで受け付ける。1行だけのテストを崩さないよう関数を直接見る
+do $$ begin
+  assert rpg_record_ok(69, 14, 70), '鏡の地球を全部';
+  assert rpg_record_ok(99, 21, 105), 'Lv99・第3章まで全部';
+  assert not rpg_record_ok(100, 0, 0), 'Lv100';
+  assert not rpg_record_ok(5, 22, 110), 'ダンジョン22';
+  assert not rpg_record_ok(5, 0, 106), 'フロア106';
+  assert not rpg_record_ok(5, 15, 70), 'ダンジョン15なのにフロア70';
+end $$;
 do $$ begin
   assert (select count(*) from rpg_players) = 1, '1行だけ';
   assert (select row(nickname, lv, dungeons, floors)::text from rpg_players) = '(チコ,12,2,13)', '保存値';

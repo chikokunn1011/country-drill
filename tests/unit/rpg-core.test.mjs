@@ -24,14 +24,14 @@ test('tuning_and_tables', () => {
   assert.deepEqual(plain(TUNING.gacha), { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] });
   // 形と値をまるごと固定する（キーの名前は以後のタスクが使う）。JSON にすると Infinity は null になるので別に見る
   assert.deepEqual(plain(TUNING), plain({
-    hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 50 },
+    hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 99 },
     levelBase: 100, levelStep: 30,
     quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2 }, hintMul: 0.6, weakMul: 2,
             decay: [[3, 1], [6, 0.5], [Infinity, 0.2]], firstEver: 20, taMinMsPerQ: 400 },
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
     battle: { winBase: 10, winPerStage: 2, firstMul: 3, bossFirst: 200, losePerRight: 2, comboStep: 0.1, comboMax: 5,
-              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2,
+              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
@@ -40,22 +40,22 @@ test('tuning_and_tables', () => {
   }));
   assert.equal(TUNING.quiz.decay[2][0], Infinity);
 
-  assert.deepEqual(plain(DUNGEONS.map(d => d.id)), IDS);
-  assert.deepEqual(plain(DUNGEONS.map(d => d.flags)), [6, 7, 8, 9, 9, 10, 12]);
-  assert.deepEqual(plain(DUNGEONS), [
-    { id: 'samerica', r: '南アメリカ', name: 'アマゾンの密林', plate: 'PLATE 01 · SOUTH AMERICA', color: '#6fa86a', flags: 6, land: '南アメリカ' },
-    { id: 'oceania', r: 'オセアニア', name: 'サンゴ礁の海', plate: 'PLATE 02 · OCEANIA', color: '#4fa3c7', flags: 7, land: 'オセアニア' },
-    { id: 'namerica', r: '北・中央アメリカ', name: '大峡谷', plate: 'PLATE 03 · N.&C. AMERICA', color: '#d29a4a', flags: 8, land: '北・中央アメリカ' },
-    { id: 'europe', r: 'ヨーロッパ', name: '古城の迷宮', plate: 'PLATE 04 · EUROPE', color: '#a77bab', flags: 9, land: 'ヨーロッパ' },
-    { id: 'asia', r: 'アジア', name: '天空の山脈', plate: 'PLATE 05 · ASIA', color: '#d0705a', flags: 9, land: 'アジア' },
-    { id: 'africa', r: 'アフリカ', name: 'サバンナの大地', plate: 'PLATE 06 · AFRICA', color: '#c4a02a', flags: 10, land: 'アフリカ' },
-    { id: 'world', r: 'all', name: '地図喰いの巣', plate: 'PLATE 07 · WORLD', color: '#5b6b73', flags: 12, land: '世界' },
+  assert.deepEqual(plain(DUNGEONS.slice(0, 7).map(d => d.id)), IDS);
+  assert.deepEqual(plain(DUNGEONS.slice(0, 7).map(d => d.flags)), [6, 7, 8, 9, 9, 10, 12]);
+  assert.deepEqual(plain(DUNGEONS.slice(0, 7)), [
+    { id: 'samerica', ch: 1, r: '南アメリカ', name: 'アマゾンの密林', plate: 'PLATE 01 · SOUTH AMERICA', color: '#6fa86a', flags: 6, land: '南アメリカ' },
+    { id: 'oceania', ch: 1, r: 'オセアニア', name: 'サンゴ礁の海', plate: 'PLATE 02 · OCEANIA', color: '#4fa3c7', flags: 7, land: 'オセアニア' },
+    { id: 'namerica', ch: 1, r: '北・中央アメリカ', name: '大峡谷', plate: 'PLATE 03 · N.&C. AMERICA', color: '#d29a4a', flags: 8, land: '北・中央アメリカ' },
+    { id: 'europe', ch: 1, r: 'ヨーロッパ', name: '古城の迷宮', plate: 'PLATE 04 · EUROPE', color: '#a77bab', flags: 9, land: 'ヨーロッパ' },
+    { id: 'asia', ch: 1, r: 'アジア', name: '天空の山脈', plate: 'PLATE 05 · ASIA', color: '#d0705a', flags: 9, land: 'アジア' },
+    { id: 'africa', ch: 1, r: 'アフリカ', name: 'サバンナの大地', plate: 'PLATE 06 · AFRICA', color: '#c4a02a', flags: 10, land: 'アフリカ' },
+    { id: 'world', ch: 1, r: 'all', name: '地図喰いの巣', plate: 'PLATE 07 · WORLD', color: '#5b6b73', flags: 12, land: '世界' },
   ]);
   assert.equal(K.dungeonOf('world').r, 'all');
   assert.equal(K.dungeonOf('europe').name, '古城の迷宮');
   assert.equal(K.dungeonOf('mars'), undefined);
 
-  assert.deepEqual(plain(Object.keys(MONSTERS)), IDS);
+  assert.deepEqual(plain(Object.keys(MONSTERS)).slice(0, 7), IDS);
   for (const id of IDS) assert.equal(MONSTERS[id].length, 5, id);
   assert.deepEqual(plain(MONSTERS.europe[3]), { e: '🕷️', n: '古城の大グモ' });
   assert.deepEqual(plain(MONSTERS.samerica[0]), { e: '🦜', n: 'おしゃべりオウム' });
@@ -82,29 +82,29 @@ test('level_cost', () => {
   assert.equal(K.levelCost(10), 370);
   assert.equal(K.levelCost(40), 1270);
   assert.equal(K.levelCost(49), 1540);
-  assert.equal(K.levelCost(50), Infinity);
+  assert.equal(K.levelCost(99), Infinity);
   // Lv1 から Lv L になるまでの累計
   const total = L => { let s = 0; for (let i = 1; i < L; i++) s += K.levelCost(i); return s; };
-  for (const [L, sum] of [[5, 580], [11, 2350], [17, 5200], [23, 9130], [29, 14140], [35, 20230], [41, 27400], [50, 40180]]) {
+  for (const [L, sum] of [[5, 580], [11, 2350], [17, 5200], [23, 9130], [29, 14140], [35, 20230], [41, 27400], [50, 40180], [99, 152390]]) {
     assert.equal(total(L), sum, `Lv${L}`);
   }
   assert.deepEqual(plain(K.maxLevelUp(1, 579)), { to: 4, cost: 390 });
   assert.deepEqual(plain(K.maxLevelUp(1, 580)), { to: 5, cost: 580 });
   assert.deepEqual(plain(K.maxLevelUp(1, 1000)), { to: 6, cost: 800 });
   assert.deepEqual(plain(K.maxLevelUp(1, 99)), { to: 1, cost: 0 });
-  assert.deepEqual(plain(K.maxLevelUp(50, 1e9)), { to: 50, cost: 0 });
-  assert.deepEqual(plain(K.maxLevelUp(1, 1e9)), { to: 50, cost: 40180 });
+  assert.deepEqual(plain(K.maxLevelUp(99, 1e9)), { to: 99, cost: 0 });
+  assert.deepEqual(plain(K.maxLevelUp(1, 1e9)), { to: 99, cost: 152390 });
   // Infinity や数でないコインでも止まる（上限 BIG で切る）
   assert.equal(K.BIG, 1e9);
-  assert.deepEqual(plain(K.maxLevelUp(1, Infinity)), { to: 50, cost: 40180 });
-  assert.deepEqual(plain(K.maxLevelUp(50, Infinity)), { to: 50, cost: 0 });
+  assert.deepEqual(plain(K.maxLevelUp(1, Infinity)), { to: 99, cost: 152390 });
+  assert.deepEqual(plain(K.maxLevelUp(99, Infinity)), { to: 99, cost: 0 });
   assert.deepEqual(plain(K.maxLevelUp(1, NaN)), { to: 1, cost: 0 });
 });
 
 test('region_colors_match_css', () => {
   // rpg.css の地域の色（--rpg-r-{id}。ライトはそのまま、ダークは白を3割まぜる。ダークは2か所）は DUNGEONS の color と同じ
   const K = loadCore(), css = read('rpg.css');
-  for (const { id, color } of K.DUNGEONS) {
+  for (const { id, color } of K.DUNGEONS) {   // 鏡の地球の7つも
     assert.ok(css.includes(`--rpg-r-${id}: ${color};`), `rpg.css に --rpg-r-${id}: ${color} が無い`);
     const dark = css.match(new RegExp(`--rpg-r-${id}: color-mix\\(in srgb, ${color} 70%, #fff\\);`, 'g')) || [];
     assert.equal(dark.length, 2, `rpg.css のダークの --rpg-r-${id} が ${color} から作られていない`);
@@ -339,7 +339,7 @@ test('dates_and_coins', () => {
 const FRESH = {
   v: 1, intro: false, show: true, coins: 0, earned: 0, lv: 1, av: 0,
   cards: {}, fr: {}, mb: {}, fe: {}, wk: {}, lc: {}, ov: {}, floors: {}, gauge: {},
-  pity: 0, pulls: 0,
+  pity: 0, pulls: 0, story: [],
   day: { d: T0, n: {}, first: false, free: false },
   bounty: { d: '', a: [], done: [] },
   paid: [],
@@ -430,7 +430,7 @@ test('sanitize_numbers', () => {
   assert.equal(s({ earned: 1e12 }).earned, 1e9);
   assert.equal(s({ pulls: -1 }).pulls, 0);
   assert.equal(s({ lv: 0 }).lv, 1);
-  assert.equal(s({ lv: 99 }).lv, 50);
+  assert.equal(s({ lv: 120 }).lv, 99);
   assert.equal(s({ lv: NaN }).lv, 1);
   assert.equal(s({ av: 9 }).av, 7);
   assert.equal(s({ pity: 60 }).pity, 49);
@@ -1363,4 +1363,65 @@ test('gacha_cost_region_mul', () => {
   assert.equal(K.gachaCost('all', 10), 1000);
   assert.equal(K.gachaCost('南アメリカ', 1), 150);
   assert.equal(K.gachaCost('アジア', 10), 1500);
+});
+
+test('mirror_dungeons', () => {
+  const K = loadCore();
+  const ids = K.DUNGEONS.map(g => g.id);
+  assert.deepEqual(plain(ids.slice(7)), ['msamerica', 'moceania', 'mnamerica', 'meurope', 'masia', 'mafrica', 'mworld']);
+  for (const g of K.DUNGEONS.slice(7)) {
+    const b = K.dungeonOf(g.base);
+    assert.equal(g.ch, 2); assert.equal(g.r, b.r); assert.equal(g.flags, b.flags);
+    assert.equal(K.MONSTERS[g.id].length, 5);
+  }
+  assert.equal(K.chapterOf('world'), 1); assert.equal(K.chapterOf('mworld'), 2); assert.equal(K.chapterOf('x'), null);
+  assert.equal(K.dungeonsOf(2).length, 7);
+  assert.deepEqual(plain(K.REGION_DUNGEONS.map(g => g.id)), ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa']);
+  assert.equal(K.stageOf('msamerica', 1), 36); assert.equal(K.stageOf('mworld', 5), 70);
+  assert.deepEqual(plain(K.CHAPTERS), [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }]);
+  assert.deepEqual(plain(K.STORY_IDS), ['ch1', 'ch2']);
+});
+test('rec_lv_by_chapter', () => {
+  const K = loadCore();
+  assert.equal(K.recLv(35), 41);            // 地球は今のまま
+  assert.equal(K.recLv(36), 42);            // 41 + round((s-35) × 0.8)
+  assert.equal(K.recLv(40), 45);
+  assert.equal(K.recLv(70), 69);
+});
+test('mirror_world_boss', () => {
+  const K = loadCore();
+  const en = K.enemy('mworld', 5);
+  assert.equal(en.boss, true); assert.equal(en.flags, 12); assert.equal(en.recLv, 69);
+  // 全世界なので、どの地域の仲間にも地域ボーナス
+  const d = dWith(K, { cards: { jp: [1, 0], br: [1, 0] } });
+  assert.ok(K.party(d, 'mworld').every(p => p.atk === K.cardAtk([1, 0], 0, true)));
+});
+test('similar_choices_always_four', () => {
+  const { ctx } = loadCtx(), K = ctx.RPG_CORE, C = ctx.COUNTRIES;
+  const rng = mulberry32(7);
+  for (const c of C) for (let i = 0; i < 3; i++) {
+    const o = K.similarChoices(c.a, rng);
+    assert.equal(o.length, 4); assert.equal(new Set(o).size, 4); assert.ok(o.includes(c.a));
+  }
+  // 似た旗の組（td ro ad md）は組の国が先に入る
+  assert.deepEqual([...K.similarChoices('td', rng)].sort(), ['ad', 'md', 'ro', 'td']);
+  // 組に無い国は同じ細かい地域（13グループ）から
+  const o = K.similarChoices('mn', rng).filter(a => a !== 'mn');
+  assert.ok(o.every(a => K.groupOf(a) === '東アジア'));
+  // 似た旗の組に知らない国コードが混じっても、選択肢は知っている国の4つ
+  ctx.DAILY_CORE = { SIMILAR: [['td', 'zz', 'ro', 'qq']] };
+  for (let i = 0; i < 20; i++) {
+    const o2 = K.similarChoices('td', rng);
+    assert.equal(o2.length, 4); assert.equal(new Set(o2).size, 4);
+    assert.ok(o2.every(x => C.some(c => c.a === x)), `知らない国: ${o2}`);
+  }
+});
+test('old_save_keeps_and_levels_past_50', () => {
+  const K = loadCore();
+  const s = K.sanitize({ ...K.fresh(T0), lv: 50, floors: { world: 5, msamerica: 2, bogus: 3 }, story: ['ch1', 'zzz', 'ch1'] }, T0);
+  assert.equal(s.lv, 50); assert.equal(s.floors.msamerica, 2); assert.equal(s.floors.bogus, undefined);
+  assert.deepEqual(plain(s.story), ['ch1']);
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0) }, T0).story), []);
+  assert.equal(K.sanitize({ ...K.fresh(T0), lv: 120 }, T0).lv, 99);
+  assert.ok(Number.isFinite(K.levelCost(50))); assert.equal(K.levelCost(99), Infinity);
 });

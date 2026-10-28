@@ -392,7 +392,9 @@ test('sanitize_rules', () => {
   assert.equal(d.s.perf, 195);
   assert.equal(d.s.taAvg, 600000);
   assert.equal(d.s.days, 0);
-  assert.equal(d.s.rpg.lv, 50);
+  assert.equal(d.s.rpg.lv, 99);   // Lv99 はそのまま残る（上限は 99）
+  assert.equal(K.sanitize({ s: { rpg: { lv: 100 } } }, X).s.rpg.lv, 99);
+  assert.equal(K.sanitize({ s: { rpg: { lv: 99 } } }, X).s.rpg.lv, 99);
   assert.equal(d.s.rpg.owned, 195);
   assert.equal(d.s.rpg.win, 1);
   assert.equal(K.sanitize({ s: { right: 2e7 } }, X).s.right, 1e7);

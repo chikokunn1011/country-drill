@@ -7,14 +7,14 @@
 
   // 数値はすべてここ。ほかのファイルに倍率・値段・確率・時間を直接書かない
   const TUNING = {
-    hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 50 },
+    hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 99 },
     levelBase: 100, levelStep: 30,
     quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2 }, hintMul: 0.6, weakMul: 2,
             decay: [[3, 1], [6, 0.5], [Infinity, 0.2]], firstEver: 20, taMinMsPerQ: 400 },
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
     battle: { winBase: 10, winPerStage: 2, firstMul: 3, bossFirst: 200, losePerRight: 2, comboStep: 0.1, comboMax: 5,
-              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2,
+              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
@@ -26,14 +26,27 @@
 
   // 国の数が少ない地域から順に開く。r は S.region と同じ日本語名（全世界は 'all'）。英字 id と日本語名の変換はここだけ
   const DUNGEONS = [
-    { id: 'samerica', r: '南アメリカ', name: 'アマゾンの密林', plate: 'PLATE 01 · SOUTH AMERICA', color: '#6fa86a', flags: 6, land: '南アメリカ' },
-    { id: 'oceania', r: 'オセアニア', name: 'サンゴ礁の海', plate: 'PLATE 02 · OCEANIA', color: '#4fa3c7', flags: 7, land: 'オセアニア' },
-    { id: 'namerica', r: '北・中央アメリカ', name: '大峡谷', plate: 'PLATE 03 · N.&C. AMERICA', color: '#d29a4a', flags: 8, land: '北・中央アメリカ' },
-    { id: 'europe', r: 'ヨーロッパ', name: '古城の迷宮', plate: 'PLATE 04 · EUROPE', color: '#a77bab', flags: 9, land: 'ヨーロッパ' },
-    { id: 'asia', r: 'アジア', name: '天空の山脈', plate: 'PLATE 05 · ASIA', color: '#d0705a', flags: 9, land: 'アジア' },
-    { id: 'africa', r: 'アフリカ', name: 'サバンナの大地', plate: 'PLATE 06 · AFRICA', color: '#c4a02a', flags: 10, land: 'アフリカ' },
-    { id: 'world', r: 'all', name: '地図喰いの巣', plate: 'PLATE 07 · WORLD', color: '#5b6b73', flags: 12, land: '世界' },
+    { id: 'samerica', ch: 1, r: '南アメリカ', name: 'アマゾンの密林', plate: 'PLATE 01 · SOUTH AMERICA', color: '#6fa86a', flags: 6, land: '南アメリカ' },
+    { id: 'oceania', ch: 1, r: 'オセアニア', name: 'サンゴ礁の海', plate: 'PLATE 02 · OCEANIA', color: '#4fa3c7', flags: 7, land: 'オセアニア' },
+    { id: 'namerica', ch: 1, r: '北・中央アメリカ', name: '大峡谷', plate: 'PLATE 03 · N.&C. AMERICA', color: '#d29a4a', flags: 8, land: '北・中央アメリカ' },
+    { id: 'europe', ch: 1, r: 'ヨーロッパ', name: '古城の迷宮', plate: 'PLATE 04 · EUROPE', color: '#a77bab', flags: 9, land: 'ヨーロッパ' },
+    { id: 'asia', ch: 1, r: 'アジア', name: '天空の山脈', plate: 'PLATE 05 · ASIA', color: '#d0705a', flags: 9, land: 'アジア' },
+    { id: 'africa', ch: 1, r: 'アフリカ', name: 'サバンナの大地', plate: 'PLATE 06 · AFRICA', color: '#c4a02a', flags: 10, land: 'アフリカ' },
+    { id: 'world', ch: 1, r: 'all', name: '地図喰いの巣', plate: 'PLATE 07 · WORLD', color: '#5b6b73', flags: 12, land: '世界' },
+    // 第2章 鏡の地球: 今の7つと同じ地域・同じ順（base は元の id）。色は元の色を暗くしたもの
+    { id: 'msamerica', base: 'samerica', ch: 2, r: '南アメリカ', name: '鏡のアマゾン', plate: 'PLATE 08 · MIRROR S. AMERICA', color: '#436540', flags: 6, land: '鏡の南アメリカ' },
+    { id: 'moceania', base: 'oceania', ch: 2, r: 'オセアニア', name: '鏡のサンゴ礁', plate: 'PLATE 09 · MIRROR OCEANIA', color: '#2f6277', flags: 7, land: '鏡のオセアニア' },
+    { id: 'mnamerica', base: 'namerica', ch: 2, r: '北・中央アメリカ', name: '鏡の大峡谷', plate: 'PLATE 10 · MIRROR N.&C. AMERICA', color: '#7e5c2c', flags: 8, land: '鏡の北・中央アメリカ' },
+    { id: 'meurope', base: 'europe', ch: 2, r: 'ヨーロッパ', name: '鏡の古城', plate: 'PLATE 11 · MIRROR EUROPE', color: '#644a67', flags: 9, land: '鏡のヨーロッパ' },
+    { id: 'masia', base: 'asia', ch: 2, r: 'アジア', name: '鏡の山脈', plate: 'PLATE 12 · MIRROR ASIA', color: '#7d4336', flags: 9, land: '鏡のアジア' },
+    { id: 'mafrica', base: 'africa', ch: 2, r: 'アフリカ', name: '鏡のサバンナ', plate: 'PLATE 13 · MIRROR AFRICA', color: '#766019', flags: 10, land: '鏡のアフリカ' },
+    { id: 'mworld', base: 'world', ch: 2, r: 'all', name: '鏡の地図喰いの巣', plate: 'PLATE 14 · MIRROR WORLD', color: '#374045', flags: 12, land: '鏡の世界' },
   ];
+  // 章。last はその章の最後のダンジョン（ここをクリアすると章クリア）
+  const CHAPTERS = [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }];
+  const STORY_IDS = ['ch1', 'ch2'];   // セーブの story に入るもの（読んだストーリー）
+  const chapterOf = id => DUNGEONS.find(d => d.id === id)?.ch ?? null;
+  const dungeonsOf = ch => DUNGEONS.filter(d => d.ch === ch);
   // F1〜F4 とボス（5件目）
   const MONSTERS = {
     samerica: [{ e: '🦜', n: 'おしゃべりオウム' }, { e: '🐸', n: 'ヤドクガエル' }, { e: '🦙', n: 'つばとばしアルパカ' }, { e: '🐍', n: '大アナコンダ' }, { e: '🐆', n: 'ジャガー王' }],
@@ -44,12 +57,17 @@
     africa: [{ e: '🦂', n: '砂漠のサソリ' }, { e: '🦒', n: 'のっぽキリン' }, { e: '🦛', n: '怒りんぼカバ' }, { e: '🦏', n: '突進サイ' }, { e: '🦁', n: '百獣の王' }],
     world: [{ e: '🌫️', n: '白紙の霧' }, { e: '🗺️', n: 'やぶれた地図' }, { e: '🧭', n: 'くるった方位磁針' }, { e: '👻', n: '地図喰いの影' }, { e: '👾', n: '地図喰い' }],
   };
+  // 鏡の地球の手下 F1〜F4 は元の絵文字のまま、名前に「鏡の」「さかさ」を交互に付ける。ボスは別の名前
+  const MIRROR_BOSS = { samerica: { e: '🐆', n: 'うつしジャガー' }, oceania: { e: '🌋', n: 'さかさ火山' }, namerica: { e: '🌪️', n: 'さかさ竜巻' }, europe: { e: '🐉', n: '白い竜' }, asia: { e: '🐲', n: '金の竜' }, africa: { e: '🦁', n: '影の百獣の王' }, world: { e: '🪞', n: '鏡の地図喰い' } };
+  for (const g of dungeonsOf(2)) {
+    MONSTERS[g.id] = [...MONSTERS[g.base].slice(0, 4).map((m, i) => ({ e: m.e, n: (i % 2 ? 'さかさ' : '鏡の') + m.n })), MIRROR_BOSS[g.base]];
+  }
   const AVATARS = ['🧙', '🧝', '🦸', '🤠', '🦊', '🐱', '🐶', '🐧'];
   // mb（ヒントなしで正解したモード）のビット
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8, cap: 16 };
   const dungeonOf = id => DUNGEONS.find(d => d.id === id);
-  // 地域のダンジョン（地図喰いの巣をのぞく6つ。DUNGEONS と同じもの・同じ順）
-  const REGION_DUNGEONS = DUNGEONS.filter(g => g.r !== 'all');
+  // 地域のダンジョン（第1章の、地図喰いの巣をのぞく6つ。DUNGEONS と同じもの・同じ順）
+  const REGION_DUNGEONS = DUNGEONS.filter(g => g.ch === 1 && g.r !== 'all');
   // 仲間の数（セーブ d の cards の国の数）
   const owned = d => Object.keys(d.cards).length;
 
@@ -69,9 +87,14 @@
   };
 
   // ---- 敵の強さ（式だけ。フロアごとの数字は手で書かない） ----
-  // ステージ番号 1〜35。floor は 1〜4 が通常、5 がボス
+  // ステージ番号 1〜70（第1章 1〜35、第2章 36〜70）。floor は 1〜4 が通常、5 がボス
   const stageOf = (id, floor) => 5 * DUNGEONS.findIndex(d => d.id === id) + floor;
-  const recLv = s => 1 + Math.floor((s - 1) * TUNING.battle.recStep);
+  // 第1章の最後のステージまでは 1 + floor((s-1) × recStep)。そのさき（第2章）は、そこの推奨 Lv から recStep2 ずつ
+  const recLv1 = s => 1 + Math.floor((s - 1) * TUNING.battle.recStep);
+  const recLv = s => {
+    const last = 5 * dungeonsOf(1).length;
+    return s <= last ? recLv1(s) : recLv1(last) + Math.round((s - last) * TUNING.battle.recStep2);
+  };
   // 推奨 Lv・仲間なしで、通常は正解約5回で勝ち・ミス3回まで OK。ボスは旗1枚が1発・ミス3回まで OK
   const enemy = (id, floor) => {
     const B = TUNING.battle, s = stageOf(id, floor), R = recLv(s), h = heroStats(R);
@@ -223,7 +246,7 @@
   const fresh = todayStr => ({
     v: VERSION, intro: false, show: true, coins: 0, earned: 0, lv: 1, av: 0,
     cards: {}, fr: {}, mb: {}, fe: {}, wk: {}, lc: {}, ov: {}, floors: {}, gauge: {},
-    pity: 0, pulls: 0,
+    pity: 0, pulls: 0, story: [],
     day: { d: todayStr, n: {}, first: false, free: false },
     bounty: { d: '', a: [], done: [] },
     paid: [],
@@ -302,6 +325,7 @@
       gr: GR.has(s.gr) ? s.gr : '',
       teams: sanitizeTeams(s.teams),
       deco: uniq(list(s.deco).filter(isCode)).slice(0, 3),
+      story: uniq(list(s.story).filter(id => STORY_IDS.includes(id))),
     };
     d.tsel = int(s.tsel, 0, d.teams.length - 1) ?? 0;
     for (const k of Object.keys(s)) if (!KNOWN.has(k) && k !== '__proto__') d[k] = s[k];
@@ -656,11 +680,27 @@
     out.push(...weak.slice(cap, cap + n - out.length));
     return out;
   };
+  // 鏡の地球の4択: 正解 a を含む4つ。入れる国の優先は ①似た旗の同じ組 ②同じ細かい地域（13グループ） ③同じ地域 ④全部（各段はシャッフル）
+  // SIMILAR は daily-core.js のもの。呼ぶたびに読む（無くても②から動く）
+  const similarChoices = (a, rng) => {
+    const sim = globalThis.DAILY_CORE?.SIMILAR || [], g = groupOf(a), r = REGION.get(a);
+    const tiers = [
+      sim.filter(set => set.includes(a)).flat().filter(x => REGION.has(x)),   // 知らない国コードは落とす
+      C.filter(c => g && groupOf(c.a) === g).map(c => c.a),
+      C.filter(c => c.r === r).map(c => c.a),
+      C.map(c => c.a),
+    ];
+    const out = [];
+    for (const t of tiers) {
+      for (const x of shuffled(t, rng)) if (out.length < 3 && x !== a && !out.includes(x)) out.push(x);
+    }
+    return shuffled([a, ...out], rng);
+  };
   // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。出題は国旗・国名・場所だけ（首都は問題に出さない）
   const bossMode = k => { const cy = modeCycle(5); return cy[k % cy.length]; };
 
   globalThis.RPG_CORE = {
-    TUNING, BIG, DUNGEONS, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
+    TUNING, BIG, DUNGEONS, CHAPTERS, STORY_IDS, chapterOf, dungeonsOf, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
     levelCost, maxLevelUp, heroStats,
     stageOf, recLv, enemy, firstClearTotal,
     battleReward, damage,
@@ -674,6 +714,6 @@
     newRun, runAnswer, settleRun,
     ensureDay, bountyFor, resetWeak,
     pull, gachaRates, gachaCost,
-    modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode,
+    modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, similarChoices,
   };
 })();

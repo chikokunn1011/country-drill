@@ -18,7 +18,7 @@
   // セーブを整えるときの範囲（設計書 §7.1）
   const S_MAX = { right: 1e7, streak: 999, perf: 195, flaw: 195, ta: 195, taAvg: 6e5, clears: 1e7, days: 1e5 };
   const S_FLAGS = ['grit', 'back', 'dopa', 'fever'];
-  const RPG_MAX = { lv: 50, owned: 195, bounty: 1e5 };
+  const RPG_MAX = { lv: 99, owned: 195, bounty: 1e5 };
   const RPG_FLAGS = ['start', 'win', 'nodmg', 'under', 'friend', 'master'];
   const T_MAX = 1e13;      // 時刻(ms)の上限
   const MAX_KEYS = 500;    // got と sent に残す最大件数

@@ -539,3 +539,49 @@ t('battle_learning', async page => {
   assert.deepEqual((await events(page, 'rpg:join')).map(e => pick(e, { a: 0, via: 0, owned: 0 })), [{ a: 'br', via: 'learn', owned: 1 }]);
   assert.ok((await text(page, '#bt-end')).includes('ブラジルが仲間になった！'));
 });
+
+// ---- 鏡の地球（第2章） ----
+const EARTH_CLEARED = { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 };
+// 地球を全部クリアしたセーブで、鏡のアマゾン F1 のチャド(td)・国旗→国名を出す
+const mirrorTd = async page => {
+  await writeSave(page, saveWith({ lv: 20, floors: { ...EARTH_CLEARED } }));
+  await startBattle(page, 'msamerica', 1);
+  assert.equal(await page.evaluate(() => RPG_BATTLE.force('td', 'f2n')), true);
+};
+
+t('mirror_similar_choices', async page => {
+  await mirrorTd(page);
+  const as = await page.$$eval('#bt-q .choice', els => els.map(e => e.dataset.a));
+  assert.deepEqual([...as].sort(), ['ad', 'md', 'ro', 'td']);
+});
+
+t('mirror_reveal_shows_picked', async page => {
+  await mirrorTd(page);
+  await battleGuard(page);
+  await page.click('#bt-q .choice[data-a="ro"]');
+  await page.waitForSelector('#bt-reveal');
+  const s = await text(page, '#bt-reveal');
+  assert.ok(s.includes('えらんだのは「ルーマニア」'), s);
+  const srcs = await page.$$eval('#bt-reveal .rpg-rv-pair img', els => els.map(e => e.getAttribute('src')));
+  assert.equal(srcs.length, 2, srcs.join());
+  assert.ok(srcs[0].includes("flag-icons-ro") && srcs[1].includes("flag-icons-td"), srcs.join());
+});
+
+t('earth_reveal_has_no_pair', async page => {
+  await writeSave(page, saveWith({}));
+  await startBattle(page, 'samerica', 1);
+  await battleGuard(page);
+  await page.locator('#scr-battle .choice:not([data-a="' + await cur(page) + '"])').first().click();
+  await page.waitForSelector('#bt-reveal');
+  assert.equal(await page.locator('.rpg-rv-pair').count(), 0);
+});
+
+t('earth_last_boss_has_no_next', async page => {
+  for (const id of ['world', 'mworld']) {
+    await writeSave(page, saveWith({ lv: 50, floors: { ...EARTH_CLEARED, [id]: 4 } }));
+    await startBattle(page, id, 5);
+    await winBattle(page);
+    assert.equal(await page.isVisible('#bt-end'), true);
+    assert.equal(await page.locator('#bt-nextfloor').count(), 0, `${id} に［つぎのフロアへ］がある`);
+  }
+});

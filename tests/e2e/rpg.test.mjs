@@ -434,7 +434,8 @@ t('works_without_cards', async page => {
   assert.equal(await page.isVisible('#rpg-map'), false);
   await page.setViewportSize({ width: 390, height: 844 });
   // 全クリアの「仲間にしよう」と RPG.open('cards' / 'gacha') は、画面が無いので冒険ホームを開く（例外を出さない）
-  await writeSave(page, saveWith({ floors: { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 5, world: 5 } }));
+  const all = Object.fromEntries(await page.evaluate(() => RPG_CORE.DUNGEONS.map(g => [g.id, 5])));   // 鏡の地球も
+  await writeSave(page, saveWith({ floors: all, story: ['ch1', 'ch2'] }));
   await page.evaluate(() => show('rpg'));
   assert.ok((await page.textContent('#rpg-next')).includes('全クリア！'));
   await page.click('#rpg-next');

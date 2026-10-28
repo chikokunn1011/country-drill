@@ -28,7 +28,7 @@ t('home_entry_and_my_record', async page => {
   await page.click('#rpg-to-rank');
   assert.equal(await page.isVisible('#scr-rpgrank'), true);
   const me = await text(page, '#rr-me');
-  assert.ok(me.includes('Lv 12') && me.includes('ダンジョン 1/7（フロア 8/35）'), me);
+  assert.ok(me.includes('Lv 12') && me.includes('ダンジョン 1/14（フロア 8/70）'), me);
   await page.waitForFunction(() => $('rr-rank').textContent.includes('相当'));
   assert.equal(await text(page, '#rr-rank'), 'レベル順 1位・ダンジョン順 1位 相当');
   assert.equal(await page.isVisible('#rr-empty'), true);

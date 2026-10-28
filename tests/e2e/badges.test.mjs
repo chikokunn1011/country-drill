@@ -44,7 +44,7 @@ async function startPractice(page) {
 t('loads_and_counts', async page => {
   assert.deepEqual(await page.evaluate(() => ({
     title: typeof BADGES.title, count: BADGES.count(), text: BADGES.title(), key: BADGES.titleKey(),
-    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=3"]'),
+    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=5"]'),
   })), { title: 'function', count: { got: 0, total: 26, byColor: { 1: 0, 2: 0, 3: 0, 4: 0 } }, text: '', key: null, css: true, js: true });
 });
 

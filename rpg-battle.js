@@ -271,7 +271,9 @@
     if (mode === 'm2f') box.append(zoomableMap(c, '出題中の国の位置', { region: B.dg.r }));
     const byName = mode === 'f2n', ch = document.createElement('div');
     ch.className = 'choices' + (byName ? ' textc' : '');
-    makeQuestion(c).opts.forEach((o, k) => {
+    // 鏡の地球は似た旗の4択（おとり選びは rpg-core の similarChoices）
+    const opts = K.chapterOf(B.id) === 2 ? K.similarChoices(a, Math.random).map(x => byA.get(x)) : makeQuestion(c).opts;
+    opts.forEach((o, k) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'choice' + (byName ? '' : ' flagc'); b.dataset.a = o.a;
       b.innerHTML = byName ? `<kbd>${k + 1}</kbd><span>${esc(o.n)}</span>` : `<kbd>${k + 1}</kbd><img src="${flag(o.a)}" alt="選択肢${k + 1}の国旗">`;
@@ -300,7 +302,7 @@
     store.set('misses', misses);
     K.runAnswer(B.run, { a: q.a, right, first: !B.missed.has(q.a), hint: false, mode: q.mode, missesBefore: before, missesAfter: misses[q.a] });
     emit('rpg:answer', { a: q.a, right, mode: q.mode, dungeon: B.id, boss: B.boss });
-    if (right) hit(); else miss();
+    if (right) hit(); else miss(a);
   };
   // 自動で進む（タイマーの中の例外はページの例外にせず console.error('[rpg]') にする）
   const wait = () => {
@@ -350,7 +352,7 @@
     stopTimer();
     nextQ();
   };
-  const miss = () => {
+  const miss = picked => {   // picked: 押した国コード（鏡の地球の答え合わせで見比べる）
     const { q } = B;
     B.mistakes.push({ a: q.a, mode: q.mode });
     B.missed.add(q.a);
@@ -369,6 +371,11 @@
     const c = byA.get(q.a), rv = document.createElement('div');
     rv.className = 'reveal rpg-reveal'; rv.id = 'bt-reveal';
     rv.innerHTML = `<p class="verdict ng">ざんねん。正解は「${esc(c.n)}」</p>${factsHTML(c)}`;
+    const pc = K.chapterOf(B.id) === 2 && picked !== q.a ? byA.get(picked) : null;
+    if (pc) {   // 鏡の地球: 押した国と正解の国旗を並べて見比べる
+      const f = (x, cap) => `<figure><img src="${flag(x.a)}" alt="${esc(cap)}の国旗"><figcaption>${esc(cap)}</figcaption></figure>`;
+      rv.querySelector('.verdict').insertAdjacentHTML('afterend', `<p class="rpg-rv-pick">えらんだのは「${esc(pc.n)}」</p><div class="rpg-rv-pair">${f(pc, pc.n)}${f(c, c.n)}</div>`);
+    }
     if (q.mode !== 'm2f') rv.append(mapSvg(c, `${c.n}の位置`, { region: B.dg.r }));
     const nx = document.createElement('button');
     nx.type = 'button'; nx.className = 'btn next'; nx.id = 'bt-next'; nx.textContent = 'つぎへ ⏎';
@@ -392,6 +399,7 @@
   // 次のフロア。ボスのあとは次のダンジョンの F1（地図喰いのあとは無し）
   const nextOf = (id, floor) => {
     if (floor < BOSS) return { id, floor: floor + 1 };
+    if (K.CHAPTERS.some(c => c.last === id)) return null;   // 章の最後（地図喰い）のあとは無し。ストーリーは冒険ホームで出す
     const g = DG[DG.findIndex(x => x.id === id) + 1];
     return g ? { id: g.id, floor: 1 } : null;
   };
@@ -433,6 +441,7 @@
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
     const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
+    if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}`;
     return dg.r === 'all' ? `国旗クエストで地図喰いをたおして、世界を取りもどした！ ${mates}` : `国旗クエストで${dg.land}を取りもどした！ ${mates}`;
   };
   const drawEnd = ({ receipt: rc, coins, first, gauge, d, shares }) => {
@@ -469,7 +478,7 @@
     RPG.drawShares($('bt-shares'), shares || []);   // 仲間の節目に届いたら、その場に［シェア］（設計書 §3.7）
     // ボスを初めて倒した: 取りもどした行の下に［シェア］（押したときだけ共有する）
     if (win && b.boss && first && d) {
-      const sb = RPG.shareButton(b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final
+      const sb = RPG.shareButton(b.id === 'mworld' ? 'final2' : b.dg.r === 'all' ? 'final' : `boss-${b.id}`, bossShareText(b.dg, d));   // 地図喰いは final、鏡の地図喰いは final2
       sb.id = 'bt-share';
       $('bt-end').querySelector('.rpg-bend-x').after(sb);
     }
