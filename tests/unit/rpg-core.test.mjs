@@ -32,7 +32,7 @@ test('tuning_and_tables', () => {
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
     battle: { winBase: 10, winPerStage: 2, firstMul: 3, bossFirst: 200, losePerRight: 2, comboStep: 0.1, comboMax: 5,
               critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2,
-              autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7, reviveMax: 3 },
+              autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
@@ -343,7 +343,7 @@ const FRESH = {
   day: { d: T0, n: {}, first: false, free: false },
   bounty: { d: '', a: [], done: [] },
   paid: [],
-  st: { win: 0, lose: 0, flee: 0, revive: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
+  st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
   badgesPaid: [], gr: '',
   teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
 };
@@ -358,7 +358,7 @@ test('fresh_shape', () => {
   assert.equal(f.v, 1);
   assert.equal(f.show, true);
   assert.equal(f.lv, 1);
-  assert.deepEqual(Object.keys(f.st).sort(), ['bossWins', 'bountyDays', 'combo', 'flee', 'lose', 'nodmg', 'overcome', 'revive', 'win']);
+  assert.deepEqual(Object.keys(f.st).sort(), ['bossWins', 'bountyDays', 'combo', 'flee', 'lose', 'nodmg', 'overcome', 'win']);
   assert.ok(Object.values(f.st).every(x => x === 0));
   assert.deepEqual(f, FRESH);
   assert.equal(K.VERSION, 1);
@@ -1354,15 +1354,6 @@ test('boss_mode', () => {
   assert.deepEqual([0, 1, 2, 3, 4, 5, 8].map(k => K.bossMode(k)), ['f2n', 'n2f', 'm2f', 'f2n', 'n2f', 'm2f', 'm2f']);
   // 首都は問題に出さない（旗が残り少なくても）
   for (let k = 0; k < 30; k++) assert.notEqual(K.bossMode(k, 1, 6, 'cl'), 'cap');
-});
-
-test('revive_set', () => {
-  const K = loadCore();
-  const ms = [{ a: 'br', mode: 'f2n' }, { a: 'ar', mode: 'm2f' }, { a: 'br', mode: 'n2f' }, { a: 'pe', mode: 'f2n' }, { a: 'cl', mode: 'f2n' }];
-  assert.deepEqual(plain(K.reviveSet(ms)), [{ a: 'cl', mode: 'n2f' }, { a: 'pe', mode: 'n2f' }, { a: 'br', mode: 'm2f' }]);
-  assert.deepEqual(plain(ms[0]), { a: 'br', mode: 'f2n' }, '渡した配列は変えない');
-  assert.deepEqual(plain(K.reviveSet([{ a: 'uy', mode: 'cap' }, { a: 'uy', mode: 'm2f' }])), [{ a: 'uy', mode: 'f2n' }]);
-  assert.deepEqual(plain(K.reviveSet([])), []);
 });
 
 test('gacha_cost_region_mul', () => {

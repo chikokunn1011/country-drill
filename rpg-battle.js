@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  // 国旗クエストのバトル（#scr-battle）: 登場画面 → 4択（ボスは旗を1枚ずつ取りもどす）→ 思い出して復活 → 勝ち／負けをまとめて保存。にげる・キー操作も
+  // 国旗クエストのバトル（#scr-battle）: 登場画面 → 4択（ボスは旗を1枚ずつ取りもどす）→ 勝ち／負けをまとめて保存。にげる・キー操作も
   // index.html のインライン script と rpg.js の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   // ---- 起動時のチェック。足りなければ何もしない（画面を作らない。クイズはそのまま動く） ----
@@ -25,7 +25,7 @@
   const COIN = RPG.COIN;
   const LABEL = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？' };
   const MODES = new Set(['f2n', 'n2f', 'm2f']);
-  const ONGOING = new Set(['question', 'reveal', 'revive']);   // バトルが続いている（にげたら数える）
+  const ONGOING = new Set(['question', 'reveal']);   // バトルが続いている（にげたら数える）
   const FLEE_ASK = 'にげる？（報酬はなし）';
   const todayStr = () => K.today(new Date());
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
@@ -36,7 +36,7 @@
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /* ---------- いまのバトル（無ければ null） ---------- */
-  // phase: 'intro' | 'question' | 'reveal' | 'revive' | 'end'。q: いまの問題 {a, mode}。waiting: 正解のあとの自動送りを待っている
+  // phase: 'intro' | 'question' | 'reveal' | 'end'。q: いまの問題 {a, mode}。waiting: 正解のあとの自動送りを待っている
   let B = null;
   const sec = document.createElement('section');
   sec.id = 'scr-battle'; sec.className = 'wrap'; sec.hidden = true;
@@ -174,7 +174,7 @@
       flags, order: flags.map((_, i) => i), k: 0, again: false,
       need: boss ? flags.length : K.hitsNeeded(stats, en), got: [],
       phase: 'intro', q: null, shownAt: 0, answered: false, waiting: false, timer: 0, win: null, next: null,
-      combo: 0, maxCombo: 0, rights: 0, mistakes: [], missed: new Set(), revive: null, reviveUsed: false, revived: false,
+      combo: 0, maxCombo: 0, rights: 0, mistakes: [], missed: new Set(),
     };
     sec.innerHTML = stageHTML();
     drawTop();
@@ -264,8 +264,7 @@
     ].filter(Boolean);
     const box = document.createElement('div');
     box.className = 'bq'; box.id = 'bt-q';
-    box.innerHTML = (B.revive ? `<h2 class="rpg-rvh">思い出して復活！ まちがえた国をもう一度 <small>${B.revive.i + 1}/${B.revive.list.length}</small></h2>` : '')
-      + (tags.length ? `<p class="rpg-tags">${tags.map(s => `<span class="rpg-tag">${s}</span>`).join('')}</p>` : '')
+    box.innerHTML = (tags.length ? `<p class="rpg-tags">${tags.map(s => `<span class="rpg-tag">${s}</span>`).join('')}</p>` : '')
       + `<p class="qlabel">${LABEL[mode]}</p>`
       + (mode === 'f2n' ? `<img class="qflag" src="${flag(a)}" alt="国旗">` : '')
       + (mode === 'n2f' ? `<p class="qbig">${esc(c.n)}</p>` : '');
@@ -287,7 +286,7 @@
 
   // ---- 答える ----
   const answer = a => {
-    if (!B || B.answered || (B.phase !== 'question' && B.phase !== 'revive')) return;
+    if (!B || B.answered || B.phase !== 'question') return;
     B.answered = true;
     const { q } = B, right = a === q.a;
     for (const b of sec.querySelectorAll('.choice')) {
@@ -311,15 +310,6 @@
   const hit = () => {
     const { q } = B;
     B.rights++;
-    if (B.phase === 'revive') {   // 思い出して復活: 攻撃はしない。全部正解したら HP が半分もどる
-      if (B.revive.i + 1 >= B.revive.list.length) {
-        B.revived = true;
-        B.hp = Math.round(B.stats.hp / 2);
-        drawTop();
-        say(`思い出して復活！ HP ${fmt(B.hp)}`);
-      }
-      return wait();
-    }
     const crit = Math.random() < TB.critRate, dmg = K.damage(B.stats.atk, B.combo, crit);
     // 仲間が1枚以上いれば後ろに「（チリ・ペルーの援護）」を足して、仲間カードが跳ねる（assist）。
     // スマホのログは1行で末尾が … で切れるので、ダメージを先に書く
@@ -358,29 +348,21 @@
   const advance = () => {
     if (!B || !B.waiting) return;
     stopTimer();
-    if (B.phase === 'revive') {
-      const rv = B.revive;
-      if (++rv.i < rv.list.length) { B.q = { ...rv.list[rv.i] }; return showQ(); }
-      B.revive = null;
-      setPhase('question');
-    }
     nextQ();
   };
   const miss = () => {
     const { q } = B;
     B.mistakes.push({ a: q.a, mode: q.mode });
     B.missed.add(q.a);
-    if (!B.revive) {
-      B.combo = 0;
-      B.hp = Math.max(0, B.hp - B.en.atk);
-      if (B.boss) { B.order.push(B.order.shift()); B.again = false; }   // いまの旗は後ろに回す
-      else {   // 2問あとに同じ国を別の形式で
-        if (!B.queue.length) B.queue = refill();
-        B.queue.splice(1, 0, { a: q.a, mode: K.nextMode(q.mode, B.floor) });
-      }
-      drawTop();
-      say(`${B.mon.n}の反撃！ ${B.en.atk}ダメージ`);
+    B.combo = 0;
+    B.hp = Math.max(0, B.hp - B.en.atk);
+    if (B.boss) { B.order.push(B.order.shift()); B.again = false; }   // いまの旗は後ろに回す
+    else {   // 2問あとに同じ国を別の形式で
+      if (!B.queue.length) B.queue = refill();
+      B.queue.splice(1, 0, { a: q.a, mode: K.nextMode(q.mode, B.floor) });
     }
+    drawTop();
+    say(`${B.mon.n}の反撃！ ${B.en.atk}ダメージ`);
     RPG.fx('miss', $('bt-hhp'));   // 旅人の HP が赤く光る（ドパガキ ON なら効果音・振動・赤いフラッシュ）
     setPhase('reveal');
     // 答え合わせは選択肢の場所と入れかえて出し、［つぎへ］を押すまで待つ。m2f は地図をもう1枚出さない
@@ -398,19 +380,10 @@
     if (clearTop(rv)) rv.scrollIntoView({ block: 'start', behavior: reduced() ? 'auto' : 'smooth' });
     else nx.scrollIntoView({ block: 'nearest' });
   };
-  // ［つぎへ］: HP が 0 なら思い出して復活（1バトル1回。まちがえた国が無ければ無し）か負け。復活の問題をまちがえたら負け
+  // ［つぎへ］: HP が 0 なら負け（復活はない）
   const next = () => {
     if (!B || B.phase !== 'reveal') return;
-    if (B.revive) return finish(false);
-    if (B.hp <= 0) {
-      const list = K.reviveSet(B.mistakes);
-      if (B.reviveUsed || !list.length) return finish(false);
-      B.reviveUsed = true;
-      B.revive = { list, i: 0 };
-      setPhase('revive');
-      B.q = { ...list[0] };
-      return showQ();
-    }
+    if (B.hp <= 0) return finish(false);
     setPhase('question');
     nextQ();
   };
@@ -439,7 +412,6 @@
       else d.gauge[key] = Math.min(TB.gaugeMax, (d.gauge[key] || 0) + 1);
       const st = d.st, add = k => { st[k] = Math.min(K.BIG, st[k] + 1); };
       add(win ? 'win' : 'lose');
-      if (b.revived) add('revive');
       if (win && b.boss) add('bossWins');
       if (win && !mistakes) add('nodmg');
       st.combo = Math.max(st.combo, b.maxCombo);
@@ -447,7 +419,7 @@
     });
     if (res) {
       const { receipt: rc, d } = res;
-      emit('rpg:battle', { dungeon: b.id, floor: b.floor, boss: b.boss, win, first: res.first, mistakes, revived: b.revived,
+      emit('rpg:battle', { dungeon: b.id, floor: b.floor, boss: b.boss, win, first: res.first, mistakes,
         gauge: res.gauge, maxCombo: b.maxCombo, lv: d.lv, recLv: b.en.recLv });
       if (b.boss && res.first) emit('rpg:clear', { dungeon: b.id });
       RPG.emitCoins(d, res.coins, 'battle');
@@ -585,15 +557,14 @@
 
   window.RPG_BATTLE = {
     start: tryStart,   // 外から呼んでも、例外のときは片付けてから始めていない画面を出す
-    // いまの問題の国コード（問題・答え合わせ・復活のあいだ。ほかは null）
+    // いまの問題の国コード（問題・答え合わせのあいだ。ほかは null）
     cur: () => B && B.q && B.phase !== 'intro' && B.phase !== 'end' ? B.q.a : null,
     state: () => ({ phase: B ? B.phase : null, shownAt: B ? B.shownAt : 0, win: B ? B.win : null }),
     // テストと開発用: いまの問題をその国・形式に置きかえる（ボスはいまの旗の国も入れかえる）。置きかえたら true
     force(a, mode) {
-      if (!B || !byA.has(a) || !MODES.has(mode) || (B.phase !== 'question' && B.phase !== 'revive')) return false;
+      if (!B || !byA.has(a) || !MODES.has(mode) || B.phase !== 'question') return false;
       stopTimer();
-      if (B.revive) B.revive.list[B.revive.i] = { a, mode };
-      else if (B.boss) {
+      if (B.boss) {
         const i = B.order[0], j = B.flags.findIndex(f => f.a === a && !f.got);
         if (j >= 0 && j !== i) B.flags[j].a = B.flags[i].a;   // 同じ国の旗が2枚にならないように入れかえる
         B.flags[i].a = a;
