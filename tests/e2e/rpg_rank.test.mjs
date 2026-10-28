@@ -1,4 +1,5 @@
-// 冒険ランキング（rpg-rank.js の #scr-rpgrank）: 冒険ホームの入口、きみの記録、載せる（偽 Supabase）、レベル順・ダンジョン順、つながらないとき
+// 冒険ランキング（rpg-rank.js の #scr-rpgrank）: 冒険ホームの入口、きみの記録、プロフィールで載せる・自動更新（偽 Supabase）、レベル順・ダンジョン順、
+// 名前を押すとプロフィールの窓、かざり、冒険データを消したとき、つながらないとき
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -36,53 +37,107 @@ t('home_entry_and_my_record', async page => {
   assert.equal(await page.isVisible('#scr-rpg'), true);
 });
 
-t('submit_and_sorts', async (page, app) => {
+// ---- プロフィール ----
+// db にプロフィールを入れて、この端末の localStorage profile も入れる（セーブを書く writeSave の読み込み直しで効く）。id は rpgRows の profile_id に使う
+const T0 = '00000000-0000-4000-8000-0000000000a1', PID = 'chikopid0001';
+const withProfile = async (page, app, { name = 'チコ', token = T0, pid = PID, id = 1, auto = true } = {}) => {
+  app.db.profiles.push({ id, token, nickname: name, pid });
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify(p)), { token, pid, name, auto, isPublic: true, sent: { isPublic: true } });
+};
+const callsOf = (app, name) => app.db.calls.filter(c => c.name === name);
+const until = async (fn, ms = 20000) => {
+  for (const end = Date.now() + ms; !fn(); await new Promise(r => setTimeout(r, 100))) if (Date.now() > end) throw new Error('until: timeout');
+};
+
+t('sorts_me_and_card', async (page, app) => {
+  // 名前・かざりはプロフィールのもの。pid のある名前は押すと窓、古い記録（profile_id なし）は押せない。自分の行は me
+  app.db.profiles.push({ id: 2, token: 't-mike', nickname: 'ミケ', pid: 'mikepid00001', deco: ['jp'] });
   app.db.rpgRows.push(
-    { token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) },
+    { token: 't-mike', profile_id: 2, nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) },
     { token: 't-taro', nickname: 'タロウ', lv: 8, dungeons: 3, floors: 16, created_at: ago(50), at: ago(50) },
+    { token: T0, profile_id: 1, nickname: 'チコ', lv: 12, dungeons: 2, floors: 10, created_at: ago(40), at: ago(40) },
   );
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 12, dungeons: 2, floors: 10 })), PID);
   await writeSave(page, saveWith({ lv: 12, floors: { samerica: 5, oceania: 5 } }));
   await page.evaluate(() => RPG.open('rpgrank'));
-  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
-  assert.ok((await rows(page))[0].startsWith('1 ミケ Lv 30'), (await rows(page))[0]);
-  // 名前の確認（空はだめ）
-  await page.fill('#rr-name', '  ');
-  await page.click('#rr-submit');
-  assert.equal(await text(page, '#rr-msg'), 'ニックネームは1〜12文字で入れてね');
-  // ほかの人と同じ名前はだめ
-  await page.fill('#rr-name', 'ミケ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.includes('ほかの人'));
-  await page.fill('#rr-name', 'チコ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
-  assert.equal(await text(page, '#rr-msg'), '載せたよ！ レベル順 2位・ダンジョン順 2位　これからは自動で更新するね');
-  const calls = app.db.calls.filter(c => c.name === 'rpg_register');
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].args.p_token, calls[1].args.p_token);   // 通らなかったときは同じ合言葉でやり直す
-  const { p_token, ...rest } = calls[1].args;
-  assert.match(p_token, /^[0-9a-f-]{36}$/);
-  assert.deepEqual(rest, { p_nickname: 'チコ', p_lv: 12, p_dungeons: 2, p_floors: 10 });
-  assert.deepEqual(await page.evaluate(() => store.get('rpgRank')), { name: 'チコ', token: p_token, sent: { lv: 12, dungeons: 2, floors: 10 } });
-  // 登録したら、載せるフォームは消えて［名前を変える］だけ
-  assert.equal(await page.isVisible('#rr-form'), false);
-  assert.equal(await page.isVisible('#rr-rename'), true);
-  assert.equal(await page.evaluate(() => store.get('nickname')), 'チコ');
   await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 3);
-  assert.ok((await rows(page))[1].startsWith('2 チコ Lv 12'), (await rows(page)).join('|'));
+  const r = await rows(page);
+  assert.ok(r[0].startsWith('1 ミケ Lv 30') && r[1].startsWith('2 チコ Lv 12') && r[2].startsWith('3 タロウ Lv 8'), r.join('|'));
+  assert.deepEqual(await page.$$eval('#rr-list li', ls => ls.map(l => l.classList.contains('me'))), [false, true, false]);
+  assert.deepEqual(await page.$$eval('#rr-list li .nick', ls => ls.map(l => l.querySelector('.pf-name')?.dataset.pid ?? null)), ['mikepid00001', PID, null]);
+  assert.deepEqual(await page.locator('#rr-list li').first().locator('.rr-deco img').evaluateAll(els => els.map(e => e.alt)), ['日本']);
+  // 送ってある記録といまの記録が同じなので、送らない
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_update2'), []);
+  // 名前を押すとプロフィールの窓
+  await page.click('#rr-list li .pf-name');
+  await page.waitForFunction(() => document.querySelector('#pf-card[open] .pf-card-name')?.textContent.includes('ミケ'));
+  await page.click('#pf-card [data-pfc="close"]');
   // ダンジョン順
   await page.click('#rr-tabs button[data-s="dg"]');
   await page.waitForFunction(() => document.querySelector('#rr-list li .nick')?.textContent === 'タロウ');
-  const r = await rows(page);
-  assert.ok(r[0].startsWith('1 タロウ 🏰3・F16 Lv 8') && r[1].startsWith('2 チコ 🏰2・F10 Lv 12') && r[2].startsWith('3 ミケ'), r.join('|'));
+  const d = await rows(page);
+  assert.ok(d[0].startsWith('1 タロウ 🏰3・F16 Lv 8') && d[1].startsWith('2 チコ 🏰2・F10 Lv 12') && d[2].startsWith('3 ミケ'), d.join('|'));
   assert.equal(await page.getAttribute('#rr-tabs button[data-s="dg"]', 'aria-pressed'), 'true');
+  assert.equal(callsOf(app, 'top_rpg2').length + callsOf(app, 'top_rpg').length, 0);
+});
+
+t('no_profile_shows_postBox', async (page, app) => {
+  // プロフィールが無ければ、名前を入れて［プロフィールを作って載せる］。作ったらこの記録も載る（rpgSent に覚える）
+  app.db.profiles.push({ id: 2, token: 't-mike', nickname: 'ミケ', pid: 'mikepid00001' });
+  app.db.rpgRows.push({ token: 't-mike', profile_id: 2, nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) });
+  await page.evaluate(() => localStorage.setItem('nickname', JSON.stringify('ミケ')));
+  await writeSave(page, saveWith({ lv: 12, floors: { samerica: 5, oceania: 5 } }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  assert.equal(await page.isVisible('#rr-auto'), false);
+  assert.ok((await text(page, '#rr-post')).includes('冒険ランキングに載せる'));
+  assert.equal(await page.inputValue('#rr-post input'), 'ミケ');   // 前に使った名前
+  await page.click('#rr-post .btn');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('ほかの人'));
+  await page.fill('#rr-post input', 'チコ');
+  await page.click('#rr-post .btn');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  assert.ok((await text(page, '#rr-post')).includes('載せたよ！ レベル順 2位・ダンジョン順 1位'), await text(page, '#rr-post'));
+  assert.equal(await page.isVisible('#rr-auto'), false);   // 作って自動になっても、開き直すまでは箱の文のまま
+  const p = app.db.profiles.find(x => x.nickname === 'チコ');
+  assert.ok(p);
+  assert.deepEqual(callsOf(app, 'rpg_update2').map(c => c.args), [{ p_token: p.token, p_lv: 12, p_dungeons: 2, p_floors: 10 }]);
+  assert.deepEqual(app.db.rpgRows.map(r => [r.profile_id, r.lv]), [[2, 30], [p.id, 12]]);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('rpgSent'))), { pid: p.pid, lv: 12, dungeons: 2, floors: 10 });
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpgRank')), null);
+  assert.deepEqual(callsOf(app, 'rpg_register'), []);
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
+  assert.equal(await page.locator('#rr-list li.me .nick').innerText(), 'チコ');
+  // 開き直すと、自動で載るのお知らせ
+  await page.evaluate(() => RPG.open('rpg'));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  assert.equal(await page.isVisible('#rr-auto'), true);
+  assert.equal(await text(page, '#rr-auto-name'), 'チコ');
+  await page.click('#rr-profile');
+  assert.equal(await page.isVisible('#scr-profile'), true);
+});
+
+t('manual_when_auto_off', async (page, app) => {
+  // 自動 OFF: 勝手には送らず、［チコ で載せる］を押したときだけ
+  await withProfile(page, app, { auto: false });
+  await writeSave(page, saveWith({ lv: 7 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_update2'), []);
+  assert.equal(await page.isVisible('#rr-auto'), false);
+  await page.click('#rr-post [data-pf="send"]');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  assert.deepEqual(callsOf(app, 'rpg_update2').map(c => c.args), [{ p_token: T0, p_lv: 7, p_dungeons: 0, p_floors: 0 }]);
+  assert.equal(app.db.rpgRows[0].profile_id, 1);
 });
 
 t('not_started_and_offline', async page => {
-  // まだ旅に出ていなければ載せるフォームは出ない。つながらなければ再読み込みのボタン
+  // まだ旅に出ていなければ載せる箱は出ない。つながらなければ再読み込みのボタン
   await writeSave(page, { v: 1 });
   await page.evaluate(() => RPG.open('rpgrank'));
-  assert.equal(await page.isVisible('#rr-form'), false);
+  assert.equal(await page.locator('#rr-post').innerHTML(), '');
+  assert.equal(await page.isVisible('#rr-auto'), false);
   assert.ok((await text(page, '#rr-me')).includes('まだ旅に出ていないよ'));
   await page.waitForFunction(() => !$('rr-error').hidden);
 }, { supabase: 'down' });
@@ -94,156 +149,90 @@ t('link_from_timeattack_ranking', async page => {
   assert.equal(await page.isVisible('#scr-rpgrank'), true);
 });
 
-t('auto_update_after_register', async (page, app) => {
-  // 1回載せたら登録（rpgRank）。レベルアップすると、前に送ってから11秒あけて自動で送り直す
+t('auto_update_with_profile', async (page, app) => {
+  // プロフィールあり＋自動 ON＋冒険を始めた: 起動時にまだ送っていない記録を送り、レベルアップしたら前に送ってから11秒あけて送り直す
+  await withProfile(page, app);
   await writeSave(page, saveWith({ lv: 3, coins: 100000 }));
+  const sent = () => callsOf(app, 'rpg_update2').map(c => c.args.p_lv);
+  await until(() => sent().length === 1, 8000);
+  assert.deepEqual(callsOf(app, 'rpg_update2')[0].args, { p_token: T0, p_lv: 3, p_dungeons: 0, p_floors: 0 });
   await page.evaluate(() => RPG.open('rpgrank'));
-  await page.fill('#rr-name', 'チコ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
   assert.equal(await page.isVisible('#rr-auto'), true);
   assert.equal(await text(page, '#rr-auto-name'), 'チコ');
   await page.evaluate(() => RPG.open('rpg'));
   await page.click('#rpg-lvup');
-  const sent = () => app.db.calls.filter(c => c.name === 'rpg_update').map(c => c.args.p_lv);
   await page.waitForTimeout(3000);
-  assert.deepEqual(sent(), []);   // まだ11秒たっていない
-  await page.waitForFunction(() => store.get('rpgRank')?.sent?.lv === 4, null, { timeout: 15000 });
-  assert.deepEqual(sent(), [4]);
-  assert.equal(app.db.rpgRows.length, 1);
-  assert.equal(app.db.rpgRows[0].lv, 4);
+  assert.deepEqual(sent(), [3]);   // まだ11秒たっていない
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('rpgSent'))?.lv === 4, null, { timeout: 15000 });
+  assert.deepEqual(sent(), [3, 4]);
+  assert.deepEqual(app.db.rpgRows.map(r => [r.profile_id, r.lv]), [[1, 4]]);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('rpgSent'))), { pid: PID, lv: 4, dungeons: 0, floors: 0 });
+  assert.deepEqual(callsOf(app, 'rpg_update').concat(callsOf(app, 'rpg_set_deco')), []);
 });
 
-t('rename_only', async (page, app) => {
-  // 登録ずみなら、別の名前で新しく登録はできず、名前だけ変わる（記録と合言葉はそのまま）
-  app.db.rpgRows.push({ token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) });
-  await writeSave(page, saveWith({ lv: 5 }));
-  await page.evaluate(() => RPG.open('rpgrank'));
-  await page.fill('#rr-name', 'チコ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('載せたよ'));
-  const token = await page.evaluate(() => store.get('rpgRank').token);
-  await page.click('#rr-rename');
-  assert.equal(await page.isVisible('#rr-form'), true);
-  assert.equal(await page.inputValue('#rr-name'), 'チコ');
-  assert.equal(await text(page, '#rr-submit'), '変える');
-  await page.fill('#rr-name', 'ミケ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.includes('ほかの人'));
-  await page.fill('#rr-name', 'チコチコ');
-  await page.click('#rr-submit');
-  await page.waitForFunction(() => $('rr-msg').textContent.startsWith('名前を'));
-  assert.equal(await text(page, '#rr-msg'), '名前を「チコチコ」に変えたよ');
-  assert.equal(await text(page, '#rr-auto-name'), 'チコチコ');
-  assert.equal(await page.isVisible('#rr-form'), false);
-  assert.equal(app.db.calls.filter(c => c.name === 'rpg_register').length, 1);
-  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_rename').at(-1).args, { p_token: token, p_nickname: 'チコチコ' });
-  assert.deepEqual(app.db.rpgRows.map(r => [r.nickname, r.lv]), [['ミケ', 30], ['チコチコ', 5]]);
-  assert.deepEqual(await page.evaluate(() => store.get('rpgRank')), { name: 'チコチコ', token, sent: { lv: 5, dungeons: 0, floors: 0 } });
-  // 読み込み直しても登録ずみのまま（フォームは出ない）
-  await page.reload();
-  await page.evaluate(() => RPG.open('rpgrank'));
-  assert.equal(await page.isVisible('#rr-form'), false);
-  assert.equal(await text(page, '#rr-auto-name'), 'チコチコ');
-});
-
-t('auto_update_on_startup', async (page, app) => {
-  // 登録していて、前に送った記録より進んでいたら、開いたときに送る
-  const T = '00000000-0000-4000-8000-000000000009';
-  app.db.rpgRows.push({ token: T, nickname: 'ミケ', lv: 2, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) });
-  await page.evaluate(T => store.set('rpgRank', { name: 'ミケ', token: T, sent: { lv: 2, dungeons: 0, floors: 0 } }), T);
+t('sent_is_per_profile', async (page, app) => {
+  // rpgSent の pid がいまのプロフィールとちがえば、送っていない扱い
+  await withProfile(page, app);
+  await page.evaluate(() => localStorage.setItem('rpgSent', JSON.stringify({ pid: 'otherpid0001', lv: 9, dungeons: 1, floors: 5 })));
   await writeSave(page, saveWith({ lv: 9, floors: { samerica: 5 } }));
-  await page.waitForFunction(() => store.get('rpgRank')?.sent?.lv === 9, null, { timeout: 8000 });
-  const call = app.db.calls.find(c => c.name === 'rpg_update');
-  assert.deepEqual(call.args, { p_token: T, p_lv: 9, p_dungeons: 1, p_floors: 5 });
+  await until(() => callsOf(app, 'rpg_update2').length === 1, 8000);
+  assert.deepEqual(callsOf(app, 'rpg_update2')[0].args, { p_token: T0, p_lv: 9, p_dungeons: 1, p_floors: 5 });
+  await page.waitForFunction(p => JSON.parse(localStorage.getItem('rpgSent'))?.pid === p, PID);
   // 同じ記録なら送り直さない
   await page.reload();
   await page.waitForTimeout(2500);
-  assert.equal(app.db.calls.filter(c => c.name === 'rpg_update').length, 1);
+  assert.equal(callsOf(app, 'rpg_update2').length, 1);
 });
 
-t('old_or_deleted_registration', async (page, app) => {
-  // 合言葉の無い前の形の覚え書きは登録していないことに。DB から消されていたら（not_found）登録していないことにもどる
-  await page.evaluate(() => store.set('rpgRank', { name: 'チコ', sent: { lv: 1, dungeons: 0, floors: 0 } }));
-  await writeSave(page, saveWith({ lv: 4 }));
-  await page.evaluate(() => RPG.open('rpgrank'));
-  assert.equal(await page.isVisible('#rr-form'), true);
-  assert.equal(await page.isVisible('#rr-auto'), false);
-  await page.evaluate(() => store.set('rpgRank', { name: 'チコ', token: '00000000-0000-4000-8000-00000000000a', sent: { lv: 1, dungeons: 0, floors: 0 } }));
-  await page.reload();
-  await page.waitForFunction(() => store.get('rpgRank', null) === null, null, { timeout: 8000 });
-  assert.deepEqual(app.db.calls.map(c => c.name).filter(n => n.startsWith('rpg_up')), ['rpg_update']);
-});
-
-// 冒険データを消すと、ランキングからも消える（返事の届かなかった登録の合言葉も）。つながらなければ次の起動で消し直す
-const wipe = async page => {
-  page.on('dialog', d => d.accept());
-  await page.evaluate(() => RPG.open('rpg'));
-  await page.click('#rpg-data summary');
-  await page.click('#rpg-wipe');
-};
-t('wipe_removes_from_ranking', async (page, app) => {
-  const T = '00000000-0000-4000-8000-00000000000b', P = '00000000-0000-4000-8000-00000000000c';
-  app.db.rpgRows.push(
-    { token: T, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) },
-    { token: P, nickname: 'チコ別', lv: 3, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) },
-    { token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) },
-  );
-  await page.evaluate(({ T, P }) => { store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 9, dungeons: 0, floors: 2 } }); store.set('rpgRankPending', P); }, { T, P });
-  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
-  await wipe(page);
-  await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
-  assert.deepEqual(app.db.rpgRows.map(r => r.nickname), ['ミケ']);
-  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_unregister').map(c => c.args.p_token), [T, P]);
-  assert.deepEqual(await page.evaluate(() => [store.get('rpgRank', null), store.get('rpgRankPending', null)]), [null, null]);
-  // 消したあとは登録していない扱い（はじめからやり直すと、載せるフォームが出る）
-  await page.evaluate(() => RPG.open('rpgrank'));
-  assert.equal(await page.isVisible('#rr-auto'), false);
-});
-
-t('wipe_not_registered', async (page, app) => {
+t('lost_when_not_found', async (page, app) => {
+  // サーバーにもうプロフィールが無い（別の端末に引き継がれた）: プロフィールを消して知らせ、載せる箱は作るフォームに
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify({ token: 'gone', pid: p, name: 'チコ', auto: true, isPublic: true, sent: { isPublic: true } })), PID);
   await writeSave(page, saveWith({ lv: 5 }));
-  await wipe(page);
-  await page.waitForTimeout(500);
-  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_unregister'), []);
-  assert.equal(await page.evaluate(() => localStorage.getItem('rpgRankDel')), null);
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => !PROFILE.get(), null, { timeout: 8000 });
+  assert.ok((await page.evaluate(() => window.__toasts)).some(s => s.includes('別の端末に引き継がれた')));
+  await page.waitForFunction(() => !!document.querySelector('#rr-post input'));
+  assert.equal(await page.isVisible('#rr-auto'), false);
 });
 
-t('wipe_offline_retries_on_startup', async (page, app) => {
-  const T = '00000000-0000-4000-8000-00000000000d';
-  app.db.rpgRows.push({ token: T, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
-  await page.evaluate(T => store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 9, dungeons: 0, floors: 2 } }), T);
-  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
-  app.db.down = true;
-  await wipe(page);
-  await page.waitForFunction(() => store.get('rpgRank', null) === null);
-  await page.waitForTimeout(500);
-  assert.deepEqual(await page.evaluate(() => store.get('rpgRankDel')), [T]);   // 消せるまで覚えておく
-  assert.equal(app.db.rpgRows.length, 1);
-  app.db.down = false;
-  await page.reload();
-  await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
-  assert.equal(app.db.rpgRows.length, 0);
+t('rename_shows_in_rpg_ranking', async (page, app) => {
+  // 名前を変えると、冒険ランキングの名前も変わる（表の名前はプロフィールのもの）
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 5, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 5, dungeons: 0, floors: 0 })), PID);
+  await writeSave(page, saveWith({ lv: 5 }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelector('#rr-list li .nick')?.textContent === 'チコ');
+  assert.deepEqual(await page.evaluate(() => PROFILE.rename('チコチコ')), { ok: true });
+  await page.waitForFunction(() => document.querySelector('#rr-list li .nick')?.textContent === 'チコチコ');
+  assert.equal(await text(page, '#rr-auto-name'), 'チコチコ');
+  // 冒険ホームの旅人カードもプロフィールの名前
+  await page.evaluate(() => RPG.open('rpg'));
+  assert.equal(await text(page, '#rpg-name'), 'チコチコ');
 });
 
-// ---- かざり（rpg_set_deco・top_rpg2） ----
-// 登録ずみ（送った記録 = いまの記録）で、仲間 jp・br を持っているセーブ
-const DT = '00000000-0000-4000-8000-0000000000de';
-const registered = async (page, app, fields = {}) => {
-  app.db.rpgRows.push({ token: DT, nickname: 'チコ', lv: 5, dungeons: 0, floors: 0, deco: [], created_at: ago(60), at: ago(60) });
-  await page.evaluate(T => store.set('rpgRank', { name: 'チコ', token: T, sent: { lv: 5, dungeons: 0, floors: 0 } }), DT);
-  await writeSave(page, saveWith({ lv: 5, coins: 100000, cards: { jp: [1, 0], br: [2, 0] }, ...fields }));
-};
+// ---- かざり（プロフィールの profile_set で送り、top_rpg3 がプロフィールのかざりを返す） ----
 const pickDeco = async (page, as) => {
   await page.evaluate(() => show('rpg'));
   await page.click('#rpg-deco');
   for (const a of as) await page.click(`#rpg-deco-dlg .rpg-card[data-a="${a}"]`);
   await page.click('#rpg-deco-ok');
 };
-const callsOf = (app, name) => app.db.calls.filter(c => c.name === name);
-const until = async (fn, ms = 20000) => {
-  for (const end = Date.now() + ms; !fn(); await new Promise(r => setTimeout(r, 100))) if (Date.now() > end) throw new Error('until: timeout');
-};
+
+t('deco_from_profile', async (page, app) => {
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 5, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 5, dungeons: 0, floors: 0 })), PID);
+  await writeSave(page, saveWith({ lv: 5, cards: { jp: [1, 0], br: [2, 0] } }));
+  await pickDeco(page, ['jp']);
+  await until(() => callsOf(app, 'profile_set').some(c => c.args.p_deco?.length === 1), 15000);
+  assert.deepEqual(app.db.profiles[0].deco, ['jp']);
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li .rr-deco img').length === 1);
+  assert.equal(await page.locator('#rr-list li .rr-deco img').getAttribute('alt'), '日本');
+  // 記録は同じなので rpg_update2 は送らない。前の版の rpg_set_deco も使わない
+  assert.deepEqual(callsOf(app, 'rpg_update2').concat(callsOf(app, 'rpg_set_deco')), []);
+});
 
 t('rows_show_deco_flags', async (page, app) => {
   app.db.rpgRows.push(
@@ -258,13 +247,13 @@ t('rows_show_deco_flags', async (page, app) => {
   assert.deepEqual(await li.locator('.rr-deco img').evaluateAll(els => els.map(e => e.alt)), ['日本', 'ブラジル']);   // 知らない 'zz' は出ない
   assert.equal(await page.locator('#rr-list li').nth(1).locator('.rr-deco img').count(), 0);
   assert.ok((await rows(page))[0].startsWith('1 ミケ Lv 30'), (await rows(page))[0]);
-  assert.deepEqual(callsOf(app, 'top_rpg').length, 0);
 });
 
 // スマホ 360×640: かざり3つ・12文字の名前でも名前の列が細くならない（国旗は .nick の中。列は増やさない）
 t('deco_row_phone_width', async (page, app) => {
+  app.db.profiles.push({ id: 3, token: 't-long', nickname: 'あいうえおかきくけこさし', pid: 'longpid00001', deco: ['jp', 'br', 'fr'] });
   app.db.rpgRows.push(
-    { token: 't-long', nickname: 'あいうえおかきくけこさし', lv: 30, dungeons: 7, floors: 35, deco: ['jp', 'br', 'fr'], created_at: ago(60), at: ago(60) },
+    { token: 't-long', profile_id: 3, nickname: 'あいうえおかきくけこさし', lv: 30, dungeons: 7, floors: 35, created_at: ago(60), at: ago(60) },
     { token: 't-taro', nickname: 'タロウ', lv: 8, dungeons: 3, floors: 16, created_at: ago(50), at: ago(50) },
   );
   await writeSave(page, saveWith({ lv: 3 }));
@@ -282,47 +271,97 @@ t('deco_row_phone_width', async (page, app) => {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 }, { viewport: { width: 360, height: 640 } });
 
-t('falls_back_to_top_rpg', async (page, app) => {
-  // DB にまだ top_rpg2 が無い（本番に適用する前）: top_rpg にもどして、かざり無しで今どおり出る
-  delete app.db.rpc.top_rpg2;
-  app.db.rpgRows.push({ token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, deco: ['jp'], created_at: ago(60), at: ago(60) });
+t('without_profile_js', async (page, app) => {
+  // profile.js が読めない（配信漏れ）: ランキングは見るだけ、載せる代わりに「ページを読み直してね」
+  app.db.rpgRows.push({ token: 't-mike', nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) });
   await writeSave(page, saveWith({ lv: 3 }));
   await page.evaluate(() => RPG.open('rpgrank'));
   await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 1);
-  assert.ok((await rows(page))[0].startsWith('1 ミケ Lv 30'), (await rows(page))[0]);
-  assert.equal(await page.locator('#rr-list .rr-deco img').count(), 0);
-  assert.equal(await page.isVisible('#rr-error'), false);
-  assert.ok(callsOf(app, 'top_rpg2').length >= 1 && callsOf(app, 'top_rpg').length >= 1);
+  assert.ok((await text(page, '#rr-post')).includes('ページを読み直してね'));
+  assert.equal(await page.locator('#rr-post input').count(), 0);
+}, { blockScripts: ['badges.js', 'profile.js'] });
+
+// 冒険データを消すと、冒険ランキングからも消える（プロフィールは残る）。つながらなければ rpgUnreg に覚えて次の起動で消し直す
+const wipe = async page => {
+  page.on('dialog', d => d.accept());
+  await page.evaluate(() => RPG.open('rpg'));
+  await page.click('#rpg-data summary');
+  await page.click('#rpg-wipe');
+};
+t('wipe_unregisters', async (page, app) => {
+  // 返事の届かなかった前の版の登録の合言葉（rpgRankPending）も、サーバーではプロフィールになっているかもしれないので一緒に消す
+  const P = '00000000-0000-4000-8000-00000000000c';
+  app.db.profiles.push({ id: 4, token: P, nickname: 'チコ別', pid: 'pendpid00001' }, { id: 2, token: 't-mike', nickname: 'ミケ', pid: 'mikepid00001' });
+  app.db.rpgRows.push(
+    { token: T0, profile_id: 1, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) },
+    { token: P, profile_id: 4, nickname: 'チコ別', lv: 3, dungeons: 0, floors: 0, created_at: ago(60), at: ago(60) },
+    { token: 't-mike', profile_id: 2, nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, created_at: ago(60), at: ago(60) },
+  );
+  await withProfile(page, app);
+  await page.evaluate(({ P, PID }) => { localStorage.setItem('rpgRankPending', JSON.stringify(P)); localStorage.setItem('rpgSent', JSON.stringify({ pid: PID, lv: 9, dungeons: 0, floors: 2 })); }, { P, PID });
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  await wipe(page);
+  await until(() => app.db.rpgRows.length === 1, 8000);
+  assert.deepEqual(app.db.rpgRows.map(r => r.nickname), ['ミケ']);
+  assert.deepEqual(callsOf(app, 'rpg_unregister2').map(c => c.args.p_token), [T0, P]);
+  assert.deepEqual(callsOf(app, 'rpg_unregister'), []);
+  await page.waitForFunction(() => localStorage.getItem('rpgUnreg') === null);
+  assert.deepEqual(await page.evaluate(() => ['rpgSent', 'rpgRankPending'].map(k => localStorage.getItem(k))), [null, null]);
+  assert.equal(await page.evaluate(() => PROFILE.get()?.name), 'チコ');   // プロフィールは残る
+  assert.equal(app.db.profiles.length, 3);
 });
 
-t('deco_change_sends_set_deco', async (page, app) => {
-  // 登録ずみでかざりだけ変えたら rpg_set_deco だけ送る（記録は同じなので rpg_update は送らない）
-  await registered(page, app);
-  await page.waitForTimeout(2000);
-  assert.deepEqual(callsOf(app, 'rpg_set_deco'), []);   // 起動時: かざりは空のままなので送らない
-  await pickDeco(page, ['jp']);
-  await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 1, null, { timeout: 15000 });
-  assert.deepEqual(callsOf(app, 'rpg_set_deco').map(c => c.args), [{ p_token: DT, p_deco: ['jp'] }]);
-  assert.deepEqual(callsOf(app, 'rpg_update'), []);
-  assert.deepEqual(app.db.rpgRows[0].deco, ['jp']);
-  assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 5, dungeons: 0, floors: 0, deco: ['jp'] });
-  // 一覧の自分の行にも出る
-  await page.evaluate(() => RPG.open('rpgrank'));
-  await page.waitForFunction(() => document.querySelectorAll('#rr-list li .rr-deco img').length === 1);
+t('wipe_not_registered', async (page, app) => {
+  await writeSave(page, saveWith({ lv: 5 }));
+  await wipe(page);
+  await page.waitForTimeout(500);
+  assert.deepEqual(callsOf(app, 'rpg_unregister2'), []);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpgUnreg')), null);
 });
 
-t('record_and_deco_both_sent', async (page, app) => {
-  // かざりを変えてからレベルアップ: 記録（rpg_update）とかざり（rpg_set_deco）を1回ずつ、GAP をあけて送る。
-  // どちらが先かは［レベルアップ］を押すまでの時間しだい（WAIT より遅いとかざりが先）なので、順番は見ない
-  await registered(page, app);
-  await pickDeco(page, ['br', 'jp']);
-  await page.click('#rpg-lvup');
-  await until(() => callsOf(app, 'rpg_set_deco').length > 0 && callsOf(app, 'rpg_update').length > 0, 30000);
-  await page.waitForTimeout(1500);
-  const up = callsOf(app, 'rpg_update'), dc = callsOf(app, 'rpg_set_deco');
-  assert.deepEqual(up.map(c => c.args.p_lv), [6]);
-  assert.deepEqual(dc.map(c => c.args.p_deco), [['br', 'jp']]);
-  assert.ok(Math.abs(dc[0].at - up[0].at) >= 10000, String(dc[0].at - up[0].at));
-  await page.waitForFunction(() => store.get('rpgRank')?.sent?.deco?.length === 2);
-  assert.deepEqual(await page.evaluate(() => store.get('rpgRank').sent), { lv: 6, dungeons: 0, floors: 0, deco: ['br', 'jp'] });
+t('wipe_offline_retries_on_startup', async (page, app) => {
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 9, dungeons: 0, floors: 2 })), PID);
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  app.db.down = true;
+  await wipe(page);
+  await page.waitForFunction(() => localStorage.getItem('rpgSent') === null);
+  await page.waitForTimeout(500);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('rpgUnreg'))), [T0]);   // 消せるまで覚えておく
+  assert.equal(app.db.rpgRows.length, 1);
+  app.db.down = false;
+  await page.reload();
+  await page.waitForFunction(() => localStorage.getItem('rpgUnreg') === null, null, { timeout: 8000 });
+  assert.equal(app.db.rpgRows.length, 0);
+});
+
+t('wipe_offline_then_restart_waits', async (page, app) => {
+  // 消し終わる前に冒険をやり直しても、先に消してから新しい記録を送る（あとから消し直して新しい記録まで消さない）
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 9, dungeons: 0, floors: 2 })), PID);
+  await writeSave(page, saveWith({ lv: 9, floors: { samerica: 2 } }));
+  app.db.down = true;
+  await wipe(page);
+  await page.waitForFunction(() => localStorage.getItem('rpgUnreg') !== null);
+  await writeSave(page, saveWith({ lv: 2 }));   // つながらないまま、はじめからやり直した
+  app.db.down = false;
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('rpg:levelup')));
+  await until(() => callsOf(app, 'rpg_update2').length === 1, 8000);
+  const names = app.db.calls.map(c => c.name).filter(n => n === 'rpg_unregister2' || n === 'rpg_update2');
+  assert.equal(names.indexOf('rpg_unregister2') < names.indexOf('rpg_update2') && names.includes('rpg_unregister2'), true, names.join(','));
+  assert.deepEqual(app.db.rpgRows.map(r => r.lv), [2]);
+});
+
+t('old_rpgRankDel_drains', async (page, app) => {
+  // 前の版で消しそこねた合言葉（rpgRankDel）も rpg_unregister2 で消し直す
+  const D = '00000000-0000-4000-8000-00000000000d';
+  app.db.profiles.push({ id: 5, token: D, nickname: 'むかし', pid: 'oldpid000001' });
+  app.db.rpgRows.push({ token: D, profile_id: 5, nickname: 'むかし', lv: 9, dungeons: 0, floors: 2, created_at: ago(60), at: ago(60) });
+  await page.evaluate(D => localStorage.setItem('rpgRankDel', JSON.stringify([D])), D);
+  await page.reload();
+  await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
+  assert.deepEqual(callsOf(app, 'rpg_unregister2').map(c => c.args.p_token), [D]);
+  assert.equal(app.db.rpgRows.length, 0);
 });
