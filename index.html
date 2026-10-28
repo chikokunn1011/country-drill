@@ -386,6 +386,11 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
         <p class="hint">正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。</p>
       </div>
       <div class="field">
+        <span class="lbl">進み方</span>
+        <label class="switch"><input type="checkbox" id="set-quick"> 正解したらすぐ次の問題へ</label>
+        <p class="hint">プレイのクイズで、正解したら国のプロフィールや豆知識を出さずにすぐ次へ進むよ。まちがえたときは今までどおり正解を見せる（タイムアタック・今日の難問・冒険はもともと正解ですぐ進む）。</p>
+      </div>
+      <div class="field">
         <span class="lbl">演出</span>
         <label class="switch"><input type="checkbox" id="set-dopa"> ドパガキ向け</label>
         <p class="hint">正解すると紙吹雪・コンボ・スコア倍率でド派手に盛り上がる、刺激つよめのモード（効果音もド派手になる）。</p>
@@ -566,7 +571,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light' }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light', quick: false }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -809,6 +814,7 @@ const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末�
 function renderSettings() {
   $('set-theme').innerHTML = THEMES.map(([v, l]) => `<button class="chip" aria-pressed="${v === S.theme}" data-th="${v}">${l}</button>`).join('');
   $('set-dopa').checked = S.dopa;
+  $('set-quick').checked = !!S.quick;
   $('set-sound').checked = S.sound;
   $('set-vol').value = S.vol ?? 70;
   $('set-vol').disabled = !S.sound;
@@ -823,6 +829,7 @@ $('set-theme').onclick = e => {
   const b = e.target.closest('[data-th]'); if (!b) return;
   S.theme = b.dataset.th; store.set('settings', S); applyTheme(); renderSettings();
 };
+$('set-quick').onchange = e => { S.quick = e.target.checked; store.set('settings', S); };
 const applyDopa = () => document.body.classList.toggle('dopa', S.dopa);
 $('set-dopa').onchange = e => {
   S.dopa = e.target.checked; store.set('settings', S); applyDopa(); renderSettings();
@@ -928,6 +935,8 @@ let G;
 const TA_GUARD_MS = 250;
 // タイムアタックと今日の難問（daily.js）は、1ミスで終わり・タイムを計る・正解ならすぐ次へ、の同じ進み方
 const timed = () => G.kind === 'ta' || G.kind === 'daily';
+// 正解したら答えを出さずにすぐ次へ進むか。タイムアタック・今日の難問はいつも、練習・挑戦は設定「正解したらすぐ次の問題へ」（S.quick）のとき
+const quick = () => timed() || !!S.quick;
 const QUIT_LABEL = 'やめてモード選択へ';
 function startGame() {
   if (G && !G.ended) endGame('quit');
@@ -995,11 +1004,11 @@ function nextQuestion() {
     if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
     ch.append(b);
   });
-  // タイムアタックは出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
-  ch.onclick = e => { if (timed() && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
+  // すぐ次へ進むとき（quick）は出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
+  ch.onclick = e => { if (quick() && performance.now() - G.shownAt < TA_GUARD_MS) return; const b = e.target.closest('.choice'); if (b && !b.disabled) answer(b.dataset.a); };
   box.append(ch);
-  // タイムアタックは正解だと答えを出さずに次へ進むので、ここに出るのはまちがえたときの正解だけ
-  const slotHint = timed() ? 'まちがえたら、ここに正解が出るよ' : '答えたら、ここに国のプロフィールが出るよ';
+  // すぐ次へ進むときは正解だと答えを出さないので、ここに出るのはまちがえたときの正解だけ
+  const slotHint = quick() ? 'まちがえたら、ここに正解が出るよ' : '答えたら、ここに国のプロフィールが出るよ';
   box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys"><kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる ・ <kbd>Enter</kbd> で次へ</p></div>`);
   G.shownAt = performance.now();
   updateProgress();
@@ -1067,6 +1076,8 @@ function answer(a) {
       G.timeMs = now - G.t0;
       return showResult();
     }
+    // 練習・挑戦も、設定「正解したらすぐ次の問題へ」なら同じように進む（まちがえたときは下の答え合わせを出す）
+    if (right && S.quick) return nextQuestion();   // 最後の問題なら nextQuestion が結果を出す
     if (G.kind === 'ta') { G.failed = true; $('ptime').textContent = RANKING.formatTime(now - G.t0); endGame('fail'); }
   }
   const r = document.createElement('div');
@@ -1233,8 +1244,8 @@ function taResult(board, timeMs, questions) {
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
-  // タイムアタックでは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
-  if (/^[1-4]$/.test(e.key) && !(e.repeat && timed())) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
+  // すぐ次へ進むときは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
+  if (/^[1-4]$/.test(e.key) && !(e.repeat && quick())) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
 });
 
