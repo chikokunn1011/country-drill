@@ -379,3 +379,122 @@ for (const [label, viewport] of [['phone', PHONE], ['narrow', { width: 320, heig
     assert.deepEqual(r.out, []);
   }, { viewport });
 }
+
+// ---- 引き継ぎ（コードを出す・入れる） ----
+// confirm は受けて、文を dialogs に積む（Playwright は何もしないと閉じてしまう）
+const acceptDialogs = page => { const dialogs = []; page.on('dialog', d => { dialogs.push(d.message()); d.accept(); }); return dialogs; };
+// 2つ目の端末（新しいブラウザコンテキスト）。偽DB は a の db を使う（rpc を a のものにする）
+async function secondDevice(a, opts = {}) {
+  const b = await openApp(browser, { blockScripts: RPG_FILES, ...opts });
+  Object.assign(b.db.rpc, a.db.rpc);
+  await b.page.waitForFunction(() => window.PROFILE);
+  return b;
+}
+// プロフィール画面でコードを入れて、読み直しが終わるまで待つ
+async function claim(page, code) {
+  await openProfile(page);
+  await page.fill('#pf-tr-in', code);
+  await Promise.all([page.waitForEvent('load'), page.click('#pf-tr-claim')]);
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+}
+
+t('transfer moves data', async (page, app) => {
+  const { db } = app;
+  const dialogs = acceptDialogs(page);
+  await openWithProfile(page, db);
+  await page.evaluate(() => { localStorage.setItem('rpg', '{"v":1,"coins":123}'); localStorage.setItem('evil', '"x"'); });
+  await openProfile(page);
+  await page.click('#pf-tr-start');
+  await page.locator('#pf-tr-code').waitFor();
+  assert.match(dialogs[0], /この端末のデータ（冒険・バッジ・設定など）を預けて、コードを出すよ/);
+  assert.equal(db.transfers.length, 1);
+  const code = db.transfers[0].code;
+  assert.equal(await text(page, '#pf-tr-code'), code.match(/.{4}/g).join('-'));
+  assert.match(await text(page, '#pf-tr-exp'), /^\d{1,2}\/\d{1,2} \d{2}:\d{2} まで/);
+  // 預けたのは一覧のキーだけ・生の文字列のまま
+  assert.equal(db.transfers[0].data.v, 1);
+  assert.equal(db.transfers[0].data.keys.rpg, '{"v":1,"coins":123}');
+  assert.equal(db.transfers[0].data.keys.evil, undefined);
+  assert.equal(db.transfers[0].data.keys.profile, undefined);
+  // 新しい端末: 小文字・空白まじりでも入れられる
+  const b = await secondDevice(app);
+  try {
+    const bd = acceptDialogs(b.page);
+    await b.page.evaluate(() => localStorage.setItem('rpg', '"old"'));
+    await claim(b.page, ' ' + code.slice(0, 6).toLowerCase() + ' ' + code.slice(6));
+    assert.match(bd[0], /この端末の今のデータ.*上書きされる/);
+    const p = await stored(b.page, 'profile');
+    assert.equal(p.name, 'チコ');
+    assert.equal(p.pid, PID);
+    assert.notEqual(p.token, 'tok-1');
+    assert.equal(db.profiles[0].token, p.token);
+    assert.equal(await b.page.evaluate(() => localStorage.getItem('rpg')), '{"v":1,"coins":123}');
+    assert.equal(await stored(b.page, 'nickname'), 'チコ');
+    assert.equal((await stored(b.page, 'transferBackup')).keys.rpg, '"old"');   // 前の値は退避（badges.js が起動時に書く badges も入る）
+    await b.page.locator('.toast', { hasText: 'チコ のプロフィールを引き継いだよ' }).waitFor();
+    assert.deepEqual(b.errors.map(String), []);
+  } finally { await b.close(); }
+  // 前の端末: 次にサーバーとやりとりしたとき not_found → 知らせて、作るフォームになる（ゲームのデータはそのまま）
+  await page.click('#brand');
+  await openProfile(page);
+  await page.locator('.toast', { hasText: 'このプロフィールは別の端末に引き継がれたよ' }).waitFor();
+  await page.locator('#pf-form').waitFor();
+  assert.equal(await stored(page, 'profile'), null);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpg')), '{"v":1,"coins":123}');
+}, { blockScripts: RPG_FILES });
+
+// 引き継ぎで受け取ったデータに一覧外のキーや文字列でない値があっても、一覧のキーの文字列だけ書き戻す
+t('claim ignores unknown keys', async (page, { db }) => {
+  db.profiles.push({ id: 1, token: 'old', nickname: 'ミケ' });
+  db.transfers.push({ code: 'ABCDEFGHJKLM', profile_id: 1, data: { v: 1, keys: { evil: '"x"', rpg: 123, bview: '"list"', profile: '{"token":"t","pid":"p","name":"n"}' } },
+    expires_at: new Date(Date.now() + 864e5).toISOString(), used_at: null });
+  acceptDialogs(page);
+  await page.evaluate(() => localStorage.setItem('rpg', '"before"'));
+  await claim(page, 'ABCD-EFGH-JKLM');
+  assert.equal(await page.evaluate(() => localStorage.getItem('evil')), null);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpg')), '"before"');
+  assert.equal(await page.evaluate(() => localStorage.getItem('bview')), '"list"');
+  const p = await stored(page, 'profile');
+  assert.equal(p.name, 'ミケ');
+  assert.equal(p.token, db.profiles[0].token);
+  // 形がちがうデータは何もしない
+  assert.equal(await page.evaluate(() => PROFILE.unpack({ v: 2, keys: { bview: '"x"' } })), false);
+  assert.equal(await page.evaluate(() => PROFILE.unpack({ v: 1, keys: ['x'] })), false);
+  assert.equal(await page.evaluate(() => PROFILE.unpack(null)), false);
+  assert.equal(await page.evaluate(() => localStorage.getItem('bview')), '"list"');
+}, { blockScripts: RPG_FILES });
+
+t('bad code', async (page, { db }) => {
+  const dialogs = acceptDialogs(page);
+  await openProfile(page);
+  // 形がちがうコードは送らない
+  await page.fill('#pf-tr-in', 'abc');
+  await page.click('#pf-tr-claim');
+  await page.locator('#pf-tr-msg', { hasText: 'コードがちがうか、期限が切れているみたい' }).waitFor();
+  assert.equal(dialogs.length, 0);
+  // 形は合っていても、出していないコード
+  await page.fill('#pf-tr-in', 'AAAA-BBBB-CCCC');
+  await page.click('#pf-tr-claim');
+  await page.waitForFunction(() => document.querySelector('#pf-tr-msg').textContent === 'コードがちがうか、期限が切れているみたい' && !document.querySelector('#pf-tr-claim').disabled);
+  assert.equal(dialogs.length, 1);
+  assert.ok(db.calls.some(c => c.name === 'profile_transfer_claim'));
+  assert.equal(await stored(page, 'profile'), null);
+});
+
+// この端末にプロフィールがあれば、確認の文にその名前も出す。出し直すと前のコードは使えない
+t('claim over own profile and reissue', async (page, { db }) => {
+  const dialogs = acceptDialogs(page);
+  await openWithProfile(page, db);
+  await openProfile(page);
+  await page.click('#pf-tr-start');
+  await page.locator('#pf-tr-code').waitFor();
+  const first = await text(page, '#pf-tr-code');
+  await page.click('#pf-tr-start');
+  await page.waitForFunction(f => document.querySelector('#pf-tr-code')?.textContent !== f, first);
+  assert.equal(db.transfers.filter(x => x.data != null).length, 1);
+  await page.fill('#pf-tr-in', first);
+  await page.click('#pf-tr-claim');
+  await page.locator('#pf-tr-msg', { hasText: 'コードがちがうか' }).waitFor();
+  assert.match(dialogs.at(-1), /この端末のプロフィール「チコ」は使えなくなる/);
+});

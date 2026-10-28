@@ -3,7 +3,7 @@
   // サイト共通のプロフィール（window.PROFILE）: 端末ごとに1つ。合言葉（token、端末で作る UUID）で本人確認して、タイムアタック・今日の難問・冒険のランキングに載せる。
   // サーバー側は supabase/schema.sql の profiles と profile_create / profile_me / profile_rename / profile_set（ranking.js の RANKING.profile*）。
   // ここが持つもの: localStorage の profile・プロフィール画面（#scr-profile）・結果画面の「載せる」箱（postBox）・称号やバッジの数の同期・rpgRank からの引っ越し・
-  // ランキングの名前のセル（nameHTML）とプロフィールの窓（openCard、<dialog id="pf-card">）。
+  // ランキングの名前のセル（nameHTML）とプロフィールの窓（openCard、<dialog id="pf-card">）・引き継ぎ（データを預けてコードを出す・コードを入れて受け取る）。
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
 
   const NEED = {
@@ -144,6 +144,68 @@
     else console.warn('[profile] profile_set', r.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
   for (const type of ['badge:title', 'badge:earned', 'rpg:deco']) document.addEventListener(type, scheduleSync);
+
+  // ---- 引き継ぎ ----
+  // 預けるキー（同じ github.io のほかのサイトのデータを持っていかないよう、全部ではなくこの一覧）と、預けないキー（端末ごとのもの）。
+  // localStorage のキーを足したらどちらかに入れる（tests/unit/transfer-keys.test.mjs がコードの中のキーと文字で比べる）
+  const TRANSFER_KEYS = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'bdgcat', 'bview'];
+  const LOCAL_KEYS = ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'badges-broken'];
+  const rawGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  // { v: 1, keys: { キー: 中身の文字列 } }。一覧のキーで、この端末にあるものだけ（JSON にせず生の文字列のまま）
+  const pack = () => {
+    const keys = {};
+    for (const k of TRANSFER_KEYS) { const v = rawGet(k); if (typeof v === 'string') keys[k] = v; }
+    return { v: 1, keys };
+  };
+  // 受け取ったデータを書き戻す。一覧のキーの文字列だけ（一覧に無いキー・文字列でない値は無視）。
+  // 書く前に、いまの一覧のキーの値を transferBackup に1つだけ退避する。v や形がちがえば何もしないで false
+  const unpack = data => {
+    const keys = data?.keys;
+    if (!data || typeof data !== 'object' || data.v !== 1 || !keys || typeof keys !== 'object' || Array.isArray(keys)) return false;
+    const backup = {};
+    for (const k of TRANSFER_KEYS) { const v = rawGet(k); if (v != null) backup[k] = v; }
+    store.set('transferBackup', { at: Date.now(), keys: backup });
+    for (const k of TRANSFER_KEYS) {
+      if (!Object.hasOwn(keys, k) || typeof keys[k] !== 'string') continue;
+      try { localStorage.setItem(k, keys[k]); } catch (e) { console.warn('[profile] unpack', k, e); }
+    }
+    return true;
+  };
+  // コードは12文字（0/O/1/I なし）。表示は XXXX-XXXX-XXXX、入力は全角・小文字・ハイフン・空白まじりでもよい（ranking.js の transferClaim と同じそろえ方）
+  const normCode = c => String(c ?? '').normalize('NFKC').replace(/[\s\-\u2010-\u2015\u2212\u30fc]/g, '').toUpperCase();
+  const codeOk = c => /^[A-HJ-NP-Z2-9]{12}$/.test(c);
+  const fmtCode = c => c.match(/.{1,4}/g).join('-');
+  // 日本時間の「10/29 16:05」
+  const jstTime = d => {
+    const j = new Date(d.getTime() + 9 * 3600e3), two = n => String(n).padStart(2, '0');
+    return `${j.getUTCMonth() + 1}/${j.getUTCDate()} ${two(j.getUTCHours())}:${two(j.getUTCMinutes())}`;
+  };
+  let issued = null;   // この画面で出したコード { token, code, expiresAt }（描き直しても出したままにする）
+  // 前の端末: データを預けてコードをもらう。出し直すと前のコードは使えなくなる（サーバーがそうする）
+  const startTransfer = async () => {
+    const p = read();
+    if (!p) return { ok: false, reason: 'not_found' };
+    const r = await RANKING.transferStart({ token: p.token, data: pack() });
+    if (!r.ok) { if (r.reason === 'not_found') lost(); return { ok: false, reason: r.reason }; }
+    issued = { token: p.token, code: r.code, expiresAt: r.expiresAt };
+    return { ok: true, code: r.code, expiresAt: r.expiresAt };
+  };
+  // 新しい端末: 新しい合言葉とコードを送って、プロフィールとデータを受け取る。データを書き戻して profile を新しい合言葉で書く（読み直しは呼ぶ側）。
+  // 公開・称号・かざりは profile_me で取りなおす（取れなければ公開のまま送らない。非公開をこちらから公開に戻さないように）
+  const claimTransfer = async code => {
+    const token = newToken();
+    const r = await RANKING.transferClaim({ code, newToken: token });
+    if (!r.ok) return { ok: false, reason: r.reason };
+    if (!unpack(r.data)) console.warn('[profile] 引き継ぎのデータの形がちがうので、データは移さなかった');
+    const me = await RANKING.profileMe({ token }).catch(() => ({ ok: false }));
+    const isPublic = me.ok ? me.isPublic !== false : true;
+    const sent = me.ok ? { isPublic, title: me.title, deco: me.deco } : { isPublic };
+    // claimed: 読み直したあとに「◯◯ のプロフィールを引き継いだよ」を1回出す印
+    store.set(KEY, { token, pid: r.pid, name: r.nickname, auto: true, isPublic, sent, claimed: true });
+    store.set('nickname', r.nickname);   // データの nickname より、プロフィールの名前が本物
+    drop(PENDING);
+    return { ok: true, name: r.nickname };
+  };
 
   // ---- 結果画面の「載せる」箱 ----
   // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。プロフィールがあって自動 ON ならすぐ送る、自動 OFF なら［載せる］、
@@ -303,8 +365,64 @@
   // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］
   const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function'; };
   const field = (lbl, body) => `<div class="field"><span class="lbl">${lbl}</span>${body}</div>`;
+  // プロフィール画面を開いたら、まだ使えるか確かめる（別の端末に引き継がれていたら not_found → lost で作るフォームに）
+  const checkMe = async p => {
+    let r;
+    try { r = await RANKING.profileMe({ token: p.token }); } catch { return; }
+    if (!r.ok && r.reason === 'not_found' && read()?.token === p.token) lost();
+  };
+  // 出したコード（無い・期限切れ・別のプロフィールのものなら消す）
+  const drawIssued = () => {
+    const out = $('pf-tr-out'), p = read();
+    if (!out) return;
+    if (!issued || issued.token !== p?.token || issued.expiresAt <= new Date()) { out.innerHTML = ''; return; }
+    out.innerHTML = `<div class="pf-tr-box"><p class="pf-tr-code mono" id="pf-tr-code">${fmtCode(issued.code)}</p>`
+      + `<p class="hint" id="pf-tr-exp">${jstTime(issued.expiresAt)} まで・1回だけ使えるよ。出し直すと前のコードは使えなくなる</p>`
+      + '<button type="button" class="btn ghost" id="pf-tr-copy">コピー</button></div>';
+    $('pf-tr-copy').onclick = () => {
+      const c = fmtCode(issued.code), fail = () => toast('コピーできなかった。コードを長押ししてコピーしてね');
+      try { navigator.clipboard.writeText(c).then(() => toast('コピーしたよ'), fail); } catch { fail(); }
+    };
+  };
+  // 引き継ぎの欄。プロフィールがあれば［引き継ぎコードを出す］、いつも［引き継ぎコードを入れる］（spec §2.5）
+  const renderTransfer = p => {
+    const box = $('pf-transfer');
+    box.innerHTML = (p ? field('引き継ぎ', '<p class="hint">新しい端末に、プロフィールとこの端末のデータ（冒険・バッジ・設定など）を移せるよ</p>'
+        + '<button type="button" class="btn ghost pf-tr-start" id="pf-tr-start">引き継ぎコードを出す</button><div id="pf-tr-out" role="status"></div>') : '')
+      + field('<label for="pf-tr-in">引き継ぎコードを入れる</label>', '<form class="pf-form" id="pf-tr-form" novalidate><div class="row">'
+        + '<input id="pf-tr-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" placeholder="XXXX-XXXX-XXXX">'
+        + '<button class="btn ghost" id="pf-tr-claim">入れる</button></div></form><p class="tamsg" id="pf-tr-msg" role="status"></p>'
+        + '<p class="hint">前の端末で出したコードを入れると、この端末にプロフィールとデータが移るよ</p>');
+    if (p) {
+      drawIssued();
+      $('pf-tr-start').onclick = async () => {
+        if (!confirm('この端末のデータ（冒険・バッジ・設定など）を預けて、コードを出すよ。新しい端末でコードを入れると、この端末のプロフィールは使えなくなる')) return;
+        const btn = $('pf-tr-start'), out = $('pf-tr-out');
+        btn.disabled = true; out.innerHTML = '<p class="tamsg">送信中…</p>';
+        const r = await startTransfer();
+        if (!btn.isConnected) return;   // not_found で描き直した
+        btn.disabled = false;
+        if (r.ok) drawIssued();
+        else out.innerHTML = `<p class="tamsg ng">${esc(RANKING.message(r.reason))}</p>`;
+      };
+    }
+    // confirm してから claim する（先に claim するとコードが使われてしまう）。名前は読み直したあとのトーストに出す
+    $('pf-tr-form').onsubmit = async e => {
+      e.preventDefault();
+      const btn = $('pf-tr-claim'), msg = $('pf-tr-msg'), code = normCode($('pf-tr-in').value);
+      if (!codeOk(code)) { msg.className = 'tamsg ng'; msg.textContent = RANKING.message('bad_code'); return; }
+      const now = read();
+      if (!confirm('コードのプロフィールとデータをこの端末に移すよ。この端末の今のデータ（冒険・バッジ・設定など）は上書きされる'
+        + (now ? `。この端末のプロフィール「${now.name}」は使えなくなる` : ''))) return;
+      btn.disabled = true; msg.className = 'tamsg'; msg.textContent = '送信中…';
+      const r = await claimTransfer(code);
+      if (r.ok) { location.reload(); return; }
+      btn.disabled = false; msg.className = 'tamsg ng'; msg.textContent = RANKING.message(r.reason);
+    };
+  };
   function render() {
     const p = read(), main = $('pf-main');
+    renderTransfer(p);
     if (!p) {
       main.innerHTML = '<p class="pf-lead">プロフィールを作ると、タイムアタック・今日の難問・冒険のランキングにこの名前で載るよ。</p>'
         + field('<label for="pf-name">プロフィールを作る</label>', '<form class="pf-form" id="pf-form" novalidate><div class="row">'
@@ -334,6 +452,7 @@
         + '<label class="switch"><input type="checkbox" id="pf-auto"> 記録をランキングに自動で載せる</label>'
         + '<p class="hint">オフにすると、結果画面の［載せる］を押したときだけ載るよ</p>');
     loadMe(p);
+    checkMe(p);
     $('pf-rename-in').value = p.name;
     $('pf-public').checked = p.isPublic !== false;
     $('pf-auto').checked = p.auto !== false;
@@ -384,9 +503,16 @@
   };
   const ready = migrate().catch(e => console.warn('[profile] migrate', e));
   // badges.js・rpg.js はこの後に読むので、全部読み終わってから比べる
-  const boot = () => ready.then(scheduleSync);
+  // 引き継いで読み直したところなら、1回だけ知らせる
+  const welcome = () => {
+    const p = read();
+    if (!p?.claimed) return;
+    update(p.token, { claimed: undefined });
+    toast(`${esc(p.name)} のプロフィールを引き継いだよ`, 5000);
+  };
+  const boot = () => ready.then(() => { welcome(); scheduleSync(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
   else boot();
 
-  window.PROFILE = { get, create, rename, setAuto, setPublic, auto: () => !!get()?.auto, lost, postBox, nameHTML, cardHTML, openCard, ready };
+  window.PROFILE = { get, create, rename, setAuto, setPublic, auto: () => !!get()?.auto, lost, postBox, nameHTML, cardHTML, openCard, pack, unpack, ready };
 })();
