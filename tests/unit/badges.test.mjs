@@ -57,7 +57,7 @@ test('fresh_shape', () => {
   assert.deepEqual(Object.keys(d.s), ['right', 'streak', 'm', 'ov', 'wk', 'bk', 'rc', 'perf', 'flaw', 'cf', 'grit', 'ta', 'taAvg',
     'clears', 'days', 'last', 'back', 'dopa', 'fever', 'rpg']);
   assert.deepEqual(plain(d.s.rpg.boss), []);
-  assert.deepEqual(plain(d.s.rpg), { start: 0, win: 0, nodmg: 0, under: 0, phoenix: 0, friend: 0, master: 0, lv: 0, owned: 0, bounty: 0, boss: [] });
+  assert.deepEqual(plain(d.s.rpg), { start: 0, win: 0, nodmg: 0, under: 0, friend: 0, master: 0, lv: 0, owned: 0, bounty: 0, boss: [] });
   assert.notEqual(K.fresh().s, d.s);   // 毎回新しいオブジェクト
   assert.deepEqual(plain(K.MODE_BIT), { f2n: 1, n2f: 2, m2f: 4, f2m: 8 });
   assert.ok(K.KEY_RE.test('reg-asia@2') && !K.KEY_RE.test('reg-asia@0') && !K.KEY_RE.test('Reg@1'));
@@ -246,18 +246,19 @@ test('rpg_ops', () => {
   run(K, X, [rp('answer', { a: 'zz', right: true, mode: 'f2n' })], d);
   assert.equal(d.s.right, 2);
 
-  const win = { dungeon: 'asia', floor: 5, boss: true, win: true, first: true, mistakes: 0, revived: true, gauge: 0, maxCombo: 12, lv: 3, recLv: 8 };
+  const win = { dungeon: 'asia', floor: 5, boss: true, win: true, first: true, mistakes: 0, gauge: 0, maxCombo: 12, lv: 3, recLv: 8 };
   d = run(K, X, [rp('battle', win)]);
   assert.equal(d.s.days, 1);
   assert.equal(d.s.streak, 12);
-  for (const k of ['win', 'nodmg', 'under', 'phoenix']) assert.equal(d.s.rpg[k], 1, k);
+  for (const k of ['win', 'nodmg', 'under']) assert.equal(d.s.rpg[k], 1, k);
   assert.equal(run(K, X, [rp('battle', { ...win, lv: 4 })]).s.rpg.under, 0);
   d = run(K, X, [rp('battle', { ...win, win: false })]);
-  for (const k of ['win', 'nodmg', 'under', 'phoenix']) assert.equal(d.s.rpg[k], 0, k);
+  for (const k of ['win', 'nodmg', 'under']) assert.equal(d.s.rpg[k], 0, k);
   assert.equal(d.s.days, 1);
   assert.equal(d.s.streak, 12);
   d = run(K, X, [rp('battle', { ...win, boss: false, mistakes: 2 })]);
-  assert.deepEqual([d.s.rpg.win, d.s.rpg.nodmg, d.s.rpg.under, d.s.rpg.phoenix], [1, 0, 0, 1]);
+  assert.deepEqual([d.s.rpg.win, d.s.rpg.nodmg, d.s.rpg.under], [1, 0, 0]);
+  assert.equal(d.s.rpg.phoenix, undefined, '復活のバッジ（不死鳥）は無い');
 
   d = run(K, X, [rp('levelup', { lv: 12, from: 11 }), rp('levelup', { lv: 5, from: 4 })]);
   assert.equal(d.s.rpg.lv, 12);
@@ -288,8 +289,8 @@ test('pick_shapes', () => {
   assert.equal(K.pickResult({ timeMs: NaN }).timeMs, null);
   assert.equal(K.pickResult({ hint: 'yes' }).hint, true);
   // rpg:* の detail から決まったキーだけ
-  assert.deepEqual(plain(K.pickRpg('battle', { dungeon: 'asia', floor: 5, boss: 1, win: 'y', first: true, mistakes: '2', revived: 0, gauge: 3,
-    maxCombo: 7.9, lv: '4', recLv: 10 }, 'battle')), { boss: true, win: true, mistakes: 2, revived: false, maxCombo: 7, lv: 4, recLv: 10 });
+  assert.deepEqual(plain(K.pickRpg('battle', { dungeon: 'asia', floor: 5, boss: 1, win: 'y', first: true, mistakes: '2', revived: 1, gauge: 3,
+    maxCombo: 7.9, lv: '4', recLv: 10 }, 'battle')), { boss: true, win: true, mistakes: 2, maxCombo: 7, lv: 4, recLv: 10 });
   assert.deepEqual(plain(K.pickRpg('levelup', { lv: '9', from: 8 })), { lv: 9 });
   assert.deepEqual(plain(K.pickRpg('join', { a: 'jp', via: 'learn', owned: '3' })), { via: 'learn', owned: 3 });
   assert.deepEqual(plain(K.pickRpg('promote', { a: 'jp', star: 2 }, 'home')), { learn: true });
@@ -441,17 +442,17 @@ const badge = (cat, id) => cat.find(b => b.id === id);
 const IDS = ['first-clear', 'answers', 'streak', 'overcome', 'micro', 'prac-perfect', 'chal-flawless', 'chal-grit', 'ta-clear', 'ta-speed',
   'mode-f2n', 'mode-n2f', 'mode-m2f', 'mode-f2m', 'reg-samerica', 'reg-oceania', 'reg-namerica', 'reg-europe', 'reg-asia', 'reg-africa', 'reg-world',
   'book', 'days', 'comeback', 'dopa-on', 'dopa-fever', 'rpg-start', 'rpg-first-win', 'rpg-lv', 'rpg-boss', 'rpg-final', 'rpg-nodmg', 'rpg-underdog',
-  'rpg-phoenix', 'rpg-friend', 'rpg-master', 'rpg-cards', 'rpg-bounty'];
+  'rpg-friend', 'rpg-master', 'rpg-cards', 'rpg-bounty'];
 
 test('catalog_counts', () => {
   const { K, cat, x0, xr } = cat0();
   assert.equal(K.visible(cat, x0).length, 26);
   assert.equal(stepCount(K.visible(cat, x0)), 66);
-  assert.equal(K.visible(cat, xr).length, 38);
-  assert.equal(stepCount(K.visible(cat, xr)), 86);
+  assert.equal(K.visible(cat, xr).length, 37);
+  assert.equal(stepCount(K.visible(cat, xr)), 85);
   const byColor = { 1: 0, 2: 0, 3: 0, 4: 0 };
   for (const b of K.visible(cat, xr)) for (const t of b.tiers) byColor[t.color]++;
-  assert.deepEqual(byColor, { 1: 30, 2: 30, 3: 24, 4: 2 });
+  assert.deepEqual(byColor, { 1: 30, 2: 29, 3: 24, 4: 2 });
 });
 
 test('catalog_shape', () => {
@@ -463,8 +464,8 @@ test('catalog_shape', () => {
   assert.equal(new Set(cat.map(b => b.id)).size, cat.length);
   for (const k of keysOf(cat)) assert.ok(K.KEY_RE.test(k), k);
   const titles = cat.flatMap(b => b.tiers.map(t => t.title));
-  assert.equal(titles.length, 86);
-  assert.equal(new Set(titles).size, 86);
+  assert.equal(titles.length, 85);
+  assert.equal(new Set(titles).size, 85);
   for (const t of titles) assert.ok(typeof t === 'string' && t && [...t].length <= 10, t);
   for (const b of cat) for (const t of b.tiers) {
     assert.ok(typeof t.desc === 'string' && t.desc.length > 0, b.id);
@@ -477,7 +478,7 @@ test('catalog_shape', () => {
     'dopa-fever': 'ドパガキ向けで、王冠が見えるまで…',
   });
   assert.deepEqual(plain(cat.filter(b => b.rpg).map(b => b.id)), IDS.filter(id => id.startsWith('rpg-')));
-  assert.equal(cat.filter(b => b.rpg).length, 12);
+  assert.equal(cat.filter(b => b.rpg).length, 11);
   // 印と単位
   assert.deepEqual(plain(cat.filter(b => b.lower).map(b => b.id)), ['ta-speed']);
   assert.deepEqual(plain(cat.filter(b => b.skill).map(b => b.id)), ['streak', 'overcome', 'micro', 'prac-perfect', 'chal-flawless', 'chal-grit',
@@ -492,7 +493,7 @@ test('catalog_shape', () => {
   // 1段だけのバッジの色
   assert.deepEqual(Object.fromEntries(cat.filter(b => b.tiers.length === 1).map(b => [b.id, b.tiers[0].color])), {
     'first-clear': 1, micro: 2, 'chal-grit': 2, comeback: 1, 'dopa-on': 1, 'dopa-fever': 2, 'rpg-start': 1, 'rpg-first-win': 1, 'rpg-final': 4,
-    'rpg-nodmg': 2, 'rpg-underdog': 3, 'rpg-phoenix': 2, 'rpg-friend': 1, 'rpg-master': 2,
+    'rpg-nodmg': 2, 'rpg-underdog': 3, 'rpg-friend': 1, 'rpg-master': 2,
   });
 });
 
@@ -556,12 +557,12 @@ test('reach_every_step', () => {
   for (let i = 0; i < 30; i++) ops.push(res({ outcome: 'fail' }, { day: dayAfter(14 + i) }));   // DAY のあと14日あけて30日
   ops.push(res({ best: 20 }, { dopa: true }));
   ops.push(rp('coins', { reason: 'start' }),
-    rp('battle', { boss: true, win: true, mistakes: 0, revived: true, maxCombo: 3, lv: 1, recLv: 10 }), rp('levelup', { lv: 50 }));
+    rp('battle', { boss: true, win: true, mistakes: 0, maxCombo: 3, lv: 1, recLv: 10 }), rp('levelup', { lv: 50 }));
   for (const dungeon of X.DUNGEONS) ops.push(rp('clear', { dungeon }));
   ops.push(rp('join', { via: 'learn', owned: 195 }), rp('promote', { via: 'learn', star: 2 }), rp('bounty', { totalDays: 30 }));
   const d = run(K, X, ops);
   const all = keysOf(cat);
-  assert.equal(all.length, 86);
+  assert.equal(all.length, 85);
   assert.deepEqual(plain(K.evaluate(cat, d, xr)), all);
 });
 
@@ -650,7 +651,7 @@ test('progress_and_summary', () => {
   s.s.right = 150;
   s.got = { 'answers@1': 1700000000000, 'rpg-lv@1': 2, 'future@1': 3 };
   assert.deepEqual(plain(K.summarize(cat, s, x0)), { got: 1, total: 26, byColor: { 1: 1, 2: 0, 3: 0, 4: 0 } });
-  assert.deepEqual(plain(K.summarize(cat, s, xr)), { got: 2, total: 38, byColor: { 1: 2, 2: 0, 3: 0, 4: 0 } });
+  assert.deepEqual(plain(K.summarize(cat, s, xr)), { got: 2, total: 37, byColor: { 1: 2, 2: 0, 3: 0, 4: 0 } });
   // 色はそのバッジで取った一番上の段の色。バッジは1つと数える
   s.got = { 'reg-world@1': 1, 'reg-world@3': 2, 'answers@2': 3 };
   assert.deepEqual(plain(K.summarize(cat, s, x0)), { got: 2, total: 26, byColor: { 1: 0, 2: 1, 3: 0, 4: 1 } });
@@ -658,7 +659,7 @@ test('progress_and_summary', () => {
   s.got = { 'answers@1': 1700000000000 };
   const lv = K.listView(cat, s, x0);
   assert.equal(lv.length, 26);
-  assert.equal(K.listView(cat, s, xr).length, 38);
+  assert.equal(K.listView(cat, s, xr).length, 37);
   const a = lv.find(b => b.id === 'answers');
   assert.deepEqual(plain(a.tiers[0]), { key: 'answers@1', got: 1700000000000, title: 'こつこつ派', goal: 100, val: 150 });
   assert.deepEqual(plain(a.tiers[1]), { key: 'answers@2', got: 0, title: '努力の人', goal: 1000, val: 150 });

@@ -1,4 +1,4 @@
-// 国旗クエストのバトル（rpg-battle.js）: 登場画面・4択・ボスの旗・思い出して復活・勝ち負けの記録・にげる・キー操作・ゴーストタップ対策
+// 国旗クエストのバトル（rpg-battle.js）: 登場画面・4択・ボスの旗・勝ち負けの記録・にげる・キー操作・ゴーストタップ対策
 // どのテストも badges.js を止め、Math.random を種1にして開く（openRpg）。セーブは writeSave(page, saveWith({…})) で入れる
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,8 +67,8 @@ t('win_first_floor', async page => {
   assert.deepEqual([d.floors.samerica, d.coins, d.st.win], [1, 36, 1]);
   const b = await events(page, 'rpg:battle');
   assert.equal(b.length, 1);
-  assert.deepEqual(pick(b[0], { dungeon: 0, floor: 0, boss: 0, win: 0, first: 0, mistakes: 0, revived: 0, gauge: 0, lv: 0, recLv: 0 }),
-    { dungeon: 'samerica', floor: 1, boss: false, win: true, first: true, mistakes: 0, revived: false, gauge: 0, lv: 1, recLv: 1 });
+  assert.deepEqual(pick(b[0], { dungeon: 0, floor: 0, boss: 0, win: 0, first: 0, mistakes: 0, gauge: 0, lv: 0, recLv: 0 }),
+    { dungeon: 'samerica', floor: 1, boss: false, win: true, first: true, mistakes: 0, gauge: 0, lv: 1, recLv: 1 });
   assert.equal(b[0].maxCombo, n);
   assert.deepEqual((await events(page, 'rpg:coins')).map(e => pick(e, { delta: 0, reason: 0 })), [{ delta: 36, reason: 'battle' }]);
   assert.equal((await events(page, 'rpg:answer')).length, n);
@@ -137,13 +137,12 @@ t('wrong_reveal_waits', async page => {
   assert.equal(await hp(page), 36 - 11);
 });
 
-t('lose_revive_fail_practice', async page => {
+t('lose_no_revive_practice', async page => {
   await writeSave(page, saveWith({}));
   await startBattle(page, 'samerica', 1);
-  for (let i = 0; i < 4; i++) await battleAnswer(page, false);
-  assert.equal(await phase(page), 'revive');
-  assert.ok((await text(page, '#bt-q')).includes('思い出して復活'));
-  await battleAnswer(page, false);
+  for (let i = 0; i < 3; i++) await battleAnswer(page, false);
+  assert.equal(await phase(page), 'question');
+  await battleAnswer(page, false);   // HP 36 → 0。復活は無く、そのまま負け
   assert.equal(await phase(page), 'end');
   const s = await text(page, '#bt-end');
   for (const x of ['やられた…！ でも、まちがえた国はもう覚えたはず', 'がんばり賞', 'がんばりゲージ 1/5']) assert.ok(s.includes(x), `${x} が無い: ${s}`);
@@ -153,40 +152,14 @@ t('lose_revive_fail_practice', async page => {
   const d = await readSave(page);
   assert.equal(d.gauge['samerica:1'], 1);
   assert.equal(d.coins, Math.min(rights * 2, 6));
-  assert.deepEqual([d.st.lose, d.st.revive, d.floors.samerica], [1, 0, undefined]);
-  assert.deepEqual(pick((await events(page, 'rpg:battle'))[0], { win: 0, revived: 0, gauge: 0, mistakes: 0 }), { win: false, revived: false, gauge: 1, mistakes: 5 });
+  assert.deepEqual([d.st.lose, d.st.revive, d.floors.samerica], [1, undefined, undefined]);
+  assert.deepEqual(pick((await events(page, 'rpg:battle'))[0], { win: 0, revived: 0, gauge: 0, mistakes: 0 }), { win: false, revived: undefined, gauge: 1, mistakes: 4 });
   // この地域を練習する
   await page.click('#bt-practice');
   assert.equal(await page.isVisible('#scr-setup'), true);
   assert.deepEqual(await page.evaluate(() => [S.region, P.kind]), ['南アメリカ', 'practice']);
   assert.equal(await page.getAttribute('#regions .chip[data-r="南アメリカ"]', 'aria-pressed'), 'true');
   assert.equal(await phase(page), null);
-});
-
-t('revive_success_then_win', async page => {
-  await writeSave(page, saveWith({}));
-  await startBattle(page, 'samerica', 1);
-  for (let i = 0; i < 4; i++) await battleAnswer(page, false);
-  assert.equal(await phase(page), 'revive');
-  while (await phase(page) === 'revive') await battleAnswer(page, true);
-  assert.equal(await phase(page), 'question');
-  assert.equal(await hp(page), 18);   // 最大 HP 36 の半分
-  await winBattle(page);
-  let b = await events(page, 'rpg:battle');
-  assert.deepEqual(pick(b.at(-1), { win: 0, revived: 0 }), { win: true, revived: true });
-  assert.equal((await readSave(page)).st.revive, 1);
-  // 別のバトル: 復活は1回だけ
-  await startBattle(page, 'samerica', 1);
-  for (let i = 0; i < 4; i++) await battleAnswer(page, false);
-  while (await phase(page) === 'revive') await battleAnswer(page, true);
-  assert.equal(await hp(page), 18);
-  await battleAnswer(page, false);
-  assert.equal(await phase(page), 'question');
-  await battleAnswer(page, false);
-  assert.equal(await phase(page), 'end');
-  assert.ok((await text(page, '#bt-end')).includes('やられた…！'));
-  b = await events(page, 'rpg:battle');
-  assert.deepEqual(pick(b.at(-1), { win: 0, revived: 0 }), { win: false, revived: true });
 });
 
 t('gauge_shows_and_resets', async page => {

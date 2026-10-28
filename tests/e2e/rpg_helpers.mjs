@@ -81,16 +81,16 @@ export async function startBattle(page, id, floor) {
   await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
 }
 // いまの問題に正解／不正解で答える。不正解なら答え合わせの［つぎへ］まで押す。
-// 正解なら次の問題が出る（shownAt が変わる）か、バトルが終わる・思い出して復活に入るまで待つ
+// 正解なら次の問題が出る（shownAt が変わる）か、バトルが終わるまで待つ
 export async function battleAnswer(page, right) {
   await battleGuard(page);
-  const { a, shownAt, phase } = await page.evaluate(() => ({ a: RPG_BATTLE.cur(), ...RPG_BATTLE.state() }));
+  const { a, shownAt } = await page.evaluate(() => ({ a: RPG_BATTLE.cur(), ...RPG_BATTLE.state() }));
   await page.locator(right ? `#scr-battle .choice[data-a="${a}"]` : `#scr-battle .choice:not([data-a="${a}"])`).first().click();
   if (!right) { await page.click('#bt-next'); return; }
-  await page.waitForFunction(([t0, p0]) => {
+  await page.waitForFunction(t0 => {
     const s = RPG_BATTLE.state();
-    return s.shownAt !== t0 || s.phase === 'end' || (s.phase === 'revive' && p0 !== 'revive');
-  }, [shownAt, phase]);
+    return s.shownAt !== t0 || s.phase === 'end';
+  }, shownAt);
 }
 // 終わるまで正解し続ける。正解した数を返す
 export async function winBattle(page) {

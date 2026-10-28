@@ -44,7 +44,7 @@ async function startPractice(page) {
 t('loads_and_counts', async page => {
   assert.deepEqual(await page.evaluate(() => ({
     title: typeof BADGES.title, count: BADGES.count(), text: BADGES.title(), key: BADGES.titleKey(),
-    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=3"]'),
+    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=5"]'),
   })), { title: 'function', count: { got: 0, total: 26, byColor: { 1: 0, 2: 0, 3: 0, 4: 0 } }, text: '', key: null, css: true, js: true });
 });
 
@@ -917,7 +917,7 @@ async function withRpg(app, snap = {}, paid = 50) {
 }
 // 偽の rpg.js が受け取った badge:earned の detail（paid を書く前）
 const earned = page => page.evaluate(() => window.__earned);
-const BATTLE_WIN = { dungeon: 'samerica', floor: 1, boss: false, win: true, first: true, mistakes: 0, revived: false, gauge: 0, maxCombo: 3, lv: 10, recLv: 1 };
+const BATTLE_WIN = { dungeon: 'samerica', floor: 1, boss: false, win: true, first: true, mistakes: 0, gauge: 0, maxCombo: 3, lv: 10, recLv: 1 };
 
 // rpg.js が無いときは冒険のバッジを出さず、badge:earned も出さない
 t('rpg_hidden_without_rpg', async page => {
@@ -936,7 +936,7 @@ t('rpg_hidden_without_rpg', async page => {
 // 起動時に snapshot からさかのぼる。払いは retro: true で1つずつ1回、トーストはまとめて1枚。読み直しても二度払いしない
 t('rpg_retro_on_startup', async (page, app) => {
   await withRpg(app, { intro: true, lv: 12, owned: 60, floors: { samerica: 5 }, st: { win: 3 }, bountyDays: 2, overcome: { jp: 1 } });
-  assert.equal(await page.evaluate(() => BADGES.count().total), 38);
+  assert.equal(await page.evaluate(() => BADGES.count().total), 37);
   const want = ['rpg-start@1', 'rpg-first-win@1', 'rpg-lv@1', 'rpg-boss@1', 'rpg-cards@1', 'rpg-bounty@1', 'overcome@1'].sort();
   const ev = await earned(page);
   assert.deepEqual(ev.map(e => e.id).sort(), want);
@@ -1043,7 +1043,7 @@ t('rpg_battle_end_one_notice', async (page, app) => {
   await withRpg(app, {});
   await page.evaluate(() => {
     const go = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-    go('rpg:battle', { dungeon: 'oceania', floor: 5, boss: true, win: true, first: true, mistakes: 0, revived: false, gauge: 0, maxCombo: 3, lv: 3, recLv: 9 });
+    go('rpg:battle', { dungeon: 'oceania', floor: 5, boss: true, win: true, first: true, mistakes: 0, gauge: 0, maxCombo: 3, lv: 3, recLv: 9 });
     go('rpg:clear', { dungeon: 'oceania' });
     go('rpg:coins', { delta: 100, reason: 'battle', coins: 100, earned: 100 });
     go('rpg:join', { a: 'jp', via: 'learn', owned: 1 });
