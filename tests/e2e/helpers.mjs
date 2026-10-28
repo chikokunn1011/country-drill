@@ -74,6 +74,9 @@ export function fakeDb() {
     const me = { lv, dungeons, floors }, above = sort => rpgBests(sort).filter(r => cmpKeys(RPG_KEYS[sort](r), RPG_KEYS[sort](me)) < 0).length + 1;
     return { rank_lv: above('lv'), rank_dg: above('dg') };
   };
+  // 今日の難問の行 { day, nickname, correct, total, time_ms, created_at }
+  const dailyRows = [];
+  const dailyRank = (day, correct, t) => dailyRows.filter(r => r.day === day && (r.correct > correct || (r.correct === correct && r.time_ms < t))).length + 1;
   const rankOf = (board, t) => ({
     rank_all: bests(board).filter(r => r.time_ms < t).length + 1,
     rank_week: bests(board, weekStart()).filter(r => r.time_ms < t).length + 1,
@@ -133,9 +136,22 @@ export function fakeDb() {
     top_rpg2: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, deco, at }) => ({ nickname, lv, dungeons, floors, deco: deco ?? [], created_at: at })) : [],
     top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
+    // 今日の難問（submit_daily / top_daily / daily_rank_of と同じ形。日付は形だけ、名前は文字数と同じ日の重なりだけ見る）
+    submit_daily({ p_day, p_nickname, p_correct, p_total, p_time_ms }) {
+      const nickname = String(p_nickname ?? '').trim(), len = [...nickname].length;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(p_day ?? '')) return { ok: false, reason: 'bad_day' };
+      if (len < 1 || len > 12) return { ok: false, reason: 'bad_name' };
+      if (dailyRows.some(r => r.day === p_day && r.nickname === nickname)) return { ok: false, reason: 'name_taken' };
+      dailyRows.push({ day: p_day, nickname, correct: p_correct, total: p_total, time_ms: p_time_ms, created_at: new Date().toISOString() });
+      return { ok: true, rank: dailyRank(p_day, p_correct, p_time_ms) };
+    },
+    top_daily: ({ p_day }) => dailyRows.filter(r => r.day === p_day)
+      .sort((a, b) => b.correct - a.correct || a.time_ms - b.time_ms || Date.parse(a.created_at) - Date.parse(b.created_at)).slice(0, 50)
+      .map(({ nickname, correct, total, time_ms, created_at }) => ({ nickname, correct, total, time_ms, created_at })),
+    daily_rank_of: ({ p_day, p_correct, p_time_ms }) => ({ rank: dailyRank(p_day, p_correct, p_time_ms) }),
   };
   // calls: 届いた RPC の記録 { name, args, at }（at は届いた時刻 ms）。down を true にすると通信失敗になる
-  return { rows, rpgRows, calls: [], down: false, rpc };
+  return { rows, rpgRows, dailyRows, calls: [], down: false, rpc };
 }
 
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'apikey, content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
@@ -147,7 +163,7 @@ async function supabaseRoute(route, db) {
   db.calls.push({ name, args, at: Date.now() });
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
-  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors'].some(k => k in args && !Number.isInteger(args[k]));
+  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total'].some(k => k in args && !Number.isInteger(args[k]));
   if (!fn || badInt) return route.fulfill({ status: fn ? 400 : 404, headers: CORS, contentType: 'application/json', body: JSON.stringify({ message: 'fake supabase: bad request' }) });
   return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(fn(args)) });
 }
@@ -211,8 +227,9 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
   if (count) await page.click(`#counts .chip[data-c="${count}"]`);
 }
 
-// タイムアタックは問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
-export const settle = page => page.waitForFunction(() => G.kind !== 'ta' || performance.now() - G.shownAt >= TA_GUARD_MS);
+// タイムアタックと今日の難問は問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
+// （timed が無い変更前のコードではタイムアタックだけ）
+export const settle = page => page.waitForFunction(() => !(typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS);
 // 結果画面も出した直後（TA_GUARD_MS の間）は結果のボタンを押せない。その間が過ぎるまで待つ
 // （resultAt が無い変更前のコードでは待たない。GEOM_BASE の比較で clearTimeAttack を古いコードにも使うため）
 export const settleResult = page => page.waitForFunction(() => typeof resultAt === 'undefined' || performance.now() - resultAt >= TA_GUARD_MS);

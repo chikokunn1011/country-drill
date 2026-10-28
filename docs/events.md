@@ -23,6 +23,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `drill:screen` | `show(name)` で画面を切りかえるたび | `{name}` | `show()` 1回につき1回 |
 | `drill:book-open` | 図鑑で国の詳細を開いたとき: 一覧のカードで詳細を開いた／地図で国をタップした | `{a}` | 開くたびに1回（同じ国でも毎回）。地図の検索で1件にしぼったときの自動選択では出ない |
 | `drill:misses-reset` | 設定の［まちがえた記録を消す］を押したとき（`misses` を空にして保存した直後） | `{}` | 押すたびに1回 |
+| `drill:daily` | 今日の難問（`startDaily()`、`kind: 'daily'`）で正解したとき（最後の問題以外）と、終わったとき（全問正解・まちがえ・途中で離れた） | `{phase: 'answer', done, timeMs}` か `{phase: 'end', outcome, done, timeMs}`。`timeMs` は1問目からその時点まで（ミリ秒）。受け取るのは `daily.js` | 正解ごとに1回、終わりは1回のゲームにつき1回。今日の難問では `drill:start` `drill:answer` `drill:result` は出ない（バッジ・冒険のコイン・苦手の記録に入れない） |
 
 `drill:result` の決まり:
 

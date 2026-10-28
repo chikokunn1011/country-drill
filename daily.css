@@ -1,0 +1,25 @@
+/* 今日の難問（daily.js の #scr-daily） */
+.daily .dl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.daily .dl-date { margin: 0; color: var(--muted); font-weight: 500; }
+.daily .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.daily .col + .col { margin-top: 8px; }
+.dl-intro { display: flex; flex-direction: column; gap: 10px; }
+.dl-lead { margin: 0; font-size: 1.05rem; }
+.dl-rules { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+#dl-start { min-width: 200px; padding-block: 14px; font-size: 1.15rem; }
+.dl-result .tabox { margin-top: 4px; }
+.dl-next { margin: 4px 0 0; }
+.dl-list .dl-all { color: var(--ok); }
+.dl-list li.me { border-color: var(--accent); border-width: 2px; }
+.dl-ans summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.dl-qs { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dl-qs li { display: grid; grid-template-columns: 1.2em 1.8em 40px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: .92rem; }
+.dl-qs img { width: 40px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
+.dl-qs b { min-width: 0; overflow-wrap: anywhere; }
+.dl-qs .dl-mode { font-size: .78rem; color: var(--muted); text-align: right; }
+.dl-qs .dl-no { color: var(--muted); text-align: right; }
+.dl-ok { color: var(--ok); font-weight: 900; } .dl-ng { color: var(--ng); font-weight: 900; } .dl-skip { color: var(--muted); }
+.dl-new { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--ng); color: #fff; font: 700 .7rem var(--font-mono); vertical-align: middle; letter-spacing: .05em; }
+@media (min-width: 900px) {
+  .daily .col + .col { margin-top: 0; }
+}
