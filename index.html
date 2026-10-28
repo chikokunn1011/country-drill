@@ -30,8 +30,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <script>
-// 画面の色（設定の theme）を描く前に当てる。'auto' や未設定なら data-theme を付けず、端末の設定に合わせる
-try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+// 画面の色（設定の theme、未設定はライト）を描く前に当てる。'auto' なら data-theme を付けず、端末の設定に合わせる
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
 </script>
 <style>
 /* Layout: 地図帳の1ページ。ホーム→モード選択→出題カード。地図は選んだ地域に合わせて切り出す */
@@ -564,7 +564,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'auto' }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light' }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -771,7 +771,7 @@ $('to-settings').onclick = () => show('settings');
 $('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="">`).join('');
 
 /* ---------- 設定 ---------- */
-const THEMES = [['auto', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']];
+const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末に合わせる']];
 function renderSettings() {
   $('set-theme').innerHTML = THEMES.map(([v, l]) => `<button class="chip" aria-pressed="${v === S.theme}" data-th="${v}">${l}</button>`).join('');
   $('set-dopa').checked = S.dopa;

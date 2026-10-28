@@ -269,6 +269,7 @@ t('badges_screen_pc', async page => {
   assert.ok(m.cols >= 6, `列が少ない: ${json(m)}`);
   assert.ok(await noHScroll(page));
   await page.emulateMedia({ colorScheme: 'dark' });
+  await page.evaluate(() => { S.theme = 'auto'; applyTheme(); });   // はじめはライト固定なので、端末に合わせる
   for (const [w, h] of [[390, 844], [1440, 900]]) { await vp(w, h); assert.ok(await noHScroll(page), `dark ${w}x${h}`); }
 }, { viewport: { width: 1024, height: 768 } });
 
@@ -1225,4 +1226,4 @@ t('dark_dopa_layouts', async page => {
     await page.evaluate(() => show('badges'));
     assert.ok(await noHScroll(page), `badges ${key}`);
   }
-}, { colorScheme: 'dark', storage: { settings: DOPA, badges: { v: 1, got: { 'answers@1': 1, 'answers@2': 1, 'answers@3': 1 }, eq: 'answers@3', sn: { answers: 2 } } } });
+}, { colorScheme: 'dark', storage: { settings: { ...DOPA, theme: 'auto' }, badges: { v: 1, got: { 'answers@1': 1, 'answers@2': 1, 'answers@3': 1 }, eq: 'answers@3', sn: { answers: 2 } } } });

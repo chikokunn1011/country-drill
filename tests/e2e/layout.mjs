@@ -164,6 +164,7 @@ export async function openScene(browser, { scene, viewport, url, dopa, colorSche
   if (!SCENES[scene]) throw new Error(`そんな場面はない: ${scene}`);
   const storage = dopa ? { settings: { region: 'all', dopa: true, sound: false } } : {};
   if (badges) storage.badges = badges;
+  if (colorScheme) storage.settings = { ...storage.settings, theme: 'auto' };   // 画面の色ははじめライト固定。colorScheme を渡したら端末に合わせる
   const app = await openApp(browser, { viewport, url, seed: 1, reducedMotion: 'reduce', colorScheme, blockScripts, storage });
   try {
     await SCENES[scene](app.page);
