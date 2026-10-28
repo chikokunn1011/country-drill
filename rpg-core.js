@@ -14,13 +14,15 @@
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
     battle: { winBase: 10, winPerStage: 2, firstMul: 3, bossFirst: 200, losePerRight: 2, comboStep: 0.1, comboMax: 5,
-              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8,
+              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8, recStep3: 0.85,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
     // 編成: 枠は最大 slots 個。slotCost[i] は i+2 枠目の値段。bonus[n] は同じグループ n 枚のときのチームボーナス
     team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
+    // 宇宙のテーマ: 小さい国・大きい国の数（面積の順）、赤道の国の緯度（±度）
+    space: { small: 40, big: 40, equator: 12 },
   };
   const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
 
@@ -41,10 +43,18 @@
     { id: 'masia', base: 'asia', ch: 2, r: 'アジア', name: '鏡の山脈', plate: 'PLATE 12 · MIRROR ASIA', color: '#7d4336', flags: 9, land: '鏡のアジア' },
     { id: 'mafrica', base: 'africa', ch: 2, r: 'アフリカ', name: '鏡のサバンナ', plate: 'PLATE 13 · MIRROR AFRICA', color: '#766019', flags: 10, land: '鏡のアフリカ' },
     { id: 'mworld', base: 'world', ch: 2, r: 'all', name: '鏡の地図喰いの巣', plate: 'PLATE 14 · MIRROR WORLD', color: '#374045', flags: 12, land: '鏡の世界' },
+    // 第3章 宇宙: 地域ではなくテーマ（t は THEMES のキー）で国をしぼる。r は全部 'all'（ガチャ・セーブの地域と同じ値のまま）。e は太陽系の地図に出す星
+    { id: 'moon', ch: 3, r: 'all', t: 'island', e: '🌕', name: '月', plate: 'PLATE 15 · MOON', color: '#b8b4a8', flags: 9, land: '月' },
+    { id: 'mercury', ch: 3, r: 'all', t: 'small', e: '☿', name: '水星', plate: 'PLATE 16 · MERCURY', color: '#8f8a86', flags: 9, land: '水星' },
+    { id: 'venus', ch: 3, r: 'all', t: 'equator', e: '♀', name: '金星', plate: 'PLATE 17 · VENUS', color: '#d6a54e', flags: 10, land: '金星' },
+    { id: 'mars', ch: 3, r: 'all', t: 'landlocked', e: '🔴', name: '火星', plate: 'PLATE 18 · MARS', color: '#c25a3c', flags: 10, land: '火星' },
+    { id: 'jupiter', ch: 3, r: 'all', t: 'big', e: '🪐', name: '木星', plate: 'PLATE 19 · JUPITER', color: '#b98a62', flags: 11, land: '木星' },
+    { id: 'saturn', ch: 3, r: 'all', t: 'south', e: '🪐', name: '土星', plate: 'PLATE 20 · SATURN', color: '#c9b27a', flags: 11, land: '土星' },
+    { id: 'blackhole', ch: 3, r: 'all', e: '🕳️', name: '星喰いの巣', plate: 'PLATE 21 · BLACK HOLE', color: '#3a3550', flags: 12, land: '宇宙' },
   ];
   // 章。last はその章の最後のダンジョン（ここをクリアすると章クリア）
-  const CHAPTERS = [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }];
-  const STORY_IDS = ['ch1', 'ch2'];   // セーブの story に入るもの（読んだストーリー）
+  const CHAPTERS = [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }, { ch: 3, name: '宇宙', e: '🪐', last: 'blackhole' }];
+  const STORY_IDS = ['ch1', 'ch2', 'ch3start', 'ch3'];   // セーブの story に入るもの（読んだストーリー）
   const chapterOf = id => DUNGEONS.find(d => d.id === id)?.ch ?? null;
   const dungeonsOf = ch => DUNGEONS.filter(d => d.ch === ch);
   // F1〜F4 とボス（5件目）
@@ -62,6 +72,27 @@
   for (const g of dungeonsOf(2)) {
     MONSTERS[g.id] = [...MONSTERS[g.base].slice(0, 4).map((m, i) => ({ e: m.e, n: (i % 2 ? 'さかさ' : '鏡の') + m.n })), MIRROR_BOSS[g.base]];
   }
+  // 宇宙の F1〜F4 とボス
+  Object.assign(MONSTERS, {
+    moon: [{ e: '🛸', n: 'ちびUFO' }, { e: '🪨', n: 'クレーター岩' }, { e: '🌠', n: 'まいご流れ星' }, { e: '🤖', n: '月面ロボ' }, { e: '🐇', n: '月のウサギ大王' }],
+    mercury: [{ e: '☀️', n: 'じりじり太陽風' }, { e: '🪨', n: 'ちび小惑星' }, { e: '🛰️', n: 'まよい衛星' }, { e: '🌡️', n: '温度計おばけ' }, { e: '☄️', n: 'ほうき星' }],
+    venus: [{ e: '☁️', n: '硫酸の雲' }, { e: '🌋', n: '金星火山' }, { e: '⚡', n: 'かみなり雲' }, { e: '🥵', n: 'あつがり星人' }, { e: '🔥', n: '金星の炎' }],
+    mars: [{ e: '🤖', n: '探査ロボ' }, { e: '🌪️', n: '赤い砂あらし' }, { e: '🛸', n: '火星UFO' }, { e: '🐙', n: 'タコ型火星人' }, { e: '👽', n: '火星人の将軍' }],
+    jupiter: [{ e: '🌕', n: 'ガリレオ衛星' }, { e: '🌩️', n: 'ガスのいなずま' }, { e: '🧲', n: '磁場のうず' }, { e: '🎈', n: 'ふわふわガス' }, { e: '🌀', n: '大赤斑' }],
+    saturn: [{ e: '🧊', n: '氷のかけら' }, { e: '💍', n: '輪っかの石' }, { e: '🌫️', n: 'もやもや衛星' }, { e: '🚀', n: '迷子ロケット' }, { e: '💫', n: '輪っかの番人' }],
+    blackhole: [{ e: '🌌', n: 'ゆがんだ銀河' }, { e: '⭐', n: '吸いこまれ星' }, { e: '🕳️', n: '小さな穴' }, { e: '👁️', n: '星喰いの目' }, { e: '🌑', n: '星喰い' }],
+  });
+  // 宇宙のテーマ。n は答えのあとに出す名前、a は国コード。島国・内陸国は手書き、ほかは countries.js の面積（ar）・緯度（ll[0]）から作る
+  const SP = TUNING.space, byArea = [...C].sort((x, y) => x.ar - y.ar).map(c => c.a);   // 面積の小さい順
+  const THEMES = {
+    // 国土が島だけで、ほかの国と陸の国境がない国
+    island: { n: '島国', a: 'ag bs bb bh cv km cu cy dm fj gd is jm jp ki lk mv mg mh mt mu fm nr nz pw ph lc vc ws st sc sg sb kn to tt tv vu'.split(' ') },
+    small: { n: '小さい国', a: byArea.slice(0, SP.small) },
+    equator: { n: '赤道の国', a: C.filter(c => Math.abs(c.ll[0]) <= SP.equator).map(c => c.a) },
+    landlocked: { n: '内陸国', a: 'af am at az by bo bw bf bi cf td cz sz et hu kz xk kg la ls li lu mw ml md mn np ne mk py rw sm rs ss sk ch tj tm ug uz va zm zw ad'.split(' ') },
+    big: { n: '大きい国', a: byArea.slice(-SP.big).reverse() },
+    south: { n: '南半球の国', a: C.filter(c => c.ll[0] < 0).map(c => c.a) },
+  };
   const AVATARS = ['🧙', '🧝', '🦸', '🤠', '🦊', '🐱', '🐶', '🐧'];
   // mb（ヒントなしで正解したモード）のビット
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8, cap: 16 };
@@ -87,13 +118,18 @@
   };
 
   // ---- 敵の強さ（式だけ。フロアごとの数字は手で書かない） ----
-  // ステージ番号 1〜70（第1章 1〜35、第2章 36〜70）。floor は 1〜4 が通常、5 がボス
+  // ステージ番号 1〜105（第1章 1〜35、第2章 36〜70、第3章 71〜105）。floor は 1〜4 が通常、5 がボス
   const stageOf = (id, floor) => 5 * DUNGEONS.findIndex(d => d.id === id) + floor;
-  // 第1章の最後のステージまでは 1 + floor((s-1) × recStep)。そのさき（第2章）は、そこの推奨 Lv から recStep2 ずつ
+  // 第1章の最後のステージまでは 1 + floor((s-1) × recStep)。そのさき（第2章）は、そこの推奨 Lv から recStep2 ずつ。
+  // 第3章は第2章の最後の推奨 Lv から recStep3 ずつ
   const recLv1 = s => 1 + Math.floor((s - 1) * TUNING.battle.recStep);
-  const recLv = s => {
+  const recLv2 = s => {
     const last = 5 * dungeonsOf(1).length;
     return s <= last ? recLv1(s) : recLv1(last) + Math.round((s - last) * TUNING.battle.recStep2);
+  };
+  const recLv = s => {
+    const last = 5 * (dungeonsOf(1).length + dungeonsOf(2).length);
+    return s <= last ? recLv2(s) : recLv2(last) + Math.round((s - last) * TUNING.battle.recStep3);
   };
   // 推奨 Lv・仲間なしで、通常は正解約5回で勝ち・ミス3回まで OK。ボスは旗1枚が1発・ミス3回まで OK
   const enemy = (id, floor) => {
@@ -118,6 +154,9 @@
     return Math.round(atk * (1 + B.comboStep * Math.min(combo, B.comboMax)) * (crit ? B.critMul : 1));
   };
 
+  // 国 a がダンジョン dg の国か（地域ボーナス）。テーマがあればテーマに入るか、無ければ全世界か同じ地域
+  const inDungeon = (dg, a) => dg.t ? THEMES[dg.t].a.includes(a) : dg.r === 'all' || REGION.get(a) === dg.r;
+
   // ---- 仲間カードとバトルでの値 ----
   // card = [★, かさね]、fr = なかよし度。丸めない
   const cardAtk = ([star, stack], fr, bonus) => {
@@ -128,7 +167,7 @@
   const party = (d, id) => {
     const dg = dungeonOf(id), fr = d.fr || {};
     return Object.entries(d.cards || {})
-      .map(([a, card]) => ({ a, star: card[0], atk: cardAtk(card, fr[a], !!dg && (dg.r === 'all' || REGION.get(a) === dg.r)) }))
+      .map(([a, card]) => ({ a, star: card[0], atk: cardAtk(card, fr[a], !!dg && inDungeon(dg, a)) }))
       .sort((x, y) => y.atk - x.atk || y.star - x.star || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0))
       .slice(0, 3).map(({ a, atk }) => ({ a, atk }));
   };
@@ -167,7 +206,7 @@
     if (!tm || !Array.isArray(tm.c)) return party(d, id);
     const dg = dungeonOf(id), fr = d.fr || {}, cards = d.cards || {};
     return tm.c.filter(a => Object.prototype.hasOwnProperty.call(cards, a))
-      .map(a => ({ a, atk: cardAtk(cards[a], fr[a], !!dg && (dg.r === 'all' || REGION.get(a) === dg.r)) }));
+      .map(a => ({ a, atk: cardAtk(cards[a], fr[a], !!dg && inDungeon(dg, a)) }));
   };
   // (旅人 ＋ 仲間) ×（1 + 0.05 × がんばりゲージ）×（1 + チームボーナス）。ゲージはフロアごと（'samerica:1' の形）
   // おまかせの枠にはチームボーナスをかけない（一度も編成を組んでいないセーブは今と同じ強さ）
@@ -219,10 +258,20 @@
   };
 
   // ---- 出題 ----
-  // 地域の国を面積の大きい順に並べて4等分した国コード（F1〜F4）。region は 'all' か地域名
-  const floorsOf = region => {
-    const list = C.filter(c => region === 'all' || c.r === region).sort((x, y) => y.ar - x.ar), n = list.length;
-    return [0, 1, 2, 3].map(i => list.slice(Math.round(n * i / 4), Math.round(n * (i + 1) / 4)).map(c => c.a));
+  // 地域の国を面積の大きい順に並べて4等分した国コード（F1〜F4）。x は 'all' か地域名、またはダンジョン
+  // テーマのダンジョンはテーマの国を同じように4等分。1階が FLOOR_MIN か国より少なければ前後の階と重ねて FLOOR_MIN か国にする
+  const FLOOR_MIN = 5;
+  const floorsOf = x => {
+    if (typeof x !== 'string' && !x?.t) return floorsOf(x?.r ?? 'all');
+    const list = (typeof x === 'string' ? C.filter(c => x === 'all' || c.r === x) : C.filter(c => THEMES[x.t].a.includes(c.a)))
+      .sort((p, q) => q.ar - p.ar), n = list.length;
+    return [0, 1, 2, 3].map(i => {
+      let lo = Math.round(n * i / 4), hi = Math.round(n * (i + 1) / 4);
+      if (typeof x !== 'string' && hi - lo < FLOOR_MIN) {
+        lo = Math.max(0, lo - Math.floor((FLOOR_MIN - (hi - lo)) / 2)); hi = Math.min(n, lo + FLOOR_MIN); lo = Math.max(0, hi - FLOOR_MIN);
+      }
+      return list.slice(lo, hi).map(c => c.a);
+    });
   };
 
   // ---- 日付とコインの表示 ----
@@ -628,6 +677,8 @@
 
   // ---- バトルの出題（設計書 §7.3・§7.4） ----
   const codesOf = region => C.filter(c => region === 'all' || c.r === region).map(c => c.a);
+  // そのダンジョンで出す国。テーマがあればテーマの国、無ければ地域の国
+  const poolOf = dg => dg.t ? [...THEMES[dg.t].a] : codesOf(dg.r);
   const missOf = (m, a) => Math.max(0, +(m || {})[a] || 0);
   // rng でシャッフルした新しい配列
   const shuffled = (xs, rng) => {
@@ -635,12 +686,17 @@
     for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
     return a;
   };
-  // その階の形式の順。F1〜F2 は f2n と n2f の交互、F3〜F4 とボス（5）は f2n → n2f → m2f
-  const modeCycle = floor => floor <= 2 ? ['f2n', 'n2f'] : ['f2n', 'n2f', 'm2f'];
+  // その階の形式の順。F1〜F2 は f2n と n2f の交互、F3〜F4 とボス（5）は f2n → n2f → m2f。
+  // 宇宙（ch 3）は場所が多め: どの階も m2f → f2n → m2f → n2f
+  const SPACE_CYCLE = ['m2f', 'f2n', 'm2f', 'n2f'];
+  const modeCycle = (floor, ch) => ch === 3 ? [...SPACE_CYCLE] : floor <= 2 ? ['f2n', 'n2f'] : ['f2n', 'n2f', 'm2f'];
   // 通常フロアの番号（1〜4）。範囲外（ボスの 5・0・数でない）は最後のフロア（4）に丸める
   const normalFloor = floor => Number.isInteger(floor) && floor >= 1 && floor <= 4 ? floor : 4;
-  // その階の順で次の、ちがう形式。その階に無い形式（cap など）の次は先頭の f2n
-  const nextMode = (mode, floor) => { const cy = modeCycle(floor); return cy[(cy.indexOf(mode) + 1) % cy.length]; };
+  // その階の順で次の、ちがう形式。その階に無い形式（cap など）の次は先頭の f2n。宇宙は m2f の次は f2n、ほかの次は m2f
+  const nextMode = (mode, floor, ch) => {
+    if (ch === 3) return mode === 'm2f' ? 'f2n' : 'm2f';
+    const cy = modeCycle(floor); return cy[(cy.indexOf(mode) + 1) % cy.length];
+  };
 
   // 通常フロアの国の袋: その階の国（シャッフル）→ 階の外の苦手な国を misses の多い順 → wk がある順に最大 weakMax 個
   // （苦手が無ければなかよし度の低い順。同点は乱数）→ 今日の手配書でまだ達成していない地域の国（袋に無ければ足す）。
@@ -649,14 +705,14 @@
     const dg = dungeonOf(id);
     if (!dg) return [];
     floor = normalFloor(floor);
-    const here = floorsOf(dg.r)[floor - 1] || [], codes = codesOf(dg.r), fr = d.fr || {}, wk = d.wk || {};
+    const here = floorsOf(dg)[floor - 1] || [], codes = poolOf(dg), fr = d.fr || {}, wk = d.wk || {};
     const bag = shuffled(here, rng), away = shuffled(codes.filter(a => !here.includes(a)), rng);
     const weak = away.filter(a => isWeak(d, m, a)).sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x]);
     const pick = weak.length ? weak : [...away].sort((x, y) => (fr[x] || 0) - (fr[y] || 0));
     bag.push(...pick.slice(0, TUNING.battle.weakMax));
     const b = d.bounty || {}, done = list(b.done), wanted = list(b.a).filter(a => !done.includes(a) && codes.includes(a));
     for (const a of wanted) if (!bag.includes(a)) bag.push(a);
-    const cy = modeCycle(floor);
+    const cy = modeCycle(floor, dg.ch);
     return bag.map((a, i) => ({ a, mode: cy[i % cy.length], tag: wanted.includes(a) ? 'wanted' : null }));
   };
   // 袋が空になったら、その階の国をもう一度（シャッフル）、前と別の形式で。lastMode は {国コード: 前に出した形式}
@@ -664,7 +720,7 @@
     const dg = dungeonOf(id), last = lastMode || {};
     if (!dg) return [];
     floor = normalFloor(floor);
-    return shuffled(floorsOf(dg.r)[floor - 1] || [], rng).map(a => ({ a, mode: nextMode(last[a] ?? 'f2n', floor), tag: null }));
+    return shuffled(floorsOf(dg)[floor - 1] || [], rng).map(a => ({ a, mode: nextMode(last[a] ?? 'f2n', floor, dg.ch), tag: null }));
   };
   // ボスの旗（flags 枚）: 地域の国を misses の多い順 → wk あり → なかよし度の低い順 → 乱数で並べ、苦手な国を上から
   // floor(枚数 × bossWeakPct) 個まで。残りは苦手でない国から乱数で選び、足りなければ苦手な国の続きで埋める
@@ -672,7 +728,7 @@
     const dg = dungeonOf(id);
     if (!dg) return [];
     const fr = d.fr || {}, wk = d.wk || {}, n = dg.flags, cap = Math.floor(n * TUNING.battle.bossWeakPct);
-    const mixed = shuffled(codesOf(dg.r), rng);
+    const mixed = shuffled(poolOf(dg), rng);
     const weak = mixed.filter(a => isWeak(d, m, a))
       .sort((x, y) => missOf(m, y) - missOf(m, x) || !!wk[y] - !!wk[x] || (fr[x] || 0) - (fr[y] || 0));
     const out = weak.slice(0, cap);
@@ -696,17 +752,25 @@
     }
     return shuffled([a, ...out], rng);
   };
+  // 宇宙の4択: 正解 a を含む4つ。テーマの国から3つ、足りなければ全部の国から（各段はシャッフル）
+  const themeChoices = (a, dg, rng) => {
+    const out = [];
+    for (const t of [poolOf(dg), C.map(c => c.a)]) {
+      for (const x of shuffled(t, rng)) if (out.length < 3 && x !== a && !out.includes(x)) out.push(x);
+    }
+    return shuffled([a, ...out], rng);
+  };
   // ボスの k 問目（0から。同じ旗のもう1問もふくむ）の形式。出題は国旗・国名・場所だけ（首都は問題に出さない）
-  const bossMode = k => { const cy = modeCycle(5); return cy[k % cy.length]; };
+  const bossMode = (k, ch) => { const cy = modeCycle(5, ch); return cy[k % cy.length]; };
 
   globalThis.RPG_CORE = {
-    TUNING, BIG, DUNGEONS, CHAPTERS, STORY_IDS, chapterOf, dungeonsOf, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
+    TUNING, BIG, DUNGEONS, CHAPTERS, STORY_IDS, THEMES, chapterOf, dungeonsOf, REGION_DUNGEONS, MONSTERS, AVATARS, MODE_BIT, dungeonOf, owned,
     levelCost, maxLevelUp, heroStats,
     stageOf, recLv, enemy, firstClearTotal,
     battleReward, damage,
-    cardAtk, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
+    cardAtk, inDungeon, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
     hitsNeeded, missesAllowed, judge,
-    floorsOf,
+    floorsOf, poolOf,
     today, dayNum, shortCoins,
     VERSION, MIGRATE, fresh, sanitize, migrate,
     encodeCode, decodeCode, sanitizeMisses,
@@ -714,6 +778,6 @@
     newRun, runAnswer, settleRun,
     ensureDay, bountyFor, resetWeak,
     pull, gachaRates, gachaCost,
-    modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, similarChoices,
+    modeCycle, nextMode, battleBag, refillBag, bossFlags, bossMode, similarChoices, themeChoices,
   };
 })();

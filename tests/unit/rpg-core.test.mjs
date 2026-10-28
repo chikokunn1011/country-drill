@@ -31,12 +31,13 @@ test('tuning_and_tables', () => {
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
     battle: { winBase: 10, winPerStage: 2, firstMul: 3, bossFirst: 200, losePerRight: 2, comboStep: 0.1, comboMax: 5,
-              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8,
+              critRate: 0.1, critMul: 1.5, enemyHits: 5, enemyHitPct: 0.3, bossHitPct: 0.25, recStep: 1.2, recStep2: 0.8, recStep3: 0.85,
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
     team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
+    space: { small: 40, big: 40, equator: 12 },
   }));
   assert.equal(TUNING.quiz.decay[2][0], Infinity);
 
@@ -53,7 +54,7 @@ test('tuning_and_tables', () => {
   ]);
   assert.equal(K.dungeonOf('world').r, 'all');
   assert.equal(K.dungeonOf('europe').name, '古城の迷宮');
-  assert.equal(K.dungeonOf('mars'), undefined);
+  assert.equal(K.dungeonOf('pluto'), undefined);
 
   assert.deepEqual(plain(Object.keys(MONSTERS)).slice(0, 7), IDS);
   for (const id of IDS) assert.equal(MONSTERS[id].length, 5, id);
@@ -104,7 +105,8 @@ test('level_cost', () => {
 test('region_colors_match_css', () => {
   // rpg.css の地域の色（--rpg-r-{id}。ライトはそのまま、ダークは白を3割まぜる。ダークは2か所）は DUNGEONS の color と同じ
   const K = loadCore(), css = read('rpg.css');
-  for (const { id, color } of K.DUNGEONS) {   // 鏡の地球の7つも
+  // 宇宙（第3章）の色はまだ rpg.css に無い（あとのタスクで足して、この絞りを外す）
+  for (const { id, color } of K.DUNGEONS.filter(g => g.ch <= 2)) {   // 鏡の地球の7つも
     assert.ok(css.includes(`--rpg-r-${id}: ${color};`), `rpg.css に --rpg-r-${id}: ${color} が無い`);
     const dark = css.match(new RegExp(`--rpg-r-${id}: color-mix\\(in srgb, ${color} 70%, #fff\\);`, 'g')) || [];
     assert.equal(dark.length, 2, `rpg.css のダークの --rpg-r-${id} が ${color} から作られていない`);
@@ -435,7 +437,7 @@ test('sanitize_numbers', () => {
   assert.equal(s({ av: 9 }).av, 7);
   assert.equal(s({ pity: 60 }).pity, 49);
   assert.deepEqual(s({ fr: { cl: 12 } }).fr, { cl: 10 });
-  assert.deepEqual(s({ floors: { samerica: 9, mars: 2 } }).floors, { samerica: 5 });
+  assert.deepEqual(s({ floors: { samerica: 9, pluto: 2, mars: 7 } }).floors, { samerica: 5, mars: 5 });
   assert.deepEqual(s({ gauge: { 'oceania:3': 2, 'oceania:9': 1, 'x:1': 1, 'asia:2': 8 } }).gauge, { 'oceania:3': 2, 'asia:2': 5 });
   assert.deepEqual(s({ mb: { cl: 40 } }).mb, { cl: 31 });
   assert.deepEqual(s({ fe: { cl: 20 } }).fe, { cl: 15 });
@@ -1368,8 +1370,8 @@ test('gacha_cost_region_mul', () => {
 test('mirror_dungeons', () => {
   const K = loadCore();
   const ids = K.DUNGEONS.map(g => g.id);
-  assert.deepEqual(plain(ids.slice(7)), ['msamerica', 'moceania', 'mnamerica', 'meurope', 'masia', 'mafrica', 'mworld']);
-  for (const g of K.DUNGEONS.slice(7)) {
+  assert.deepEqual(plain(ids.slice(7, 14)), ['msamerica', 'moceania', 'mnamerica', 'meurope', 'masia', 'mafrica', 'mworld']);
+  for (const g of K.dungeonsOf(2)) {
     const b = K.dungeonOf(g.base);
     assert.equal(g.ch, 2); assert.equal(g.r, b.r); assert.equal(g.flags, b.flags);
     assert.equal(K.MONSTERS[g.id].length, 5);
@@ -1378,8 +1380,8 @@ test('mirror_dungeons', () => {
   assert.equal(K.dungeonsOf(2).length, 7);
   assert.deepEqual(plain(K.REGION_DUNGEONS.map(g => g.id)), ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa']);
   assert.equal(K.stageOf('msamerica', 1), 36); assert.equal(K.stageOf('mworld', 5), 70);
-  assert.deepEqual(plain(K.CHAPTERS), [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }]);
-  assert.deepEqual(plain(K.STORY_IDS), ['ch1', 'ch2']);
+  assert.deepEqual(plain(K.CHAPTERS), [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }, { ch: 3, name: '宇宙', e: '🪐', last: 'blackhole' }]);
+  assert.deepEqual(plain(K.STORY_IDS), ['ch1', 'ch2', 'ch3start', 'ch3']);
 });
 test('rec_lv_by_chapter', () => {
   const K = loadCore();
@@ -1418,10 +1420,72 @@ test('similar_choices_always_four', () => {
 });
 test('old_save_keeps_and_levels_past_50', () => {
   const K = loadCore();
-  const s = K.sanitize({ ...K.fresh(T0), lv: 50, floors: { world: 5, msamerica: 2, bogus: 3 }, story: ['ch1', 'zzz', 'ch1'] }, T0);
+  const s = K.sanitize({ ...K.fresh(T0), lv: 50, floors: { world: 5, msamerica: 2, bogus: 3 }, story: ['ch1', 'zzz', 'ch1', 'ch3start', 'ch3'] }, T0);
   assert.equal(s.lv, 50); assert.equal(s.floors.msamerica, 2); assert.equal(s.floors.bogus, undefined);
-  assert.deepEqual(plain(s.story), ['ch1']);
+  assert.deepEqual(plain(s.story), ['ch1', 'ch3start', 'ch3']);
   assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0) }, T0).story), []);
   assert.equal(K.sanitize({ ...K.fresh(T0), lv: 120 }, T0).lv, 99);
   assert.ok(Number.isFinite(K.levelCost(50))); assert.equal(K.levelCost(99), Infinity);
+});
+
+// ---- 第3章 宇宙 ----
+test('space_dungeons', () => {
+  const K = loadCore();
+  assert.equal(K.DUNGEONS.length, 21);
+  assert.deepEqual(plain(K.DUNGEONS.slice(14).map(g => g.id)), ['moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'blackhole']);
+  assert.deepEqual(plain(K.DUNGEONS.slice(14).map(g => g.t ?? null)), ['island', 'small', 'equator', 'landlocked', 'big', 'south', null]);
+  assert.deepEqual(plain(K.DUNGEONS.slice(14).map(g => g.flags)), [9, 9, 10, 10, 11, 11, 12]);
+  for (const g of K.dungeonsOf(3)) { assert.equal(g.ch, 3); assert.equal(g.r, 'all'); assert.equal(K.MONSTERS[g.id].length, 5); assert.ok(g.e); }
+  assert.deepEqual(plain(K.MONSTERS.moon[4]), { e: '🐇', n: '月のウサギ大王' });
+  assert.deepEqual(plain(K.MONSTERS.blackhole[4]), { e: '🌑', n: '星喰い' });
+  assert.equal(K.stageOf('moon', 1), 71); assert.equal(K.stageOf('blackhole', 5), 105);
+  assert.equal(K.recLv(70), 69); assert.equal(K.recLv(71), 70); assert.equal(K.recLv(105), 99);   // 69 + round((s-70) × 0.85)
+  assert.equal(K.CHAPTERS[2].last, 'blackhole');
+  assert.equal(K.chapterOf('blackhole'), 3);
+});
+test('themes', () => {
+  const K = loadCore();
+  const n = k => K.THEMES[k].a.length;
+  assert.deepEqual([n('island'), n('small'), n('equator'), n('landlocked'), n('big'), n('south')], [38, 40, 51, 44, 40, 39]);
+  assert.ok(K.THEMES.island.a.includes('jp') && !K.THEMES.island.a.includes('gb'));   // 陸の国境がある国は島国に入れない
+  assert.ok(K.THEMES.landlocked.a.includes('ch') && K.THEMES.small.a[0] === 'va' && K.THEMES.big.a.includes('ru'));
+  assert.equal(K.THEMES.island.n, '島国');
+  assert.deepEqual(plain(K.TUNING.space), { small: 40, big: 40, equator: 12 });
+});
+test('space_pools_fill', () => {
+  const K = loadCore(), rng = mulberry32(3);
+  for (const g of K.dungeonsOf(3)) {
+    const fl = K.floorsOf(g); assert.equal(fl.length, 4); assert.ok(fl.every(f => f.length >= 5), g.id);
+    assert.equal(K.bossFlags(dWith(K), {}, g.id, rng).length, g.flags);
+    for (const a of K.poolOf(g)) { const o = K.themeChoices(a, g, rng); assert.equal(new Set(o).size, 4); assert.ok(o.includes(a)); }
+  }
+  // 地球の floorsOf は文字列でもダンジョンでも今と同じ
+  assert.deepEqual(plain(K.floorsOf(K.dungeonOf('samerica'))), plain(K.floorsOf('南アメリカ')));
+  assert.deepEqual(plain(K.poolOf(K.dungeonOf('blackhole'))).length, 195);
+});
+test('space_bag_stays_in_theme', () => {
+  const K = loadCore();
+  const d = dWith(K, { wk: { fr: 1, de: 1 } }), m = { fr: 9, de: 9 };   // テーマ外（フランス・ドイツ）が苦手
+  const bag = K.battleBag(d, m, 'moon', 1, mulberry32(1));
+  assert.ok(bag.length > 0 && bag.every(x => K.THEMES.island.a.includes(x.a)));
+  assert.ok(K.refillBag('moon', 2, {}, mulberry32(1)).every(x => K.THEMES.island.a.includes(x.a)));
+  assert.ok(K.bossFlags(d, m, 'moon', mulberry32(1)).every(a => K.THEMES.island.a.includes(a)));
+});
+test('space_theme_bonus', () => {
+  const K = loadCore();
+  const moon = K.dungeonOf('moon');
+  assert.equal(K.inDungeon(moon, 'jp'), true); assert.equal(K.inDungeon(moon, 'fr'), false);
+  assert.equal(K.inDungeon(K.dungeonOf('world'), 'fr'), true); assert.equal(K.inDungeon(K.dungeonOf('asia'), 'fr'), false);
+  const d = dWith(K, { cards: { jp: [1, 0], fr: [1, 0] } });
+  const p = Object.fromEntries(plain(K.party(d, 'moon')).map(c => [c.a, c.atk]));
+  assert.equal(p.jp, K.cardAtk([1, 0], 0, true)); assert.equal(p.fr, K.cardAtk([1, 0], 0, false));
+});
+test('space_modes', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.modeCycle(1)), ['f2n', 'n2f']);                 // 地球は今のまま
+  assert.deepEqual(plain(K.modeCycle(1, 3)), ['m2f', 'f2n', 'm2f', 'n2f']);
+  assert.equal(K.nextMode('m2f', 1, 3), 'f2n'); assert.equal(K.nextMode('f2n', 1, 3), 'm2f'); assert.equal(K.nextMode('n2f', 4, 3), 'm2f');
+  assert.equal(K.bossMode(0, 3), 'm2f'); assert.equal(K.bossMode(3, 3), 'n2f');
+  assert.equal(K.bossMode(2), 'm2f'); assert.equal(K.nextMode('f2n', 1), 'n2f');
+  assert.deepEqual(plain(K.battleBag(dWith(K), {}, 'moon', 1, mulberry32(1)).slice(0, 4).map(x => x.mode)), ['m2f', 'f2n', 'm2f', 'n2f']);
 });
