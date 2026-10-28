@@ -30,6 +30,7 @@
 1. 左メニュー **SQL Editor** → **New query**。
 2. リポジトリの `supabase/admin.sql` を**全部**コピーして貼る。
 3. **Run**。エラーなしで終わればOK。何回流しても大丈夫。
+   - 「destructive operation（壊す操作）が入ってる」みたいな警告が出ることがある。中の関数が行を消す（`delete`）からで、問題ないのでそのまま確認して Run してOK。
 
 これで `admins`（管理者リスト）・`admin_log`（操作の記録）・`admin_trash`（ごみ箱）と、`admin_` で始まる関数ができる。
 
@@ -40,10 +41,10 @@
 3. **SQL Editor** → **New query** に次を貼って、`<UID>` をさっきのUIDに置きかえて **Run**。
 
 ```sql
-insert into admins (user_id, note) values ('<UID>', 'チコ');
+insert into admins (user_id, note) values ('<UID>', 'チコ') on conflict (user_id) do nothing;
 ```
 
-`<` `>` は消して、UID を `'` で囲んだまま残す。
+`<` `>` は消して、UID を `'` で囲んだまま残す。もう登録してあっても、エラーにならずそのまま（何回流しても大丈夫）。
 
 ## 5. ログインして確認
 
@@ -65,7 +66,8 @@ select has_function_privilege('anon','admin_list(text,jsonb)','execute');
 
 - **ログインできない**: メール・パスワードを見直す。Authentication → Users に自分がいるか、**Auto Confirm User** で作ったか（未確認のままだと入れない）を確認。
 - **「管理者じゃない」と出る**: ログインはできてるけど `admins` に入ってない。Authentication → Users の **User UID** と、SQL Editor で `select * from admins;` の `user_id` が同じか見る。違う・空なら手順4をやり直す。
-- **パスワードを忘れた**: Authentication → Users で自分の行のメニュー（右の「…」）から **Send password recovery**（メールで再設定）か、パスワードを直接リセットする項目を選ぶ。
+- **パスワードを忘れた**: Authentication → Users で自分の行のメニュー（右の「…」）から **Send password recovery** を押す。届いたメールのリンクから新しいパスワードを決める（画面からパスワードを直接書きかえる項目は無い）。
+  - メールがいつまでも届かないときは、その行を **Delete user** で消して、手順1でユーザーを作り直し、手順4で新しい UID を admins に入れ直す（古い UID の行は `delete from admins where user_id = '<古いUID>';` で消しておく）。
 
 ## 注意
 
