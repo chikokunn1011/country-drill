@@ -132,6 +132,30 @@ t('manual_when_auto_off', async (page, app) => {
   assert.equal(app.db.rpgRows[0].profile_id, 1);
 });
 
+t('reopen_sends_once', async (page, app) => {
+  // 何回開き直しても、載せる箱は1つだけ（前に開いたときの箱が残って同じ記録を何回も送らない）
+  await withProfile(page, app, { auto: false });
+  await writeSave(page, saveWith({ lv: 7 }));
+  for (let i = 0; i < 4; i++) { await page.evaluate(() => RPG.open('rpg')); await page.evaluate(() => RPG.open('rpgrank')); }
+  await page.click('#rr-post [data-pf="send"]');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  await page.waitForTimeout(1000);
+  assert.equal(callsOf(app, 'rpg_update2').length, 1);
+  assert.ok((await text(page, '#rr-post')).includes('載せたよ！'), await text(page, '#rr-post'));
+});
+
+t('reopen_creates_once', async (page, app) => {
+  // プロフィールが無いときの箱も同じ。作るのも載せるのも1回
+  await writeSave(page, saveWith({ lv: 12, floors: { samerica: 5, oceania: 5 } }));
+  for (let i = 0; i < 3; i++) { await page.evaluate(() => RPG.open('rpg')); await page.evaluate(() => RPG.open('rpgrank')); }
+  await page.fill('#rr-post input', 'チコ');
+  await page.click('#rr-post .btn');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  await page.waitForTimeout(2500);   // 作ったあとの自動更新（1.5秒後）も、送ってある記録と同じなので送らない
+  assert.equal(app.db.profiles.length, 1);
+  assert.equal(callsOf(app, 'rpg_update2').length, 1);
+});
+
 t('not_started_and_offline', async page => {
   // まだ旅に出ていなければ載せる箱は出ない。つながらなければ再読み込みのボタン
   await writeSave(page, { v: 1 });

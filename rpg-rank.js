@@ -93,13 +93,17 @@
     const p = prof();
     return p?.auto ? 'auto' : 'box';
   };
-  // 箱で送る: いまの記録を rpg_update2 で。通ったら rpgSent に覚える
+  // 箱で送る: いまの記録を rpg_update2 で。通ったら rpgSent に覚える。
+  // 送っているあいだは自動で送らない（箱でプロフィールを作ると profile:change で自動の予約が入る）。終わったら予約し直す
   const sendBox = async token => {
     const rec = recordOf(RPG.get()), p = prof();
-    lastSent = Date.now();
+    clearTimeout(autoTimer); autoTimer = null;
+    sending = true; lastSent = Date.now();
     const r = await RANKING.rpgUpdate2({ token, ...rec });
+    sending = false;
+    if (r.ok && p?.token === token) markSent(p, rec);
+    scheduleAuto();
     if (!r.ok) return r;
-    if (p?.token === token) markSent(p, rec);
     $('rr-rank').textContent = '';
     load();
     return { ok: true, text: `載せたよ！ ${ranks(r)}` };
@@ -110,7 +114,8 @@
     if (mode === 'auto') $('rr-auto-name').textContent = p.name;
     if (mode === postMode) return;   // 箱は作り直さない（入力の途中・送っている途中を消さない）
     postMode = mode;
-    if (mode === 'box') P.postBox(el, { label: '冒険ランキングに載せる', send: sendBox });
+    // 箱は毎回新しい子要素に作る（同じ #rr-post に作ると、前の箱の listener が残って押すたびに何回も送る）
+    if (mode === 'box') { const box = document.createElement('div'); el.replaceChildren(box); P.postBox(box, { label: '冒険ランキングに載せる', send: sendBox }); }
     else el.innerHTML = mode === 'reload' ? '<p class="tamsg ng">プロフィールが読みこめなかった。ページを読み直してね</p>' : '';
   };
   const drawMe = () => {
