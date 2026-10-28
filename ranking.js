@@ -23,6 +23,7 @@
     not_found: '登録が見つからなかった。もう一回載せてね',
     bad_deco: 'かざりの国が正しくないみたい',
     bad_token: '登録の合言葉がおかしいみたい',
+    bad_day: '日付が変わったので、この記録は載せられない',
     network: 'ランキングに接続できなかった',
   };
 
@@ -124,6 +125,25 @@
     async rpgRankOf({ lv, dungeons, floors }) {
       const r = await rpc('rpg_rank_of', { p_lv: lv, p_dungeons: dungeons, p_floors: floors });
       return { rankLv: r.rank_lv, rankDg: r.rank_dg };
+    },
+    // 今日の難問: 記録を送る（day は日本時間の 'YYYY-MM-DD'、total は問題数）。失敗しても例外は投げず { ok:false, reason }
+    async dailySubmit({ day, nickname, correct, total, timeMs }) {
+      try {
+        const r = await rpc('submit_daily', { p_day: day, p_nickname: nickname, p_correct: correct, p_total: total, p_time_ms: wholeMs(timeMs) });
+        return r.ok ? { ok: true, rank: r.rank } : { ok: false, reason: r.reason };
+      } catch (e) {
+        console.warn('ranking dailySubmit', e);
+        return { ok: false, reason: 'network' };
+      }
+    },
+    // その日の上位50件（正答数が多い順 → 速い順）。失敗したら reject
+    async dailyTop({ day }) {
+      const rows = await rpc('top_daily', { p_day: day });
+      return rows.map(r => ({ nickname: r.nickname, correct: r.correct, total: r.total, timeMs: r.time_ms, at: new Date(r.created_at) }));
+    },
+    // この記録なら何位相当か。失敗したら reject
+    async dailyRankOf({ day, correct, timeMs }) {
+      return (await rpc('daily_rank_of', { p_day: day, p_correct: correct, p_time_ms: wholeMs(timeMs) })).rank;
     },
     message: reason => MESSAGES[reason] ?? MESSAGES.network,
     // 0.01秒単位で切り捨て。12345 → '12.34秒'、61234 → '1分01.23秒'

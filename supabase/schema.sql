@@ -1,7 +1,8 @@
 -- 195か国ドリル タイムアタックのランキング用（Supabase）
 -- 使い方: Supabase の SQL Editor にこのファイルを全部貼って Run。何度流しても大丈夫。
 -- ブラウザ（anon）からはテーブルを直接さわれない。呼べるのはタイムアタックの submit_score / top_scores / rank_of と、
--- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of だけ。
+-- 冒険の rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco / top_rpg / top_rpg2 / rpg_rank_of と、
+-- 今日の難問の submit_daily / top_daily / daily_rank_of だけ。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -329,3 +330,113 @@ grant execute on function top_rpg2(text) to anon;
 
 -- PostgREST に関数が増えたことを知らせる
 notify pgrst, 'reload schema';
+
+-- ---- 今日の難問（毎日1回のチャレンジ） ----
+-- 日本時間の1日ごとのランキング。全問正解ならクリアタイム、途中でまちがえたらそこまでの正答数とタイムを載せる。
+-- 同じ日に同じニックネームは1回だけ（2回目は name_taken。全角半角・大文字小文字のちがいは同じ名前）。端末ごとの1日1回はブラウザ側で守る。
+-- 並べ方: 正答数が多い順（全問正解がいちばん上）→ タイムが短い順 → 先に載せた順
+-- 変な記録は Table Editor の daily_scores から行を消せばランキングからも消える
+create table if not exists daily_scores (
+  id bigint generated always as identity primary key,
+  day date not null,               -- 日本時間の日付
+  nickname text not null,          -- 前後空白を除いた1〜12文字
+  correct int not null,            -- 正答数（0〜total）
+  total int not null,              -- 問題数
+  time_ms int not null,            -- 全問正解ならクリアタイム、途中で終わったらそこまでのタイム（ミリ秒）
+  created_at timestamptz not null default now()
+);
+-- 同じ日に同じ名前は1回だけ。全角半角・大文字小文字のちがいも同じ名前とみなす（なりすまし防止）
+create unique index if not exists daily_scores_day_name on daily_scores (day, lower(normalize(nickname, NFKC)));
+create index if not exists daily_scores_day_rank on daily_scores (day, correct desc, time_ms, created_at);
+alter table daily_scores enable row level security;
+revoke all on daily_scores from anon, authenticated;
+
+-- 問題数（daily-core.js の COUNT と同じにしておくこと）
+create or replace function daily_count() returns int
+language sql immutable set search_path = public, pg_temp as $$ select 20 $$;
+revoke all on function daily_count() from public, anon, authenticated;
+
+-- 'YYYY-MM-DD' を日付に。形がおかしい・ありえない日付は null
+create or replace function daily_day(p_day text) returns date
+language plpgsql immutable set search_path = public, pg_temp as $$
+begin
+  if p_day is null or p_day !~ '^\d{4}-\d{2}-\d{2}$' then return null; end if;
+  return p_day::date;
+exception when others then return null;
+end $$;
+revoke all on function daily_day(text) from public, anon, authenticated;
+
+-- その日に、この記録より上の人数＋1。同じ記録は同じ順位
+create or replace function daily_rank_of(p_day text, p_correct int, p_time_ms int) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare
+  v_day date := daily_day(p_day);
+begin
+  if v_day is null or p_correct is null or p_time_ms is null then return jsonb_build_object('rank', null); end if;
+  return jsonb_build_object('rank', (select count(*) + 1 from daily_scores
+    where day = v_day and (correct > p_correct or (correct = p_correct and time_ms < p_time_ms))));
+end $$;
+revoke all on function daily_rank_of(text, int, int) from public;
+grant execute on function daily_rank_of(text, int, int) to anon;
+
+-- p_at の時点で、その日の記録を受け付けるか。日本時間の今日だけ。0時をまたいで遊んだ人のために、0時30分までは昨日も受け付ける
+create or replace function daily_day_open(p_day date, p_at timestamptz) returns boolean
+language sql immutable set search_path = public, pg_temp as $$
+  select p_day = (p_at at time zone 'Asia/Tokyo')::date
+      or (p_day = (p_at at time zone 'Asia/Tokyo')::date - 1
+          and (p_at at time zone 'Asia/Tokyo') - (p_at at time zone 'Asia/Tokyo')::date < interval '30 min')
+$$;
+revoke all on function daily_day_open(date, timestamptz) from public, anon, authenticated;
+
+-- 記録を受け付ける。だめなら {"ok":false,"reason":...}、通れば {"ok":true,"rank":n}
+create or replace function submit_daily(p_day text, p_nickname text, p_correct int, p_total int, p_time_ms int) returns jsonb
+language plpgsql volatile security definer set search_path = public, pg_temp as $$
+declare
+  v_day date := daily_day(p_day);
+  v_name text := btrim(p_nickname, E' \t\n\r\f\u000b\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff');
+  v_norm text := lower(normalize(v_name, NFKC));
+  v_id bigint;
+begin
+  if v_day is null or not daily_day_open(v_day, now()) then
+    return jsonb_build_object('ok', false, 'reason', 'bad_day');
+  end if;
+  if p_total is distinct from daily_count() or p_correct is null or p_correct not between 0 and p_total then
+    return jsonb_build_object('ok', false, 'reason', 'bad_record');
+  end if;
+  if v_name is null or char_length(v_name) not between 1 and 12 then
+    return jsonb_build_object('ok', false, 'reason', 'bad_name');
+  end if;
+  if exists (select 1 from unnest(ng_words()) w where strpos(v_norm, w) > 0) then
+    return jsonb_build_object('ok', false, 'reason', 'ng_name');
+  end if;
+  if p_time_ms is null or p_time_ms < greatest(p_correct, 1) * 400 then
+    return jsonb_build_object('ok', false, 'reason', 'too_fast');
+  end if;
+  if p_time_ms > 10800000 then
+    return jsonb_build_object('ok', false, 'reason', 'too_slow');
+  end if;
+  insert into daily_scores (day, nickname, correct, total, time_ms) values (v_day, v_name, p_correct, p_total, p_time_ms)
+    on conflict (day, lower(normalize(nickname, NFKC))) do nothing returning id into v_id;
+  if v_id is null then return jsonb_build_object('ok', false, 'reason', 'name_taken'); end if;
+  return jsonb_build_object('ok', true) || daily_rank_of(p_day, p_correct, p_time_ms);
+end $$;
+revoke all on function submit_daily(text, text, int, int, int) from public;
+grant execute on function submit_daily(text, text, int, int, int) to anon;
+
+-- その日の上位50件。日付がおかしければ空
+create or replace function top_daily(p_day text)
+returns table(nickname text, correct int, total int, time_ms int, created_at timestamptz)
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+#variable_conflict use_column
+declare
+  v_day date := daily_day(p_day);
+begin
+  if v_day is null then return; end if;
+  return query
+    select d.nickname, d.correct, d.total, d.time_ms, d.created_at from daily_scores d
+    where d.day = v_day
+    order by d.correct desc, d.time_ms, d.created_at
+    limit 50;
+end $$;
+revoke all on function top_daily(text) from public;
+grant execute on function top_daily(text) to anon;

@@ -1,0 +1,35 @@
+/* 今日の難問（daily.js の #scr-daily） */
+.daily .dl-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.daily .dl-date { margin: 0; color: var(--muted); font-weight: 500; }
+.daily .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.daily .col + .col { margin-top: 8px; }
+.dl-intro { display: flex; flex-direction: column; gap: 10px; }
+.dl-lead { margin: 0; font-size: 1.05rem; }
+.dl-rules { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
+#dl-start { min-width: 200px; padding-block: 14px; font-size: 1.15rem; }
+.dl-result .tabox { margin-top: 4px; }
+.dl-next { margin: 4px 0 0; }
+.dl-list .dl-all { color: var(--ok); }
+.dl-list li.me { border-color: var(--accent); border-width: 2px; }
+.dl-ans summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+.dl-qs { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dl-qs li { display: grid; grid-template-columns: 1.2em 1.8em 40px minmax(0, 1fr) auto; column-gap: 8px; align-items: center; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: .92rem; }
+.dl-qs img { width: 40px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
+.dl-qs b { min-width: 0; overflow-wrap: anywhere; }
+.dl-qs .dl-mode { font-size: .78rem; color: var(--muted); text-align: right; }
+.dl-qs .dl-no { color: var(--muted); text-align: right; }
+.dl-ok { color: var(--ok); font-weight: 900; } .dl-ng { color: var(--ng); font-weight: 900; } .dl-skip { color: var(--muted); }
+/* ホームの入口（プレイの上の細い帯） */
+.dl-homerow { width: 100%; display: flex; justify-content: center; }
+.dl-homebtn { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; border: 1.5px dashed var(--accent); background: var(--surface); color: var(--accent);
+  border-radius: 999px; padding: 5px 16px; font: 700 1rem/1.4 var(--font-display); cursor: pointer; }
+.dl-homebtn:hover { border-style: solid; }
+.dl-homeday { font-size: .8rem; color: var(--muted); font-weight: 500; }
+.dl-homedone { font-size: .75rem; color: var(--muted); }
+@media (min-width: 1280px) { body[data-screen] .dl-homerow { justify-content: flex-start; } }
+@media (min-width: 1280px) and (max-height: 1000px) { .home .menu > .dl-homerow { grid-column: 1 / -1; } }
+@media (min-width: 1280px) and (max-height: 760px) { .dl-homebtn { padding-block: 2px; } }
+.dl-new { padding: 1px 7px; border-radius: 999px; background: var(--ng); color: #fff; font: 700 .7rem var(--font-mono); vertical-align: middle; letter-spacing: .05em; }
+@media (min-width: 900px) {
+  .daily .col + .col { margin-top: 0; }
+}
