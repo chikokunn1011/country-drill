@@ -440,6 +440,8 @@ begin
   r := submit_daily(d, 'E', 0, 20, 3000);
   assert r = '{"ok":true,"rank":5}'::jsonb, format('0問も載る: %s', r);
   assert submit_daily(d, 'チコ', 5, 20, 9000)->>'reason' = 'name_taken', '同じ日に同じ名前';
+  assert submit_daily(d, 'b', 5, 20, 9000)->>'reason' = 'name_taken', '大文字小文字だけちがう';
+  assert submit_daily(d, 'Ｂ', 5, 20, 9000)->>'reason' = 'name_taken', '全角半角だけちがう';
   assert submit_daily(old, 'Z', 5, 20, 9000)->>'reason' = 'bad_day', 'おととい';
   assert submit_daily('x', 'Z', 5, 20, 9000)->>'reason' = 'bad_day', '形がちがう日付';
   assert submit_daily(null, 'Z', 5, 20, 9000)->>'reason' = 'bad_day', 'null の日付';

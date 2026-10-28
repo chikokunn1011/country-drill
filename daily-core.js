@@ -2,7 +2,8 @@
 // 全員が同じ日に同じ問題になるように、Math.random は使わず日付から作った乱数だけで決める。
 // ブラウザでは <script src="daily-core.js"> で window.DAILY_CORE になる（テストでは vm で読み込む）
 (() => {
-  // 規則を変えるとその日の問題が変わる（ランキングとずれる）。変えるときは VERSION を上げ、SINCE を翌日以降の日付にする
+  // 規則を変えるとその日の問題が変わる（ランキングとずれる）。変えるときは version を上げ、since を翌日以降の日付にする。
+  // countries.js の地域（r）・面積（ar）・国の増減も問題を変える（古いキャッシュの人とずれる）ので、直すなら日本時間の0時ごろに出す
   const RULES = [
     { since: '2000-01-01', version: 1 },
   ];
@@ -48,7 +49,7 @@
   // 日本時間の次の0時まであと何ミリ秒か
   const msToNextDay = (d = new Date()) => { const t = d.getTime() + 9 * 3600e3; return 86400e3 - (((t % 86400e3) + 86400e3) % 86400e3); };
   const addDays = (day, n) => new Date(Date.parse(day + 'T00:00:00Z') + n * 86400e3).toISOString().slice(0, 10);
-  const validDay = day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && addDays(day, 0) === day;
+  const validDay = day => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && !Number.isNaN(Date.parse(day + 'T00:00:00Z')) && addDays(day, 0) === day;
 
   // 文字列 → 32bit の種（FNV-1a）、種 → 0以上1未満の乱数（mulberry32）
   function hash(s) {

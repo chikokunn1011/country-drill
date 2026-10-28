@@ -35,9 +35,9 @@ const noHScroll = page => page.evaluate(() => document.documentElement.scrollWid
 const namesFit = page => page.$$eval('#rk-list .nick', els => els.every(e => e.scrollWidth <= e.clientWidth));
 const wait = ms => new Promise(ok => setTimeout(ok, ms));
 
-// バッジのボタンは設定の前（称号の札も button なので、札が出ない QUIET_BADGES で開く）
+// バッジのボタンは設定の前（称号の札も button なので、札が出ない QUIET_BADGES で開く）。いちばん上は今日の難問の帯（daily.js）
 t('home_button_order', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-play', 'home-rank', 'home-badges', 'home-settings']);
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rank', 'home-badges', 'home-settings']);
   assert.equal(await text(page, '#home-rank'), 'ランキング');
   assert.equal(await page.getAttribute('#home-rank', 'class'), 'btn ghost');
   await page.click('#home-rank');
@@ -48,7 +48,7 @@ t('home_button_order', async page => {
 
 // 何も止めないとき（本物の rpg.js と badges.js）は プレイ / 冒険 / ランキング / バッジ / 設定（RPG 設計 §3.1「プレイの次に冒険」、バッジ設計 §6.1「設定の直前」）
 t('home_button_order_with_rpg', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings']);
+  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings']);
 }, { storage: { badges: QUIET_BADGES } });
 
 t('home_button_hidden_when_disabled', async page => {

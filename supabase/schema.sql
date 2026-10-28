@@ -333,7 +333,7 @@ notify pgrst, 'reload schema';
 
 -- ---- 今日の難問（毎日1回のチャレンジ） ----
 -- 日本時間の1日ごとのランキング。全問正解ならクリアタイム、途中でまちがえたらそこまでの正答数とタイムを載せる。
--- 同じ日に同じニックネームは1回だけ（2回目は name_taken）。端末ごとの1日1回はブラウザ側で守る。
+-- 同じ日に同じニックネームは1回だけ（2回目は name_taken。全角半角・大文字小文字のちがいは同じ名前）。端末ごとの1日1回はブラウザ側で守る。
 -- 並べ方: 正答数が多い順（全問正解がいちばん上）→ タイムが短い順 → 先に載せた順
 -- 変な記録は Table Editor の daily_scores から行を消せばランキングからも消える
 create table if not exists daily_scores (
@@ -345,7 +345,8 @@ create table if not exists daily_scores (
   time_ms int not null,            -- 全問正解ならクリアタイム、途中で終わったらそこまでのタイム（ミリ秒）
   created_at timestamptz not null default now()
 );
-create unique index if not exists daily_scores_day_nickname on daily_scores (day, nickname);
+-- 同じ日に同じ名前は1回だけ。全角半角・大文字小文字のちがいも同じ名前とみなす（なりすまし防止）
+create unique index if not exists daily_scores_day_name on daily_scores (day, lower(normalize(nickname, NFKC)));
 create index if not exists daily_scores_day_rank on daily_scores (day, correct desc, time_ms, created_at);
 alter table daily_scores enable row level security;
 revoke all on daily_scores from anon, authenticated;
@@ -415,7 +416,7 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'too_slow');
   end if;
   insert into daily_scores (day, nickname, correct, total, time_ms) values (v_day, v_name, p_correct, p_total, p_time_ms)
-    on conflict (day, nickname) do nothing returning id into v_id;
+    on conflict (day, lower(normalize(nickname, NFKC))) do nothing returning id into v_id;
   if v_id is null then return jsonb_build_object('ok', false, 'reason', 'name_taken'); end if;
   return jsonb_build_object('ok', true) || daily_rank_of(p_day, p_correct, p_time_ms);
 end $$;

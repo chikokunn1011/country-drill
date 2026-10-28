@@ -22,7 +22,7 @@ const today = page => page.evaluate(() => DAILY.today());
 const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); };
 
 t('home_entry_and_intro', async page => {
-  assert.match(await text(page, '#home-daily'), /今日の難問\s*NEW/);
+  assert.match(await text(page, '#home-daily'), /今日の難問[\s\S]*NEW/);
   await page.click('#home-daily');
   assert.equal(await page.isVisible('#scr-daily'), true);
   assert.match(await text(page, '#dl-main'), /挑戦できるのは1日1回だけ/);
@@ -94,7 +94,11 @@ t('clear_all_20', async (page, app) => {
 t('reload_cannot_retry', async page => {
   await startDailyFromHome(page);
   await answerCorrect(page); await answerCorrect(page);
+  const t2 = (await rec(page)).timeMs;
+  await page.waitForTimeout(600);
   await page.reload();
+  // 閉じた時点のタイムで終わり（最後に正解した時点ではない）
+  assert.ok((await rec(page)).timeMs >= t2 + 500, JSON.stringify(await rec(page)));
   await page.click('#home-daily');
   assert.equal(await page.locator('#dl-start').count(), 0, 'もう挑戦できない');
   assert.match(await text(page, '#dl-main'), /とちゅうでやめた/);
@@ -149,3 +153,42 @@ t('ranking_down_quiz_still_works', async page => {
   await page.locator('#dl-msg.ng').waitFor();
   assert.match(await text(page, '#dl-msg'), /接続できなかった/);
 }, { supabase: 'down' });
+
+// 別のタブで開いても、遊んでいるタブの記録は止まらない
+t('second_tab_does_not_stop_play', async (page, app) => {
+  await startDailyFromHome(page);
+  await answerCorrect(page);
+  const other = await app.context.newPage();
+  await other.goto(page.url());
+  await other.click('#home-daily');
+  assert.match(await other.locator('#dl-main').innerText(), /別のタブで挑戦中/);
+  assert.equal(await other.locator('#dl-start').count(), 0);
+  await page.bringToFront();
+  for (let i = 1; i < 20; i++) await answerCorrect(page);
+  await page.locator('#scr-daily').waitFor();
+  const r = await rec(page);
+  assert.equal(r.correct, 20); assert.equal(r.outcome, 'clear');
+  await other.close();
+});
+
+// 0時をまたいだ人は、0時30分まで昨日の記録を載せられる（日本時間 10/29 0:10 にする）
+const at = iso => `{ const off = Date.parse('${iso}') - Date.now(), D = Date;
+  globalThis.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + off])); } static now() { return D.now() + off; } }; }`;
+t('after_midnight_can_send_yesterday', async (page, app) => {
+  assert.equal(await today(page), '2026-10-29');
+  await page.click('#home-daily');
+  assert.match(await text(page, '#dl-main'), /昨日（10月28日）の挑戦の記録/);
+  assert.match(await text(page, '#dl-main'), /5\s*\/ 20 問正解/);
+  await page.fill('#dl-name', 'よふかし');
+  await page.click('#dl-submit');
+  await page.locator('#dl-list li').first().waitFor();
+  assert.equal(app.db.dailyRows[0].day, '2026-10-28');
+  // 載せたあとは今日の挑戦ができる
+  assert.equal(await page.isVisible('#dl-start'), true);
+}, { init: at('2026-10-28T15:10:00Z'), storage: { daily: { day: '2026-10-28', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
+
+t('after_half_past_midnight_yesterday_is_closed', async page => {
+  await page.click('#home-daily');
+  assert.equal(await page.isVisible('#dl-start'), true);
+  assert.equal(await page.locator('#dl-form').count(), 0);
+}, { init: at('2026-10-28T15:31:00Z'), storage: { daily: { day: '2026-10-28', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });

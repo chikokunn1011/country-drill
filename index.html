@@ -863,6 +863,8 @@ $('rmap').onclick = e => {
 $('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = P.want = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
+// 今日の難問の途中でページを閉じた・再読み込みした: その時点のタイムで終わりにする（むずかしい問題で考えた時間も入れる）
+addEventListener('pagehide', () => { if (G?.kind === 'daily' && !G.ended) endGame('quit'); });
 $('quit').onclick = () => {
   if (G?.kind !== 'daily') return show('setup');
   if (G.ended || confirm('やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？')) show('daily');
@@ -894,11 +896,11 @@ function startGame() {
 }
 // 今日の難問（daily.js が DAILY_CORE.build で作った [{ mode, a, opts }]）を遊ぶ。全員同じ問題なので、形式・選択肢・並びはそのまま使う。
 // 地図は全世界、国名表示なし、苦手の記録・drill:* のイベント（バッジ・冒険のコイン）には入れない。進み具合は drill:daily で daily.js に知らせる
-function startDaily(qs) {
+function startDaily(qs, sid) {
   if (G && !G.ended) endGame('quit');
   const set = qs.map(q => byA.get(q.a));
   G = { mode: modeOf(qs[0].mode), kind: 'daily', region: 'all', daily: qs, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0, endMs: 0, hint: false };
-  G.sid = 'daily-' + Date.now().toString(36);
+  G.sid = sid || 'daily-' + Date.now().toString(36);
   $('ptime').textContent = RANKING.formatTime(0);
   $('quit').textContent = 'やめる（今日の挑戦はここまで）';
   show('quiz');
@@ -970,7 +972,7 @@ function updateProgress(answered) {
     $('pscore').textContent = `残り ${remaining}問`;
   } else { // 挑戦とタイムアタック（タイムアタックは挑戦回数が1のままなので #pscore は空）
     $('pnum').textContent = `${Math.min(G.done + 1, n)} / ${n}`;
-    $('pscore').textContent = G.attempts > 1 ? `${G.attempts}回目の挑戦` : '';
+    $('pscore').textContent = G.kind === 'daily' ? `むずかしさ ${'★'.repeat(G.daily[Math.min(G.done, n - 1)].stage)}` : G.attempts > 1 ? `${G.attempts}回目の挑戦` : '';
   }
   $('pstreak').textContent = G.streak >= 2 ? (S.dopa ? comboText(G.streak) : `${G.streak}連続！`) : '';
   $('pstreak').classList.toggle('hot', G.streak >= 5);
@@ -999,7 +1001,7 @@ function answer(a) {
   if (daily) {
     if (S.dopa) dopaAnswer(right); else SND.play(right ? 'correct' : 'fail', { combo: G.streak });
     G.endMs = now - G.t0;
-    if (right && G.queue.length) { emit('drill:daily', { phase: 'answer', done: G.done, timeMs: G.endMs }); return nextQuestion(); }
+    if (right && G.queue.length) { emit('drill:daily', { sid: G.sid, phase: 'answer', done: G.done, timeMs: G.endMs }); return nextQuestion(); }
     if (right) { G.timeMs = G.endMs; endGame('clear'); return show('daily'); }
     G.failed = true; $('ptime').textContent = RANKING.formatTime(G.endMs); endGame('fail');
   } else {
@@ -1100,7 +1102,7 @@ function endGame(outcome) {            // 1回のゲームにつき必ず1回だ
   G.ended = true;
   if (G.kind === 'daily') {   // 途中でやめた・閉じたは、そこまでの正答数とタイム
     if (outcome === 'quit') G.endMs = G.t0 ? performance.now() - G.t0 : 0;
-    return emit('drill:daily', { phase: 'end', outcome, done: G.done, timeMs: G.endMs });
+    return emit('drill:daily', { sid: G.sid, phase: 'end', outcome, done: G.done, timeMs: G.endMs });
   }
   emit('drill:result', { sid: G.sid, outcome, mode: G.mode.k, kind: G.kind, region: S.region,
     n: G.set.length, done: G.done, firstTry: G.firstTry, wrongs: G.wrongs, attempts: G.attempts,

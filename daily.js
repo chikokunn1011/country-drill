@@ -34,10 +34,15 @@
   const save = r => store.set(KEY, r);
   // 今日の記録（無ければ null）。前の日の記録は今日の分としては見ない
   const todayRec = () => { const r = rec(); return r && r.day === today() ? r : null; };
-  // playing のまま残っていたら（閉じた・リロードした）、そこまでの記録で終わりにする
+  // このページの id。playing の記録に入れて、どのページが遊んでいるかを見分ける（別のタブで開いても、遊んでいるタブの記録を止めない）
+  const PAGE = Date.now().toString(36) + Math.floor(performance.now()).toString(36);
+  // 閉じた・再読み込みしたときは index.html が pagehide で終わりにする。それでも playing のまま残った（落ちた・電源が切れた）記録は、
+  // 別のページのもので、最後の正解から STALE 以上たっていたら、そこまでの記録で終わりにする
+  const STALE = 30 * 60e3;
+  const busyElsewhere = r => r?.status === 'playing' && r.sid !== PAGE && Date.now() - (r.beat || 0) < STALE;
   const settle = () => {
     const r = rec();
-    if (r && r.status === 'playing') save({ ...r, status: 'done', outcome: 'quit' });
+    if (r && r.status === 'playing' && r.sid !== PAGE && !busyElsewhere(r)) save({ ...r, status: 'done', outcome: 'quit' });
   };
   // サーバーが受け付けるのは今日と、0時30分までの昨日（schema.sql の daily_day_open と同じ）
   const canSend = r => {
@@ -45,14 +50,13 @@
     if (r.day === today()) return true;
     return r.day === K.addDays(today(), -1) && (86400e3 - K.msToNextDay(new Date())) < 30 * 60e3;
   };
-  const scoreText = r => r.correct >= N ? `全問正解 ${RANKING.formatTime(r.timeMs)}` : `${r.correct}問 ${RANKING.formatTime(r.timeMs)}`;
 
   // ---- クイズからの知らせ ----
   document.addEventListener('drill:daily', e => {
     const d = e.detail || {}, r = rec();
-    if (!r || r.status !== 'playing') return;
+    if (!r || r.sid !== d.sid) return;   // このページで始めた挑戦だけ（ほかのタブがもう終わりにしていても、遊んでいるタブの記録を残す）
     const correct = Math.max(0, Math.min(N, d.done | 0)), timeMs = Math.max(0, Math.floor(+d.timeMs || 0));
-    if (d.phase === 'answer') save({ ...r, correct, timeMs });
+    if (d.phase === 'answer') save({ ...r, status: 'playing', correct, timeMs, beat: Date.now() });
     if (d.phase === 'end') save({ ...r, status: 'done', outcome: d.outcome, correct, timeMs });
     if (d.phase === 'end') { V.tab = 'today'; V.fresh = true; markHome(); }
   });
@@ -97,10 +101,14 @@
 
   function render() {
     settle();
-    const day = today(), r = todayRec();
+    const day = today(), mine = rec();
+    // 0時をまたいで遊んだ人: 昨日の記録をまだ載せられる間（0時30分まで）は、その結果を出す
+    const r = todayRec() ?? (mine?.day === K.addDays(day, -1) && mine.status === 'done' && canSend(mine) ? mine : null);
     $('dl-date').textContent = md(day);
     const main = $('dl-main');
-    if (!r) {
+    if (busyElsewhere(r)) {
+      main.innerHTML = '<p class="dl-lead">いま別のタブで挑戦中だよ。終わったら、ここに結果が出るよ。</p>';
+    } else if (!r) {
       main.innerHTML = `<div class="dl-intro">
         <p class="dl-lead">毎日0時（日本時間）に新しい${N}問。<b>挑戦できるのは1日1回だけ</b>。</p>
         <ul class="dl-rules">
@@ -118,6 +126,7 @@
       const head = clear ? '全問正解！' : r.outcome === 'quit' ? 'とちゅうでやめた' : 'ここまで！';
       const big = clear ? `<span>${RANKING.formatTime(r.timeMs)}</span>` : `${r.correct}<small> / ${N} 問正解</small>`;
       main.innerHTML = `<div class="result dl-result">
+        ${r.day !== day ? `<p class="hint">昨日（${md(r.day)}）の挑戦の記録。0時30分までなら載せられるよ</p>` : ''}
         <p class="qlabel">${head}</p><p class="score">${big}</p>
         ${clear ? '' : `<p class="hint">タイム ${RANKING.formatTime(r.timeMs)}</p>`}
         <p class="tarank" id="dl-rank"></p>
@@ -126,12 +135,15 @@
           <p class="tamsg" id="dl-msg" role="status"></p></div>` : r.sent ? `<p class="tamsg ok">「${esc(r.sent.name)}」で載せたよ！</p>` : ''}
         <div class="row center"><button class="btn ghost" id="dl-share">結果をシェア</button></div>
         <p class="hint dl-next" id="dl-next"></p>
-      </div>${answersHTML(day, '今日の問題と答え', r, Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)))}`;
+        ${r.day !== day ? '<div class="row center"><button class="btn" id="dl-start">今日の難問に挑戦する</button></div>' : ''}
+      </div>${answersHTML(r.day, r.day === day ? '今日の問題と答え' : '昨日の問題と答え', r, r.day === day ? Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)) : N)}`;
+      if ($('dl-start')) $('dl-start').onclick = start;
       $('dl-share').onclick = () => share(r);
       if (canSend(r)) form(r);
-      if (RANKING.enabled && !r.sent) RANKING.dailyRankOf({ day, correct: r.correct, timeMs: r.timeMs })
-        .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = `今日${n}位 相当`; }, e => console.warn('daily rankOf', e));
-      if (r.sent?.rank) $('dl-rank').textContent = `今日${r.sent.rank}位（載せたとき）`;
+      const dayWord = r.day === day ? '今日' : '昨日';
+      if (RANKING.enabled && !r.sent) RANKING.dailyRankOf({ day: r.day, correct: r.correct, timeMs: r.timeMs })
+        .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = `${dayWord}${n}位 相当`; }, e => console.warn('daily rankOf', e));
+      if (r.sent?.rank) $('dl-rank').textContent = `${dayWord}${r.sent.rank}位（載せたとき）`;
       tickNext();
       if (V.fresh) { V.fresh = false; if (clear) window.SND?.play?.('perfect'); }
     }
@@ -155,9 +167,10 @@
   function start() {
     const day = today();
     if (todayRec()) return render();
-    save({ day, status: 'playing', outcome: null, correct: 0, timeMs: 0, sent: null });
+    const sid = `daily-${PAGE}-${Date.now().toString(36)}`;
+    save({ day, sid, status: 'playing', outcome: null, correct: 0, timeMs: 0, sent: null, beat: Date.now() });
     markHome();
-    startDaily(questions(day));
+    startDaily(questions(day), sid);
   }
 
   function form(r) {
@@ -170,7 +183,13 @@
       const chk = RANKING.checkName(name.value);
       if (!chk.ok) return fail(chk.reason);
       btn.disabled = true; say('送信中…');
-      const res = await RANKING.dailySubmit({ day: r.day, nickname: chk.name, correct: r.correct, total: N, timeMs: r.timeMs });
+      let res = await RANKING.dailySubmit({ day: r.day, nickname: chk.name, correct: r.correct, total: N, timeMs: r.timeMs });
+      // 前に送ったときに登録はできていて、返事だけ届かなかった: 同じ名前・同じ記録の行があれば、載せたことにする
+      if (res.reason === 'name_taken') {
+        const rows = await RANKING.dailyTop({ day: r.day }).catch(() => []);
+        const i = rows.findIndex(x => x.nickname === chk.name && x.correct === r.correct && x.timeMs === Math.floor(r.timeMs));
+        if (i >= 0) res = { ok: true, rank: null };
+      }
       btn.disabled = false;
       if (!res.ok) return fail(res.reason);
       store.set('nickname', chk.name);
@@ -217,14 +236,16 @@
   $('dl-tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; V.tab = b.dataset.t; for (const x of $('dl-tabs').children) x.setAttribute('aria-pressed', String(x === b)); load(); };
   $('dl-retry').onclick = () => load();
 
-  // ---- ホームの入口。今日まだなら「NEW」 ----
-  const hb = document.createElement('button');
-  hb.className = 'btn ghost'; hb.id = 'home-daily';
+  // ---- ホームの入口。メニューのボタンとは別の、プレイの上の細い帯（ボタンの並びを変えない）。今日まだなら「NEW」 ----
+  const row = document.createElement('div'), hb = document.createElement('button');
+  row.className = 'dl-homerow';
+  hb.type = 'button'; hb.className = 'dl-homebtn'; hb.id = 'home-daily';
   hb.onclick = () => { V.tab = 'today'; show('daily'); };
-  $('home-play')?.after(hb);
+  row.append(hb);
+  $('home-play')?.before(row);
   function markHome() {
     const done = !!todayRec();
-    hb.innerHTML = `今日の難問${done ? '' : '<span class="dl-new">NEW</span>'}`;
+    hb.innerHTML = `<span aria-hidden="true">📅</span>今日の難問<span class="mono dl-homeday">${mdShort(today())}</span>${done ? '<span class="dl-homedone">挑戦ずみ</span>' : '<span class="dl-new">NEW</span>'}`;
   }
   markHome();
   document.addEventListener('drill:screen', e => { if (e.detail?.name === 'home') markHome(); });
