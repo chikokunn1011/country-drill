@@ -66,8 +66,12 @@ select has_function_privilege('anon','admin_list(text,jsonb)','execute');
 
 - **ログインできない**: メール・パスワードを見直す。Authentication → Users に自分がいるか、**Auto Confirm User** で作ったか（未確認のままだと入れない）を確認。
 - **「管理者じゃない」と出る**: ログインはできてるけど `admins` に入ってない。Authentication → Users の **User UID** と、SQL Editor で `select * from admins;` の `user_id` が同じか見る。違う・空なら手順4をやり直す。
-- **パスワードを忘れた**: Authentication → Users で自分の行のメニュー（右の「…」）から **Send password recovery** を押す。届いたメールのリンクから新しいパスワードを決める（画面からパスワードを直接書きかえる項目は無い）。
-  - メールがいつまでも届かないときは、その行を **Delete user** で消して、手順1でユーザーを作り直し、手順4で新しい UID を admins に入れ直す（古い UID の行は `delete from admins where user_id = '<古いUID>';` で消しておく）。
+- **パスワードを忘れた**: ユーザーを作り直す（これがいちばん確実）。
+  1. Authentication → Users で自分の行のメニュー（右の「…」）から **Delete user** で消す。
+  2. 手順1で同じメールのユーザーを新しいパスワードで作り直す（**Auto Confirm User** を ON）。
+  3. 手順4で**新しい** UID を admins に入れ直す。古い UID の行は SQL Editor で `delete from admins where user_id = '<古いUID>';` を Run して消しておく。
+  - **Send password recovery** は使わない。届くリンクは新しいパスワードを決める画面に行かない（このサイトにも管理ページにもその画面が無い）ので、押しても直せない。
+  - 操作ログ（admin_log）の「だれが」は古い UID のまま残る（管理ページでは頭8文字で出る）。記録は消えない。
 
 ## 注意
 
