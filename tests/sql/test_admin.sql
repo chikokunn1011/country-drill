@@ -141,11 +141,12 @@ reset role;
 
 \echo '- list_filters'
 truncate scores, daily_scores, rpg_players;
+-- 時刻は今週の始まり（jst_week_start）から数える。月曜0時すぎに流しても「今週」の行が先週にこぼれない
 insert into scores (board, nickname, time_ms, questions, created_at) values
-  ('f2n:asia:10', 'ﾁｺ', 9000, 10, now() - interval '3 min'),
-  ('f2n:asia:10', 'ミケ', 7000, 10, now() - interval '2 min'),
-  ('f2n:asia:10', 'old', 6000, 10, now() - interval '30 days'),
-  ('n2f:all:5', 'チコ', 8000, 5, now() - interval '1 min');
+  ('f2n:asia:10', 'ﾁｺ', 9000, 10, jst_week_start() + interval '1 s'),
+  ('f2n:asia:10', 'ミケ', 7000, 10, jst_week_start() + interval '2 s'),
+  ('f2n:asia:10', 'old', 6000, 10, jst_week_start() - interval '1 s'),
+  ('n2f:all:5', 'チコ', 8000, 5, jst_week_start() + interval '3 s');
 insert into daily_scores (day, nickname, correct, total, time_ms, created_at) values
   ('2026-10-01', 'A', 18, 20, 50000, now() - interval '3 min'),
   ('2026-10-01', 'B', 20, 20, 70000, now() - interval '2 min'),
@@ -307,6 +308,78 @@ do $$ declare r jsonb; begin
   assert r = '{"ok":true,"restored":0,"failed":1}'::jsonb, format('同じ id: %s', r);
 end $$;
 reset role;
+
+\echo '- restore_rpg_refuses_same_normalized_name'
+truncate scores, daily_scores, rpg_players, admin_log, admin_trash;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x11', 'Taro', 5, 1, 5), ('\x12', 'Hana', 5, 1, 5);
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_delete('rpg', (select array_agg((x->>'id')::bigint) from jsonb_array_elements(admin_list('rpg', '{}')->'rows') x));
+  assert r->>'deleted' = '2', format('rpg delete: %s', r);
+end $$;
+reset role;
+-- 消したあいだに、NFKC＋小文字で同じ名前（ＴＡＲＯ → taro）で別の人が登録した
+do $$ declare r jsonb := rpg_register('00000000-0000-4000-8000-0000000000aa', 'ＴＡＲＯ', 1, 0, 0); begin
+  assert r->>'ok' = 'true', format('Taro が消えたので ＴＡＲＯ は登録できる: %s', r);
+end $$;
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_restore((select array_agg((x->>'id')::bigint) from jsonb_array_elements(admin_list('trash', '{}')->'rows') x));
+  assert r = '{"ok":true,"restored":1,"failed":1}'::jsonb, format('同じ名前（NFKC＋小文字）は戻さない: %s', r);
+  assert (admin_list('trash', '{}')->'rows'->0->'row_data'->>'nickname') = 'Taro', '戻せなかった Taro は trash に残る';
+end $$;
+reset role;
+do $$ begin
+  assert (select array_agg(nickname order by nickname) from rpg_players) = array['Hana', 'ＴＡＲＯ'], format('rpg: %s', (select array_agg(nickname) from rpg_players));
+end $$;
+
+\echo '- restore_ignores_trash_older_than_30_days'
+truncate scores, admin_trash restart identity;  -- trash の id は 1（40日前）と 2（29日前）
+insert into admin_trash (kind, row_data, at) values
+  ('scores', '{"id": 801, "board": "f2n:asia:10", "nickname": "古い", "time_ms": 9000, "questions": 10, "created_at": "2026-01-01T00:00:00Z"}', now() - interval '40 days'),
+  ('scores', '{"id": 802, "board": "f2n:asia:10", "nickname": "新しい", "time_ms": 9000, "questions": 10, "created_at": "2026-01-01T00:00:00Z"}', now() - interval '29 days');
+set role authenticated;
+do $$ declare r jsonb; begin
+  assert (admin_list('trash', '{}')->>'total')::int = 1, '40日前のものは一覧に出ない';
+  r := admin_restore(array[1, 2]::bigint[]);
+  assert r = '{"ok":true,"restored":1,"failed":1}'::jsonb, format('40日前のものは戻さない: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select array_agg(nickname) from scores) = array['新しい'], format('scores: %s', (select array_agg(nickname) from scores));
+  assert (select restored_at from admin_trash where (row_data->>'id') = '801') is null, '古いものは restored_at も入らない';
+end $$;
+
+\echo '- delete_nothing_writes_no_log'
+truncate admin_log;
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_delete('scores', array[987654::bigint]);
+  assert r = '{"ok":true,"deleted":0}'::jsonb, format('0件: %s', r);
+  r := admin_delete('rpg', array[]::bigint[]);
+  assert r = '{"ok":true,"deleted":0}'::jsonb, format('空の配列: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from admin_log) = 0, format('0件のときは log に残さない: %s', (select count(*) from admin_log));
+end $$;
+
+\echo '- rename_trims_same_chars_as_schema'
+insert into scores (board, nickname, time_ms, questions) values ('f2n:asia:10', 'trim', 8000, 10);
+set role authenticated;
+do $$ declare r jsonb; begin
+  -- NBSP・全角空白・BOM・ゼロ幅でない空白（U+2009）を前後に付ける
+  r := admin_rename('scores', (admin_list('scores', '{"q": "trim"}')->'rows'->0->>'id')::bigint,
+                    chr(160) || chr(12288) || ' ハチ' || chr(8201) || chr(65279));
+  assert r = '{"ok":true,"nickname":"ハチ"}'::jsonb, format('trim: %s', r);
+end $$;
+reset role;
+do $$ begin
+  -- 文字の並びが schema.sql の submit_score と同じ（\u で書いてある）
+  assert position(
+    (select substring(prosrc from 'btrim\(p_nickname, E''([^'']*)''') from pg_proc where proname = 'submit_score')
+    in (select prosrc from pg_proc where proname = 'admin_rename')) > 0, 'admin_rename の trim 文字は submit_score と同じ';
+end $$;
 
 \echo '- rename_rules'
 truncate scores, daily_scores, rpg_players, admin_log, admin_trash;

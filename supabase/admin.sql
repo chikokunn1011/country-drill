@@ -185,7 +185,7 @@ end $$;
 revoke all on function admin_boards() from public, anon;
 grant execute on function admin_boards() to authenticated;
 
--- 消す。行を admin_trash に入れてから消し、admin_log に1件残す
+-- 消す。行を admin_trash に入れてから消し、admin_log に1件残す（0件なら残さない）
 create or replace function admin_delete(p_kind text, p_ids bigint[]) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
@@ -208,31 +208,42 @@ begin
   else
     return jsonb_build_object('ok', false, 'reason', 'bad_kind');
   end if;
-  insert into admin_log (user_id, action, kind, detail)
-    values (auth.uid(), 'delete', p_kind, jsonb_build_object('ids', coalesce(to_jsonb(v_ids), '[]'::jsonb)));
+  if v_n > 0 then  -- 1件も消えなかったときは記録しない
+    insert into admin_log (user_id, action, kind, detail)
+      values (auth.uid(), 'delete', p_kind, jsonb_build_object('ids', coalesce(to_jsonb(v_ids), '[]'::jsonb)));
+  end if;
   return jsonb_build_object('ok', true, 'deleted', v_n);
 end $$;
 revoke all on function admin_delete(text, bigint[]) from public, anon;
 grant execute on function admin_delete(text, bigint[]) to authenticated;
 
 -- ごみ箱から戻す（同じ id で）。1件ずつ試して、同じ id の行がもうある・同じ日に同じ名前がある などでぶつかったら戻さずに failed に数える
--- 無い・もう戻した trash の id も failed に数える
+-- 無い・もう戻した・30日より古い trash の id も failed に数える（一覧に出ないものは戻さない）
+-- rpg は rpg_register と同じ鍵（'rpgname:'）を取り、NFKC＋小文字で同じ名前のほかの行があれば戻さない
 create or replace function admin_restore(p_trash_ids bigint[]) returns jsonb
 language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
   t admin_trash;
+  v_norm text;
   v_want int;
   v_ok int := 0;
 begin
   perform admin_check();
   v_want := (select count(distinct x) from unnest(p_trash_ids) x where x is not null);
-  for t in select * from admin_trash where id = any(p_trash_ids) and restored_at is null order by id for update loop
+  for t in select * from admin_trash where id = any(p_trash_ids) and restored_at is null
+             and at > now() - interval '30 days' order by id for update loop
     begin
       if t.kind = 'scores' then
         insert into scores overriding system value select * from jsonb_populate_record(null::scores, t.row_data);
       elsif t.kind = 'daily' then
         insert into daily_scores overriding system value select * from jsonb_populate_record(null::daily_scores, t.row_data);
       elsif t.kind = 'rpg' then
+        v_norm := lower(normalize(coalesce(t.row_data->>'nickname', ''), NFKC));
+        perform pg_advisory_xact_lock(hashtext('rpgname:' || v_norm));  -- rpg_register と同じ鍵
+        if exists (select 1 from rpg_players where lower(normalize(nickname, NFKC)) = v_norm
+                   and id is distinct from (t.row_data->>'id')::bigint) then
+          raise unique_violation;
+        end if;
         insert into rpg_players overriding system value select * from jsonb_populate_record(null::rpg_players, t.row_data);
       else
         continue;
@@ -266,7 +277,7 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'bad_kind');
   end if;
   if p_name is not null then
-    v_name := btrim(p_name, E' \t\n\r\f\u000b                 　﻿');
+    v_name := btrim(p_name, E' \t\n\r\f\u000b\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff');
     if char_length(v_name) not between 1 and 12 then
       return jsonb_build_object('ok', false, 'reason', 'bad_name');
     end if;
