@@ -211,7 +211,8 @@ export const measureFit = page => page.evaluate(() => {
     const inner = { top: cb.top + parseFloat(cs.paddingTop), bottom: cb.bottom - parseFloat(cs.paddingBottom),
                     left: cb.left + parseFloat(cs.paddingLeft), right: cb.right - parseFloat(cs.paddingRight) };
     let overflow = 0;
-    for (const el of q.querySelectorAll('*')) { const b = r(el); if (!b.width || !b.height) continue;
+    // svg の中身は svg の枠で切られて見えない（出題地図は縮小用に画面の外の国も描いている）ので数えない
+    for (const el of q.querySelectorAll('*')) { if (el.parentElement?.closest('svg')) continue; const b = r(el); if (!b.width || !b.height) continue;
       overflow = Math.max(overflow, b.bottom - inner.bottom, inner.top - b.top, inner.left - b.left, b.right - inner.right); }
     for (const el of q.querySelectorAll('p, b, span, dd, button'))
       if (el.clientWidth && el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflow === 'visible') overflow = Math.max(overflow, el.scrollWidth - el.clientWidth);
