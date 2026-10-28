@@ -807,8 +807,12 @@
     const codes = allCodes();
     return bagOf(d, m, shuffled(codes, rng).slice(0, TUNING.tower.bagSize), codes, towerModes(f), rng);
   };
-  const towerRefill = (f, lastMode, rng) =>
-    refillOf(shuffled(allCodes(), rng).slice(0, TUNING.tower.bagSize), mode => towerNextMode(mode, f), lastMode || {}, rng);
+  // 詰め直し: 全世界から新しく bagSize か国。前の形式がある国は towerNextMode、無い国はその階の形式の順でまわす
+  const towerRefill = (f, lastMode, rng) => {
+    const last = lastMode || {}, cy = towerModes(f);
+    return shuffled(allCodes(), rng).slice(0, TUNING.tower.bagSize)
+      .map((a, i) => ({ a, mode: last[a] ? towerNextMode(last[a], f) : cy[i % cy.length], tag: null }));
+  };
   const towerFlags = (d, m, f, rng) => flagsOf(d, m, allCodes(), towerBossFlagsN(f), rng);
   // f 階を勝ったときのコイン。best は勝つ前の最高記録（勝った階）。はじめて勝った階だけボーナス
   const towerReward = (f, best) => { const T = TUNING.tower; return { coins: T.coinBase + f, bonus: f > best ? T.bestBonus : 0 }; };

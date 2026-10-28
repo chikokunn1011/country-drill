@@ -253,6 +253,28 @@ t('tower_no_story_side_effects', async page => {
   assert.equal(typeof got['rpg-first-win@1'], 'number');   // 初勝利は今のまま数える
 }, { blockScripts: [] });
 
+// 2階から先と［もう一度］（バトル画面のまま始まる）でも、badges.js はバトル中としてトーストを消して保留する（rpg:tower-floor）
+t('tower_floor_holds_badge_toasts', async page => {
+  const bdg = () => page.locator('#toasts [data-bdg-toast]').count();
+  await writeSave(page, saveWith({ lv: 30, floors: { world: 5 }, story: ['ch1'],
+    st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 } }));
+  await page.evaluate(() => { localStorage.removeItem('badges'); });
+  await startTower(page);
+  await winTowerFloor(page);
+  await page.waitForFunction(() => document.querySelectorAll('#toasts [data-bdg-toast]').length > 0);   // 初勝利のトースト
+  await nextFloor(page);
+  assert.equal(await bdg(), 0, '2階を始めたら消える');
+  // 2階のあいだに来たお知らせは保留（階を終えるまで出さない）
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('rpg:levelup', { detail: { lv: 99 } })));
+  await page.waitForTimeout(300);
+  assert.equal(await bdg(), 0, '2階のあいだは出さない');
+  assert.deepEqual((await events(page, 'rpg:tower-floor')).map(e => e.floor), [1, 2]);
+  await loseFloor(page);
+  await page.click('#bt-tretry');
+  assert.deepEqual((await events(page, 'rpg:tower-floor')).map(e => e.floor), [1, 2, 1]);
+  assert.equal(await bdg(), 0, '［もう一度］で消える');
+}, { blockScripts: [] });
+
 // スマホ幅（360px）でも、終わりの画面の「（自己ベスト 12階）」が数字と「階」のあいだで折り返さない
 t('tower_end_best_nowrap_360', async page => {
   await page.setViewportSize({ width: 360, height: 740 });

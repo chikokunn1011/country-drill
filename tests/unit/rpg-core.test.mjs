@@ -1541,6 +1541,19 @@ test('tower_bag_and_flags', () => {
   assert.equal(K.towerFlags(d, {}, 30, rng).length, 8);
   assert.equal(K.towerRefill(60, { jp: 'm2f' }, rng).length, K.TUNING.tower.bagSize);
 });
+test('tower_refill_mixes_modes', () => {
+  // 前の形式が無い国（塔の詰め直しはふつう全部）は、その階の形式の順でまわす（全部 n2f や m2f にしない）
+  const K = loadCore(), rng = mulberry32(9);
+  for (const f of [30, 60]) {
+    const bag = K.towerRefill(f, {}, rng), modes = new Set(bag.map(x => x.mode));
+    assert.ok(modes.size > 1, `${f}F: ${[...modes]}`);
+    for (const x of bag) assert.ok(K.towerModes(f).includes(x.mode));
+  }
+  // 前の形式がある国は towerNextMode
+  const bag = K.towerRefill(30, {}, mulberry32(3)), last = Object.fromEntries(bag.map(x => [x.a, 'm2f']));
+  const again = K.towerRefill(30, last, mulberry32(3));
+  for (const x of again) if (last[x.a]) assert.equal(x.mode, K.towerNextMode('m2f', 30));
+});
 test('tower_reward', () => {
   const K = loadCore();
   assert.deepEqual(plain(K.towerReward(1, 0)), { coins: 6, bonus: 20 });

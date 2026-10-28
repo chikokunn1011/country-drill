@@ -544,6 +544,8 @@
     drawTop();
     if (intro) $('bt-col').innerHTML = introHTML();
     if (sec.hidden) { RPG.opts = {}; show('battle'); }
+    // 階を始めるたび（2階から先と［もう一度］はバトル画面のままで drill:screen が出ない）。badges.js はバトル中としてトーストを保留する
+    emit('rpg:tower-floor', { floor: f });
     if (intro) $('bt-fight')?.focus({ preventScroll: true });
     else nextQ();
     return true;

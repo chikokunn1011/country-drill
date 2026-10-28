@@ -102,7 +102,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 ## 7. rpg.js / rpg-cards.js / rpg-battle.js → ほかの機能（バッジなど）
 
-`rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` `rpg:tower` `rpg:tower-end` など）は rpg-battle.js、ほかは rpg.js。
+`rpg:pull` と、ガチャで仲間になった・ランクアップした `rpg:join` `rpg:promote`（`via: 'gacha'`）、ガチャの `rpg:coins`（`gacha` `refund`）、`rpg:share` は rpg-cards.js が出す。バトルのもの（`rpg:answer` `rpg:battle` `rpg:clear` `rpg:tower` `rpg:tower-end` `rpg:tower-floor` など）は rpg-battle.js、ほかは rpg.js。
 
 | イベント | detail | メモ |
 |---|---|---|
@@ -116,6 +116,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `rpg:battle` | `{dungeon, floor, boss, win, first, mistakes, revived, gauge, maxCombo, lv, recLv}` | 英雄の塔では1階終わるごとに `dungeon: 'tower'`（`floor` は塔の階、`boss` は中ボス、`first` はその階をはじめて勝った、`gauge` は 0）。塔では `rpg:clear` は出さない |
 | `rpg:clear` | `{dungeon}` | ボスを初めて倒した（ストーリーのダンジョンだけ） |
 | `rpg:tower` | `{floor, win, best, newBest, coins}` | 英雄の塔の1階が終わるたび（`rpg:battle` とコインのあと）。`best` は書いたあとの最高記録（勝ったいちばん上の階）、`newBest` はこの階で `best` が増えたか、`coins` はこの階でもらった塔のコイン（基本＋ボーナス。負けは 0） |
+| `rpg:tower-floor` | `{floor}` | 英雄の塔の1階が始まるたび（1階・つぎの階へ・［もう一度］。1階はバトル画面を出したあと）。2階から先と［もう一度］はバトル画面のままなので `drill:screen` が出ない。badges.js はこれでバトル中の保留を始める |
 | `rpg:tower-end` | `{cleared, best}` | 英雄の塔の1回が終わったとき（負け・［やめる］・にげる・バトルの画面を離れた）。`cleared` はその回で勝ったいちばん上の階（0 もある）。ページを閉じたときは出ない |
 | `rpg:overcome` | `{a, total}` | |
 | `rpg:bounty` | `{a, doneAll, totalDays}` | |
@@ -174,10 +175,11 @@ badges.js（バッジ設計 §3.3・§8）が rpg.js / rpg-cards.js / rpg-battle
 | `rpg:overcome` | `a` | 苦手克服 |
 | `rpg:bounty` | `totalDays` | 手配書ハンター |
 | `rpg:pull` | （時刻だけ） | ガチャの演出中の保留を決め直す |
+| `rpg:tower-floor` | （なし） | `drill:screen {name: 'battle'}` と同じく、バトル中にして出ているバッジのトーストを消す（塔の2階から先・［もう一度］） |
 | `rpg:ready` `rpg:share` `rpg:tower` `rpg:tower-end` | | 使わない |
 
 - クイズ中（`drill:start` から `drill:result` まで）に来たものと `rpg:answer` は積むだけで、判定も保存もしない（クイズ中のものは `drill:result` でまとめて判定する）。クイズの外の `rpg:answer`（バトルの1問ごと）は、次に判定するイベント（ふつうはバトルの終わりの `rpg:battle`。ほかの `rpg:*` や `drill:result` などでもよい）でまとめて判定する。その前にページを閉じた・隠れた（`pagehide`・`visibilitychange`）ときは保存だけして、そのあとの判定（次に判定するイベントか、次の起動時）で判定する（隠れただけならページは残るので、戻ってきたあとの次のイベントで判定することもある）。ほかはすぐ判定して保存し、取れたステップは `badge:earned` で払う。
-- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から4秒（パックの演出＋めくる）。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
+- お知らせ（トースト）は、バトル中（`drill:screen {name: 'battle'}` か `rpg:tower-floor` から `rpg:battle` か、バトル画面を離れるまで）と、ガチャの演出中（いまの画面が `'gacha'` で、最後の `rpg:pull` から4秒（パックの演出＋めくる）。reduced motion なら1秒）は出さずに待つ。お知らせは、同じタスクで続けて来た分（バトルの終わりの `rpg:battle` → `rpg:clear` → 仲間・克服・手配書など）をまとめて1回で出し、枚数の上限はそのまとめに効く。クイズ（`drill:start`）やバトル（`drill:screen {name: 'battle'}`・塔の階の `rpg:tower-floor`）が始まったら、出ているバッジのトーストは消し、400ms ずつずらしてまだ出していない分は終わってから出す（rpg.js などほかのトーストは消さない）。
 - 起動時と判定のたびに `RPG.snapshot()` を同期で読む（7章）。使うキーは `intro` `lv` `owned` `floors` `st`（`st.win` `st.lose` `st.flee`）`overcome` `bountyDays`。ボスを倒したかは `floors` を見て、`floors[id] >= 5` なら倒したとみなす（`cleared` の形には頼らない）。冒険の値は、badges.js が覚えた値と snapshot の値の大きいほうで判定する。
 
 rpg.js へのお願い（バッジ設計 §8.4）と、rpg.js がやらなかったときのバッジ側の代わりの判定:

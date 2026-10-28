@@ -733,6 +733,7 @@
     if (d.name === 'home') renderHome();
     flush();                                   // 保留していたお知らせ（バトル・ガチャを離れた）
   });
+  on('rpg:tower-floor', () => { battle = true; hideToasts(); });   // 塔の階が始まった（2階から先はバトル画面のままなので drill:screen が来ない）
   // 冒険（rpg.js / rpg-battle.js。§8.2）。バトルの1問ごと・クイズ中は積むだけ（drill:result でまとめて判定）
   for (const t of ['coins', 'levelup', 'join', 'promote', 'answer', 'battle', 'clear', 'overcome', 'bounty']) on('rpg:' + t, d => {
     if (t === 'coins' && d.reason !== 'start') return;   // バッジのごほうび（'badge'）などでは判定しない

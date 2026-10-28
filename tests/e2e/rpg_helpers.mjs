@@ -6,7 +6,7 @@ import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './
 export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // window.__ev に積むイベント（helpers の events(page, type?) で読める）
 export const RPG_EVENTS = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer', 'rpg:battle', 'rpg:clear',
-  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:deco', 'rpg:tower', 'rpg:tower-end', 'badge:earned', 'badge:title',
+  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:deco', 'rpg:tower', 'rpg:tower-end', 'rpg:tower-floor', 'badge:earned', 'badge:title',
   'drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
 
 // 読み込むたびに（再読み込みのあとも）ページのスクリプトより前に走る。イベントを window.__ev に、出たトーストの文字を window.__toasts に積む
