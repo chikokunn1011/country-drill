@@ -511,6 +511,8 @@
     + `<span class="rpg-debug-lv"><label for="rpg-dbg-lv">Lv</label><input type="number" id="rpg-dbg-lv" min="1" max="${T.hero.maxLv}" value="${d.lv}">`
     + '<button class="btn ghost" id="rpg-dbg-setlv">Lv にする</button></span>'
     + '<button class="btn ghost" id="rpg-dbg-unlock">全部のフロアを開く</button>'
+    + '<span class="rpg-debug-lv"><label for="rpg-dbg-tf">塔</label><input type="number" id="rpg-dbg-tf" min="1" value="10">'
+    + '<button class="btn ghost" id="rpg-dbg-tower">階から</button></span>'
     + '<button class="btn ghost" id="rpg-dbg-wipe">冒険データを消す</button></div></div>';
   const bindDebug = () => {
     if (!$('rpg-debug')) return;
@@ -519,6 +521,10 @@
     // どのダンジョンもボスまで行けるようにする（もう倒したボスはそのまま。倒したことにはしない）
     $('rpg-dbg-unlock').onclick = () => tx(x => { for (const g of DG) x.floors[g.id] = Math.max(cleared(x, g.id), BOSS - 1); });   // 鏡の地球・宇宙も入れて21個
     $('rpg-dbg-wipe').onclick = wipeAsk;
+    // 英雄の塔をその階から（RPG_BATTLE.debugTower。地図喰いを倒していないセーブでは始まらない）
+    $('rpg-dbg-tower').onclick = () => {
+      if (!window.RPG_BATTLE?.debugTower?.(+$('rpg-dbg-tf').value)) toast('英雄の塔は地図喰いをたおすと開くよ');
+    };
   };
 
   // ---- はじめての画面 ----
@@ -808,7 +814,16 @@
     dlg.querySelector('.close').onclick = $('rpg-story-ok').onclick = () => dlg.close();
     dlg.showModal();
   };
-  // スマホは上から 旅人・レベルアップ・つぎにやること・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
+  // 英雄の塔の入口（つぎにやることの下）。地図喰いを倒すまでは 🔒 で［挑戦］を押せない。バトルの画面が無ければ出さない
+  const towerHTML = d => {
+    if (!SCREENS.includes('battle')) return '';
+    const on = K.towerOpen(d), best = d.tower?.best || 0;
+    return `<div class="rpg-tower${on ? '' : ' rpg-locked'}" id="rpg-tower"><p class="rpg-tower-h">`
+      + (on ? '<span class="rpg-tower-e" aria-hidden="true">🗼</span>' : '<span class="rpg-tower-e" role="img" aria-label="まだ開いていない">🔒</span>')
+      + `<b>英雄の塔</b><span class="rpg-tower-s">${on ? (best ? `自己ベスト ${fmt(best)}階` : '1階から、どこまで登れるかな') : '地図喰いをたおすと開く'}</span></p>`
+      + `<button type="button" class="btn" id="rpg-tower-go"${on ? '' : ' disabled'}>挑戦</button></div>`;
+  };
+  // スマホは上から 旅人・レベルアップ・つぎにやること・塔・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
   const homeHTML = (d, nf, nx) => {
     const st = nf ? K.battleStats(d, nf.id, nf.floor) : K.battleStats(d, DG[DG.length - 1].id, BOSS);   // 全部クリアなら最後の章のボス（星喰い）
@@ -827,7 +842,7 @@
       + `<div class="rpg-lv"><button class="btn" id="rpg-lvup"${max || !can ? ' disabled' : ''}>${lvup}</button>`
       + `<button class="linkbtn" id="rpg-lvmax"${upTo > d.lv ? '' : ' disabled'}>上げられるだけ上げる</button></div>`
       + `<button type="button" class="rpg-next" id="rpg-next"><span class="rpg-next-k" aria-hidden="true">▸</span>`
-      + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>`
+      + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>${towerHTML(d)}`
       + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
         + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button>'
         + (SCREENS.includes('team') ? '<button class="btn ghost" id="rpg-to-team">⚔️ 編成</button>' : '') + '</div>' : '')
@@ -858,6 +873,7 @@
     $('rpg-lvup').onclick = levelUp;
     $('rpg-lvmax').onclick = levelMax;
     $('rpg-next').onclick = nx.go;
+    if ($('rpg-tower-go')) $('rpg-tower-go').onclick = () => open('battle', { tower: true });
     if ($('rpg-deco')) $('rpg-deco').onclick = openDeco;
     if ($('rpg-to-gacha')) $('rpg-to-gacha').onclick = () => open('gacha');
     if ($('rpg-to-cards')) $('rpg-to-cards').onclick = () => open('cards');
@@ -967,6 +983,7 @@
       intro: d.intro, lv: d.lv, coins: d.coins, owned: as.length, ownedByStar, ownedByRegion,
       floors: { ...d.floors }, cleared: DG.filter(g => cleared(d, g.id) >= BOSS).map(g => g.id),
       earned: d.earned, st: { ...d.st }, overcome: d.st.overcome, bountyDays: d.st.bountyDays,
+      tower: d.tower?.best || 0,   // 英雄の塔の最高記録（勝ったいちばん上の階）
     };
   };
   // 起動時に1回: 冒険ホームの画面（<section> を作ってから登録）、ホームのボタン、トップバーのチップ、設定のスイッチ

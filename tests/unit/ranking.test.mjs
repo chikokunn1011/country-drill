@@ -291,12 +291,16 @@ test('profileCard_public', async () => {
   assert.equal(Object.prototype.toString.call(c.since), '[object Date]');
   assert.equal(c.since.toISOString(), '2026-10-01T00:00:00.000Z');
   assert.deepEqual(plain({ ...c, since: undefined }), { ok: true, private: false, pid: 'abcdef123456', nickname: 'チコ', title: '旗の達人', deco: ['jp'],
-    badges: 12, badgesTotal: 40, rpg: { lv: 7, dungeons: 2 }, ta: [{ board: 'f2n:asia:10', timeMs: 12345, rank: 3 }], daily: { plays: 4, perfect: 1 } });
+    badges: 12, badgesTotal: 40, rpg: { lv: 7, dungeons: 2, tower: 0 }, ta: [{ board: 'f2n:asia:10', timeMs: 12345, rank: 3 }], daily: { plays: 4, perfect: 1 } });
   // 冒険の記録が無ければ rpg は null
   const none = await load(reply({ ok: true, private: false, pid: 'p', nickname: 'a', title: '', deco: [], badges: 0, badges_total: 0,
     rpg: null, ta: [], daily: { plays: 0, perfect: 0 }, since: '2026-10-01T00:00:00Z' })).R.profileCard({ pid: 'p' });
   assert.equal(none.rpg, null);
   assert.deepEqual(plain(none.ta), []);
+  // 英雄の塔の最高記録があれば rpg.tower に（無ければ 0）
+  const tw = await load(reply({ ok: true, private: false, pid: 'p', nickname: 'a', title: '', deco: [], badges: 0, badges_total: 0,
+    rpg: { lv: 30, dungeons: 21, tower: 12 }, ta: [], daily: { plays: 0, perfect: 0 }, since: '2026-10-01T00:00:00Z' })).R.profileCard({ pid: 'p' });
+  assert.deepEqual(plain(tw.rpg), { lv: 30, dungeons: 21, tower: 12 });
 });
 
 test('profileCard_private', async () => {
@@ -364,4 +368,40 @@ test('rpg2_args_and_rows', async () => {
   assert.deepEqual(Object.keys(rows[0]), ['nickname', 'pid', 'deco', 'lv', 'dungeons', 'floors', 'at']);
   assert.deepEqual(plain(rows.map(r => [r.nickname, r.pid, r.deco, r.lv])), [['ミケ', 'p1', ['jp', 'br'], 3], ['タロウ', null, [], 2]]);
   await assert.rejects(load(reply({ message: 'boom' }, 500)).R.rpgTop3({ sort: 'lv' }), e => e.status === 500);
+});
+
+test('rpg_set_tower2_args', async () => {
+  // 塔の最高記録をプロフィールの合言葉で送る。返事の rank_tower は rankTower に。失敗しても例外は投げない
+  const { R, calls } = load(reply({ ok: true, rank_tower: 4 }));
+  assert.deepEqual(plain(await R.rpgSetTower2({ token: 't', tower: 12 })), { ok: true, rankTower: 4 });
+  assert.equal(calls[0].url, RPC + 'rpg_set_tower2');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { p_token: 't', p_tower: 12 });
+  assert.deepEqual(plain(await load(reply({ ok: false, reason: 'too_soon' })).R.rpgSetTower2({ token: 't', tower: 3 })), { ok: false, reason: 'too_soon' });
+  assert.deepEqual(plain(await load(reply({ message: 'boom' }, 500)).R.rpgSetTower2({ token: 't', tower: 3 })), { ok: false, reason: 'network' });
+  // 古い rpgSetTower・topTower はもう無い（名前を rpg_players から出す道を残さない）
+  assert.equal(R.rpgSetTower, undefined);
+  assert.equal(R.topTower, undefined);
+});
+
+test('top_tower2_maps_rows', async () => {
+  const row = { nickname: 'ミケ', pid: 'p1', tower: 12, lv: 30, deco: ['jp'], created_at: '2026-10-28T00:00:00Z' };
+  const { R, calls } = load(reply([row, { ...row, nickname: 'タロウ', pid: null, deco: null }]));
+  const rows = await R.topTower2();
+  assert.equal(calls[0].url, RPC + 'top_tower2');
+  assert.equal(calls[0].opts.body, '{}');
+  assert.deepEqual(Object.keys(rows[0]), ['nickname', 'pid', 'deco', 'tower', 'lv', 'at']);
+  assert.deepEqual(plain(rows.map(r => ({ ...r, at: r.at.toISOString() }))), [
+    { nickname: 'ミケ', pid: 'p1', deco: ['jp'], tower: 12, lv: 30, at: '2026-10-28T00:00:00.000Z' },
+    { nickname: 'タロウ', pid: null, deco: [], tower: 12, lv: 30, at: '2026-10-28T00:00:00.000Z' }]);
+  // DB にまだ top_tower2 が無い（404）ときは e.status 付きで reject（rpg-rank.js が「準備中」と出す）
+  await assert.rejects(load(reply({ message: 'Could not find the function' }, 404)).R.topTower2(), e => e.status === 404);
+  await assert.rejects(load(() => Promise.reject(new TypeError('Failed to fetch'))).R.topTower2());
+});
+
+test('rpg_tower_rank_of', async () => {
+  const { R, calls } = load(reply({ rank: 3 }));
+  assert.equal(await R.rpgTowerRankOf({ tower: 12, lv: 30 }), 3);
+  assert.equal(calls[0].url, RPC + 'rpg_tower_rank_of');
+  assert.deepEqual(JSON.parse(calls[0].opts.body), { p_tower: 12, p_lv: 30 });
+  await assert.rejects(load(reply({ message: 'boom' }, 500)).R.rpgTowerRankOf({ tower: 1, lv: 1 }));
 });

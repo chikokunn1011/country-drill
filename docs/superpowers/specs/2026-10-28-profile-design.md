@@ -57,6 +57,7 @@
   - 名前・称号・かざり
   - バッジ ◯個（全◯個中）
   - 冒険 Lv◯・ダンジョン◯/21（冒険に載っていなければ出さない）
+  - 英雄の塔 ◯階（最高記録の階。塔に登っていなければ出さない）
   - タイムアタックのいちばん良い記録3つ（順位が良い順。「国旗→国名・アジア・10問 12.34秒（3位）」の形）
   - 今日の難問 参加◯回（うち全問正解◯回）
   - はじめた日
@@ -120,7 +121,7 @@ create table if not exists profile_transfers (
 | `profile_me(p_token)` | 自分のプロフィール `{ok, pid, nickname, is_public, title, deco}`。無ければ `not_found`（引き継がれた・消された） |
 | `profile_rename(p_token, p_nickname)` | 名前を変える。`rpg_players.nickname` と、`scores`・`daily_scores` のこの人の行の `nickname` もそろえる（表示は profiles から取るが、Table Editor で見やすいように） |
 | `profile_set(p_token, p_is_public, p_title, p_deco, p_badges, p_badges_total)` | 公開・称号・かざり・バッジの数を一度に。値の範囲チェック（deco は rpg_codes() の中・3つまで・重複なし、title 40文字まで、badges 0〜500）。null の引数は変えない |
-| `profile_card(p_pid)` | §2.4 の窓の中身。非公開なら `{ok, private: true, nickname, deco}`。無ければ `not_found` |
+| `profile_card(p_pid)` | §2.4 の窓の中身。非公開なら `{ok, private: true, nickname, deco}`。無ければ `not_found`。`rpg` に英雄の塔の最高記録 `tower`（0 なら入れない） |
 | `submit_score2(p_token, p_board, p_time_ms, p_questions)` | 今の submit_score と同じチェック（名前の代わりにプロフィール）。10秒の連投よけは profile_id で |
 | `top_scores2(p_board, p_period)` | 同じ人は最速1件（profile_id ごと、古い記録は nickname ごと）。返す列に `pid`（古い記録は null）と `deco` を足す。名前は profiles のいまの名前 |
 | `submit_daily2(p_token, p_day, p_correct, p_total, p_time_ms)` | 今の submit_daily と同じチェック。1日1回は profile_id で（2回目は `already`） |
@@ -128,6 +129,8 @@ create table if not exists profile_transfers (
 | `rpg_update2(p_token, p_lv, p_dungeons, p_floors)` | プロフィールの冒険の記録を入れる／新しくする（行が無ければ作る）。記録は今までの最高を残す。10秒の連投よけ |
 | `rpg_unregister2(p_token)` | 冒険データを消したとき、この人の rpg_players の行を消す（プロフィールは残す） |
 | `top_rpg3(p_sort)` | top_rpg2 に `pid` を足し、名前・かざりは profiles から |
+| `rpg_set_tower2(p_token, p_tower)` | 英雄の塔の最高記録の階をプロフィールで送る（行が無ければ rpg_update2 と同じく作る。レベル1・ダンジョン0から）。最高を残す。10秒の連投よけは rpg_set_tower と同じく tower_at で（記録とは別） |
+| `top_tower2()` | top_tower に `pid` を足し、名前・かざりは profiles から |
 | `profile_transfer_start(p_token, p_data)` | 前のコードの data を null にしてから、新しいコード（12文字）を作って返す。data は 512KB まで。1分に1回まで（too_soon） |
 | `profile_transfer_claim(p_code, p_new_token)` | 使える（期限内・未使用）コードなら、profiles.token_hash を新しい合言葉に入れかえ、used_at を入れて data を null に。返事 `{ok, pid, nickname, data}`。だめなら `bad_code` |
 
@@ -138,8 +141,8 @@ create table if not exists profile_transfers (
 ### 3.4 古い関数
 
 前の版のページがキャッシュに残っている人のために、今の関数は残すが中身を入れかえる（create or replace。drop しない）:
-- `submit_score` / `submit_daily` / `rpg_register` / `rpg_rename` / `rpg_update` / `rpg_set_deco` は `{ok:false, reason:'old_version'}` を返す（「ページを読み直してね」）。名前をプロフィールと別に送れる道を残さないため。
-- `rpg_unregister`・`top_scores` / `top_daily` / `top_rpg` / `top_rpg2` / `rank_of` などの読むだけ・消すだけの関数はそのまま。
+- `submit_score` / `submit_daily` / `rpg_register` / `rpg_rename` / `rpg_update` / `rpg_set_deco` / `rpg_set_tower` は `{ok:false, reason:'old_version'}` を返す（「ページを読み直してね」）。名前をプロフィールと別に送れる道を残さないため。
+- `rpg_unregister`・`top_scores` / `top_daily` / `top_rpg` / `top_rpg2` / `top_tower` / `rank_of` などの読むだけ・消すだけの関数はそのまま。
 - 使わなくなった関数とテーブル（rpg_scores、submit_rpg など）は消さない（今までの方針）。
 
 ## 4. ブラウザ側
@@ -161,10 +164,10 @@ create table if not exists profile_transfers (
 
 ### 4.2 ランキング・結果画面の変更
 
-- `ranking.js`: §3.3 の関数を呼ぶメソッドを足す（`profileCreate`・`profileMe`・`profileRename`・`profileSet`・`profileCard`・`submit2`・`top2`・`dailySubmit2`・`dailyTop2`・`rpgUpdate2`・`rpgUnregister2`・`rpgTop3`・`transferStart`・`transferClaim`）。古いメソッドは消す。メッセージに `old_version`・`bad_code`・`not_found`（引き継ぎ）を足す。
+- `ranking.js`: §3.3 の関数を呼ぶメソッドを足す（`profileCreate`・`profileMe`・`profileRename`・`profileSet`・`profileCard`・`submit2`・`top2`・`dailySubmit2`・`dailyTop2`・`rpgUpdate2`・`rpgUnregister2`・`rpgTop3`・`rpgSetTower2`・`topTower2`・`transferStart`・`transferClaim`）。古いメソッドは消す。メッセージに `old_version`・`bad_code`・`not_found`（引き継ぎ）を足す。
 - `index.html`（タイムアタック）: 結果画面の名前入力を §2.3 に。ランキングの表は `PROFILE.nameHTML`。
 - `daily.js`: 同じ。
-- `rpg-rank.js`: 登録フォーム・合言葉・`rpgRank` まわりを消して、プロフィールの合言葉で `rpg_update2`。表は `top_rpg3` と `PROFILE.nameHTML`。冒険データを消したら `rpg_unregister2`（今の「つながらなかったら次の起動で」はそのまま）。
+- `rpg-rank.js`: 登録フォーム・合言葉・`rpgRank` まわりを消して、プロフィールの合言葉で `rpg_update2`（英雄の塔は `rpg_set_tower2`）。表は `top_rpg3`（塔のタブは `top_tower2`）と `PROFILE.nameHTML`。冒険データを消したら `rpg_unregister2`（今の「つながらなかったら次の起動で」はそのまま）。
 - `rpg.js`: かざりは今までどおり冒険のセーブ（`deco`）に持ち、変わったら `rpg:deco`（もう出している）。
 - profile.js が読めなかったとき（配信漏れ）は、ランキングは見るだけ・載せられない（「ページを読み直してね」）。
 

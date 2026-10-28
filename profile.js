@@ -347,6 +347,7 @@
     let h = head + (card.title ? `<p class="pf-card-title">〈${esc(card.title)}〉</p>` : '');
     if (card.badges != null) h += line(`バッジ ${card.badges}個（全${card.badgesTotal ?? 0}個中）`);
     if (card.rpg) h += line(`冒険 Lv${card.rpg.lv}・ダンジョン${card.rpg.dungeons}/${dg}`);
+    if (card.rpg?.tower > 0) h += line(`英雄の塔 ${card.rpg.tower}階`);   // 最高記録の階。登っていなければ出さない
     if (card.ta?.length) {
       h += '<p class="pf-card-sub">タイムアタック</p><ul class="pf-card-ta">'
         + card.ta.map(t => `<li><span>${esc(boardLabel(t.board))}</span> <span class="mono">${RANKING.formatTime(t.timeMs)}（${t.rank}位）</span></li>`).join('') + '</ul>';

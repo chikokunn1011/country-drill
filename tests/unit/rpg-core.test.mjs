@@ -38,6 +38,7 @@ test('tuning_and_tables', () => {
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
     team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
     space: { small: 40, big: 40, equator: 12 },
+    tower: { recStep: 1.0, bossEvery: 10, bossFlags0: 5, bossFlagsMax: 12, healPct: 0.1, bagSize: 8, coinBase: 5, bestBonus: 20, similarFrom: 21, similarRate: 0.5, spaceFrom: 51, maxFloor: 100000 },
   }));
   assert.equal(TUNING.quiz.decay[2][0], Infinity);
 
@@ -347,13 +348,14 @@ const FRESH = {
   st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
   badgesPaid: [], gr: '',
   teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
+  tower: { best: 0 },
 };
 // テスト側で作る引き継ぎコード（実装の base64url とは別に Node の Buffer で作る）
 const enc = obj => 'CQ1.' + Buffer.from(JSON.stringify(obj), 'utf8').toString('base64url');
 
 test('fresh_shape', () => {
   const K = loadCore(), f = plain(K.fresh(T0));
-  for (const k of 'v intro show coins earned lv av cards fr mb fe wk lc ov floors gauge pity pulls day bounty paid st badgesPaid gr'.split(' ')) {
+  for (const k of 'v intro show coins earned lv av cards fr mb fe wk lc ov floors gauge pity pulls day bounty paid st badgesPaid gr tower'.split(' ')) {
     assert.ok(k in f, k);
   }
   assert.equal(f.v, 1);
@@ -1493,4 +1495,84 @@ test('space_modes', () => {
   assert.equal(K.bossMode(0, 3), 'm2f'); assert.equal(K.bossMode(3, 3), 'n2f');
   assert.equal(K.bossMode(2), 'm2f'); assert.equal(K.nextMode('f2n', 1), 'n2f');
   assert.deepEqual(plain(K.battleBag(dWith(K), {}, 'moon', 1, mulberry32(1)).slice(0, 4).map(x => x.mode)), ['m2f', 'f2n', 'm2f', 'n2f']);
+});
+
+// ---- 英雄の塔 ----
+test('tower_open', () => {
+  const K = loadCore();
+  assert.equal(K.towerOpen({ ...K.fresh(T0), floors: { world: 4 } }), false);
+  assert.equal(K.towerOpen({ ...K.fresh(T0), floors: { world: 5 } }), true);
+  assert.equal(['jp', 'br', 'ke', 'fj'].every(a => K.inDungeon(K.TOWER, a)), true);
+});
+test('tower_enemy', () => {
+  const K = loadCore(), B = K.TUNING.battle;
+  assert.equal(K.towerRecLv(1), 1); assert.equal(K.towerRecLv(30), 30);
+  const h1 = K.heroStats(1), h10 = K.heroStats(10);
+  assert.deepEqual(plain(K.towerEnemy(1)), { boss: false, s: 1, recLv: 1, hp: h1.atk * B.enemyHits, atk: Math.ceil(h1.hp * B.enemyHitPct) });
+  assert.deepEqual(plain(K.towerEnemy(10)), { boss: true, s: 10, recLv: 10, flags: 6, flagHp: h10.atk, atk: Math.ceil(h10.hp * B.bossHitPct) });
+  assert.equal(K.towerEnemy(70).flags, 12); assert.equal(K.towerEnemy(200).flags, 12);
+  assert.equal(K.towerMonster(10).n, '塔の番人'); assert.notEqual(K.towerMonster(1).n, '塔の番人');
+});
+test('tower_heal', () => {
+  const K = loadCore();
+  assert.equal(K.towerHeal(50, 100, 3), 60); assert.equal(K.towerHeal(95, 100, 3), 100); assert.equal(K.towerHeal(1, 100, 10), 100);
+});
+test('tower_modes', () => {
+  const K = loadCore(), SP = ['m2f', 'f2n', 'm2f', 'n2f'];
+  assert.deepEqual(plain(K.towerModes(1)), ['f2n', 'n2f', 'm2f']); assert.deepEqual(plain(K.towerModes(50)), ['f2n', 'n2f', 'm2f']); assert.deepEqual(plain(K.towerModes(51)), SP);
+  assert.deepEqual([0, 1, 2, 3].map(k => K.towerBossMode(k, 60)), SP);
+  assert.deepEqual([0, 1, 2].map(k => K.towerBossMode(k, 40)), ['f2n', 'n2f', 'm2f']);
+  assert.equal(K.towerNextMode('m2f', 60), K.nextMode('m2f', 1, 3));
+});
+test('tower_similar', () => {
+  const K = loadCore(), rng = mulberry32(5);
+  assert.equal(Array.from({ length: 50 }, () => K.towerSimilar(20, rng)).some(Boolean), false);
+  const s = Array.from({ length: 200 }, () => K.towerSimilar(21, rng)).filter(Boolean).length;
+  assert.ok(s > 60 && s < 140);
+});
+test('tower_bag_and_flags', () => {
+  const K = loadCore(), rng = mulberry32(2), d = dWith(K);
+  const bag = K.towerBag(d, {}, 1, rng);
+  assert.equal(bag.filter(x => x.tag !== 'wanted').length >= K.TUNING.tower.bagSize, true);
+  assert.deepEqual(plain(bag.slice(0, 3).map(x => x.mode)), ['f2n', 'n2f', 'm2f']);
+  assert.deepEqual(plain(K.towerBag(d, {}, 51, rng).slice(0, 4).map(x => x.mode)), ['m2f', 'f2n', 'm2f', 'n2f']);
+  const m = { fj: 5 };                                   // まちがえの多い国は混ざる
+  assert.ok(Array.from({ length: 5 }, () => K.towerBag(d, m, 2, rng)).some(b => b.some(x => x.a === 'fj')));
+  assert.equal(K.towerFlags(d, {}, 30, rng).length, 8);
+  assert.equal(K.towerRefill(60, { jp: 'm2f' }, rng).length, K.TUNING.tower.bagSize);
+});
+test('tower_refill_mixes_modes', () => {
+  // 前の形式が無い国（塔の詰め直しはふつう全部）は、その階の形式の順でまわす（全部 n2f や m2f にしない）
+  const K = loadCore(), rng = mulberry32(9);
+  for (const f of [30, 60]) {
+    const bag = K.towerRefill(f, {}, rng), modes = new Set(bag.map(x => x.mode));
+    assert.ok(modes.size > 1, `${f}F: ${[...modes]}`);
+    for (const x of bag) assert.ok(K.towerModes(f).includes(x.mode));
+  }
+  // 前の形式がある国は towerNextMode
+  const bag = K.towerRefill(30, {}, mulberry32(3)), last = Object.fromEntries(bag.map(x => [x.a, 'm2f']));
+  const again = K.towerRefill(30, last, mulberry32(3));
+  for (const x of again) if (last[x.a]) assert.equal(x.mode, K.towerNextMode('m2f', 30));
+});
+test('tower_reward', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.towerReward(1, 0)), { coins: 6, bonus: 20 });
+  assert.deepEqual(plain(K.towerReward(3, 5)), { coins: 8, bonus: 0 });
+  assert.deepEqual(plain(K.towerReward(5, 5)), { coins: 10, bonus: 0 });
+});
+test('tower_stats', () => {
+  const K = loadCore(), d = dWith(K), s = K.towerStats(d);
+  assert.equal(s.gauge, 0);
+  assert.deepEqual(plain(s), plain({ ...K.battleStats({ ...d, gauge: {} }, 'world', 0), gauge: 0 }));
+});
+test('tower_sanitize', () => {
+  const K = loadCore(), base = K.sanitize(K.fresh(T0), T0);
+  const { tower, ...rest } = K.sanitize({ ...K.fresh(T0), tower: undefined }, T0);
+  assert.deepEqual(plain(tower), { best: 0 });
+  const { tower: _t, ...restBase } = base; assert.deepEqual(plain(rest), plain(restBase));
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: -3 } }, T0).tower), { best: 0 });
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: 'x', junk: 1 } }, T0).tower), { best: 0 });
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: '7' } }, T0).tower), { best: 7 });
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: 2.6 } }, T0).tower), { best: 3 });
+  assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: 1e12 } }, T0).tower), { best: K.TUNING.tower.maxFloor });
 });

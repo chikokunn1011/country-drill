@@ -6,7 +6,7 @@ import { openApp, pickSetup, answerCorrect, answerWrong, settleResult } from './
 export const RPG_FILES = ['rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // window.__ev に積むイベント（helpers の events(page, type?) で読める）
 export const RPG_EVENTS = ['rpg:ready', 'rpg:coins', 'rpg:levelup', 'rpg:join', 'rpg:promote', 'rpg:pull', 'rpg:answer', 'rpg:battle', 'rpg:clear',
-  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:deco', 'badge:earned', 'badge:title',
+  'rpg:overcome', 'rpg:bounty', 'rpg:share', 'rpg:deco', 'rpg:tower', 'rpg:tower-end', 'rpg:tower-floor', 'badge:earned', 'badge:title',
   'drill:start', 'drill:answer', 'drill:result', 'drill:screen', 'drill:book-open', 'drill:misses-reset'];
 
 // 読み込むたびに（再読み込みのあとも）ページのスクリプトより前に走る。イベントを window.__ev に、出たトーストの文字を window.__toasts に積む
@@ -81,7 +81,7 @@ export async function startBattle(page, id, floor) {
   await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
 }
 // いまの問題に正解／不正解で答える。不正解なら答え合わせの［つぎへ］まで押す。
-// 正解なら次の問題が出る（shownAt が変わる）か、バトルが終わるまで待つ
+// 正解なら次の問題が出る（shownAt が変わる）か、バトルが終わる（塔は階クリアの 'tclear' も）まで待つ
 export async function battleAnswer(page, right) {
   await battleGuard(page);
   const { a, shownAt } = await page.evaluate(() => ({ a: RPG_BATTLE.cur(), ...RPG_BATTLE.state() }));
@@ -89,12 +89,27 @@ export async function battleAnswer(page, right) {
   if (!right) { await page.click('#bt-next'); return; }
   await page.waitForFunction(t0 => {
     const s = RPG_BATTLE.state();
-    return s.shownAt !== t0 || s.phase === 'end';
+    return s.shownAt !== t0 || s.phase === 'end' || s.phase === 'tclear';
   }, shownAt);
 }
 // 終わるまで正解し続ける。正解した数を返す
 export async function winBattle(page) {
   let n = 0;
   while (await page.evaluate(() => RPG_BATTLE.state().phase) !== 'end') { await battleAnswer(page, true); n++; }
+  return n;
+}
+
+// ---- 英雄の塔 ----
+// RPG_BATTLE.startTower → 登場画面の［たたかう］→ 最初の問題が出るまで
+export async function startTower(page) {
+  assert.equal(await page.evaluate(() => RPG_BATTLE.startTower()), true, '塔を始められない');
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+}
+// いまの階を正解し続けて勝つ（階クリアの画面 'tclear' まで）。正解した数を返す
+export async function winTowerFloor(page) {
+  let n = 0;
+  while (await page.evaluate(() => RPG_BATTLE.state().phase) === 'question') { await battleAnswer(page, true); n++; }
+  assert.equal(await page.evaluate(() => RPG_BATTLE.state().phase), 'tclear');
   return n;
 }

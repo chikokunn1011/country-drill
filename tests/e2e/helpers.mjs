@@ -96,7 +96,7 @@ export function fakeDb() {
     }
     return [...m.values()].sort((a, b) => a.time_ms - b.time_ms || Date.parse(a.created_at) - Date.parse(b.created_at));
   };
-  // rpgRows の行は { token, profile_id, nickname, lv, dungeons, floors, deco, created_at, at }（deco は無くてもよい = 空）
+  // rpgRows の行は { token, profile_id, nickname, lv, dungeons, floors, deco, tower, tower_at, created_at, at }（deco は無くてもよい = 空、tower は無くてもよい = 0）
   const rpgRows = [];
   // 並べ方ごとに比べる値の順（大きいほど上）。同じなら先に載せた順
   const RPG_KEYS = { lv: r => [r.lv, r.dungeons, r.floors], dg: r => [r.dungeons, r.floors, r.lv] };
@@ -109,6 +109,10 @@ export function fakeDb() {
     const me = { lv, dungeons, floors }, above = sort => rpgBests(sort).filter(r => cmpKeys(RPG_KEYS[sort](r), RPG_KEYS[sort](me)) < 0).length + 1;
     return { rank_lv: above('lv'), rank_dg: above('dg') };
   };
+  // 塔: tower > 0 の人を、塔 → レベル → 塔を送った時刻の順に（行の tower は無くてもよい = 0、tower_at は塔を送った時刻）
+  const towerAt = r => Date.parse(r.tower_at ?? r.at ?? r.created_at);
+  const towerBests = () => rpgRows.filter(r => (r.tower ?? 0) > 0).sort((a, b) => b.tower - a.tower || b.lv - a.lv || towerAt(a) - towerAt(b));
+  const towerRank = (tower, lv) => rpgRows.filter(r => (r.tower ?? 0) > tower || ((r.tower ?? 0) === tower && r.lv > lv)).length + 1;
   // 今日の難問の行 { day, profile_id, nickname, correct, total, time_ms, created_at }
   const dailyRows = [];
   const dailyRank = (day, correct, t) => dailyRows.filter(r => r.day === day && (r.correct > correct || (r.correct === correct && r.time_ms < t))).length + 1;
@@ -172,7 +176,7 @@ export function fakeDb() {
       }).sort((a, b) => a.rank - b.rank || a.time_ms - b.time_ms).slice(0, 3);
       const mine = dailyRows.filter(r => r.profile_id === p.id), rpg = rpgRows.find(r => r.profile_id === p.id);
       return { ok: true, private: false, pid: p.pid, nickname: p.nickname, title: p.title, deco: [...p.deco], badges: p.badges, badges_total: p.badges_total,
-        rpg: rpg ? { lv: rpg.lv, dungeons: rpg.dungeons } : null, ta,
+        rpg: rpg ? { lv: rpg.lv, dungeons: rpg.dungeons, ...(rpg.tower > 0 ? { tower: rpg.tower } : {}) } : null, ta,
         daily: { plays: mine.length, perfect: mine.filter(r => r.correct === r.total).length }, since: p.created_at };
     },
     // ---- 引き継ぎ（profile_transfer_start / profile_transfer_claim）。transfers の行は { code, profile_id, data, expires_at, used_at, created_at } ----
@@ -247,8 +251,22 @@ export function fakeDb() {
     top_rpg3: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50)
       .map(r => ({ ...shown(r), lv: r.lv, dungeons: r.dungeons, floors: r.floors, created_at: r.at })) : [],
     rpg_rank_of: ({ p_lv, p_dungeons, p_floors }) => rpgRank(p_lv, p_dungeons, p_floors),
+    // ---- 英雄の塔（rpg_set_tower2 / top_tower2 / rpg_tower_rank_of）。行が無ければ rpg_update2 と同じく作り（レベル1から）、塔は最高を残す ----
+    rpg_set_tower2({ p_token, p_tower }) {
+      if (!p_token) return { ok: false, reason: 'bad_token' };
+      if (!Number.isInteger(p_tower) || p_tower < 0 || p_tower > 100000) return { ok: false, reason: 'bad_record' };
+      const p = byToken(p_token);
+      if (!p) return { ok: false, reason: 'not_found' };
+      const at = new Date().toISOString();
+      let r = rpgRows.find(r => r.profile_id === p.id);
+      if (!r) rpgRows.push(r = { token: p.token, profile_id: p.id, nickname: p.nickname, lv: 1, dungeons: 0, floors: 0, deco: [], created_at: at, at });
+      Object.assign(r, { tower: Math.max(r.tower ?? 0, p_tower), tower_at: at });
+      return { ok: true, rank_tower: towerRank(r.tower, r.lv) };
+    },
+    top_tower2: () => towerBests().slice(0, 50).map(r => ({ ...shown(r), tower: r.tower, lv: r.lv, created_at: r.tower_at ?? r.at })),
+    rpg_tower_rank_of: ({ p_tower, p_lv }) => ({ rank: towerRank(p_tower, p_lv) }),
     // ---- 前の版の関数。書きこみは old_version を返し、読むだけ・消すだけのものはそのまま（schema.sql の -- >>> old_version と同じ） ----
-    submit_score: old, submit_daily: old, rpg_register: old, rpg_rename: old, rpg_update: old, rpg_set_deco: old,
+    submit_score: old, submit_daily: old, rpg_register: old, rpg_rename: old, rpg_update: old, rpg_set_deco: old, rpg_set_tower: old,
     top_scores({ p_board, p_period }) {
       if (p_period !== 'all' && p_period !== 'week') return [];
       return bests(p_board, p_period === 'week' ? weekStart() : -Infinity, r => r.nickname).slice(0, 50)
@@ -263,6 +281,8 @@ export function fakeDb() {
     },
     top_rpg2: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, deco, at }) => ({ nickname, lv, dungeons, floors, deco: deco ?? [], created_at: at })) : [],
     top_rpg: ({ p_sort }) => p_sort in RPG_KEYS ? rpgBests(p_sort).slice(0, 50).map(({ nickname, lv, dungeons, floors, at }) => ({ nickname, lv, dungeons, floors, created_at: at })) : [],
+    // 前の版の塔のランキング（読むだけ。名前・かざりは rpg_players の行のもの）
+    top_tower: () => towerBests().slice(0, 50).map(r => ({ nickname: r.nickname, tower: r.tower, lv: r.lv, deco: r.deco ?? [], created_at: r.tower_at ?? r.at })),
   };
   // calls: 届いた RPC の記録 { name, args, at }（at は届いた時刻 ms）。down を true にすると通信失敗になる
   return { profiles, transfers, rows, rpgRows, dailyRows, calls: [], down: false, rpc };
@@ -278,7 +298,7 @@ async function supabaseRoute(route, db) {
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
   // （null は「変えない」として通る）
-  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total', 'p_badges', 'p_badges_total']
+  const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total', 'p_tower', 'p_badges', 'p_badges_total']
     .some(k => k in args && args[k] !== null && !Number.isInteger(args[k]));
   if (!fn || badInt) return route.fulfill({ status: fn ? 400 : 404, headers: CORS, contentType: 'application/json', body: JSON.stringify({ message: 'fake supabase: bad request' }) });
   return route.fulfill({ status: 200, headers: CORS, contentType: 'application/json', body: JSON.stringify(fn(args)) });

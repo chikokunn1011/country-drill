@@ -10,7 +10,7 @@
 | ② `-- >>> SQL Editor` 〜 `-- <<< SQL Editor` | `rpg_unregister`・`rpg_unregister2`（中に delete がある） | チコが SQL Editor で Run | ①のすぐ後 |
 | ⑤ `-- >>> old_version` 〜 `-- <<< old_version` | 古い関数を `old_version` を返す中身に入れかえ＋もう一度引っ越し | MCP `apply_migration`（name `profiles_old_version`） | PR マージ（サイト公開）の後 |
 
-- 戻すときの main: `origin/main` の今のコミット `c0dcce971ded278499ec08bb1a00a48d62d6e6fd`（設定に「正解したらすぐ次の問題へ」を追加 (#24)）
+- 戻すときの main: `origin/main` の今のコミット `bb44880d70a5cdcb4fb0a6ed6a4e227ee2047648`（国旗クエスト「英雄の塔」 (#27)）
 - Supabase: `https://vgdkklvhtvcamtxwjpke.supabase.co`（`ranking.js` の先頭と同じプロジェクト）
 
 ## 0. 区切りの切り出し方
@@ -105,7 +105,7 @@ select p.proname as name, pg_get_function_identity_arguments(p.oid) as args,
 
 - `profiles` = `rpg_players`（設計書の時点では 3）、`rpg_no_profile` = 0。ずれていたら①をもう一度流す（引っ越しは何度でも大丈夫）
   - サイト公開の後はプロフィールだけ作る人が増えるので `profiles` の方が多くなる。そのときは `rpg_no_profile` = 0 だけ見る
-- `anon_can_run` が t の関数（28 個）: `profile_create`・`profile_me`・`profile_rename`・`profile_set`・`profile_card`・`profile_transfer_start`・`profile_transfer_claim`・`submit_score2`・`top_scores2`・`rank_of`・`rpg_update2`・`rpg_unregister2`・`top_rpg3`・`rpg_rank_of`・`submit_daily2`・`top_daily2`・`daily_rank_of`、古いページ用の `submit_score`・`top_scores`・`rpg_register`・`rpg_update`・`rpg_rename`・`rpg_unregister`・`rpg_set_deco`・`top_rpg`・`top_rpg2`・`submit_daily`・`top_daily`
+- `anon_can_run` が t の関数（33 個）: `profile_create`・`profile_me`・`profile_rename`・`profile_set`・`profile_card`・`profile_transfer_start`・`profile_transfer_claim`・`submit_score2`・`top_scores2`・`rank_of`・`rpg_update2`・`rpg_unregister2`・`top_rpg3`・`rpg_rank_of`・`rpg_set_tower2`・`top_tower2`・`rpg_tower_rank_of`・`submit_daily2`・`top_daily2`・`daily_rank_of`、古いページ用の `submit_score`・`top_scores`・`rpg_register`・`rpg_update`・`rpg_rename`・`rpg_unregister`・`rpg_set_deco`・`top_rpg`・`top_rpg2`・`rpg_set_tower`・`top_tower`・`submit_daily`・`top_daily`
 - f の関数（中で使うだけ）: `profile_by_token`・`profile_clean_name`・`profile_migrate_rpg`・`profile_name_problem`・`rpg_hash`・`rpg_name_problem`・`rpg_record_ok`・`rpg_codes`・`ng_words`・`jst_week_start`・`daily_count`・`daily_day`・`daily_day_open`。ここが t なら①を流し直す（中に revoke がある）
 - `rpg_unregister2` が一覧に無ければ②がまだ
 
@@ -119,7 +119,7 @@ select p.proname as name, pg_get_function_identity_arguments(p.oid) as args,
 - 公開を確かめたら、MCP の `apply_migration` に name `profiles_old_version`、query に `/tmp/step5.sql` の中身を渡す
 - 古いページから送ると `{"ok":false,"reason":"old_version"}` が返る（関数は drop しない）
 - 最後の `profile_migrate_rpg()` で、①〜⑤の間に古いページで登録された冒険の行もプロフィールに引っ越す
-- 流した後に③をもう一度（`rpg_no_profile` = 0）。`select rpg_register('00000000-0000-4000-8000-000000000000','テスト',1,0,0);` が `old_version` を返すことも見る（行は増えない）
+- 流した後に③をもう一度（`rpg_no_profile` = 0）。`select rpg_register('00000000-0000-4000-8000-000000000000','テスト',1,0,0);` と `select rpg_set_tower('00000000-0000-4000-8000-000000000000',1);` が `old_version` を返すことも見る（行は増えない）
 
 ## ⑥ 戻し方
 
@@ -129,16 +129,16 @@ select p.proname as name, pg_get_function_identity_arguments(p.oid) as args,
    git revert -m 1 <マージコミット>   # PR の変更を打ち消すコミットを作って push（squash マージなら -m 1 は付けない）
    ```
 
-   戻った後の main の中身が `c0dcce9` と同じこと: `git diff c0dcce971ded278499ec08bb1a00a48d62d6e6fd HEAD --stat` が空
+   戻った後の main の中身が `bb44880` と同じこと: `git diff bb44880d70a5cdcb4fb0a6ed6a4e227ee2047648 HEAD --stat` が空
 
-2. ⑤の後に戻すときは、古い関数の元の中身も流し直す（⑤の前なら要らない）。`origin/main` 版の schema.sql から6つの関数（revoke・grant まで）を切り出して、MCP の `apply_migration`（name `profiles_rollback_old`）で流す。中に delete は無い
+2. ⑤の後に戻すときは、古い関数の元の中身も流し直す（⑤の前なら要らない）。`origin/main` 版の schema.sql から7つの関数（revoke・grant まで）を切り出して、MCP の `apply_migration`（name `profiles_rollback_old`）で流す。中に delete は無い
 
    ```bash
-   git show c0dcce971ded278499ec08bb1a00a48d62d6e6fd:supabase/schema.sql \
-     | awk '/^create or replace function (submit_score|submit_daily|rpg_register|rpg_rename|rpg_update|rpg_set_deco)\(/{on=1} on{print} on && /^grant execute on function/{on=0; print ""}' \
+   git show bb44880d70a5cdcb4fb0a6ed6a4e227ee2047648:supabase/schema.sql \
+     | awk '/^create or replace function (submit_score|submit_daily|rpg_register|rpg_rename|rpg_update|rpg_set_deco|rpg_set_tower)\(/{on=1} on{print} on && /^grant execute on function/{on=0; print ""}' \
      > /tmp/rollback_old.sql
    echo "notify pgrst, 'reload schema';" >> /tmp/rollback_old.sql
-   grep -c '^create or replace function' /tmp/rollback_old.sql   # 6
+   grep -c '^create or replace function' /tmp/rollback_old.sql   # 7
    grep -ci delete /tmp/rollback_old.sql                          # 0
    ```
 

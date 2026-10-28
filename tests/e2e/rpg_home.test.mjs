@@ -830,12 +830,12 @@ t('badges_real_gacha_hold', async page => {
 /* ---------- RPG.snapshot()・タブ2つ ---------- */
 t('snapshot_shape', async page => {
   await writeSave(page, saveWith({ intro: true, lv: 7, coins: 1234, earned: 5678, cards: { cl: [1, 0], br: [2, 1], jp: [3, 0] },
-    floors: { samerica: 5, oceania: 2 }, st: { overcome: 4, bountyDays: 2 } }));
+    floors: { samerica: 5, oceania: 2 }, st: { overcome: 4, bountyDays: 2 }, tower: { best: 12 } }));
   const s = await page.evaluate(() => RPG.snapshot());
   const want = {
     intro: true, lv: 7, coins: 1234, earned: 5678, owned: 3, ownedByStar: { 1: 1, 2: 1, 3: 1 },
     ownedByRegion: { samerica: 2, oceania: 0, namerica: 0, europe: 0, asia: 1, africa: 0 },
-    floors: { samerica: 5, oceania: 2 }, cleared: ['samerica'], overcome: 4, bountyDays: 2,
+    floors: { samerica: 5, oceania: 2 }, cleared: ['samerica'], overcome: 4, bountyDays: 2, tower: 12,
   };
   assert.deepEqual(pick(s, want), want);
   assert.deepEqual(Object.keys(s).sort(), [...Object.keys(want), 'st'].sort());
@@ -844,7 +844,7 @@ t('snapshot_shape', async page => {
   assert.equal(await page.evaluate(() => { const x = RPG.snapshot(); x.floors.asia = 5; x.st.win = 9; return RPG.snapshot().floors.asia ?? 0; }), 0);
   // はじめての人
   await writeSave(page, saveWith({ intro: false }));
-  assert.deepEqual(pick(await page.evaluate(() => RPG.snapshot()), { intro: 0, owned: 0, cleared: 0 }), { intro: false, owned: 0, cleared: [] });
+  assert.deepEqual(pick(await page.evaluate(() => RPG.snapshot()), { intro: 0, owned: 0, cleared: 0, tower: 0 }), { intro: false, owned: 0, cleared: [], tower: 0 });
 });
 
 t('two_tabs_sync', async (page, app) => {

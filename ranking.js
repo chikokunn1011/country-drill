@@ -86,13 +86,13 @@
     // 公開・称号・かざり・バッジの数を一度に送る。渡さなかった項目はサーバー側で前の値のまま
     profileSet: ({ token, isPublic, title, deco, badges, badgesTotal }) => write('profile_set', { p_token: token, p_is_public: orNull(isPublic),
       p_title: orNull(title), p_deco: orNull(deco), p_badges: orNull(badges), p_badges_total: orNull(badgesTotal) }),
-    // ランキングから開くプロフィールの窓の中身。非公開なら { ok, private:true, pid, nickname, deco } だけ。無ければ { ok:false, reason }。つながらなければ reject
+    // ランキングから開くプロフィールの窓の中身（rpg.tower は英雄の塔の最高記録の階。無ければ 0）。非公開なら { ok, private:true, pid, nickname, deco } だけ。無ければ { ok:false, reason }。つながらなければ reject
     async profileCard({ pid }) {
       const r = await rpc('profile_card', { p_pid: pid });
       if (!r.ok) return { ok: false, reason: r.reason };
       const base = { ok: true, private: !!r.private, pid: r.pid, nickname: r.nickname, deco: Array.isArray(r.deco) ? r.deco : [] };
       if (r.private) return base;
-      return { ...base, title: r.title ?? '', badges: r.badges, badgesTotal: r.badges_total, rpg: r.rpg ? { lv: r.rpg.lv, dungeons: r.rpg.dungeons } : null,
+      return { ...base, title: r.title ?? '', badges: r.badges, badgesTotal: r.badges_total, rpg: r.rpg ? { lv: r.rpg.lv, dungeons: r.rpg.dungeons, tower: r.rpg.tower ?? 0 } : null,
         ta: (r.ta ?? []).map(t => ({ board: t.board, timeMs: t.time_ms, rank: t.rank })),
         daily: { plays: r.daily?.plays ?? 0, perfect: r.daily?.perfect ?? 0 }, since: new Date(r.since) };
     },
@@ -130,6 +130,17 @@
     async rpgRankOf({ lv, dungeons, floors }) {
       const r = await rpc('rpg_rank_of', { p_lv: lv, p_dungeons: dungeons, p_floors: floors });
       return { rankLv: r.rank_lv, rankDg: r.rank_dg };
+    },
+    // 英雄の塔: 最高記録の階をプロフィールで送る（行が無ければサーバーが作る。記録・かざりとは別。10秒の連投よけも別）。返事の rank_tower は rankTower に
+    rpgSetTower2: ({ token, tower }) => write('rpg_set_tower2', { p_token: token, p_tower: tower }, r => ({ rankTower: r.rank_tower })),
+    // 塔の上位50件（塔 → レベルの順、かざりつき）。失敗したら reject（DB にまだ top_tower2 が無いときは e.status が 404）
+    async topTower2() {
+      const rows = await rpc('top_tower2', {});
+      return rows.map(r => ({ ...who(r), tower: r.tower, lv: r.lv, at: new Date(r.created_at) }));
+    },
+    // この塔の記録なら何位相当か（数を返す）。失敗したら reject
+    async rpgTowerRankOf({ tower, lv }) {
+      return (await rpc('rpg_tower_rank_of', { p_tower: tower, p_lv: lv })).rank;
     },
     // 今日の難問: 記録をプロフィールで送る（day は日本時間の 'YYYY-MM-DD'、total は問題数。1日1回で2回目は reason 'already'）
     dailySubmit2: ({ token, day, correct, total, timeMs }) => write('submit_daily2',

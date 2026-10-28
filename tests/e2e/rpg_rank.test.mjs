@@ -1,10 +1,10 @@
-// 冒険ランキング（rpg-rank.js の #scr-rpgrank）: 冒険ホームの入口、きみの記録、プロフィールで載せる・自動更新（偽 Supabase）、レベル順・ダンジョン順、
+// 冒険ランキング（rpg-rank.js の #scr-rpgrank）: 冒険ホームの入口、きみの記録、プロフィールで載せる・自動更新（偽 Supabase）、レベル順・ダンジョン順・英雄の塔、
 // 名前を押すとプロフィールの窓、かざり、冒険データを消したとき、つながらないとき
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { startServer } from './helpers.mjs';
-import { openRpg, writeSave, saveWith } from './rpg_helpers.mjs';
+import { openRpg, writeSave, saveWith, startTower, winTowerFloor } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -435,4 +435,150 @@ t('old_rpgRankDel_drains', async (page, app) => {
   await page.waitForFunction(() => localStorage.getItem('rpgRankDel') === null, null, { timeout: 8000 });
   assert.deepEqual(callsOf(app, 'rpg_unregister2').map(c => c.args.p_token), [D]);
   assert.equal(app.db.rpgRows.length, 0);
+});
+
+// ---- 英雄の塔（rpg_set_tower2・top_tower2・rpg_tower_rank_of） ----
+const TOWER_SAVE = f => saveWith({ lv: 30, floors: { world: 5 }, story: ['ch1'], ...f });
+
+t('tower_tab', async (page, app) => {
+  // 名前・かざりはプロフィールのもの（top_tower2）。自分の行は me
+  app.db.profiles.push({ id: 2, token: 't-mike', nickname: 'ミケ', pid: 'mikepid00001', deco: ['jp'] });
+  app.db.rpgRows.push(
+    { token: 't-mike', profile_id: 2, nickname: 'ミケ', lv: 30, dungeons: 1, floors: 7, tower: 12, tower_at: ago(60), created_at: ago(90), at: ago(90) },
+    { token: 't-taro', nickname: 'タロウ', lv: 50, dungeons: 3, floors: 16, tower: 30, tower_at: ago(50), created_at: ago(80), at: ago(80) },
+    { token: 't-hana', nickname: 'ハナ', lv: 99, dungeons: 3, floors: 16, created_at: ago(70), at: ago(70) },   // 塔 0 は出ない
+  );
+  await writeSave(page, TOWER_SAVE({ tower: { best: 20 } }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  const tabs = await page.$$eval('#rr-tabs button', bs => bs.map(b => b.textContent));
+  assert.deepEqual(tabs, ['レベル', 'ダンジョン', '英雄の塔']);
+  await page.click('#rr-tabs button[data-s="tower"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
+  const r = await rows(page);
+  assert.ok(r[0].startsWith('1 タロウ 🗼30階 Lv 50') && r[1].startsWith('2 ミケ 🗼12階 Lv 30'), r.join('|'));
+  assert.equal(await page.locator('#rr-list li').nth(1).locator('.rr-deco img').count(), 1);
+  assert.deepEqual(await page.$$eval('#rr-list li .nick', ls => ls.map(l => l.querySelector('.pf-name')?.dataset.pid ?? null)), [null, 'mikepid00001']);
+  assert.equal(await text(page, '#rr-how'), '上位50人まで。最高記録の階 → レベルの順');
+  assert.equal(await page.getAttribute('#rr-tabs button[data-s="tower"]', 'aria-pressed'), 'true');
+  // 自分の記録: 自己ベストと、何位相当か
+  assert.ok((await text(page, '#rr-me')).includes('英雄の塔 自己ベスト 20階'), await text(page, '#rr-me'));
+  await page.waitForFunction(() => $('rr-rank').textContent.startsWith('英雄の塔'));
+  assert.equal(await text(page, '#rr-rank'), '英雄の塔 2位 相当');
+  assert.deepEqual(app.db.calls.filter(c => c.name === 'rpg_tower_rank_of').at(-1).args, { p_tower: 20, p_lv: 30 });
+  assert.equal(callsOf(app, 'top_tower2').length >= 1, true);
+  assert.deepEqual(callsOf(app, 'top_tower'), []);
+  // 同じ記録は同じ順位
+  app.db.rpgRows.push({ token: 't-kai', nickname: 'カイ', lv: 30, dungeons: 0, floors: 0, tower: 12, tower_at: ago(10), created_at: ago(10), at: ago(10) });
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.click('#rr-tabs button[data-s="tower"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 3);
+  assert.deepEqual((await rows(page)).map(x => x.split(' ').slice(0, 2).join(' ')), ['1 タロウ', '2 ミケ', '2 カイ']);
+  // もどすと今のタブ
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 4);
+  assert.ok(!(await text(page, '#rr-me')).includes('英雄の塔'));
+});
+
+t('tower_tab_me_row', async (page, app) => {
+  // 自分（pid が同じ）の行は塔のタブでも me。名前を押すとプロフィールの窓に「英雄の塔 ◯階」
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 30, dungeons: 1, floors: 5, tower: 7, tower_at: ago(30), created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 30, dungeons: 1, floors: 5, tower: 7 })), PID);
+  await writeSave(page, TOWER_SAVE({ tower: { best: 7 } }));
+  await page.evaluate(() => RPG.open('rpgrank', { sort: 'tower' }));
+  await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 1);
+  assert.deepEqual(await page.$$eval('#rr-list li', ls => ls.map(l => l.classList.contains('me'))), [true]);
+  await page.click('#rr-list li .pf-name');
+  await page.waitForFunction(() => document.querySelector('#pf-card[open]')?.textContent.includes('英雄の塔 7階'));
+  // 送ってある記録・塔と同じなので、何も送らない
+  await page.waitForTimeout(2000);
+  assert.deepEqual(callsOf(app, 'rpg_update2').concat(callsOf(app, 'rpg_set_tower2')), []);
+});
+
+// レベルのタブで頼んだ順位の返事が、塔のタブに切りかえたあとに来ても、塔のタブには書かない
+for (const best of [0, 20]) t(`tower_tab_late_level_rank_${best}`, async page => {
+  await writeSave(page, TOWER_SAVE({ tower: { best } }));
+  await page.evaluate(() => {
+    window.__lvRank = [];
+    const orig = RANKING.rpgRankOf;
+    RANKING.rpgRankOf = want => new Promise((ok, ng) => { window.__lvRank.push(() => orig(want).then(ok, ng)); });
+  });
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.waitForFunction(() => window.__lvRank.length >= 1);
+  await page.click('#rr-tabs button[data-s="tower"]');
+  if (best) await page.waitForFunction(() => $('rr-rank').textContent.startsWith('英雄の塔'));
+  // 遅れていたレベル順の返事をいま返す
+  await page.evaluate(() => Promise.all(window.__lvRank.splice(0).map(f => f())));
+  await page.waitForTimeout(300);
+  const want = best ? '英雄の塔 1位 相当' : '';
+  assert.equal(await page.evaluate(() => $('rr-rank').textContent), want);
+});
+
+t('tower_tab_not_ready', async (page, app) => {
+  // DB にまだ top_tower2 が無い（本番に適用する前）: 「準備中」と出して、エラーにしない
+  delete app.db.rpc.top_tower2;
+  delete app.db.rpc.rpg_tower_rank_of;
+  await writeSave(page, TOWER_SAVE({ tower: { best: 3 } }));
+  await page.evaluate(() => RPG.open('rpgrank', { sort: 'tower' }));
+  await page.waitForFunction(() => !$('rr-soon').hidden);
+  assert.ok((await text(page, '#rr-soon')).includes('準備中'));
+  assert.equal(await page.isVisible('#rr-error'), false);
+  assert.equal(await page.isVisible('#rr-empty'), false);
+  assert.equal(await page.locator('#rr-list li').count(), 0);
+  // ほかのタブにもどると今どおり
+  await page.click('#rr-tabs button[data-s="lv"]');
+  await page.waitForFunction(() => !$('rr-empty').hidden);
+  assert.equal(await page.isVisible('#rr-soon'), false);
+});
+
+t('tower_auto_send', async (page, app) => {
+  // プロフィールあり＋自動 ON・塔で新しい階に勝った（rpg:tower の newBest）→ GAP のあとに rpg_set_tower2 をプロフィールの合言葉と best で送る
+  app.db.rpgRows.push({ token: T0, profile_id: 1, nickname: 'チコ', lv: 30, dungeons: 1, floors: 5, created_at: ago(60), at: ago(60) });
+  await withProfile(page, app);
+  await page.evaluate(p => localStorage.setItem('rpgSent', JSON.stringify({ pid: p, lv: 30, dungeons: 1, floors: 5 })), PID);
+  await writeSave(page, TOWER_SAVE({}));
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower2'), []);   // best 0 は送らない
+  await startTower(page);
+  await winTowerFloor(page);
+  await until(() => callsOf(app, 'rpg_set_tower2').length > 0, 30000);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower2').map(c => c.args), [{ p_token: T0, p_tower: 1 }]);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('rpgSent'))?.tower === 1);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('rpgSent'))), { pid: PID, lv: 30, dungeons: 1, floors: 5, tower: 1 });
+  assert.equal(app.db.rpgRows[0].tower, 1);
+  // 同じ best では送り直さない（読み込み直しても）。前の版の rpg_set_tower・rpgRank は使わない
+  await page.reload();
+  await page.waitForTimeout(2500);
+  assert.equal(callsOf(app, 'rpg_set_tower2').length, 1);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower'), []);
+  assert.equal(await page.evaluate(() => localStorage.getItem('rpgRank')), null);
+});
+
+t('tower_auto_send_needs_profile', async (page, app) => {
+  // プロフィールが無ければ塔の記録があっても送らない。作ったら記録 → 塔の順に、GAP をあけて送る
+  await writeSave(page, TOWER_SAVE({ tower: { best: 3 } }));
+  await page.evaluate(() => document.dispatchEvent(new CustomEvent('rpg:tower', { detail: { floor: 3, win: true, best: 3, newBest: true, coins: 28 } })));
+  await page.waitForTimeout(2500);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower2'), []);
+  assert.deepEqual(await page.evaluate(() => PROFILE.create('チコ')), { ok: true });
+  await until(() => callsOf(app, 'rpg_set_tower2').length > 0, 30000);
+  const p = app.db.profiles[0], rec = callsOf(app, 'rpg_update2'), tw = callsOf(app, 'rpg_set_tower2');
+  assert.deepEqual(rec.map(c => c.args.p_token), [p.token]);
+  assert.deepEqual(tw.map(c => c.args), [{ p_token: p.token, p_tower: 3 }]);
+  assert.ok(tw[0].at - rec[0].at >= 10000, String(tw[0].at - rec[0].at));
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('rpgSent'))?.tower === 3);
+});
+
+t('tower_box_sends_with_record', async (page, app) => {
+  // 自動 OFF の箱: ［載せる］で記録を送り、塔の新記録もすぐ続けて送る（塔の連投よけは記録とは別）
+  await withProfile(page, app, { auto: false });
+  await writeSave(page, TOWER_SAVE({ tower: { best: 4 } }));
+  await page.evaluate(() => RPG.open('rpgrank'));
+  await page.click('#rr-post [data-pf="send"]');
+  await page.waitForFunction(() => $('rr-post').textContent.includes('載せたよ'));
+  await until(() => callsOf(app, 'rpg_set_tower2').length > 0, 5000);
+  assert.deepEqual(callsOf(app, 'rpg_update2').map(c => c.args.p_lv), [30]);
+  assert.deepEqual(callsOf(app, 'rpg_set_tower2').map(c => c.args), [{ p_token: T0, p_tower: 4 }]);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('rpgSent'))?.tower === 4);
+  assert.deepEqual(app.db.rpgRows.map(r => [r.profile_id, r.tower]), [[1, 4]]);
 });

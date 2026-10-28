@@ -512,6 +512,7 @@ t('card public', async (page, { db }) => {
   assert.match(s, /〈旅のはじまり〉/);
   assert.match(s, /バッジ 12個（全80個中）/);
   assert.match(s, /冒険 Lv17・ダンジョン4\/\d+/);
+  assert.doesNotMatch(s, /英雄の塔/);   // 塔に登っていなければ出さない
   assert.match(s, /国旗→国名・アジア・10問\s*12\.34秒（1位）/);
   assert.match(s, /国名→国旗・全世界・全部\s*1分35\.67秒（1位）/);
   assert.match(s, /今日の難問 参加2回（うち全問正解1回）/);
@@ -520,6 +521,18 @@ t('card public', async (page, { db }) => {
   // Esc で閉じる
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#pf-card').open);
+});
+
+t('card tower', async (page, { db }) => {
+  // 英雄の塔の最高記録があれば、冒険の行の下に「英雄の塔 ◯階」
+  seedCard(db);
+  db.rpgRows[0].tower = 23;
+  await page.evaluate(() => PROFILE.openCard('cardpid00001'));
+  const dlg = page.locator('#pf-card');
+  await dlg.locator('.pf-card', { hasText: 'ミケ' }).waitFor();
+  const lines = await dlg.locator('.pf-card-line').allInnerTexts();
+  const i = lines.findIndex(x => x.startsWith('冒険 Lv17'));
+  assert.ok(i >= 0 && lines[i + 1] === '英雄の塔 23階', lines.join('|'));
 });
 
 t('card private', async (page, { db }) => {
