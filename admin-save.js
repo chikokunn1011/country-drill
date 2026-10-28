@@ -62,7 +62,7 @@
     const remove = key => guard(() => { storage.removeItem(key); return { ok: true }; });
 
     // 新しい版（v > VERSION）の badges。本編は読むだけにするので、ここでも書きかえない
-    const newerBadges = v => isObj(v) && typeof v.v === 'number' && v.v > BC.VERSION;
+    const newerBadges = v => isObj(v) && v.v > BC.VERSION;   // badges.js の migrate と同じく型をそろえて比べる（"2" も新しい版）
     // 本編の形にそろえた文字列。rpg / badges 以外はそのまま（本編が読むキーは外側の形を見る）。形が合わなければ null
     const shaped = (key, v) => {
       if (key === 'rpg') {
@@ -184,6 +184,9 @@
       for (const key of ks.slice(KEEP_BROKEN)) storage.removeItem(key);
     };
     const rpgGet = () => rpgLoad().d;
+    // 画面に出す今の rpg の様子。'none' 無い・'ok' さわれる・'broken' 壊れてる（さわれない）・'newer' 新しい版（見るだけ）。
+    // storage が読めないときも、さわれないので 'broken'
+    const rpgStatus = () => { try { if (storage.getItem('rpg') == null) return 'none'; const r = rpgLoad(); return r.readOnly ? 'newer' : r.broken ? 'broken' : 'ok'; } catch { return 'broken'; } };
     // 今の rpg（無ければ新品）を fn で変えて、sanitize して書く。書いた値を返す。
     // 壊れたセーブ（JSON でない など）は { ok:false, reason:'not_json' }、新しい版のセーブは { ok:false, reason:'newer' } で、どちらも書かない
     // （本編も新しい版は書かない。壊れたものは上書きせず、書き出し・入れかえで直してもらう）
@@ -270,12 +273,13 @@
       badgesWrite(d, X);
       return { ok: true };
     });
-    // 外したステップを称号にしていたら、称号は「自動」（null）に戻す（持っていない称号を指したままにしない）
+    // 外したステップを称号にしていたら、称号は「自動」（null）に戻す（持っていない称号を指したままにしない）。
+    // 足したときは、本編と同じく称号が「自動」（null）ならそれをつける（''＝つけない はそのまま）
     const badgeToggle = key => guard(() => {
       const b = badgesRead();
       if (!b) return NEWER;
       const { X, d } = b;
-      if (key in d.got) { delete d.got[key]; if (d.eq === key) d.eq = null; } else d.got[key] = now();
+      if (key in d.got) { delete d.got[key]; if (d.eq === key) d.eq = null; } else { d.got[key] = now(); if (d.eq === null) d.eq = key; }
       badgesWrite(d, X);
       return { ok: true };
     });
@@ -313,7 +317,7 @@
 
     return {
       keys, read, write, writeCheck, remove, exportAll, importAll, importCheck, snapList, snapSave, snapLoad, snapDelete,
-      rpgGet, rpgEdit, rpgCoins, rpgSetLv, rpgSetFloor, rpgUnlockAll, rpgClearAll, rpgStoryReset, rpgSetPity, rpgGiveCard, rpgWipe,
+      rpgGet, rpgStatus, rpgEdit, rpgCoins, rpgSetLv, rpgSetFloor, rpgUnlockAll, rpgClearAll, rpgStoryReset, rpgSetPity, rpgGiveCard, rpgWipe,
       badgesAll, badgesNone, badgeToggle, badgesEq, dailyQuestions, dailyReset, settingsGet, settingsSet, setupGet, setupSet, firstTime, checkData,
     };
   }

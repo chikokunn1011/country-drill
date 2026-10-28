@@ -471,3 +471,40 @@ test('badges_all_picks_title_when_auto', () => {
   assert.equal(A2.badgesAll().ok, true);
   assert.equal(JSON.parse(st2.getItem('badges')).eq, '');
 });
+
+// ---- 2回目のレビューの直し ----
+test('rpg_status_none_ok_broken_newer', () => {
+  const { A, R, st } = load({}, () => T0);
+  assert.equal(A.rpgStatus(), 'none', 'rpg キーが無い');
+  st.setItem('rpg', v1(R));
+  assert.equal(A.rpgStatus(), 'ok');
+  for (const bad of ['{broken', '[1,2]', '{"v":"x"}', '5']) { st.setItem('rpg', bad); assert.equal(A.rpgStatus(), 'broken', bad); }
+  st.setItem('rpg', v1(R, { v: R.VERSION + 1 }));
+  assert.equal(A.rpgStatus(), 'newer');
+  const f = JSON.parse(v1(R)); delete f.v;
+  st.setItem('rpg', JSON.stringify(f));
+  assert.equal(A.rpgStatus(), 'ok', 'v の無い v1 は本編が直して読むので ok');
+  st.getItem = () => { throw new Error('denied'); };
+  assert.equal(A.rpgStatus(), 'broken', '読めない storage でも落ちない（さわれない）');
+});
+
+test('badge_toggle_add_picks_title_when_auto', () => {
+  const { A, st } = load();
+  assert.equal(A.badgeToggle('first-clear@1').ok, true);
+  assert.equal(JSON.parse(st.getItem('badges')).eq, 'first-clear@1', '本編と同じく、自動（null）なら取ったものをつける');
+  assert.equal(A.badgeToggle('answers@1').ok, true);
+  assert.equal(JSON.parse(st.getItem('badges')).eq, 'first-clear@1', 'もう称号があれば変えない');
+  const { A: A2, st: st2 } = load({ badges: JSON.stringify({ v: 1, got: {}, eq: '', sent: [] }) });
+  assert.equal(A2.badgeToggle('first-clear@1').ok, true);
+  assert.equal(JSON.parse(st2.getItem('badges')).eq, '', '「つけない」（\'\'）は変えない');
+});
+
+test('newer_badges_with_string_version_is_not_downgraded', () => {
+  const raw = JSON.stringify({ v: '2', got: { 'first-clear@1': 1 }, eq: '', sent: [] });   // 本編は raw.v > VERSION（型をそろえて比べる）
+  const { A, st } = load({ badges: raw });
+  for (const r of [A.badgeToggle('answers@1'), A.badgesAll(), A.badgesEq(''), A.write('badges', raw)])
+    assert.deepEqual(plain(r), { ok: false, reason: 'newer' });
+  assert.equal(st.getItem('badges'), raw);
+  assert.equal(A.importAll({ app: 'country-drill', kind: 'save', data: { badges: raw } }).ok, true);
+  assert.equal(st.getItem('badges'), raw, '読み戻しでも v1 に下げない');
+});

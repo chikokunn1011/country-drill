@@ -141,6 +141,41 @@ do $$ declare r jsonb := admin_list('rpg', '{}'); begin
 end $$;
 reset role;
 
+\echo '- admin_stats_today_vs_week'
+-- 今日（日本時間0時、週とは別に計算）の1秒前と1秒後に1行ずつ。今日は1秒後だけ。今週は、1秒前も今週のとき（月曜でないとき）だけ1つ多い
+truncate scores, daily_scores, rpg_players;
+do $$ declare t0 timestamptz := date_trunc('day', now() at time zone 'Asia/Tokyo') at time zone 'Asia/Tokyo'; begin
+  insert into scores (board, nickname, time_ms, questions, created_at) values
+    ('f2n:asia:10', 'まえ', 8000, 10, t0 - interval '1 s'), ('f2n:asia:10', 'あと', 8000, 10, t0 + interval '1 s');
+  insert into daily_scores (day, nickname, correct, total, time_ms, created_at) values
+    (current_date, 'まえ', 20, 20, 60000, t0 - interval '1 s'), (current_date, 'あと', 20, 20, 60000, t0 + interval '1 s');
+  insert into rpg_players (token_hash, nickname, lv, dungeons, floors, created_at, updated_at) values
+    ('\x11', 'まえ', 5, 1, 5, t0 - interval '1 s', t0 - interval '1 s'), ('\x12', 'あと', 5, 1, 5, t0 + interval '1 s', t0 + interval '1 s');
+  perform set_config('test.prev_in_week', ((t0 - interval '1 s') >= jst_week_start())::int::text, false);
+end $$;
+set role authenticated;
+do $$ declare r jsonb := admin_stats(); k text; w int := current_setting('test.prev_in_week')::int; begin
+  assert r->'today' = '{"scores":1,"daily":1,"rpg":1}'::jsonb, format('today は0時の1秒後だけ: %s', r->'today');
+  foreach k in array array['scores', 'daily', 'rpg'] loop
+    assert (r->'week'->>k)::int - (r->'today'->>k)::int = w, format('%s: week %s - today %s / 期待 %s', k, r->'week'->>k, r->'today'->>k, w);
+  end loop;
+end $$;
+reset role;
+
+\echo '- admin_stats_today_ignores_session_timezone'
+-- 接続のタイムゾーンに夏時間があっても、今日の0時は日本時間で決まる（Supabase は UTC だが、ずれない書き方にしておく）。
+-- 今週の始まり（日曜 15:00 UTC）の1時間後に夏時間が始まる、POSIX 形式の作りもののタイムゾーンにする。
+-- 月曜（今日の0時＝週の始まり）は、あいだに夏時間の切りかわりが入らないので、もとから同じ結果になる
+do $$ declare ws timestamp := jst_week_start() at time zone 'UTC'; n int := extract(doy from ws)::int - 1; begin
+  perform set_config('timezone', format('AAA0BBB,%s/%s,%s/0', n, extract(hour from ws)::int + 1, (n + 180) % 365), false);
+end $$;
+set role authenticated;
+do $$ declare r jsonb := admin_stats(); begin
+  assert r->'today' = '{"scores":1,"daily":1,"rpg":1}'::jsonb, format('夏時間のある接続（%s）で today: %s', current_setting('timezone'), r->'today');
+end $$;
+reset role;
+reset timezone;
+
 \echo '- list_filters'
 truncate scores, daily_scores, rpg_players;
 -- 時刻は今週の始まり（jst_week_start）から数える。月曜0時すぎに流しても「今週」の行が先週にこぼれない

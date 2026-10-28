@@ -62,6 +62,8 @@ select has_function_privilege('anon','admin_list(text,jsonb)','execute');
 
 結果が **false** なら正解（ログインしてない人は管理の関数を呼べない）。`true` だったら `admin.sql` をもう一度流して、それでも true なら教えて。
 
+- **Security Advisor** に `admin_` の関数がずらっと「Authenticated users can execute SECURITY DEFINER function」（lint 0029 `authenticated_security_definer_function_executable`）で出るけど、それは想定どおり。ログインした人なら呼べるようにしてあって、中で毎回 `admins` に居るか確かめて、居なければ何もせずにエラーを返す。ほかの名前の関数で出たら教えて。
+
 ## 困ったとき
 
 - **ログインできない**: メール・パスワードを見直す。Authentication → Users に自分がいるか、**Auto Confirm User** で作ったか（未確認のままだと入れない）を確認。
@@ -77,3 +79,4 @@ select has_function_privilege('anon','admin_list(text,jsonb)','execute');
 
 - Supabase の `service_role` キーなど、強い鍵は管理ページにもリポジトリにも絶対置かない・貼らない。
 - 管理ページはログイン後30分何もしないと自動ログアウトする。
+- **冒険ランキング（rpg）の行をごみ箱から戻すのは、消してすぐのときだけ**にする。消したあと、その人の端末が「ランキングから消えた」と気づく（次に記録を送ろうとして見つからない）と、端末は合言葉を捨てる。そのあとで戻すと、だれのものでもない行になって、その人は同じ名前で載せ直せなくなる（名前がふさがったまま）。そうなったら、その行を管理ページでもう一度消すか、名前を変えて名前をあけてあげて。

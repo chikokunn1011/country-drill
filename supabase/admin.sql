@@ -72,8 +72,9 @@ declare
 begin
   perform admin_check();
   v_week := jst_week_start();
-  -- 日本時間の今日0時。日本に夏時間は無いので、週の始まり（月曜0時）から丸1日ずつ足せばよい
-  v_today := v_week + floor(extract(epoch from now() - v_week) / 86400) * interval '1 day';
+  -- 日本時間の今日0時＝週の始まり（月曜0時）＋ 86400秒 × 日数。'1 day' は接続のタイムゾーンの暦で足すので使わない
+  -- （夏時間のある接続だと1時間ずれる）。日本時間の区切りは jst_week_start 1か所にまとめたまま
+  v_today := v_week + floor(extract(epoch from now() - v_week) / 86400) * interval '86400 seconds';
   return jsonb_build_object(
     'ok', true,
     'counts', jsonb_build_object(
