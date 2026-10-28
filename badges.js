@@ -19,7 +19,7 @@
   const S_MAX = { right: 1e7, streak: 999, perf: 195, flaw: 195, ta: 195, taAvg: 6e5, clears: 1e7, days: 1e5 };
   const S_FLAGS = ['grit', 'back', 'dopa', 'fever'];
   const RPG_MAX = { lv: 50, owned: 195, bounty: 1e5 };
-  const RPG_FLAGS = ['start', 'win', 'nodmg', 'under', 'phoenix', 'friend', 'master'];
+  const RPG_FLAGS = ['start', 'win', 'nodmg', 'under', 'friend', 'master'];
   const T_MAX = 1e13;      // 時刻(ms)の上限
   const MAX_KEYS = 500;    // got と sent に残す最大件数
   const CF_MAX = 30;       // つまずいた条件を覚える最大件数
@@ -61,7 +61,7 @@
       s: {
         right: 0, streak: 0, m: {}, ov: {}, wk: {}, bk: {}, rc: {}, perf: 0, flaw: 0, cf: [], grit: 0, ta: 0, taAvg: 0, clears: 0,
         days: 0, last: '', back: 0, dopa: 0, fever: 0,
-        rpg: { start: 0, win: 0, nodmg: 0, under: 0, phoenix: 0, friend: 0, master: 0, lv: 0, owned: 0, bounty: 0, boss: [] },
+        rpg: { start: 0, win: 0, nodmg: 0, under: 0, friend: 0, master: 0, lv: 0, owned: 0, bounty: 0, boss: [] },
       },
     };
   }
@@ -158,7 +158,6 @@
         g.win = 1;
         if (p.boss && p.mistakes === 0) g.nodmg = 1;
         if (p.boss && p.lv <= p.recLv - 5) g.under = 1;
-        if (p.revived) g.phoenix = 1;
         break;
       case 'clear': if (X.DUNGEONS.includes(p.dungeon) && !g.boss.includes(p.dungeon)) g.boss.push(p.dungeon); break;
       case 'overcome': if (X.codes.has(p.a)) { s.ov[p.a] = 1; delete s.wk[p.a]; } break;   // クイズでの克服と重なっても1か国1回
@@ -224,7 +223,7 @@
       case 'join': return { via: o.via, owned: o.owned | 0 };
       case 'promote': return { learn: !!(o.via ? o.via === 'learn' : o.star === 2 && screen !== 'gacha') };
       case 'answer': return { a: o.a, right: !!o.right, mode: o.mode };
-      case 'battle': return { boss: !!o.boss, win: !!o.win, mistakes: o.mistakes | 0, revived: !!o.revived, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
+      case 'battle': return { boss: !!o.boss, win: !!o.win, mistakes: o.mistakes | 0, maxCombo: o.maxCombo | 0, lv: o.lv | 0, recLv: o.recLv | 0 };
       case 'clear': return { dungeon: o.dungeon };
       case 'overcome': return { a: o.a };
       case 'bounty': return { totalDays: o.totalDays | 0 };
@@ -349,8 +348,6 @@
         tiers: one('無傷の旅人', 'ボスをミス0で倒す', 2) },
       { id: 'rpg-underdog', cat: 'rpg', icon: '📜', name: '知識こそ力', rpg: true, v: s => s.rpg.under,
         tiers: one('知識の勇者', '推奨 Lv より5以上低い Lv でボスに勝つ', 3) },
-      { id: 'rpg-phoenix', cat: 'rpg', icon: '💫', name: '不死鳥', rpg: true, v: s => s.rpg.phoenix,
-        tiers: one('不死鳥', '思い出して復活し、そのバトルに勝つ', 2) },
       { id: 'rpg-friend', cat: 'rpg', icon: '🤝', name: '覚えて仲間に', rpg: true, v: s => s.rpg.friend,
         tiers: one('国の友だち', 'なかよし度で、はじめて仲間ができる') },
       { id: 'rpg-master', cat: 'rpg', icon: '🏅', name: 'マスター昇格', rpg: true, v: s => s.rpg.master,

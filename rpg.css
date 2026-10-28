@@ -348,8 +348,6 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 /* 問題の列。外枠は .bq（.qcard と #qcard はクイズのもの）。中は index.html の .qlabel .qflag .qbig .choices .choice .flagc を使う */
 .rpg-bcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .bq { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 0; }
-.rpg-rvh { margin: 0; font: 900 1.1rem var(--font-display); color: var(--ng); text-align: center; text-wrap: balance; }
-.rpg-rvh small { margin-left: .4em; font: 500 .8rem var(--font-mono); color: var(--muted); }
 .rpg-tags { margin: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 .rpg-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--hl); background: color-mix(in srgb, var(--hl) 16%, var(--surface)); font: 700 .75rem var(--font-display); white-space: nowrap; }
 #scr-battle .choice { touch-action: manipulation; }
@@ -483,12 +481,11 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
   #bt-reveal > .map { grid-area: m; }
   #bt-reveal > .next { grid-area: n; justify-self: end; align-self: end; }
   #scr-battle .bq > .qbig { text-wrap: balance; word-break: auto-phrase; overflow-wrap: anywhere; }
-  /* 大きさはステージの高さ（cqh）から決める。--rpg-free は .bq の中で、問いの文の下に使える高さ（札・復活の見出しがあればそのぶん引く）。
+  /* 大きさはステージの高さ（cqh）から決める。--rpg-free は .bq の中で、問いの文の下に使える高さ（札があればそのぶん引く）。
      cqh が使えないブラウザはこのブロックを読まず、上の px の値のまま（入らなければ右の列の中がスクロールする） */
   @supports (height: 1cqh) {
-    #scr-battle .bq { --rpg-free: calc(100cqh - 2 * var(--card-pad, 20px) - 2px - 1.84rem - 14px - var(--rpg-xt, 0px) - var(--rpg-xr, 0px)); }
+    #scr-battle .bq { --rpg-free: calc(100cqh - 2 * var(--card-pad, 20px) - 2px - 1.84rem - 14px - var(--rpg-xt, 0px)); }
     #scr-battle .bq:has(> .rpg-tags) { --rpg-xt: 38px; }
-    #scr-battle .bq:has(> .rpg-rvh) { --rpg-xr: 44px; }
     /* 背の低い PC の画面（横向きのスマホ 932×430 など）でも、国旗は幅 64px・地図は幅 128px より小さくしない（入らないぶんは右の列の中がスクロールする） */
     /* f2n: 国旗の下に文字の4択（2段。長い国名の2行ぶん 160px を取る） */
     #scr-battle .bq > .qflag { width: min(100%, 560px, max(64px, calc((var(--rpg-free) - 184px) * 4 / 3))); }
