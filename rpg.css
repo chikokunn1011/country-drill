@@ -13,6 +13,9 @@
   /* 鏡の地球（夜の色。元のダンジョンの色を暗くしたもの） */
   --rpg-r-msamerica: #436540; --rpg-r-moceania: #2f6277; --rpg-r-mnamerica: #7e5c2c; --rpg-r-meurope: #644a67;
   --rpg-r-masia: #7d4336; --rpg-r-mafrica: #766019; --rpg-r-mworld: #374045;
+  /* 宇宙（星の色。夜空の上でも見えるよう、明るめの色） */
+  --rpg-r-moon: #9aa6bd; --rpg-r-mercury: #9a8c80; --rpg-r-venus: #d6a144; --rpg-r-mars: #c4553a;
+  --rpg-r-jupiter: #b9774a; --rpg-r-saturn: #b8a265; --rpg-r-blackhole: #7a5bb5;
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 @media (prefers-color-scheme: dark) {
@@ -25,6 +28,10 @@
     --rpg-r-mnamerica: color-mix(in srgb, #7e5c2c 70%, #fff); --rpg-r-meurope: color-mix(in srgb, #644a67 70%, #fff);
     --rpg-r-masia: color-mix(in srgb, #7d4336 70%, #fff); --rpg-r-mafrica: color-mix(in srgb, #766019 70%, #fff);
     --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
+    --rpg-r-moon: color-mix(in srgb, #9aa6bd 70%, #fff); --rpg-r-mercury: color-mix(in srgb, #9a8c80 70%, #fff);
+    --rpg-r-venus: color-mix(in srgb, #d6a144 70%, #fff); --rpg-r-mars: color-mix(in srgb, #c4553a 70%, #fff);
+    --rpg-r-jupiter: color-mix(in srgb, #b9774a 70%, #fff); --rpg-r-saturn: color-mix(in srgb, #b8a265 70%, #fff);
+    --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff);
     --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
   }
   :root:not([data-theme="light"]) .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }   /* ダークは --rpg-c がすでに白を混ぜてあるので、重ねて白くしない */
@@ -38,6 +45,10 @@
   --rpg-r-mnamerica: color-mix(in srgb, #7e5c2c 70%, #fff); --rpg-r-meurope: color-mix(in srgb, #644a67 70%, #fff);
   --rpg-r-masia: color-mix(in srgb, #7d4336 70%, #fff); --rpg-r-mafrica: color-mix(in srgb, #766019 70%, #fff);
   --rpg-r-mworld: color-mix(in srgb, #374045 70%, #fff);
+  --rpg-r-moon: color-mix(in srgb, #9aa6bd 70%, #fff); --rpg-r-mercury: color-mix(in srgb, #9a8c80 70%, #fff);
+  --rpg-r-venus: color-mix(in srgb, #d6a144 70%, #fff); --rpg-r-mars: color-mix(in srgb, #c4553a 70%, #fff);
+  --rpg-r-jupiter: color-mix(in srgb, #b9774a 70%, #fff); --rpg-r-saturn: color-mix(in srgb, #b8a265 70%, #fff);
+  --rpg-r-blackhole: color-mix(in srgb, #7a5bb5 70%, #fff);
   --rpg-fog: color-mix(in srgb, var(--land) 55%, var(--ocean));
 }
 :root[data-theme="dark"] .rpg-amap-svg.is-mirror .rpg-am-r.is-done { fill: var(--rpg-c); }
@@ -248,6 +259,27 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-amap-svg.is-mirror .rpg-am-node.is-locked .rpg-am-dot { fill: var(--rpg-night-land); stroke: var(--rpg-night-ink); }
 .rpg-amap-svg.is-mirror .rpg-am-node.is-sel .rpg-am-dot { stroke: var(--rpg-night-ink); }
 .rpg-amap-svg.is-mirror .rpg-am-track { stroke: color-mix(in srgb, var(--rpg-night-ink) 30%, var(--rpg-night)); }
+/* 宇宙（第3章）: 世界地図のかわりに太陽系。ライトでもダークでも夜空。左はしに太陽の半円、星くずと軌道、星7つ */
+.rpg-amap-svg.is-space {
+  --rpg-sky: #0d1030; --rpg-sky-hi: #2a1f4d; --rpg-sky-ink: #e6e3ff;
+  overflow: hidden; background: radial-gradient(ellipse 85% 120% at 0% 50%, var(--rpg-sky-hi), var(--rpg-sky) 70%);
+}
+.rpg-amap-svg.is-space .rpg-am-dust circle { fill: var(--rpg-sky-ink); opacity: .45; }
+.rpg-amap-svg.is-space .rpg-am-dust circle.is-big { opacity: .8; }
+.rpg-amap-svg.is-space .rpg-am-orbits circle { fill: none; stroke: var(--rpg-sky-ink); stroke-width: 1; opacity: .14; }
+.rpg-amap-svg.is-space .rpg-am-sun circle { fill: url(#rpg-sun-g); }
+.rpg-amap-svg.is-space .rpg-am-sun .rpg-am-corona { opacity: .35; }
+.rpg-amap-svg.is-space .rpg-am-road { stroke: var(--rpg-sky-ink); }
+.rpg-amap-svg.is-space .rpg-am-dot { fill: color-mix(in srgb, var(--rpg-c) 22%, var(--rpg-sky)); }
+.rpg-amap-svg.is-space .rpg-am-node.is-done .rpg-am-dot { fill: color-mix(in srgb, var(--rpg-c) 60%, var(--rpg-sky)); }
+.rpg-amap-svg.is-space .rpg-am-e { fill: var(--rpg-sky-ink); }   /* ☿ は絵文字ではなく字なので、夜空の上で見える色に */
+.rpg-amap-svg.is-space .rpg-am-track { stroke: color-mix(in srgb, var(--rpg-sky-ink) 22%, var(--rpg-sky)); }
+.rpg-amap-svg.is-space .rpg-am-name { fill: var(--rpg-sky-ink); stroke: var(--rpg-sky); }
+.rpg-amap-svg.is-space .rpg-am-node.is-locked .rpg-am-dot { fill: var(--rpg-sky); stroke: color-mix(in srgb, var(--rpg-sky-ink) 55%, var(--rpg-sky)); }
+.rpg-amap-svg.is-space .rpg-am-node.is-locked .rpg-am-name { fill: color-mix(in srgb, var(--rpg-sky-ink) 60%, var(--rpg-sky)); }
+.rpg-amap-svg.is-space .rpg-am-node.is-sel .rpg-am-dot { stroke: var(--rpg-sky-ink); }
+.rpg-amap-svg.is-space .rpg-am-node:focus-visible .rpg-am-hit { stroke: var(--rpg-sky-ink); }
+.rpg-amap-svg.is-space .rpg-am-ok circle, .rpg-amap-svg.is-space .rpg-am-ok path { stroke: var(--rpg-sky); }
 .rpg-am-node { cursor: pointer; outline: none; }
 .rpg-am-hit { fill: transparent; }
 .rpg-am-dot { fill: var(--surface); stroke: var(--rpg-c); stroke-width: 3; }

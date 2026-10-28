@@ -301,7 +301,7 @@
 
   /* ---------- 入口（ホームの［冒険］・トップバーのチップ・設定のスイッチ）と冒険ホーム（#scr-rpg） ---------- */
   const DG = K.DUNGEONS, REGION_DG = K.REGION_DUNGEONS, AV = K.AVATARS, TOTAL = C.length, owned = K.owned;
-  const CH = K.CHAPTERS;   // 章（🌍地球・🪞鏡の地球）。DG は章の順に並んでいて、次の章の1つ目の前は前の章の最後のボス
+  const CH = K.CHAPTERS;   // 章（🌍地球・🪞鏡の地球・🪐宇宙）。DG は章の順に並んでいて、次の章の1つ目の前は前の章の最後のボス
   const BOSS = 5;   // フロアは F1〜F4 とボス（5）
   const STORY = [
     '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。',
@@ -329,7 +329,24 @@
         '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。',
       ] },
     ],
+    // 第3章のはじまりは ch2 と別の id（この版より前に ch2 を読んだセーブにも出るように）
+    ch3start: [
+      { h: '🪐 第3章 宇宙', p: [
+        '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。',
+        '星には、地球の国のなかまたちの記憶が眠っている。',
+        '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！',
+      ] },
+    ],
+    ch3: [
+      { h: '🌟 エンディング', p: [
+        '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。',
+        '地球も、鏡の地球も、宇宙も、もう安心だ。',
+        'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――',
+      ] },
+    ],
   };
+  // どのストーリーを、どのボスを倒したあとに出すか（上から順に見る）
+  const STORY_DUE = [{ id: 'ch1', after: 'world' }, { id: 'ch2', after: 'mworld' }, { id: 'ch3start', after: 'mworld' }, { id: 'ch3', after: 'blackhole' }];
   const FLOOR_MARK = ['①', '②', '③', '④', '👑'];
   const JUDGE = { easy: ['余裕', 'is-easy'], ok: ['ちょうど', 'is-ok'], hard: ['きびしい', 'is-hard'] };
   // 設計書 §5.1 の例の表（ゲームとコインの列）。表示するだけの文なので、計算には使わない
@@ -500,7 +517,7 @@
     $('rpg-dbg-give').onclick = () => RPG.debug.give(DEBUG_GIVE);
     $('rpg-dbg-setlv').onclick = () => RPG.debug.setLv($('rpg-dbg-lv').value);
     // どのダンジョンもボスまで行けるようにする（もう倒したボスはそのまま。倒したことにはしない）
-    $('rpg-dbg-unlock').onclick = () => tx(x => { for (const g of DG) x.floors[g.id] = Math.max(cleared(x, g.id), BOSS - 1); });   // 鏡の地球も入れて14個
+    $('rpg-dbg-unlock').onclick = () => tx(x => { for (const g of DG) x.floors[g.id] = Math.max(cleared(x, g.id), BOSS - 1); });   // 鏡の地球・宇宙も入れて21個
     $('rpg-dbg-wipe').onclick = wipeAsk;
   };
 
@@ -570,12 +587,14 @@
     }).join('');
     const head = `<div class="rpg-plate${on ? '' : ' rpg-locked'}" data-d="${g.id}" style="--rpg-c: var(--rpg-r-${g.id}, ${g.color})"${g.id === sel ? '' : ' hidden'}><p class="rpg-plate-no">${g.plate}</p>`;
     const prev = DG[DG.findIndex(x => x.id === g.id) - 1];
+    // 宇宙の星は、出る国のテーマを1行（星喰いの巣は全部のテーマなので出さない）
+    const theme = g.t ? `<p class="rpg-plate-meta rpg-plate-theme">テーマ: ${K.THEMES[g.t].n}（${K.THEMES[g.t].a.length}か国）</p>` : '';
     if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="まだ開いていない">🔒</span><b>${g.name}</b></p>`
-      + `<p class="rpg-plate-meta rpg-plate-lock">${prev ? `${esc(prev.name)}のボスをたおすと開く` : ''}</p><div class="rpg-fls">${fls}</div></div>`;
+      + `${theme}<p class="rpg-plate-meta rpg-plate-lock">${prev ? `${esc(prev.name)}のボスをたおすと開く` : ''}</p><div class="rpg-fls">${fls}</div></div>`;
     const left = restReward(g.id, n);
     const rec = f => K.recLv(K.stageOf(g.id, f)), [jt, jc] = JUDGE[judgeOf(d, g.id, Math.min(n + 1, BOSS))];
     return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" aria-hidden="true">${boss.e}</span><b>${g.name}</b><small>ボス ${boss.n}</small></p>`
-      + `<p class="rpg-plate-meta"><span>推奨Lv${rec(1)}〜${rec(BOSS)}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? '<span>ぜんぶクリア</span>' : ''}</p>`
+      + `${theme}<p class="rpg-plate-meta"><span>推奨Lv${rec(1)}〜${rec(BOSS)}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? '<span>ぜんぶクリア</span>' : ''}</p>`
       + (left ? `<p class="rpg-plate-meta rpg-plate-gain"><span>はじめてクリアでもらえる ${COIN}<b>${fmt(left)}</b></span><span>ボスまで あと${BOSS - n}フロア</span></p>` : '')
       + `<div class="rpg-fls">${fls}</div></div>`;
   };
@@ -586,40 +605,70 @@
     return sum;
   };
 
-  // ---- 冒険マップ（冒険ホームの図版の上）。章タブで選んだ章の世界地図にダンジョン7つと道。押したダンジョンの図版を下に出す ----
+  // ---- 冒険マップ（冒険ホームの図版の上）。章タブで選んだ章の地図にダンジョン7つと道。押したダンジョンの図版を下に出す ----
+  // 地球・鏡の地球は世界地図（d3）、宇宙は太陽系（d3 を使わない手書きの SVG）。道・進み具合の輪・旅人・✓ はどの章も同じ描き方
   // SPOT は [経度, 緯度]。BEND は道の曲がり（+ は南へ、- は北へふくらむ。道の長さに対する割合）。鏡の地球は元のダンジョン（base）の場所と曲がりを使い回す
   const SPOT = { samerica: [-60, -12], oceania: [140, -26], namerica: [-102, 42], europe: [14, 50], asia: [92, 36], africa: [20, 2], world: [66, -30] };
   const BEND = [0.18, -0.12, -0.18, -0.2, 0.18, 0.22];
   const AMAP_BOX = [-122, -46, 166, 64];   // 北極・南極のほうと太平洋のはしを切って、ダンジョンを大きく見せる
+  // 太陽系: 太陽は左はし（中心 SUN が x = 0 なので半円だけ見える）。星は SPACE_SPOT（W × H の座標）に、上下にゆれながら右へゆるく上る弧。
+  // 名前は点の下（+57）・旅人は上（-72）に出るので、y は 92〜300 におさめる
+  const SUN = [0, H / 2];
+  const SPACE_SPOT = { moon: [118, 258], mercury: [200, 182], venus: [280, 254], mars: [360, 172], jupiter: [440, 240], saturn: [520, 160], blackhole: [592, 226] };
+  const SPACE_BEND = [0.14, -0.14, 0.14, -0.14, 0.14, -0.14];
   let dgSel = '';    // マップで選んだダンジョン（冒険ホームを離れたら空にもどる＝次に挑むダンジョン）
   let chSel = 0;     // タブで選んだ章（dgSel と同じく、冒険ホームを離れたら 0 にもどる＝次に挑むフロアの章）
-  let amapBase = null;
-  // 国の形を地域（featCountry の r）ごとに1本の path にまとめ、ダンジョンの場所の座標といっしょに1回だけ作る。どちらの章も g.r で引く
+  let amapBase = null, spaceBase = null;
+  // 国の形を地域（featCountry の r）ごとに1本の path にまとめ、ダンジョンの場所の座標といっしょに1回だけ作る。地球と鏡の地球は g.r で引く
   const amapGeo = () => {
     if (amapBase) return amapBase;
     const proj = boxProjection(AMAP_BOX, W, H), path = d3.geoPath(proj), byR = new Map(), rest = [];
     path.digits?.(1);
-    const rs = new Set(DG.map(g => g.r));
+    const earth = DG.filter(g => SPOT[g.base ?? g.id]);   // 宇宙の星は世界地図に置かない
+    const rs = new Set(earth.map(g => g.r));
     for (const g of feats) {
       const p = path(g);
       if (!p) continue;
       const r = featCountry.get(g)?.r;
       if (rs.has(r)) byR.set(r, (byR.get(r) || '') + p); else rest.push(p);
     }
-    const at = Object.fromEntries(DG.map(g => [g.id, proj(SPOT[g.base ?? g.id]).map(v => Math.round(v))]));
+    const at = Object.fromEntries(earth.map(g => [g.id, proj(SPOT[g.base ?? g.id]).map(v => Math.round(v))]));
     return amapBase = { byR, rest: rest.join(''), at };
+  };
+  // 太陽系の背景（星くず・軌道・太陽）。毎回同じ並びになるよう、星くずは決まった種から作る。1回だけ作る
+  const spaceSky = () => {
+    if (spaceBase) return spaceBase;
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    let dust = '';
+    for (let i = 0; i < 70; i++) {
+      const x = Math.round(rnd() * W), y = Math.round(rnd() * H), r = (0.6 + rnd() * 1.2).toFixed(1);
+      if (Math.hypot(x - SUN[0], y - SUN[1]) > 110) dust += `<circle cx="${x}" cy="${y}" r="${r}"${rnd() < .25 ? ' class="is-big"' : ''}></circle>`;
+    }
+    const orbits = Object.values(SPACE_SPOT).map(([x, y]) => `<circle r="${Math.round(Math.hypot(x - SUN[0], y - SUN[1]))}"></circle>`).join('');
+    return spaceBase = '<defs><radialGradient id="rpg-sun-g"><stop offset="0" stop-color="#fffbe6"></stop><stop offset=".45" stop-color="#ffd25e"></stop>'
+      + '<stop offset=".75" stop-color="#ff9d2e"></stop><stop offset="1" stop-color="#ff7a1a" stop-opacity="0"></stop></radialGradient></defs>'
+      + `<g class="rpg-am-dust" aria-hidden="true">${dust}</g>`
+      + `<g class="rpg-am-orbits" transform="translate(${SUN[0]} ${SUN[1]})" aria-hidden="true">${orbits}</g>`
+      + `<g class="rpg-am-sun" transform="translate(${SUN[0]} ${SUN[1]})" aria-hidden="true"><circle class="rpg-am-corona" r="150"></circle><circle r="84"></circle></g>`;
   };
   // ch の章のダンジョンだけを描く。進み具合のヘッダーと棒もその章の分
   const amapHTML = (d, sel, nf, ch) => {
-    const { byR, rest, at } = amapGeo(), list = K.dungeonsOf(ch), mirror = ch > 1;
+    const list = K.dungeonsOf(ch), mirror = ch === 2, space = list.every(g => SPACE_SPOT[g.id]);
     const done = list.filter(g => cleared(d, g.id) >= BOSS).length, floors = list.reduce((s, g) => s + Math.min(BOSS, cleared(d, g.id)), 0);
     const st = g => cleared(d, g.id) >= BOSS ? 'is-done' : unlocked(d, g.id) ? 'is-open' : 'is-locked';
     const c = g => `--rpg-c: var(--rpg-r-${g.id}, ${g.color})`;
-    let s = `<path class="rpg-am-land" d="${rest}"></path>`;
-    for (const g of list) if (byR.has(g.r)) s += `<path class="rpg-am-r ${st(g)}" data-d="${g.id}" style="${c(g)}" d="${byR.get(g.r)}"></path>`;
+    let s, at, bend;
+    if (space) { s = spaceSky(); at = SPACE_SPOT; bend = SPACE_BEND; }
+    else {
+      const geo = amapGeo();
+      s = `<path class="rpg-am-land" d="${geo.rest}"></path>`;
+      for (const g of list) if (geo.byR.has(g.r)) s += `<path class="rpg-am-r ${st(g)}" data-d="${g.id}" style="${c(g)}" d="${geo.byR.get(g.r)}"></path>`;
+      at = geo.at; bend = BEND;
+    }
     list.slice(1).forEach((g, i) => {
-      // 道に直角で南向きの向き (nx, ny) へ BEND × 長さだけ、まん中をずらした点を通る
-      const [x0, y0] = at[list[i].id], [x1, y1] = at[g.id], len = Math.hypot(x1 - x0, y1 - y0) || 1, k = BEND[i] * len;
+      // 道に直角で南向きの向き (nx, ny) へ bend × 長さだけ、まん中をずらした点を通る
+      const [x0, y0] = at[list[i].id], [x1, y1] = at[g.id], len = Math.hypot(x1 - x0, y1 - y0) || 1, k = bend[i] * len;
       const sg = x1 >= x0 ? 1 : -1, nx = -(y1 - y0) / len * sg, ny = (x1 - x0) / len * sg;
       const cx = (x0 + x1) / 2 + nx * k, cy = (y0 + y1) / 2 + ny * k;
       s += `<path class="rpg-am-road${unlocked(d, g.id) ? ' is-open' : ''}" d="M${x0} ${y0}Q${Math.round(cx)} ${Math.round(cy)} ${x1} ${y1}"></path>`;
@@ -632,7 +681,8 @@
         + ` role="button" tabindex="0" aria-pressed="${g.id === sel}" aria-label="${label}">`
         + `<circle class="rpg-am-hit" r="${R + 14}"></circle>`
         + (on ? `<circle class="rpg-am-track" r="${R + 5}"></circle><circle class="rpg-am-ring" r="${R + 5}" transform="rotate(-90)" stroke-dasharray="${(RING * n / BOSS).toFixed(1)} ${RING.toFixed(1)}"></circle>` : '')
-        + `<circle class="rpg-am-dot" r="${R}"></circle><text class="rpg-am-e" dy=".35em">${on ? K.MONSTERS[g.id][BOSS - 1].e : '🔒'}</text>`
+        // 宇宙は星の絵（DUNGEONS の e）、地球と鏡の地球はボスの絵
+        + `<circle class="rpg-am-dot" r="${R}"></circle><text class="rpg-am-e" dy=".35em">${on ? g.e ?? K.MONSTERS[g.id][BOSS - 1].e : '🔒'}</text>`
         + `<text class="rpg-am-name" y="${R + 24}">${g.name}</text>`
         + (state === 'is-done' ? `<g class="rpg-am-ok" transform="translate(${R - 3} ${-R + 3})"><circle r="13"></circle><path d="M-6 0l4 4 7-8"></path></g>` : '')
         + '</g>';
@@ -643,7 +693,7 @@
     }
     return `<div class="rpg-amap-h"><b>冒険マップ</b><span>ダンジョン <b>${done}</b>/${list.length}・フロア <b>${floors}</b>/${list.length * BOSS}</span></div>`
       + `<div class="rpg-amap-bar" aria-hidden="true"><i style="width: ${(100 * floors / (list.length * BOSS)).toFixed(1)}%"></i></div>`
-      + `<svg class="map rpg-amap-svg${mirror ? ' is-mirror' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="冒険マップ（ダンジョンを押すと下にくわしく出る）">${s}</svg>`;
+      + `<svg class="map rpg-amap-svg${mirror ? ' is-mirror' : ''}${space ? ' is-space' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="冒険マップ（ダンジョンを押すと下にくわしく出る）">${s}</svg>`;
   };
   // 章タブ（冒険マップの上）。開いていない章は 🔒 で押せない
   const chtabsHTML = (d, ch) => `<div class="rpg-chtabs" id="rpg-chtabs" role="group" aria-label="章">${CH.map(c => {
@@ -731,9 +781,9 @@
     if (!dlg.open) dlg.showModal();
   };
   // ---- 章の終わりのストーリー（<dialog id="rpg-story-dlg">。deco と同じく body に1つ） ----
-  // 章の最後のボスを倒していて story に無いものを、古い順に1つ。閉じたら（［閉じる］・下のボタン・Esc）読んだことにして story に足す。
+  // STORY_DUE の after のボスを倒していて story に無いものを、上から1つ。閉じたら（［閉じる］・下のボタン・Esc）読んだことにして story に足す。
   // 書けたら描き直しで次の章のものが出る。新しい版のデータ（読み取り専用）のあいだは出さない（読んだことにできないので）
-  const storyDue = d => CH.map(c => `ch${c.ch}`).find((id, i) => cleared(d, CH[i].last) >= BOSS && !d.story.includes(id) && STORY_END[id]);
+  const storyDue = d => STORY_DUE.find(x => cleared(d, x.after) >= BOSS && !d.story.includes(x.id))?.id;
   const storyRead = dlg => {
     const sid = dlg.dataset.story;
     dlg.dataset.story = '';
@@ -761,7 +811,7 @@
   // スマホは上から 旅人・レベルアップ・つぎにやること・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
   const homeHTML = (d, nf, nx) => {
-    const st = nf ? K.battleStats(d, nf.id, nf.floor) : K.battleStats(d, DG[DG.length - 1].id, BOSS);   // 全部クリアなら最後の章のボス（鏡の地図喰い）
+    const st = nf ? K.battleStats(d, nf.id, nf.floor) : K.battleStats(d, DG[DG.length - 1].id, BOSS);   // 全部クリアなら最後の章のボス（星喰い）
     // マップと図版は ch の章だけ。選ぶダンジョンは マップで選んだもの → 次に挑むダンジョン → その章の最後
     const ch = chNow(d, nf), list = K.dungeonsOf(ch);
     const sel = list.some(g => g.id === dgSel) ? dgSel : list.some(g => g.id === nf?.id) ? nf.id : list[list.length - 1].id;

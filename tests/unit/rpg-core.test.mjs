@@ -105,8 +105,7 @@ test('level_cost', () => {
 test('region_colors_match_css', () => {
   // rpg.css の地域の色（--rpg-r-{id}。ライトはそのまま、ダークは白を3割まぜる。ダークは2か所）は DUNGEONS の color と同じ
   const K = loadCore(), css = read('rpg.css');
-  // 宇宙（第3章）の色はまだ rpg.css に無い（あとのタスクで足して、この絞りを外す）
-  for (const { id, color } of K.DUNGEONS.filter(g => g.ch <= 2)) {   // 鏡の地球の7つも
+  for (const { id, color } of K.DUNGEONS) {   // 鏡の地球・宇宙も入れて21個
     assert.ok(css.includes(`--rpg-r-${id}: ${color};`), `rpg.css に --rpg-r-${id}: ${color} が無い`);
     const dark = css.match(new RegExp(`--rpg-r-${id}: color-mix\\(in srgb, ${color} 70%, #fff\\);`, 'g')) || [];
     assert.equal(dark.length, 2, `rpg.css のダークの --rpg-r-${id} が ${color} から作られていない`);

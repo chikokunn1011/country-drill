@@ -44,13 +44,13 @@
     { id: 'mafrica', base: 'africa', ch: 2, r: 'アフリカ', name: '鏡のサバンナ', plate: 'PLATE 13 · MIRROR AFRICA', color: '#766019', flags: 10, land: '鏡のアフリカ' },
     { id: 'mworld', base: 'world', ch: 2, r: 'all', name: '鏡の地図喰いの巣', plate: 'PLATE 14 · MIRROR WORLD', color: '#374045', flags: 12, land: '鏡の世界' },
     // 第3章 宇宙: 地域ではなくテーマ（t は THEMES のキー）で国をしぼる。r は全部 'all'（ガチャ・セーブの地域と同じ値のまま）。e は太陽系の地図に出す星
-    { id: 'moon', ch: 3, r: 'all', t: 'island', e: '🌕', name: '月', plate: 'PLATE 15 · MOON', color: '#b8b4a8', flags: 9, land: '月' },
-    { id: 'mercury', ch: 3, r: 'all', t: 'small', e: '☿', name: '水星', plate: 'PLATE 16 · MERCURY', color: '#8f8a86', flags: 9, land: '水星' },
-    { id: 'venus', ch: 3, r: 'all', t: 'equator', e: '♀', name: '金星', plate: 'PLATE 17 · VENUS', color: '#d6a54e', flags: 10, land: '金星' },
-    { id: 'mars', ch: 3, r: 'all', t: 'landlocked', e: '🔴', name: '火星', plate: 'PLATE 18 · MARS', color: '#c25a3c', flags: 10, land: '火星' },
-    { id: 'jupiter', ch: 3, r: 'all', t: 'big', e: '🪐', name: '木星', plate: 'PLATE 19 · JUPITER', color: '#b98a62', flags: 11, land: '木星' },
-    { id: 'saturn', ch: 3, r: 'all', t: 'south', e: '🪐', name: '土星', plate: 'PLATE 20 · SATURN', color: '#c9b27a', flags: 11, land: '土星' },
-    { id: 'blackhole', ch: 3, r: 'all', e: '🕳️', name: '星喰いの巣', plate: 'PLATE 21 · BLACK HOLE', color: '#3a3550', flags: 12, land: '宇宙' },
+    { id: 'moon', ch: 3, r: 'all', t: 'island', e: '🌕', name: '月', plate: 'PLATE 15 · MOON', color: '#9aa6bd', flags: 9, land: '月' },
+    { id: 'mercury', ch: 3, r: 'all', t: 'small', e: '☿', name: '水星', plate: 'PLATE 16 · MERCURY', color: '#9a8c80', flags: 9, land: '水星' },
+    { id: 'venus', ch: 3, r: 'all', t: 'equator', e: '♀', name: '金星', plate: 'PLATE 17 · VENUS', color: '#d6a144', flags: 10, land: '金星' },
+    { id: 'mars', ch: 3, r: 'all', t: 'landlocked', e: '🔴', name: '火星', plate: 'PLATE 18 · MARS', color: '#c4553a', flags: 10, land: '火星' },
+    { id: 'jupiter', ch: 3, r: 'all', t: 'big', e: '🪐', name: '木星', plate: 'PLATE 19 · JUPITER', color: '#b9774a', flags: 11, land: '木星' },
+    { id: 'saturn', ch: 3, r: 'all', t: 'south', e: '🪐', name: '土星', plate: 'PLATE 20 · SATURN', color: '#b8a265', flags: 11, land: '土星' },
+    { id: 'blackhole', ch: 3, r: 'all', e: '🕳️', name: '星喰いの巣', plate: 'PLATE 21 · BLACK HOLE', color: '#7a5bb5', flags: 12, land: '宇宙' },
   ];
   // 章。last はその章の最後のダンジョン（ここをクリアすると章クリア）
   const CHAPTERS = [{ ch: 1, name: '地球', e: '🌍', last: 'world' }, { ch: 2, name: '鏡の地球', e: '🪞', last: 'mworld' }, { ch: 3, name: '宇宙', e: '🪐', last: 'blackhole' }];

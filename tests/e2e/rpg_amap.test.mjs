@@ -80,7 +80,7 @@ t('amap_names_only_on_pc', async page => {
   assert.equal(await page.isVisible('#rpg-amap .rpg-am-name >> nth=0'), false);
 }, { viewport: PC });
 
-// ---- 章タブ（🌍地球・🪞鏡の地球） ----
+// ---- 章タブ（🌍地球・🪞鏡の地球・🪐宇宙） ----
 const EARTH = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];
 const MIRROR = ['msamerica', 'moceania', 'mnamerica', 'meurope', 'masia', 'mafrica', 'mworld'];
 const EARTH_CLEARED = Object.fromEntries(EARTH.map(id => [id, 5]));
@@ -91,13 +91,13 @@ const mirror = page => page.$eval('#rpg-amap svg', s => s.classList.contains('is
 t('chapter_tabs', async page => {
   // 新しいセーブ: 地球が押されていて、鏡の地球は開いていない
   await home(page, saveWith({}));
-  assert.deepEqual(await tabs(page), [['1', 'true', false, false], ['2', 'false', true, true]]);
+  assert.deepEqual(await tabs(page), [['1', 'true', false, false], ['2', 'false', true, true], ['3', 'false', true, true]]);
   assert.deepEqual(await ids(page), EARTH);
   assert.equal(await page.locator('#rpg-dgs .rpg-plate').count(), 7);
   assert.equal(await mirror(page), false);
   // 地図喰いを倒したセーブ: 開いた直後は次に挑むフロアの章（鏡のアマゾン F1）
   await home(page, saveWith({ lv: 30, floors: EARTH_CLEARED, story: ['ch1'] }));
-  assert.deepEqual(await tabs(page), [['1', 'false', false, false], ['2', 'true', false, false]]);
+  assert.deepEqual(await tabs(page), [['1', 'false', false, false], ['2', 'true', false, false], ['3', 'false', true, true]]);
   assert.equal(await mirror(page), true);
   assert.deepEqual(await ids(page), MIRROR);
   assert.deepEqual((await nodes(page))[0], ['msamerica', 'is-open', true, true]);
@@ -107,7 +107,7 @@ t('chapter_tabs', async page => {
   assert.equal(await page.locator('#rpg-amap .rpg-am-road').count(), 6);
   // 地球のタブ: 地球の7つ（全部クリア）、図版は最後の地図喰いの巣
   await page.click('#rpg-chtabs button[data-ch="1"]');
-  assert.deepEqual(await tabs(page), [['1', 'true', false, false], ['2', 'false', false, false]]);
+  assert.deepEqual(await tabs(page), [['1', 'true', false, false], ['2', 'false', false, false], ['3', 'false', true, true]]);
   assert.equal(await mirror(page), false);
   assert.deepEqual(await ids(page), EARTH);
   assert.match(await page.innerText('#rpg-amap .rpg-amap-h'), /ダンジョン 7\/7・フロア 35\/35/);
@@ -121,4 +121,37 @@ t('chapter_tabs', async page => {
   await page.click('#rpg-chtabs button[data-ch="1"]');
   await page.evaluate(() => { show('home'); show('rpg'); });
   assert.equal(await mirror(page), true);
+});
+
+// ---- 宇宙（第3章）: 世界地図のかわりに太陽系。星7つ ----
+const SPACE = ['moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'blackhole'];
+const space = page => page.$eval('#rpg-amap svg', s => s.classList.contains('is-space'));
+t('space_tab_and_map', async page => {
+  // 鏡の地図喰いを倒したセーブ: 宇宙のタブが開いていて、開いた直後は次に挑む月の章
+  const floors = Object.fromEntries([...EARTH, ...MIRROR].map(id => [id, 5]));
+  await home(page, saveWith({ lv: 60, floors, story: ['ch1', 'ch2', 'ch3start'] }));
+  assert.deepEqual(await tabs(page), [['1', 'false', false, false], ['2', 'false', false, false], ['3', 'true', false, false]]);
+  assert.equal(await space(page), true);
+  // 鏡の地球のタブから宇宙のタブを押してもどる
+  await page.click('#rpg-chtabs button[data-ch="2"]');
+  assert.equal(await space(page), false);
+  await page.click('#rpg-chtabs button[data-ch="3"]');
+  assert.equal(await space(page), true);
+  assert.equal(await mirror(page), false);
+  assert.deepEqual(await ids(page), SPACE);
+  assert.equal(await page.locator('#rpg-amap .rpg-am-land, #rpg-amap .rpg-am-r').count(), 0);   // 国の形は描かない
+  assert.deepEqual((await nodes(page))[0], ['moon', 'is-open', true, true]);
+  assert.ok((await nodes(page)).slice(1).every(([, st]) => st === 'is-locked'));
+  assert.match(await page.innerText('#rpg-amap .rpg-amap-h'), /ダンジョン 0\/7・フロア 0\/35/);
+  assert.equal(await page.locator('#rpg-amap .rpg-am-road').count(), 6);
+  assert.equal(await page.locator('#rpg-amap .rpg-am-hero').count(), 1);
+  // 星の絵は月の 🌕（ボスの絵ではない）。開いていない星は 🔒
+  assert.equal(await page.textContent('#rpg-amap .rpg-am-node[data-d="moon"] .rpg-am-e'), '🌕');
+  assert.equal(await page.textContent('#rpg-amap .rpg-am-node[data-d="mars"] .rpg-am-e'), '🔒');
+  // 図版はテーマを1行出す
+  assert.deepEqual(await shown(page), ['moon']);
+  assert.match(await page.innerText('.rpg-plate[data-d="moon"]'), /テーマ: 島国（38か国）/);
+  // 新しいセーブ: 宇宙のタブは押せない
+  await home(page, saveWith({}));
+  assert.deepEqual((await tabs(page))[2], ['3', 'false', true, true]);
 });
