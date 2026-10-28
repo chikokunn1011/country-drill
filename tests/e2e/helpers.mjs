@@ -166,16 +166,135 @@ export function fakeDb() {
     daily_rank_of: ({ p_day, p_correct, p_time_ms }) => ({ rank: dailyRank(p_day, p_correct, p_time_ms) }),
   };
   // calls: 届いた RPC の記録 { name, args, at }（at は届いた時刻 ms）。down を true にすると通信失敗になる
-  return { rows, rpgRows, dailyRows, calls: [], down: false, rpc };
+  const db = { rows, rpgRows, dailyRows, calls: [], down: false, rpc };
+  addAdmin(db);
+  return db;
 }
 
-const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'apikey, content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
+// 管理ページ（admin.html）用: /auth/v1/token と supabase/admin.sql の admin_ 関数のまね。
+// db.admin = { email, password, isAdmin }（isAdmin: false なら、ログインはできても admin_ 関数は 42501 で断る）。
+// 行は rows（scores）・dailyRows・rpgRows をそのまま使い、id が無ければ振る。ゴミ箱は db.trash、操作の記録は db.adminLog。
+// db.tokens: 出した access_token → { admin }。db.expireTokens() で今の合札を全部 401 にできる
+function addAdmin(db) {
+  db.admin = { email: 'admin@example.com', password: 'pass-1234', isAdmin: true };
+  db.tokens = new Map();
+  db.refresh = new Map();
+  db.trash = [];
+  db.adminLog = [];
+  db.expireTokens = () => db.tokens.clear();
+  let nextId = 1, nextTok = 1, nextTrash = 1, nextLog = 1;
+  const KIND = { scores: db.rows, daily: db.dailyRows, rpg: db.rpgRows };
+  const ids = () => { for (const a of Object.values(KIND)) for (const r of a) if (r.id == null) r.id = nextId++; else nextId = Math.max(nextId, r.id + 1); };
+  const out = r => { const { token, ...rest } = r; return structuredClone(rest); };
+  const issue = () => {
+    const access_token = `fake-access-${nextTok}`, refresh_token = `fake-refresh-${nextTok++}`;
+    db.tokens.set(access_token, { admin: db.admin.isAdmin });
+    db.refresh.set(refresh_token, true);
+    return { access_token, refresh_token, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'fake-admin', email: db.admin.email } };
+  };
+  db.auth = (path, query, body) => {
+    if (path.endsWith('/logout')) return [204, null];
+    if (path.endsWith('/health')) return [200, { ok: true }];
+    if (query.get('grant_type') === 'password')
+      return body.email === db.admin.email && body.password === db.admin.password ? [200, issue()] : [400, { error: 'invalid_grant', error_description: 'Invalid login credentials' }];
+    if (query.get('grant_type') === 'refresh_token') {
+      if (!db.refresh.delete(body.refresh_token)) return [400, { error: 'invalid_grant' }];
+      return [200, issue()];
+    }
+    return [404, {}];
+  };
+  const log = (action, kind, detail) => db.adminLog.push({ id: nextLog++, at: new Date().toISOString(), user_id: 'fake-admin', action, kind, detail });
+  const lower = s => String(s ?? '').normalize('NFKC').toLowerCase();
+  const jstDay = (t = Date.now()) => new Date(t + 9 * 3600e3).toISOString().slice(0, 10);
+  const since = (a, t) => a.filter(r => Date.parse(r.created_at) >= t).length;
+  const A = {
+    admin_whoami: () => ({ ok: true, user_id: 'fake-admin' }),
+    admin_stats() {
+      const today = Date.parse(`${jstDay()}T00:00:00+09:00`), week = weekStart();
+      const all = [...db.rows, ...db.dailyRows].map(r => r.created_at).concat(db.rpgRows.flatMap(r => [r.created_at, r.at, r.updated_at])).filter(Boolean).sort();
+      return { ok: true, counts: { scores: db.rows.length, daily: db.dailyRows.length, rpg: db.rpgRows.length },
+        today: { scores: since(db.rows, today), daily: since(db.dailyRows, today), rpg: since(db.rpgRows, today) },
+        week: { scores: since(db.rows, week), daily: since(db.dailyRows, week), rpg: since(db.rpgRows, week) },
+        last_at: all.at(-1) ?? null, recent_log: db.adminLog.slice(-5).reverse() };
+    },
+    admin_list({ p_kind, p_filter }) {
+      ids();
+      const f = p_filter ?? {}, q = lower(f.q), best = f.sort === 'best';
+      const limit = Math.min(Math.max(Number.isFinite(f.limit) ? Math.floor(f.limit) : 100, 1), 500), offset = Math.max(Number.isFinite(f.offset) ? Math.floor(f.offset) : 0, 0);
+      const newer = (a, b) => Date.parse(b.created_at ?? b.at) - Date.parse(a.created_at ?? a.at) || b.id - a.id;
+      let list;
+      if (p_kind === 'trash') list = db.trash.filter(t => !t.restored_at && lower(t.row_data.nickname).includes(q)).sort(newer)
+        .map(t => ({ ...structuredClone(t), row_data: out(t.row_data) }));
+      else if (KIND[p_kind]) {
+        list = KIND[p_kind].filter(r => lower(r.nickname).includes(q));
+        if (p_kind === 'scores') list = list.filter(r => (f.board == null || r.board === f.board) && (f.period !== 'week' || Date.parse(r.created_at) >= weekStart()));
+        if (p_kind === 'daily' && f.day) list = list.filter(r => r.day === f.day);
+        const cmp = { scores: (a, b) => a.time_ms - b.time_ms, daily: (a, b) => b.correct - a.correct || a.time_ms - b.time_ms, rpg: (a, b) => b.lv - a.lv || b.dungeons - a.dungeons || b.floors - a.floors }[p_kind];
+        list = [...list].sort(best ? (a, b) => cmp(a, b) || -newer(a, b) : newer).map(out);
+      } else return { ok: false, reason: 'bad_kind' };
+      return { ok: true, total: list.length, rows: list.slice(offset, offset + limit) };
+    },
+    admin_boards() {
+      const m = new Map(); for (const r of db.rows) m.set(r.board, (m.get(r.board) ?? 0) + 1);
+      return { ok: true, boards: [...m].sort(([a], [b]) => a < b ? -1 : 1).map(([board, n]) => ({ board, n })) };
+    },
+    admin_delete({ p_kind, p_ids }) {
+      ids();
+      const a = KIND[p_kind]; if (!a) return { ok: false, reason: 'bad_kind' };
+      const gone = [];
+      for (let i = a.length - 1; i >= 0; i--) if (p_ids.includes(a[i].id)) gone.push(...a.splice(i, 1));
+      for (const r of gone) db.trash.push({ id: nextTrash++, at: new Date().toISOString(), kind: p_kind, row_data: r, restored_at: null });
+      log('delete', p_kind, { ids: gone.map(r => r.id).sort((x, y) => x - y) });
+      return { ok: true, deleted: gone.length };
+    },
+    admin_restore({ p_trash_ids }) {
+      const want = new Set(p_trash_ids.filter(x => x != null)).size;
+      let ok = 0;
+      for (const t of db.trash.filter(t => p_trash_ids.includes(t.id) && !t.restored_at)) {
+        const a = KIND[t.kind];
+        if (a.some(r => r.id === t.row_data.id)) continue;
+        a.push(t.row_data); t.restored_at = new Date().toISOString(); ok++;
+      }
+      log('restore', null, { trash_ids: p_trash_ids, restored: ok, failed: want - ok });
+      return { ok: true, restored: ok, failed: want - ok };
+    },
+    admin_rename({ p_kind, p_id, p_name }) {
+      ids();
+      const a = KIND[p_kind]; if (!a) return { ok: false, reason: 'bad_kind' };
+      let name = p_name == null ? null : String(p_name).trim();
+      if (name != null && ([...name].length < 1 || [...name].length > 12)) return { ok: false, reason: 'bad_name' };
+      const r = a.find(r => r.id === p_id); if (!r) return { ok: false, reason: 'not_found' };
+      if (name == null) name = `名無しの旅人${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
+      if (p_kind === 'rpg' && a.some(x => x !== r && lower(x.nickname) === lower(name))) return { ok: false, reason: 'name_taken' };
+      const before = r.nickname; r.nickname = name;
+      log('rename', p_kind, { id: p_id, before, after: name });
+      return { ok: true, nickname: name };
+    },
+    admin_log_list({ p_limit, p_offset }) {
+      const l = Math.min(Math.max(p_limit ?? 100, 1), 500), o = Math.max(p_offset ?? 0, 0);
+      return { ok: true, total: db.adminLog.length, rows: db.adminLog.slice().reverse().slice(o, o + l) };
+    },
+  };
+  db.adminRpc = A;
+}
+
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'apikey, content-type, authorization', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
+const json = (route, status, body) => route.fulfill({ status, headers: CORS, contentType: 'application/json', body: body == null ? '' : JSON.stringify(body) });
 async function supabaseRoute(route, db) {
   if (db.down) return route.abort();
   const req = route.request();
   if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS });
-  const name = new URL(req.url()).pathname.split('/').pop(), args = req.postDataJSON() ?? {};
+  const u = new URL(req.url()), name = u.pathname.split('/').pop();
+  let args; try { args = req.postDataJSON() ?? {}; } catch { args = {}; }
   db.calls.push({ name, args, at: Date.now() });
+  if (u.pathname.startsWith('/auth/v1/')) { const [st, body] = db.auth(u.pathname, u.searchParams, args); return json(route, st, body); }
+  // admin_ 関数: 合札が無い・古い → 401、管理者でない → 403 の 42501（本物の PostgREST と同じ形）
+  if (Object.hasOwn(db.adminRpc, name)) {
+    const tok = db.tokens.get((req.headers().authorization ?? '').replace(/^Bearer /, ''));
+    if (!tok) return json(route, 401, { code: 'PGRST301', message: 'JWT expired' });
+    if (!tok.admin) return json(route, 403, { code: '42501', message: 'admin only' });
+    return json(route, 200, await db.adminRpc[name](args));   // テストが返事を遅らせられるように await
+  }
   const fn = Object.hasOwn(db.rpc, name) ? db.rpc[name] : null;
   // 本物（PostgREST）は int の引数に小数が来ると 400 で断るので、それもまねる
   const badInt = ['p_time_ms', 'p_questions', 'p_lv', 'p_dungeons', 'p_floors', 'p_correct', 'p_total', 'p_tower'].some(k => k in args && !Number.isInteger(args[k]));
@@ -190,7 +309,8 @@ async function supabaseRoute(route, db) {
 // init: 読み込むたびにページのスクリプトより前に走らせる関数か文字列（context.addInitScript に渡す）
 // 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字、
 // consoleErrors は console.error の文字（再読み込みをまたいで積む）
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init } = {}) {
+// path: url からの相対で開くページ（'admin.html' など。省略時は url そのもの＝index.html）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
   const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
@@ -220,7 +340,7 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (m.type() === 'warning') warnings.push(m.text());
     if (m.type() === 'error') consoleErrors.push(m.text());
   });
-  await page.goto(url);
+  await page.goto(new URL(path, url).href);
   return { page, context, db, errors, warnings, consoleErrors, close: () => context.close() };
 }
 

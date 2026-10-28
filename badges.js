@@ -526,6 +526,8 @@
   const kinds = { C: typeof C, byA: typeof byA, REGIONS: typeof REGIONS, flag: typeof flag, esc: typeof esc, fmt: typeof fmt, $: typeof $,
     store: typeof store, S: typeof S, P: typeof P, FX: typeof FX, show: typeof show, registerScreen: typeof registerScreen, emit: typeof emit, toast: typeof toast };
   const lacking = Object.keys(kinds).filter(k => kinds[k] === 'undefined');
+  // 全部無いなら本編ではないページ（admin.html は BADGES_CORE だけ使う）なので黙って終わる。一部だけ無いなら本編が壊れているので知らせる
+  if (lacking.length === Object.keys(kinds).length) return;
   if (lacking.length) { console.error('[badges] 見つからない: ' + lacking.join(' ')); return; }
 
   const X = makeX(C), CAT = makeCatalog(C);

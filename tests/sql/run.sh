@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# supabase/schema.sql を使い捨ての PostgreSQL 16 に流して、tests/sql/test_schema.sql を実行する
+# supabase/schema.sql と supabase/admin.sql を使い捨ての PostgreSQL 16 に流して、tests/sql/test_schema.sql・test_admin.sql を実行する
 # 使い方: bash tests/sql/run.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -39,4 +39,50 @@ SQL
 # 2回流しても壊れないことも確認する
 sql -f supabase/schema.sql
 sql -f supabase/schema.sql
+# Supabase の auth.uid() の代わり（ログインした人の id。admin.sql には書かない）
+sql <<'SQL'
+create schema if not exists auth;
+create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+SQL
+sql -f supabase/admin.sql
+sql -f supabase/admin.sql
 sql -f tests/sql/test_schema.sql
+sql -f tests/sql/test_admin.sql
+
+# 2つの接続を使うテスト（psql 1本ではできない）
+echo '- admin_rename_rpg_takes_name_lock_before_row_lock'
+# 本編の rpg_rename は「名前の鍵 → 行の鍵」の順。admin_rename も同じ順でないと、同時に同じ名前にしたとき deadlock になる。
+# P が名前の鍵を持っているあいだに admin_rename を呼び、admin_rename が待っているあいだに P が行の鍵を（待たずに）取れることを確かめる
+sql <<'SQL'
+truncate rpg_players;
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x71', 'locktest', 5, 1, 5);
+SQL
+sql >"$TMP/p.out" 2>&1 <<'SQL' &
+begin;
+select pg_advisory_xact_lock(hashtext('rpgname:neko'));
+do $$ begin
+  for i in 1..200 loop
+    exit when exists (select 1 from pg_locks where locktype = 'advisory' and not granted);
+    perform pg_sleep(0.05);
+  end loop;
+end $$;
+select 'row-lock:' || id from rpg_players where nickname = 'locktest' for update nowait;
+commit;
+SQL
+P=$!
+sql -t -A >"$TMP/a.out" 2>&1 <<'SQL'
+select id as rid from rpg_players where nickname = 'locktest' \gset
+do $$ begin
+  for i in 1..200 loop
+    exit when exists (select 1 from pg_locks where locktype = 'advisory' and granted and pid <> pg_backend_pid());
+    perform pg_sleep(0.05);
+  end loop;
+end $$;
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select admin_rename('rpg', :rid, 'Neko');
+SQL
+if ! wait "$P" || ! grep -q 'row-lock:' "$TMP/p.out"; then
+  echo "FAIL: admin_rename('rpg') が名前の鍵より先に行の鍵を取っている"; cat "$TMP/p.out"; exit 1
+fi
+grep -q '"ok": true' "$TMP/a.out" || { echo "FAIL: admin_rename の結果"; cat "$TMP/a.out"; exit 1; }
+echo 'ok'
