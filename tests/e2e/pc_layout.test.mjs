@@ -165,7 +165,7 @@ test('rside_contents', { timeout: 120_000 }, async () => {
     assert.equal(await page.evaluate(() => $('r-side').children.length === 1 && $('r-ext').childNodes.length === 0), true); // ノーミスなら中身は空の #r-ext だけ（右列は出ない）
   }, { blockScripts: RPG_FILES });
   await scene('ta_result', async (page, count) => {
-    assert.equal(await count('#r-side .tabox #ta-form'), 1);
+    assert.equal(await count('#r-side .tabox #ta-post .pf-post form'), 1);   // プロフィールが無いので「載せる」箱は名前の入力
     assert.equal(await count('#r-side #ta-rank'), 0); // 順位相当はスマホの並びを変えないため .stats のまま
     assert.equal(await count('.result .stats #ta-rank'), 1);
   });

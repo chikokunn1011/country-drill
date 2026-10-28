@@ -129,9 +129,13 @@ export const SCENES = {
     await page.waitForFunction(() => document.getElementById('ta-rank').textContent !== '');
   },
   ranking: async page => {
+    // 記録はプロフィールで載せる（1人ずつ別の合言葉でプロフィールを作ってから submit_score2。この端末の profile は作らない）
     await page.evaluate(async () => {
-      for (const [nickname, timeMs] of [['チコ', 8000], ['たろう', 9100], ['ながいなまえのひとですよ', 12000]])
-        await RANKING.submit({ board: 'f2n:all:10', nickname, timeMs, questions: 10 });
+      for (const [i, [nickname, timeMs]] of [['チコ', 8000], ['たろう', 9100], ['ながいなまえのひとですよ', 12000]].entries()) {
+        const token = `tok-rank-${i}`;
+        await RANKING.profileCreate({ token, nickname });
+        await RANKING.submit2({ token, board: 'f2n:all:10', timeMs, questions: 10 });
+      }
     });
     await page.click('#home-rank');
     await page.waitForFunction(() => document.querySelectorAll('#rk-list li').length === 3);
