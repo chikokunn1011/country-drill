@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, recordEvents, events } from './helpers.mjs';
+import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -53,4 +53,161 @@ t('ranking_without_tap', async page => {
   assert.ok(ks.length >= 4 && !ks.includes('tap'), ks.join());
   assert.equal(await page.evaluate(() => boardConds('tap:all:10')), null);
   assert.notEqual(await page.evaluate(() => boardConds('f2n:all:10')), null);
+});
+
+/* ---------- 出題と判定（Task 3） ---------- */
+// 練習・白地図タップ・全世界・5問で始めて、問題が出るまで待つ
+async function startTap(page, { region = 'all', named = false } = {}) {
+  await pickSetup(page, { mode: 'tap', kind: 'practice', region, count: 5 });
+  if (named) await page.check('#nameopt');
+  await page.click('#start');
+  await settle(page);
+}
+// a の国を今の問題にする
+const force = (page, a) => page.evaluate(a => { G.queue.unshift(byA.get(a)); nextQuestion(); }, a);
+// 国 a の丸印の画面の中心
+const dotAt = async (page, a) => {
+  const b = await page.locator(`#qcard .tapmap circle.dot[data-a="${a}"]`).boundingBox();
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+};
+const answers = page => events(page, 'drill:answer');
+// 地図の上の点 (x, y) でホイールを回して拡大する（d3.zoom は 2^(-deltaY × 0.002) 倍。点の位置は動かない）
+const wheelZoom = async (page, { x, y }, k) => {
+  await page.mouse.move(x, y);
+  await page.mouse.wheel(0, -Math.log2(k) / 0.002);
+  await page.waitForFunction(k => Math.abs(d3.zoomTransform(document.querySelector('#qcard .tapmap')).k - k) < 0.01, k);
+};
+
+t('tap_right_and_wrong', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  assert.equal(await page.locator('#qcard .choices').count(), 0);
+  assert.equal(await page.locator('#qcard .tapbox svg.tapmap').count(), 1);
+  await answerTap(page);
+  await page.locator('#qcard .verdict.ok').waitFor();
+  const [a1] = await answers(page);
+  assert.equal(a1.mode, 'tap'); assert.equal(a1.right, true);
+  assert.equal(await page.locator('#qcard .reveal .map').count(), 0, '答えのあとの小さい地図は出さない');
+  await page.click('#next');
+  await answerTap(page, { right: false });
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.equal((await answers(page))[1].right, false);
+  assert.equal(await page.evaluate(() => misses[G.cur.c.a]), 1);
+});
+
+t('small_country_near_px', async page => {
+  await startTap(page);
+  await force(page, 'sg');
+  let d = await dotAt(page, 'sg');
+  await page.mouse.click(d.x + 10, d.y);
+  assert.equal(await page.evaluate(() => [G.answered, document.querySelector('#qcard .verdict')?.className]).then(([a, c]) => a && c), 'verdict ok');
+  await force(page, 'sg');
+  d = await dotAt(page, 'sg');
+  await page.mouse.click(d.x + 16, d.y);
+  assert.ok(await page.locator('#qcard .verdict.ng').isVisible());
+  // 拡大しても画面の上で 12px（地図の上では狭くなる）
+  await force(page, 'sg');
+  d = await dotAt(page, 'sg');
+  await wheelZoom(page, d, 2.56);
+  d = await dotAt(page, 'sg');
+  await page.mouse.click(d.x + 10, d.y);
+  assert.ok(await page.locator('#qcard .verdict.ok').isVisible());
+  await force(page, 'sg');
+  d = await dotAt(page, 'sg');
+  await wheelZoom(page, d, 2.56);
+  d = await dotAt(page, 'sg');
+  await page.mouse.click(d.x + 16, d.y);
+  assert.ok(await page.locator('#qcard .verdict.ng').isVisible());
+});
+
+t('drag_does_not_answer', async page => {
+  await startTap(page);
+  const b = await page.locator('#qcard .tapmap').boundingBox(), mid = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  await wheelZoom(page, mid, 2);   // 拡大していないと動かせない（translateExtent が地図の大きさ）
+  const x0 = await page.evaluate(() => d3.zoomTransform(document.querySelector('#qcard .tapmap')).x);
+  await page.mouse.move(mid.x, mid.y);
+  await page.mouse.down();
+  await page.mouse.move(mid.x + 40, mid.y, { steps: 5 });
+  await page.mouse.up();
+  assert.equal(await page.evaluate(() => G.answered), false);
+  assert.notEqual(await page.evaluate(() => d3.zoomTransform(document.querySelector('#qcard .tapmap')).x), x0);
+});
+
+t('tap_outside_globe', async page => {
+  await startTap(page);
+  assert.equal(await page.evaluate(() => tapJudge(G.cur.c, [-5000, -5000], 0)), false);
+  assert.equal(await page.evaluate(() => tapLonLat([-5000, -5000])), null);
+  // 全世界の地図の左上の角（地球の外。角は丸いので少し内側）
+  assert.equal(await page.evaluate(() => tapLonLat([30, 30])), null);
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  const b = await page.locator('#qcard .tapmap').boundingBox(), k = b.width / 640;
+  await page.mouse.click(b.x + 30 * k, b.y + 30 * k);
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.equal(await page.locator('#qcard .tapkm').count(), 0);
+});
+
+t('tap_after_answer_ignored', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  const p = await page.evaluate(tapPoint, false);
+  await page.mouse.click(p.x, p.y);
+  await page.locator('#qcard .verdict.ng').waitFor();
+  const marks = () => page.evaluate(() => document.querySelectorAll('#qcard .tapx, #qcard .ngc, #qcard .tapline').length);
+  const n = await marks();
+  await page.mouse.click(p.x, p.y);
+  await page.mouse.dblclick(p.x, p.y);
+  assert.equal((await answers(page)).length, 1);
+  assert.equal(await marks(), n);
+});
+
+t('quick_guard', async page => {
+  await recordEvents(page);
+  await page.evaluate(() => { S.quick = true; });
+  await pickSetup(page, { mode: 'tap', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  // 出した直後（TA_GUARD_MS の間）に正解の所を押しても答えにならない
+  const answered = await page.evaluate(`(() => {
+    G.queue.unshift(G.cur.c); nextQuestion();
+    const { x, y } = (${tapPoint})(true);
+    document.elementFromPoint(x, y).dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: x, clientY: y }));
+    return G.answered;
+  })()`);
+  assert.equal(answered, false);
+  assert.equal((await answers(page)).length, 0);
+  await answerTap(page);
+  await page.waitForFunction(() => window.__ev.some(e => e.type === 'drill:answer'));
+  assert.equal((await answers(page))[0].right, true);
+});
+
+t('no_unreachable_country', async page => {
+  const bad = await page.evaluate(() => {
+    const out = [], host = document.createElement('div');
+    host.style.cssText = 'position:absolute;left:0;top:0;width:640px';
+    document.body.append(host);
+    for (const r of ['all', ...REGIONS, ...Object.keys(SUBREGIONS)]) {
+      const box = tapMap(C[0], r); host.replaceChildren(box);
+      for (const c of poolFor(r)) {
+        const ok = [...box.querySelectorAll(`[data-a="${c.a}"]`)].some(el => {
+          const b = el.getBBox();
+          return (b.width > 0 || b.height > 0) && b.x <= 640 && b.y <= 360 && b.x + b.width >= 0 && b.y + b.height >= 0;
+        });
+        if (!ok) out.push(`${r}:${c.a}`);
+      }
+    }
+    host.remove();
+    return out;
+  });
+  assert.deepEqual(bad, []);
+});
+
+t('quiz_only_flag_name_place', async page => {
+  await startTap(page);
+  const q = () => page.evaluate(() => ({ text: document.querySelector('#qcard .qmain').innerText, flag: !!document.querySelector('#qcard .qmain img.qflag'), n: G.cur.c.n }));
+  let v = await q();
+  assert.ok(v.flag); assert.ok(!v.text.includes('首都'), v.text); assert.ok(!v.text.includes(v.n), '国名表示なしでは国名を出さない');
+  await page.click('#quit');
+  await startTap(page, { named: true });
+  v = await q();
+  assert.ok(v.flag); assert.ok(!v.text.includes('首都'), v.text); assert.ok(v.text.includes(v.n), '国名表示ありでは国名も出す');
 });

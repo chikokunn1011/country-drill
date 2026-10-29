@@ -506,8 +506,8 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
 
 // タイムアタック・今日の難問と、設定「正解したらすぐ次の問題へ」の練習・挑戦は、問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
 // （quick・timed が無い変更前のコードではタイムアタックだけ）。タイムアタック・今日の難問は1問目の前に国旗を読む「じゅんび中」があり、
-// そのあいだ G.cur は null なので、まず問題が出る（G.cur があって #qcard .choices がある）まで待つ
-export const settle = page => page.waitForFunction(() => G?.cur && document.querySelector('#qcard .choices')
+// そのあいだ G.cur は null なので、まず問題が出る（G.cur があって #qcard .choices か白地図タップの #qcard .tapbox がある）まで待つ
+export const settle = page => page.waitForFunction(() => G?.cur && document.querySelector('#qcard .choices, #qcard .tapbox')
   && (!(typeof quick === 'function' ? quick() : typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS));
 // 結果画面も出した直後（TA_GUARD_MS の間）は結果のボタンを押せない。その間が過ぎるまで待つ
 // （resultAt が無い変更前のコードでは待たない。GEOM_BASE の比較で clearTimeAttack を古いコードにも使うため）
@@ -523,6 +523,38 @@ export async function answerWrong(page) {
   await settle(page);
   const a = await page.evaluate(() => G.cur.c.a);
   await page.locator(`.choice:not([data-a="${a}"])`).first().click();
+}
+
+// 白地図タップ（mode: 'tap'）の地図で、正解（right）か外れの点の画面の座標 { x, y }。ページの中で動かす（page.evaluate(tapPoint, right)）。
+// 正解は国の中の点（c.ll、国の形の重心、国の範囲の格子の点の順。丸印の国は丸印のまわり）、外れはその地域の国の ll を c.ll から遠い順に。
+// どれも、その点で押せるもの（ズームのボタンなどが上に無い）を選ぶ
+export const tapPoint = right => {
+  const c = G.cur.c, proj = G.cur.proj, ll = x => [x.ll[1], x.ll[0]], svg = document.querySelector('#qcard .tapmap');
+  const m = svg.querySelector('.layer').getScreenCTM(), r = TAP.nearPx * W / svg.getBoundingClientRect().width / d3.zoomTransform(svg).k;
+  const screen = ([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f });
+  const free = p => { const { x, y } = screen(p), el = document.elementFromPoint(x, y); return !!el && svg.contains(el); };
+  let pts;
+  if (right) {
+    const f = featOf(c), q = proj(ll(c));
+    pts = [q, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => [q[0] + r / 2 * Math.cos(i * Math.PI / 4), q[1] + r / 2 * Math.sin(i * Math.PI / 4)])];
+    if (f) {
+      pts.push(proj(d3.geoCentroid(f)));
+      const [[x0, y0], [x1, y1]] = d3.geoPath(proj).bounds(f);
+      for (let i = 1; i < 16; i++) for (let j = 1; j < 16; j++) pts.push([x0 + (x1 - x0) * i / 16, y0 + (y1 - y0) * j / 16]);
+    }
+    pts = pts.filter(p => p && tapJudge(c, p, r / 2));
+  } else {
+    const far = poolFor(G.region).filter(x => x !== c).sort((a, b) => d3.geoDistance(ll(b), ll(c)) - d3.geoDistance(ll(a), ll(c)));
+    pts = far.map(x => proj(ll(x))).filter(p => p && !tapJudge(c, p, r * 2));
+  }
+  return screen(pts.find(free) ?? pts[0]);
+};
+// いまの白地図タップの問題に、正解（right）か外れの所をタップして答える
+export async function answerTap(page, { right = true } = {}) {
+  await settle(page);
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  const { x, y } = await page.evaluate(tapPoint, right);
+  await page.mouse.click(x, y);
 }
 
 // タイムアタックを最後までノーミスで解いて結果画面まで進める。opts は pickSetup と同じ（省略時は 国旗→国名・全世界・5問）
