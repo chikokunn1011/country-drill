@@ -181,6 +181,14 @@ t('quit_toast_caps_joined', async page => {
 t('coins_split_by_reason', async page => {
   await writeSave(page, saveWith({ wk: { cl: 1 }, bounty: { d: localToday(), a: ['cl', 'br', 'jp'], done: [] } }));
   await startPractice(page);
+  // 手配書の br・jp がたまたま出題されると bounty が 60 になるので、出題からほかの国に差しかえておく
+  await page.evaluate(() => {
+    const out = ['cl', 'br', 'jp'], used = new Set(G.set.map(c => c.a));
+    const spare = [...byA.values()].filter(c => !out.includes(c.a) && !used.has(c.a));
+    const to = new Map(G.set.filter(c => out.includes(c.a)).map(c => [c, spare.pop()]));
+    const swap = c => to.get(c) ?? c;
+    G.set = G.set.map(swap); G.queue = G.queue.map(swap);
+  });
   await forceNext(page, 'cl');
   await answerCorrect(page);
   await page.click('#next');
