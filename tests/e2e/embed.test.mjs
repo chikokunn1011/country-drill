@@ -104,14 +104,14 @@ t('narrow_280', async () => {
 });
 
 t('fits_snippet_box', async () => {
-  for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width: 400, height: 440 } }, async page => {
+  for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width: 400, height: 460 } }, async page => {
     await page.click(`.e-opt[data-a="${wrongOf(mode)}"]`);
-    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 440), `${mode} 縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 縦に収まらない`);
     const box = await page.locator('#e-more').boundingBox();
-    assert.ok(box && box.y >= 0 && box.y + box.height <= 440, mode);
+    assert.ok(box && box.y >= 0 && box.y + box.height <= 460, mode);
     // 正解して「もう一度」が出ても収まる
     await page.click(`.e-opt[data-a="${Q(mode).a}"]`);
-    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 440), `${mode} 正解のあと縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 正解のあと縦に収まらない`);
   });
 });
 

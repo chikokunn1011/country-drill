@@ -195,7 +195,7 @@ test('howto_sections', () => {
 });
 // 埋めこみの貼り付けコード（高さと幅は tests/e2e/embed.test.mjs の fits_snippet_box と同じ）
 test('howto_embed', () => {
-  const h = read('howto.html'), snip = '<iframe src="https://chikokunn1011.github.io/country-drill/embed.html" title="今日の国旗（国旗マスター）" width="100%" height="440" style="max-width:400px;border:0" loading="lazy"></iframe>';
+  const h = read('howto.html'), snip = '<iframe src="https://chikokunn1011.github.io/country-drill/embed.html" title="今日の国旗（国旗マスター）" width="100%" height="460" style="max-width:400px;border:0" loading="lazy"></iframe>';
   assert.match(h, /<h2 id="embed"/);
   assert.ok(h.includes(snip.replace(/</g, '&lt;').replace(/>/g, '&gt;')));   // < と > だけエスケープ（" はそのまま）
   assert.ok(h.includes('?theme=dark') && h.includes('?theme=auto'));

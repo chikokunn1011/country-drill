@@ -54,10 +54,11 @@
         b.classList.add('ok');
         for (const x of buttons) x.disabled = true;
         msg.textContent = 'せいかい！'; msg.className = 'ok';
-        again.hidden = false;
+        again.hidden = false; again.focus();   // キーボードで答えた人のフォーカスを body に落とさない
       } else {
         b.classList.add('ng'); b.disabled = true;
         msg.textContent = 'ちがうよ。もう一度えらんでね'; msg.className = 'ng';
+        buttons.find(x => !x.disabled)?.focus();
       }
       links.hidden = false;
     }
