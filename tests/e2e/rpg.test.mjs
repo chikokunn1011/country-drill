@@ -4,7 +4,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, events } from './helpers.mjs';
+import { startServer, pickSetup, answerCorrect, answerWrong, clearTimeAttack, clearByAnswering, events, settle } from './helpers.mjs';
 import { RPG_FILES, openRpg, toastTexts, readSave, writeSave, saveWith, localToday, playPractice, forceNext, startBattle, winBattle } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -106,6 +106,7 @@ t('pcoin_counts', async page => {
 t('pcoin_no_layout_shift', async page => {
   const tops = async () => {
     await startTa(page);
+    await settle(page);   // 1問目の前の「じゅんび中」が終わるまで（1〜5問目の位置をくらべる）
     const ys = [];
     for (let i = 0; i < 5; i++) {
       await frames(page); // #pcoin は答えの次のフレームで描き直す

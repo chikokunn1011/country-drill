@@ -49,6 +49,7 @@ t('ta_no_names_in_choices', async page => {
   await page.click('#quit');
   await pickSetup(page, { kind: 'ta' });
   await page.click('#start');
+  await settle(page);   // 1問目の前の「じゅんび中」が終わるまで
   assert.equal(await page.evaluate(() => P.name), true);
   assert.equal(await page.locator('.choice').count(), 4);
   assert.equal(await page.locator('.cname').count(), 0);
@@ -97,6 +98,7 @@ t('ta_fail_flow', async page => {
   await page.click('#next');
   assert.equal(await text(page, '#pnum'), '1 / 5');
   assert.equal(await page.locator('.reveal').count(), 0);
+  await settle(page);   // 1問目の前の「じゅんび中」が終わるまで
   assert.equal(await page.evaluate(() => G.failed), false);
   assert.ok(await page.evaluate(() => G.t0) > t0);
 });
@@ -118,6 +120,7 @@ t('enter_key_on_fail_screen', async page => {
   const t0 = await page.evaluate(() => G.t0);
   await page.keyboard.press('Enter'); // 「もう一回」にフォーカスがある状態
   assert.equal(await text(page, '#pnum'), '1 / 5');
+  await settle(page);   // 1問目の前の「じゅんび中」が終わるまで
   assert.equal(await page.evaluate(() => G.failed), false);
   assert.ok(await page.evaluate(() => G.t0) > t0);
 

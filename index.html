@@ -1017,7 +1017,29 @@ const timed = () => G.kind === 'ta' || G.kind === 'daily';
 // 正解したら答えを出さずにすぐ次へ進むか。タイムアタック・今日の難問はいつも、練習・挑戦は設定「正解したらすぐ次の問題へ」（S.quick）のとき
 const quick = () => timed() || !!S.quick;
 const QUIT_LABEL = 'やめてモード選択へ';
-function startGame() {
+const PRELOAD_MS = 10000;   // 国旗の先読みを待つのはここまで（こえたら待つのをやめて始める）
+// 国旗をまとめて読む。全部が読み終わる（読めなかったものもふくむ）か ms たったら resolve する（reject しない）
+function preloadFlags(codes, ms = PRELOAD_MS) {
+  const list = [...new Set(codes)];
+  return new Promise(ok => {
+    let left = list.length;
+    if (!left) return ok();
+    const timer = setTimeout(ok, ms);
+    const one = () => { if (--left === 0) { clearTimeout(timer); ok(); } };
+    for (const a of list) { const img = new Image(); img.onload = img.onerror = one; img.src = flag(a); }
+  });
+}
+// タイムアタック・今日の難問は、国旗を読み終えてから1問目を出す（待った時間をタイムに入れない）。そのあいだは「じゅんび中…」で G.cur は null。
+// 待つあいだにやめた・別のゲームを始めたら（G !== g か g.ended）何もしない
+async function prepThenStart(codes) {
+  const g = G, box = $('qcard');
+  box.className = 'qcard'; box.innerHTML = '<p class="qlabel prep" role="status">じゅんび中…</p>';
+  updateProgress();   // 上の進み具合は新しいゲームの1問目のものにしておく（［もう一回］で前のゲームの数字が残らないように）
+  await preloadFlags(codes);
+  if (G !== g || g.ended) return;
+  nextQuestion();
+}
+async function startGame() {
   if (G && !G.ended) endGame('quit');
   $('quit').textContent = QUIT_LABEL;
   const pool = poolFor(S.region);
@@ -1031,11 +1053,13 @@ function startGame() {
   emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: S.region, n: set.length, hint: G.hint });
   $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
+  // タイムアタック: 国名→国旗・場所→国旗は選択肢が世界中から出るので195か国、ほかは出る国だけ
+  if (G.kind === 'ta') return prepThenStart(G.mode.a === 'flag' ? C.map(c => c.a) : set.map(c => c.a));
   nextQuestion();
 }
 // 今日の難問（daily.js が DAILY_CORE.build で作った [{ mode, a, opts }]）を遊ぶ。全員同じ問題なので、形式・選択肢・並びはそのまま使う。
 // 地図は全世界、国名表示なし、苦手の記録・drill:* のイベント（バッジ・冒険のコイン）には入れない。進み具合は drill:daily で daily.js に知らせる
-function startDaily(qs, sid) {
+async function startDaily(qs, sid) {
   if (G && !G.ended) endGame('quit');
   const set = qs.map(q => byA.get(q.a));
   G = { mode: modeOf(qs[0].mode), kind: 'daily', region: 'all', daily: qs, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0, endMs: 0, hint: false };
@@ -1043,7 +1067,7 @@ function startDaily(qs, sid) {
   $('ptime').textContent = RANKING.formatTime(0);
   $('quit').textContent = 'やめる（今日の挑戦はここまで）';
   show('quiz');
-  nextQuestion();
+  return prepThenStart(qs.flatMap(q => [q.a, ...q.opts]));
 }
 // region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）
 function makeQuestion(c, region) {
@@ -1092,6 +1116,8 @@ function nextQuestion() {
   G.shownAt = performance.now();
   updateProgress();
   if (timed() && G.done === 0) startTimer();
+  // 練習・挑戦は、次の問題の国旗だけうしろで先に読んでおく（待たない。選択肢はまだ決まっていないので読まない）
+  if (!timed() && G.queue.length) preloadFlags([G.queue[0].a]);
 }
 // タイムアタックの計測は1問目を出した瞬間から。クリア・失格・クイズ画面を離れたら表示の更新をやめる
 function startTimer() {
@@ -1339,6 +1365,7 @@ function taResult(board, timeMs, questions) {
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
+  if (!G?.cur) return;   // 「じゅんび中」（1問目の前に国旗を読んでいるあいだ）
   // すぐ次へ進むときは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
   if (/^[1-4]$/.test(e.key) && !(e.repeat && quick())) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();

@@ -301,6 +301,8 @@
     clearTop(box);   // 答え合わせのあとで下までスクロールしていても、問いの文が上の列の下に隠れない
     box.scrollIntoView({ block: 'nearest' });
     B.shownAt = performance.now();
+    // 次の問題の国旗だけうしろで先に読んでおく（待たない。ボスは旗の順が答えで変わるので読まない）
+    if (!B.boss && B.queue[0] && typeof preloadFlags === 'function') preloadFlags([B.queue[0].a]);
   };
 
   // ---- 答える ----
@@ -762,6 +764,8 @@
       // 塔: いまの階・HP・最大 HP・この回で勝った階（塔でなければ null）。similar はいまの問題が似た旗の4択か
       tower: B && B.tower ? { f: B.floor, hp: B.hp, maxHp: B.tower.maxHp, cleared: B.tower.cleared } : null,
       similar: !!(B && B.similar),
+      // 次の問題の国（先に国旗を読んでおく国。ボス・まだ決まっていないときは null）
+      next: B && !B.boss && B.queue?.[0] ? B.queue[0].a : null,
     }),
     // 英雄の塔を1階から（地図喰いを倒していなければ false）
     startTower: () => tryTower(1, null, 0, true),

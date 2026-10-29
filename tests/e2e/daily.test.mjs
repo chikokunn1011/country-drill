@@ -19,7 +19,8 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 60_000 }, async () => {
 const text = (page, sel) => page.locator(sel).innerText();
 const rec = page => page.evaluate(() => JSON.parse(localStorage.getItem('daily')));
 const today = page => page.evaluate(() => DAILY.today());
-const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); };
+// 1問目の前に国旗を読む「じゅんび中」があるので、問題が出る（G.cur が入る）まで待つ
+const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); await page.waitForFunction(() => G?.cur); };
 // プロフィールが無い人の「載せる」箱: 名前を入れて［プロフィールを作って載せる］
 const createAndPost = async (page, name) => { await page.fill('#dl-post input', name); await page.click('#dl-post form button'); };
 // 偽DB と localStorage にプロフィール（チコ）を入れて開き直す
