@@ -47,11 +47,14 @@
   }
   const family = () => getComputedStyle(document.body).getPropertyValue('--font-display').trim() || 'sans-serif';
   // 丸ゴシックを読み終えるのを最大 FONT_MS 待つ。読めなければ予備のフォントで描く
-  function waitFont() {
+  // 日本語は文字ごとに分けて配られるので、カードに描く文字を渡して 900 と 700 の両方を読ませる
+  function waitFont(d) {
     try {
-      const p = document.fonts?.load?.('900 80px "Zen Maru Gothic"');
-      if (!p) return Promise.resolve();
-      return Promise.race([Promise.resolve(p).catch(() => {}), new Promise(ok => setTimeout(ok, FONT_MS))]);
+      const fonts = document.fonts;
+      if (!fonts?.load) return Promise.resolve();
+      const txt = Object.values(d || {}).filter(v => typeof v === 'string' || typeof v === 'number').join('') + '国旗マスター' + SHARE.tag + SHARE.url;
+      const p = Promise.all(['900 80px', '700 28px'].map(w => Promise.resolve(fonts.load(`${w} "Zen Maru Gothic"`, txt)).catch(() => {})));
+      return Promise.race([p, new Promise(ok => setTimeout(ok, FONT_MS))]);
     } catch { return Promise.resolve(); }
   }
   // 国旗の svg を文字で読み、大きさを書き足して画像にする（Firefox は大きさの無い svg を canvas に描けない）。
@@ -148,7 +151,7 @@
     btn.onclick = () => share(d, file);
     const live = () => btn.isConnected && gen.get(btn) === id;
     (async () => {
-      await waitFont();
+      await waitFont(d);
       if (!live()) return;
       const cv = await draw(d, L, colors());
       if (!live()) return;
