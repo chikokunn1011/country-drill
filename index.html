@@ -852,6 +852,7 @@ function tapMap(c, region) {
     const p = d3.pointer(e, layer), r = TAP.nearPx * W / s.getBoundingClientRect().width / d3.zoomTransform(s).k;
     const at = e.target.closest('[data-a]')?.dataset.a ?? '', right = at === c.a || tapJudge(c, p, r);
     if (!right) tapMiss(c, p, at);
+    else for (const el of layer.querySelectorAll(`[data-a="${c.a}"]`)) el.classList.add('on');   // 正解でも本当の場所を見せる（となりの国の近くで正解になったとき用）
     answer(at, right);
   });
   return box;
@@ -1773,7 +1774,7 @@ addEventListener('load', () => loadMap().catch(() => {}));
 <script src="rpg-battle.js?v=16"></script>
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
-<script src="badges.js?v=10"></script>
+<script src="badges.js?v=11"></script>
 <script src="share-card.js?v=1"></script>
 <script src="daily.js?v=5"></script>
 <script src="streak.js?v=2"></script>
