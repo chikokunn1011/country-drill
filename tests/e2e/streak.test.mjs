@@ -3,7 +3,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, QUIET_BADGES } from './helpers.mjs';
+import { startServer, openApp, QUIET_BADGES, pickSetup, clearByAnswering, answerCorrect, answerWrong } from './helpers.mjs';
+import { openRpg, saveWith, startBattle, winBattle } from './rpg_helpers.mjs';
 import { settleLayout, measureFit } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -162,3 +163,63 @@ t('missing_home_status', async (page, app) => {
   assert.ok(app.consoleErrors.some(s => /\[streak\]/.test(s)), app.consoleErrors.join('\n'));
 }, { init: `new MutationObserver(() => document.getElementById('home-status')?.remove()).observe(document, { childList: true, subtree: true });` });
 
+/* ---------- 遊んだ日を数える（Task 3）: クイズの clear・fail、今日の難問の終わり（clear・fail）、冒険のバトル。quit は数えない ---------- */
+const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('streak')));
+// 出たトーストの文字を window.__toasts に積む
+const TOASTS = `window.__toasts = []; new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes)
+  if (n.nodeType === 1 && n.classList.contains('toast')) window.__toasts.push(n.textContent); }).observe(document, { childList: true, subtree: true });`;
+const practice = async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await clearByAnswering(page);
+};
+
+t('practice_counts_once', async page => {
+  await practice(page);
+  const a = await saved(page);
+  assert.equal(a.cur, 1); assert.equal(a.last, '2026-10-28'); assert.deepEqual(a.played, ['2026-10-28']);
+  await page.evaluate(() => show('home'));
+  await practice(page);
+  assert.equal((await saved(page)).cur, 1);
+  assert.deepEqual((await saved(page)).played, ['2026-10-28']);
+  await page.evaluate(() => show('home'));
+  assert.match(await rowText(page), /1日れんぞく/);
+  assert.equal((await page.locator('#streak .sk-hint').textContent()).trim(), '');
+  assert.deepEqual((await page.evaluate(() => window.__toasts)).filter(x => x.includes('日れんぞく')), []);   // トーストは出さない
+}, { init: TOASTS });
+
+t('ta_fail_counts', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'ta', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerWrong(page);
+  assert.equal((await saved(page))?.last, '2026-10-28');
+});
+
+t('quit_not_counted', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  await page.evaluate(() => show('home'));   // 途中で離れた（drill:result の quit）
+  assert.equal(await page.evaluate(() => localStorage.getItem('streak')), null);
+  assert.match(await rowText(page), /今日あそぶと1日目/);
+});
+
+t('daily_counts', async page => {
+  await page.click('#home-daily');
+  await page.click('#dl-start');
+  await page.locator('#scr-quiz').waitFor();
+  await answerWrong(page);
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('streak'))?.last === '2026-10-28');
+  assert.equal((await saved(page)).cur, 6);
+}, { streak: S() });
+
+test('battle_counts', { timeout: 60_000 }, async () => {
+  const app = await openRpg(browser, { url: server.url, seed: 1, init: NOON, storage: { rpg: saveWith({}) } });
+  try {
+    const { page } = app;
+    await startBattle(page, 'samerica', 1);
+    await winBattle(page);
+    assert.equal((await saved(page))?.last, '2026-10-28');
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});

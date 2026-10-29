@@ -73,7 +73,7 @@
   globalThis.STREAK_CORE = { fresh, sanitize, record, view, weekOf };
 })();
 
-// ---------- 後半: ホームの行（#home-status の最後）。描き直すのは drill:screen {name:'home'} のときと読み込み時だけ ----------
+// ---------- 後半: ホームの行（#home-status の最後）と、遊んだ日を数えるリスナー。描き直すのは drill:screen {name:'home'} のときと読み込み時だけ ----------
 (() => {
   'use strict';
   const NEED = { store: typeof store, emit: typeof emit, $: typeof $, DAILY_CORE: typeof DAILY_CORE, STREAK_CORE: typeof globalThis.STREAK_CORE };
@@ -128,6 +128,13 @@
     fit();
   }
   const safe = fn => (...a) => { try { fn(...a); } catch (e) { console.error('[streak]', e); } };
+
+  // 遊び終わった日を数える（1日に何回でも1日。画面は描き直さず、次の drill:screen {name:'home'} で描く。トーストは出さない）
+  const countToday = () => store.set(KEY, K.record(load(), today()));
+  const finished = outcome => outcome === 'clear' || outcome === 'fail';   // 'quit'（途中で離れた）は数えない
+  document.addEventListener('drill:result', safe(e => { if (finished(e.detail?.outcome)) countToday(); }));
+  document.addEventListener('drill:daily', safe(e => { if (e.detail?.phase === 'end' && finished(e.detail.outcome)) countToday(); }));
+  document.addEventListener('rpg:battle', safe(() => countToday()));
 
   document.addEventListener('drill:screen', safe(e => { if (e.detail?.name === 'home') render(); }));
   addEventListener('resize', safe(() => { if (document.body.dataset.screen === 'home') fit(); }));
