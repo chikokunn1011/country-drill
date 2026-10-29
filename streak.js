@@ -136,6 +136,7 @@
   const finished = outcome => outcome === 'clear' || outcome === 'fail';   // 'quit'（途中で離れた）は数えない
   document.addEventListener('drill:result', safe(e => { if (finished(e.detail?.outcome)) countToday(); }));
   document.addEventListener('drill:daily', safe(e => { if (e.detail?.phase === 'end' && finished(e.detail.outcome)) countToday(); }));
+  document.addEventListener('drill:dojo', safe(e => { if (e.detail?.phase === 'end' && e.detail.outcome === 'clear') countToday(); }));   // 似た国旗の道場（やめたは数えない）
   document.addEventListener('rpg:battle', safe(() => countToday()));
 
   document.addEventListener('drill:screen', safe(e => { if (e.detail?.name === 'home') render(); }));

@@ -27,6 +27,15 @@
 - PC の確認用スクショ: `node tests/e2e/pc_shots.mjs --out <フォルダ>` でスクショと測定の表を出す（`--viewport 1280x577,2560x1300` `--scenes home,result` `--dopa` `--dark` `--no-shot` も使える）
 - 結果画像のシェア（`share-card.js`、`window.SHARECARD`）: タイムアタックのクリア画面と今日の難問の［結果をシェア］で、1200×675 の結果画像と短い文を OS の共有シートに渡す（渡せない端末では X の投稿画面）。画像は端末の中で作るだけで、国名・首都・プロフィールの名前は入れない。今日の難問の画像は国旗を出さず20マスの帯だけ。URL とタグは `share-card.js` の先頭の `SHARE`
 
+## 似た国旗の道場
+
+モード選択のいちばん上の［🔍 似た国旗の道場 →］から入る練習（`dojo.js`・`dojo.css`、画面は `#scr-dojo`）。
+
+- `daily-core.js` の `SIMILAR`（見まちがえやすい国旗の25グループ）から1つ選ぶと、そのグループの国だけを選択肢にした10問（国旗→国名か国名→国旗。場所と首都は出さない）。同じ国は2問続けて出さず、まちがえた問題は後半にもう一度出る
+- 答えたあとは、正解の国旗と「えらんだ国」（まちがえたとき）か「にている国」（正解したとき）の国旗を縦横比のまま並べ、国旗の豆知識を出す。地図は出さない
+- 記録は localStorage の `dojo`（`{ v:1, mode, mix:{'ro-td':3}, clear:{td:1} }`。引き継ぎコードで持っていく）だけ。苦手（`misses`）・バッジ・冒険のコインには入れず、`drill:start` `drill:answer` `drill:result` も出さない（`drill:dojo` だけ。docs/events.md）。最後まで終えた日（やめたときはのぞく）はれんぞく日数に数える
+- テスト: 計算（`window.DOJO` の `build` `rival` `sanitize` `topPairs`）は `tests/unit/dojo.test.mjs`、画面は `tests/e2e/dojo.test.mjs`
+
 ## 冒険（国旗クエスト）
 
 クイズでコインを稼いで、旅人のレベルアップ・国旗ガチャ（仲間のカード）・ダンジョンのバトルに使う RPG（`rpg-core.js` `rpg.js` `rpg-cards.js` `rpg-battle.js` `rpg-rank.js` `rpg.css`。設定の「冒険（コイン・RPG）を表示する」で隠せる）。
