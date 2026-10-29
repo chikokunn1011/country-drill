@@ -123,7 +123,7 @@ t('book_list_all', async page => {
   await page.click('#home-book');
   await openDetail(page, 'jp');
   assert.deepEqual(await tvs(page, '#detail .trivia .tv'), expected(await triviaOf(page, 'jp')));
-  assert.equal(await count(page, '#detail-inner > .close + .facts + .trivia + svg.map'), 1); // 閉じる・国の情報・豆知識・地図の順
+  assert.equal(await count(page, '#detail-inner > .close + .facts + .cpage + .trivia + svg.map'), 1); // 閉じる・国の情報・国のページへ・豆知識・地図の順
 });
 
 t('book_map_all', async page => {

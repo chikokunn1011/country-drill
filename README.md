@@ -71,7 +71,17 @@
 - お問い合わせフォームの URL は `about.html` の `<h2 id="contact">` の下に `<a id="contact-form" href="…">` として置く。まだ無いあいだは `<p id="contact-pending">`（準備中）の文だけにしておく（`contact_form_url` のテストが、Google フォームの URL か準備中の文かを確かめる）。URL を置くときは `privacy.html` も見直す（`#collect` のお問い合わせの文・`#external` の Google フォーム・最終更新日が、実際のフォームと合っているか）
 - 広告を入れるときは、`privacy.html` の広告の項目（`#ads`）を見直す
 - `admin.html` にはフッターを付けない（`footer_not_in_admin`）
-- 新しいページを足したら `sitemap.xml` にも書く
+- 新しいページを足したら `sitemap.xml` にも書く（`<!-- country:start -->`〜`<!-- country:end -->` の目印の外に、手で書く）
+
+## 国ごとのページ
+
+- `country/<コード>.html`（195枚）と一覧の `country/index.html` は、`node tools/make_country_pages.mjs` で作る。作ったファイルはコミットする（JS を使わない静的なページ。地図はまだ入れない）
+- 読むもの: `countries.js`・`trivia.js`・`daily-core.js` の `SIMILAR`・`index.html` の `REGIONS`・`SUBREGIONS`・フッター・`FLAG_V`・テーマの先読み・`privacy.html` の `pages.css?v=`。どれかを変えたら流し直す（流し忘れると unit の `regenerate_same` が落ちて知らせる）
+- `sitemap.xml` は目印のあいだだけを書きかえる。国のページに `lastmod` は付けない
+- SIMILAR に知らないコード・豆知識が0件の国・`flags/<コード>.svg` が無い国・フッターの目印が無いときは、何も書かずに終了コード1で止まる
+- 国のページの［この地域で遊ぶ］は `index.html#play=<地域>`（細かい地域があればそれ）を開き、その地域を選んだモード選択の画面になる。知らない値は無視してホームを出す
+- 本編の図鑑（一覧のくわしい窓と地図の情報欄）に「この国のページ ›」を出す。クイズの答えの欄には出さない
+- `country/country.css` は国のページだけの決まり。色の変数は書かず、`pages.css` の変数だけを使う
 
 ## クレジット
 

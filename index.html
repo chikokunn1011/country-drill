@@ -230,6 +230,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .facts dt { color: var(--muted); font-size: .78rem; letter-spacing: .06em; align-self: center; }
 .facts dd { margin: 0; font-weight: 500; min-width: 0; }
 .facts .name { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; grid-column: 1 / -1; }
+.cpage { margin: 10px 0 0; } .cpage a { color: var(--accent); font-weight: 700; } /* 図鑑の「この国のページ ›」 */
 .next { align-self: flex-end; }
 .trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; contain: inline-size; } /* 長い文で欄を横に広げない（スマホでは .wrap が中身の幅になるので、問題の国旗や選択肢が動く） */
 .tv { font-size: .88rem; line-height: 1.5; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--hl) 12%, var(--surface)); }
@@ -556,7 +557,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 
   <footer>国連加盟193か国＋バチカン・コソボ（日本が承認している国）。国旗: flag-icons（MIT）／地図: Natural Earth・world-atlas
     <!-- footer:start -->
-    <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a></nav>
+    <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a><a href="country/">国の一覧</a></nav>
     <!-- footer:end -->
   </footer>
 </div>
@@ -1606,11 +1607,13 @@ function renderBookMap(matches) {
   if (matches.length === 1) bsel = matches[0].a;
   selectBook(bsel, false);
 }
+// 図鑑の情報欄から国のページ（country/<a>.html）へ。クイズの答えの欄には出さない
+const countryLink = c => `<p class="cpage"><a href="country/${c.a}.html">この国のページ ›</a></p>`;
 function selectBook(a, tapped) {
   bsel = a;
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
-  $('binfo').innerHTML = c ? factsHTML(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').innerHTML = c ? factsHTML(c) + countryLink(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
   $('binfo').scrollTop = 0; // PC では情報欄が中でスクロールする。前の国の位置のままだと国旗が上で隠れる
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   if (c && tapped) emit('drill:book-open', { a });
@@ -1619,7 +1622,7 @@ $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
   const b = e.target.closest('.card'); if (!b) return;
   const c = byA.get(b.dataset.a), inner = $('detail-inner');
-  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
+  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${countryLink(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
   inner.append(mapSvg(c, `${c.n}の位置`));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
@@ -1628,9 +1631,23 @@ $('grid').onclick = e => {
 $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 
 /* ---------- 起動 ---------- */
+// '#play=<地域>'（国のページの［この地域で遊ぶ］）の地域。'all'・6地域・細かい地域のどれかならそれ、ほか（こわれた % も）は null
+function playRegionOf(hash) {
+  if (!hash.startsWith('#play=')) return null;
+  let r; try { r = decodeURIComponent(hash.slice(6)); } catch { return null; }
+  return r === 'all' || REGIONS.includes(r) || Object.hasOwn(SUBREGIONS, r) ? r : null;
+}
 applyTheme();
 applyDopa();
-const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
+// #play=<地域> はその地域を選んで保存し、モード選択を開く。知らない値は無視してホーム
+const playR = playRegionOf(location.hash);
+// 細かい地域はタイムアタックで選べない（renderSetup が親の地域に直してしまう）ので、前回がタイムアタックなら練習にする。
+// 前の S.sub（タイムアタック中に覚えた細かい地域）も、選んだ地域を上書きしないよう消す
+if (playR) {
+  S.region = playR; delete S.sub; store.set('settings', S);
+  if (SUBREGIONS[playR] && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
+}
+const start = playR ? 'setup' : { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 // #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く。
 // 地図を使う画面を直接開いたときは、地図を待つあいだ真っ白にならないよう先にホームを出す
 if (location.hash === '#ranking' && RANKING.enabled) openRanking();
