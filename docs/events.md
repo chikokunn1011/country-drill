@@ -154,6 +154,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 ## 9. 読み込みの順番
 
 - 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `rpg-team.js` → `rpg-rank.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
+- れんぞく日数の `streak.js` はいちばん最後（`daily.js` の後）に読む。`daily-core.js`（本体より前）の `DAILY_CORE` と、本体の `store` `$` を使う。`streak.css` は機能の css のいちばん最後。
 - CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
@@ -196,3 +197,19 @@ rpg.js へのお願い（バッジ設計 §8.4）と、rpg.js がやらなかっ
 | 5 | RPG 設計 §12 のバッジの表を変える: `rpg-boss-{地域}`×6 → `rpg-boss`（1/3/6）。`rpg-lv10/30/50` → `rpg-lv` の3段。`rpg-cards-50/100/195` → `rpg-cards` の3段。`rpg-overcome-*` → `overcome`。`rpg-combo10` → `streak`。`rpg-silver` → `rpg-master`。`rpg-learn-join` → `rpg-friend`。`rpg-bounty-30` → `rpg-bounty` の3段。`rpg-gold` と `rpg-region-{id}` は作らない。地域ごとの「◯◯の勇者」の称号はなくなる（`rpg-boss` の3段の称号になる。冒険ホームの見本の〈南米の勇者〉も直す） | — |
 | 6 | 旅人カードの称号は `window.BADGES?.title?.()`（かっこなし）に〈〉を付けて出し、`badge:title` が来たら描き直す（8章） | — |
 | 7 | rpg.js はクイズ中（`drill:answer` の処理の中）に `rpg:overcome` などを出してもよい。バッジはクイズ中は積むだけにし、`drill:result` でまとめて判定する（取り決め） | — |
+
+## 11. streak.js が受け取るもの
+
+streak.js（れんぞく日数・A5）は、遊び終わった日を localStorage の `streak`（`{ v:1, cur, best, last, played, rest }`）に数え、ホームの `#home-status` の最後に1行で出す。イベントは出さない。
+
+| イベント | 使うキー | streak.js がすること |
+|---|---|---|
+| `drill:result` | `outcome` | `outcome` が `'clear'` か `'fail'` なら今日を数える。`'quit'`（途中で離れた）は数えない |
+| `drill:daily` | `phase` `outcome` | `phase === 'end'` で、`outcome` が `'clear'` か `'fail'` なら今日を数える |
+| `rpg:battle` | （なし） | 出たら今日を数える（勝ち負け・逃げたは見ない） |
+| `drill:screen` | `name` | `name === 'home'` のとき、`streak` を読み直して行を描き直す（ほかのタブとそろえる `storage` や `visibilitychange` は使わない） |
+
+- 1日に何回遊んでも1日と数える（日付は日本時間の0時で切りかえ。`DAILY_CORE.jstDay()`）。端末の時計が戻った日（前に数えた日より前）は何もしない。
+- 数えるときは画面を描き直さない（次の `drill:screen {name: 'home'}` で描く）。トーストは出さない。
+- リスナーは try/catch で包む（例外はクイズにもバトルにも伝えない）。
+- 似た国旗の道場（A6）の `drill:dojo` は、`phase === 'end'` かつ `outcome === 'clear'` で数える1行を A6 の PR で足す（この表にも1行足す）。

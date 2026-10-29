@@ -74,3 +74,13 @@ test('events_doc_badges_rpg_tower', () => {
 test('events_doc_home_entry', () => {
   for (const s of ['homeEntry', '#home-status']) assert.ok(doc().includes('`' + s), s);
 });
+
+test('events_doc_streak', () => {
+  // 11章: streak.js（れんぞく日数）が受け取るイベントと、使う localStorage のキー。9章の読み込みの順番にも streak.js
+  const d = doc();
+  const sec = d.split(/^## /m).find(s => s.startsWith('11.')) ?? '';
+  for (const s of ['`drill:result`', '`drill:daily`', '`rpg:battle`', '`streak`', "`'quit'`"])
+    assert.ok(sec.includes(s), `11章に ${s} がない`);
+  const nine = d.split(/^## /m).find(s => s.startsWith('9.')) ?? '';
+  assert.ok(nine.includes('`streak.js`'), '9章に `streak.js` がない');
+});

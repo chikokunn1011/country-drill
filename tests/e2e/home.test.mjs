@@ -102,7 +102,7 @@ t('status_empty_hidden', async page => {
   // 札は #home-status の中で1つだけ（何度描いても作り直さない）
   await page.evaluate(() => { show('setup'); show('home'); });
   assert.equal(await page.locator('#home-status .bdg-titlerow').count(), 1);
-});
+}, { blockScripts: ['streak.js'] });   // れんぞく日数の行は0日でも消えないので止める（streak.js があれば見えることは streak.test の home_row_first_time）
 
 t('entries_open', async page => {
   for (const [id, scr] of [['home-play', 'setup'], ['home-daily', 'daily'], ['home-rpg', 'rpg'], ['home-rank', 'ranking'],
