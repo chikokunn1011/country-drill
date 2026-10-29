@@ -18,8 +18,8 @@
 
   const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
   // 本編が読むキーの外側の形（ちがう形だと本編が落ちる。例: misses が null だと答えたときに例外）。
-  // setup の mode・kind は本編の MODES・KINDS のどれか（ちがうと本編が問題を作れない）
-  const GAME_MODES = ['f2n', 'n2f', 'm2f', 'f2m'], GAME_KINDS = ['practice', 'challenge', 'ta'];
+  // setup の mode・kind は本編の MODES・KINDS のどれか（ちがうと本編が問題を作れない）。tap は白地図タップ
+  const GAME_MODES = ['f2n', 'n2f', 'm2f', 'f2m', 'tap'], GAME_KINDS = ['practice', 'challenge', 'ta'];
   const isStr = v => typeof v === 'string';
   const GAME_SHAPE = {
     settings: isObj, misses: isObj, daily: isObj, rpgRank: isObj,

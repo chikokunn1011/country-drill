@@ -493,6 +493,20 @@ test('game_keys_with_wrong_outer_shape_are_not_saved', () => {
   assert.deepEqual(plain(A.write('anything', 'null')), { ok: true }, '本編が読まないキーはそのまま');
 });
 
+test('setup_tap_is_saved_and_round_trips', () => {
+  // 白地図タップを遊んだあとの setup（index.html が mode:'tap' を書く）も、書けて・書き出して・読み戻せる
+  const { A, st } = load({ setup: '{"mode":"tap","kind":"practice"}' }, () => Date.UTC(2026, 9, 29));
+  assert.deepEqual(plain(A.write('setup', '{"mode":"tap"}')), { ok: true });
+  assert.deepEqual(plain(A.writeCheck('setup', '{"mode":"tap","kind":"challenge"}')), { ok: true });
+  assert.deepEqual(plain(A.write('setup', '{"mode":"tap","kind":"practice"}')), { ok: true });
+  const file = plain(A.exportAll());
+  assert.equal(file.data.setup, '{"mode":"tap","kind":"practice"}');
+  assert.deepEqual(plain(A.importCheck(file)).ok, true);
+  const { A: A2, st: st2 } = load({ setup: '{"mode":"f2n"}' });
+  assert.equal(A2.importAll(file).ok, true);
+  assert.equal(st2.getItem('setup'), st.getItem('setup'));
+});
+
 test('checks_do_not_write', () => {
   const { A, st } = load({ rpg: '{}' });
   const before = st.dump();
