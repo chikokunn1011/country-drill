@@ -154,7 +154,7 @@
   // 預けるキー（同じ github.io のほかのサイトのデータを持っていかないよう、全部ではなくこの一覧）と、預けないキー（端末ごとのもの）。
   // localStorage のキーを足したらどちらかに入れる（tests/unit/transfer-keys.test.mjs がコードの中のキーと文字で比べる）
   // admin で始まるものは管理ページ（admin.html）の置き場（adminAuth は sessionStorage）。この端末のものなので預けない
-  const TRANSFER_KEYS = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'bdgcat', 'bview'];
+  const TRANSFER_KEYS = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'bdgcat', 'bview', 'streak'];
   const LOCAL_KEYS = ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'transferPending', 'badges-broken',
     'adminSnaps', 'adminErrors', 'adminAuth'];
   const rawGet = k => { try { return localStorage.getItem(k); } catch { return null; } };

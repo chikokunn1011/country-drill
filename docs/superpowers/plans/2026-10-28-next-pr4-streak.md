@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「A5 れんぞく日数（PR4）」・「実装の順番」・「チコに決めてほしいこと」1・4・5・「テストの方針」）
 
-前提: PR0〜PR3 はマージ済み。PR3（B6）の `#home-status`（空なら `:empty` で見えない。称号の札は prepend）がある。ファイル:行は #26 のブランチのもので、**マージ後に再確認**する。
+前提: PR0・PR1・PR3 はマージ済み。PR3（B6）の `#home-status`（空なら `:empty` で見えない。称号の札は prepend）と `homeEntry` がある。PR2（B4 国旗のファイル分け）はまだ main に無いので、PR2 の変更に頼らず、index.html のスクリプト読み込み・`flag()`・起動処理はなるべくさわらない（足すのは link 1行と script 1行と `profile.js?v=` だけ）。ファイル:行は PR3 マージ後の main（9a42d75）で確かめたもの。
 
 ## Global Constraints
 
@@ -20,10 +20,10 @@
 - 日付は日本時間0時で切りかえ（`DAILY_CORE.jstDay()`）。週は月曜はじまり。日付の計算は UTC の通算日数（`DAILY_CORE.addDays`・`validDay` を使う）。
 - お休み券は週に1枚・自動。同じ週に2日休む・8日以上あく → 連続が切れる。トーストは出さない。プロフィールの窓に日数を出さない。
 - 新しいイベントは作らない。`storage` イベント・`visibilitychange` は使わない。
-- `?v=`: `streak.js?v=1` `streak.css?v=1`（新規）、`profile.js?v=` は「そのとき main にある数 +1」（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。
+- `?v=`: `streak.js?v=1` `streak.css?v=1`（新規）、`profile.js?v=4` → `?v=5`（いまの main は `?v=4`。PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。
 - 足りないもの（`store` `emit` `$` `DAILY_CORE` `#home-status`）があれば `console.error('[streak] …')` で行を出さない。リスナーは try/catch。
 - コミットメッセージは日本語、末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` と `Claude-Session: https://claude.ai/code/session_0165YqqRbQ9cLHPBbRkUzhmj`。
-- 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`node --test --test-concurrency=1 'tests/e2e/*.test.mjs'`（tests/e2e で `npm ci` 済み）、`bash tests/sql/run.sh`。とくに `transfer-keys` `cache_bust` `events-doc` `theme` `pc_layout`（1366×657 の home）。
+- 毎タスクの終わりに: `node --test tests/unit/*.test.mjs` の全部と、変えた所に関係する e2e だけ（`cd tests/e2e && node --test --test-concurrency=1 a.test.mjs b.test.mjs`）。e2e の全体はこの計画の外で4本同時に流す。SQL は変えないので `bash tests/sql/run.sh` は要らない。とくに `transfer-keys` `cache_bust` `events-doc` `theme` `pc_layout`（1366×657 の home）`home`（`pc_fits` の 1280×577 など。れんぞく日数の行でホームが高くなる）。
 
 ## Review Focus
 
@@ -95,7 +95,7 @@ test('view_week', () => assert.deepEqual(K.view(S({ last: '2026-10-26', played: 
 - [ ] **Step 2: 落ちるのを確かめる** — Run: `node --test tests/unit/streak.test.mjs` → FAIL（`streak.js` が無い）
 
 - [ ] **Step 3: `streak.js` の前半に `STREAK_CORE` を作る**
-  - `record`: 空いた日（last の翌日〜day の前日）が7日以上（day − last ≥ 8）なら `cur=1`・`rest` は増やさない。そうでなければ古い順に見て、その日の `weekOf` の週に `rest` がまだ無ければ `rest` に足し、無い日が1日でもあれば `cur=1`（それまでに足した `rest` は残す）、全部埋まれば `cur+1`。last が null なら `cur=1`。最後に `best=max`・`last=day`・`played` に day を足し、`played` `rest` を `addDays(day,-13)` 以上だけに切る。
+  - `record`: 空いた日（last の翌日〜day の前日）が7日以上（day − last ≥ 8）なら `cur=1`・`rest` は増やさない。そうでなければ古い順に見て、その日の `weekOf` の週に `rest` がまだ無ければ `rest` に足し、無い日が1日でもあれば `cur=1`（この空きのために足した `rest` は戻す。修正ラウンド1で変更）、全部埋まれば `cur+1`。last が null なら `cur=1`。最後に `best=max`・`last=day`・`played` に day を足し、`played` `rest` を `addDays(day,-13)` 以上だけに切る。
   - `view`: `today <= last` は `'today'`（`cur` はそのまま・`next:null`）。そうでなければ `sim = record(st, today)` を作り、`st.cur > 0 && sim.cur === st.cur + 1` なら空いた日があれば `'rest'`、無ければ `'keep'`（`cur: st.cur`, `next: sim.cur`）。それ以外は `'start'`（`cur: 0`, `next: 1`、`sim` は使わない）。`tickets` と `week` の `'rest'` は、keep/rest のときは `sim.rest`、ほかは `st.rest` で、今日の週に `rest` があれば `tickets:0`。`week` の `'play'` は `st.played`。
   - `weekOf`: `Date.parse(day+'T00:00:00Z')/864e5` の通算日（1970-01-01 は木曜）から月曜まで戻す。
 
@@ -108,14 +108,14 @@ test('view_week', () => assert.deepEqual(K.view(S({ last: '2026-10-26', played: 
 **Files:**
 - Modify: `streak.js`（後半: DOM の即時関数）
 - Create: `streak.css`
-- Modify: `index.html`（`<link rel="stylesheet" href="streak.css?v=1">` を最後の機能 css の link の後ろ、`<script src="streak.js?v=1">` を最後の機能 script（`daily.js`）の後ろ、`profile.js?v=` を main +1）
-- Modify: `profile.js:154`（`TRANSFER_KEYS` の末尾に `'streak'`。マージ後に再確認）
+- Modify: `index.html`（`<link rel="stylesheet" href="streak.css?v=1">` を最後の機能 css の link（index.html:388 の `profile.css?v=3`）の後ろ、`<script src="streak.js?v=1">` を最後の機能 script（index.html:1493 の `daily.js?v=4`）の後ろ、`profile.js?v=4` → `?v=5`（index.html:1485））
+- Modify: `profile.js:157`（`TRANSFER_KEYS` の末尾に `'streak'`）
 - Test: `tests/unit/transfer-keys.test.mjs`、`tests/e2e/streak.test.mjs`（新規）
 - Modify test: `tests/e2e/home.test.mjs`（PR3 の `status_empty_hidden`。れんぞく日数の行は0日でも消さないので、このテストだけ `blockScripts: ['streak.js']` を足して「札も行も無ければ見えない」を確かめる形にする）
 
 **Interfaces:**
 - Consumes: Task 1 の `STREAK_CORE`、index.html の `store.get(k, d)` `store.set(k, v)` `$` `emit`、`DAILY_CORE.jstDay()`、B6 の `#home-status`
-- Produces: `#home-status` の最後の子 `<div id="streak" class="streak" role="group" aria-label="れんぞく日数">`。中に `.sk-text`（本文）・`.sk-hint`（今日あそぶと…）・`<button class="sk-open" aria-expanded aria-controls="sk-week">`・`<span id="sk-week" class="sk-week">` と `.sk-day[data-mark][data-day]` ×7。内部関数 `load(): State`（`STREAK_CORE.sanitize(store.get(KEY, null))`）と `render()`
+- Produces: `#home-status` の最後の子 `<div id="streak" class="home-streak" role="group" aria-label="れんぞく日数">`（`.streak` はクイズの連続正解 `#pstreak` が使っているので、クラスは `home-streak`）。中に `.sk-text`（本文）・`.sk-hint`（今日あそぶと…）・`<button class="sk-open" aria-expanded aria-controls="sk-week">`・`<span id="sk-week" class="sk-week">` と `.sk-day[data-mark][data-day]` ×7。内部関数 `load(): State`（`STREAK_CORE.sanitize(store.get(KEY, null))`）と `render()`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -140,11 +140,11 @@ e2e（`tests/e2e/streak.test.mjs`。時計は daily.test.mjs の `at(iso)` と�
 
 - [ ] **Step 3: 作る**
   - `streak.js` 後半: 即時関数。`NEED` を typeof で確かめ、`STREAK_CORE`・`$('home-status')` も確かめる（無ければ `console.error('[streak] …')` して return）。`const KEY = 'streak'`。`render()` は毎回 `load()` → `view(st, DAILY_CORE.jstDay())` → `#streak` を作るか中身を書きかえて `#home-status` に append（prepend しない）。本文は `🔥 ${cur}日れんぞく` ＋（`best > cur` のとき）`（さいこう${best}日）` ＋ `・お休み券${tickets}枚`。hint は keep `今日あそぶと${next}日に！`／rest `きのうはお休み券でつながるよ`／start `今日あそぶと1日目`／today なし。`drill:screen` で `name === 'home'` のときと、読み込み時に `document.body.dataset.screen === 'home'` のときに `render()`（try/catch）。`.sk-open` の click で `#streak` の `.open` と `aria-expanded` を切りかえる。
-  - 「収まらない幅」は CSS の幅の決めうちにしない（PR3 の `.home-status` は幅 `min(340px, 100%)` の縦の flex なので、画面の幅では決まらない）。`render()` の最後と `resize` で、`.narrow` を外してから `#streak.scrollWidth > #streak.clientWidth` なら `.narrow` を付ける。
-  - `streak.css`: `.streak` は1行の flex（`flex-wrap: nowrap`、文字は `--muted`、数は `--accent`、`position: relative`）。`.sk-day` は小さい四角（`--line` の枠・`--surface` の地）、`[data-mark=play]` は `--ok`、`[data-mark=rest]` は `--accent` の枠、`[data-mark=today]` は太い枠。`.sk-open` はふだん隠す。`.streak.narrow` では `.sk-week` を隠して `.sk-open` を出し、`.streak.narrow.open .sk-week` を `#streak` の下に絶対配置の小窓（`--surface` の地・`--line` の枠）で出す。色の変数は作らない。
+  - 「収まらない幅」は CSS の幅の決めうちにしない（PR3 の `.home-status` は幅 `min(340px, 100%)` の縦の flex なので、画面の幅では決まらない）。`render()` の最後と `resize` で、`.narrow` を外してから `#streak.scrollWidth > #streak.clientWidth` なら `.narrow` を付ける。（実装で決めたこと: かたまりは「本文」の行と「7マス＋今日あそぶと…」の行の2行。横1列に収まる広い PC では `.oneline` で1行にし、2行でも収まらなければ `.narrow`。≥1280 では `#home-status` を左の列の幅まで広げる。背の低い PC（≥900 かつ高さ ≤760、≥1280 かつ高さ ≤820）は行間を詰め、≥1280 かつ高さ ≤600（1280×577）は飾りの `.eyebrow` を隠して、home.test の `pc_fits`・pc_layout の `laptop_150pct_fits` を縦スクロールさせない）
+  - `streak.css`: `.home-streak` は1行の flex（`flex-wrap: nowrap`、文字は `--muted`、数は `--accent`、`position: relative`）。`.sk-day` は小さい四角（`--line` の枠・`--surface` の地）、`[data-mark=play]` は `--ok`、`[data-mark=rest]` は `--accent` の枠、`[data-mark=today]` は太い枠。`.sk-open` はふだん隠す。`.home-streak.narrow` では `.sk-week` を隠して `.sk-open` を出し、`.home-streak.narrow.open .sk-week` を `#streak` の下に絶対配置の小窓（`--surface` の地・`--line` の枠）で出す。色の変数は作らない。
   - `profile.js` の `TRANSFER_KEYS` に `'streak'`、index.html の2行と `profile.js?v=` +1。
 
-- [ ] **Step 4: 通るのを確かめる** — 全テスト → PASS（`transfer-keys`・`cache_bust`・`theme`・`pc_layout`・`badges`（称号の札が先頭のまま）を見る）。`phone_geometry_unchanged` は `#home-status` に行が増えるのでホームに差が出る（README のとおり扱う）。
+- [ ] **Step 4: 通るのを確かめる** — unit 全部と、e2e の `streak`・`home`・`cache_bust`・`theme`・`pc_layout`・`badges`（称号の札が先頭のまま）・`profile`（引き継ぎ）→ PASS。`phone_geometry_unchanged` は `#home-status` に行が増えるのでホームに差が出る（README のとおり扱う）。
 
 - [ ] **Step 5: コミット** — `git add streak.js streak.css index.html profile.js tests/unit/transfer-keys.test.mjs tests/e2e/streak.test.mjs tests/e2e/home.test.mjs`、メッセージ「ホームにれんぞく日数の行を出し、引き継ぎで移す」＋末尾2行
 
@@ -171,6 +171,6 @@ e2e（`tests/e2e/streak.test.mjs`。時計は daily.test.mjs の `at(iso)` と�
 
 - [ ] **Step 3: 作る** — `drill:result` は `outcome` が `'clear'|'fail'`、`drill:daily` は `phase === 'end'` かつ `outcome` が `'clear'|'fail'`、`rpg:battle` は毎回、で `countToday()`。どれも try/catch で包み、画面は描き直さない（次の `drill:screen {name:'home'}` で描く）。events.md §11 は表（イベント・使うキー・すること）と「quit は数えない・1日1回・トーストなし・`drill:dojo` は A6 で足す」。
 
-- [ ] **Step 4: 通るのを確かめる** — 全テスト → PASS（`events-doc`・`daily`・`rpg_battle`・`result_guard` を見る）
+- [ ] **Step 4: 通るのを確かめる** — unit 全部と、e2e の `streak`・`daily`・`rpg_battle`・`result_guard` → PASS
 
 - [ ] **Step 5: コミット** — `git add streak.js docs/events.md tests/e2e/streak.test.mjs tests/unit/events-doc.test.mjs`、メッセージ「クイズ・今日の難問・バトルを終えた日をれんぞく日数に数える」＋末尾2行
