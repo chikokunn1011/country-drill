@@ -292,6 +292,7 @@ dialog .close { align-self: flex-end; background: transparent; border: 1px solid
 footer { font-size: .75rem; color: var(--muted); text-align: center; }
 .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; margin-top: 4px; }
 .foot-links a { color: var(--muted); padding: 4px 2px; }
+body[data-screen="quiz"] footer { display: none; }   /* 出題中はフッターを出さない（スマホも PC も。リンクで離れると今日の難問がそこで終わるため） */
 #toasts { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%);
   display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px;

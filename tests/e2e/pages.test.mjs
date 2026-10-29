@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, PHONE, PC } from './helpers.mjs';
+import { startServer, openApp, pickSetup, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -46,5 +46,25 @@ test('footer_to_page_and_back', { timeout: 60_000 }, async () => {
     await page.click('.back');
     await page.waitForURL(u => new URL(u).pathname === '/');
     await page.waitForSelector('#scr-home', { state: 'visible' });
+  });
+});
+
+// 出題中はスマホでもフッターを出さない（リンクで離れると、確かめなしに今日の難問や練習がそこで終わるため）。ホームにもどると出る
+test('footer_hidden_during_quiz_on_phone', { timeout: 60_000 }, async () => {
+  const footer = page => page.evaluate(() => getComputedStyle(document.querySelector('footer')).display);
+  await open({ viewport: PHONE }, async page => {
+    await page.waitForSelector('#scr-home', { state: 'visible' });
+    assert.notEqual(await footer(page), 'none', 'ホーム');
+    await pickSetup(page, { mode: 'f2n', kind: 'practice' });
+    await page.click('#start');
+    await page.locator('#scr-quiz').waitFor();
+    assert.equal(await footer(page), 'none', '練習');
+    assert.equal(await page.locator('.foot-links a').filter({ visible: true }).count(), 0, '練習');
+  });
+  await open({ viewport: PHONE }, async page => {
+    await page.click('#home-daily');
+    await page.click('#dl-start');
+    await page.locator('#scr-quiz').waitFor();
+    assert.equal(await footer(page), 'none', '今日の難問');
   });
 });
