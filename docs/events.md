@@ -154,6 +154,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 ## 9. 読み込みの順番
 
 - 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `rpg-team.js` → `rpg-rank.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
+- 結果画像のシェアの `share-card.js`（`window.SHARECARD`）は `badges.js` のあと、`daily.js` の直前に読む（daily.js が `SHARECARD.attach` を使う）。イベントは出さないし受けない。読めないときはタイムアタックの結果画面に［結果をシェア］を出さず、今日の難問は文だけのシェアのまま。
 - れんぞく日数の `streak.js` はいちばん最後（`daily.js` の後）に読む。`daily-core.js`（本体より前）の `DAILY_CORE` と、本体の `store` `$` を使う。`streak.css` は機能の css のいちばん最後。
 - CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。

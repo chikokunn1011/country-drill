@@ -1342,8 +1342,9 @@ function showResult() {
   const rank = G.kind === 'challenge' ? (G.attempts === 1 ? 'S' : G.attempts <= 3 ? 'A' : 'B') : ratio === 1 ? 'S' : ratio >= .8 ? 'A' : ratio >= .6 ? 'B' : 'C';
   const dopaHead = S.dopa ? `<p class="rank">RANK ${rank}</p><p class="pts">${fmt(G.pts)} pt</p>` : '';
   const taForm = G.kind === 'ta' && RANKING.enabled;
+  const shareBtn = G.kind === 'ta' && !!window.SHARECARD;   // 結果画像のシェア（share-card.js。読めなければボタンを出さない）
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
-    <p class="hint">${cond}</p></div>
+    <p class="hint">${cond}</p>${shareBtn ? '<div class="row center"><button type="button" class="btn ghost" id="r-share">結果をシェア</button></div>' : ''}</div>
     <div class="rside" id="r-side">${taForm ? `<div class="tabox"><div class="ta-post" id="ta-post"></div><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
     <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
   $('r-again').onclick = startGame;
@@ -1351,6 +1352,12 @@ function showResult() {
   endGame('clear');
   show('result');
   resultAt = performance.now();
+  if (shareBtn) {
+    const time = RANKING.formatTime(G.timeMs);
+    // 順位は rankOf の返事を待たないので入れない（あとから描き直さない）。国名・首都は入れない
+    SHARECARD.attach($('r-share'), { kind: 'ta', title: cond, big: time, sub: 'クリア！', rank: null, flags: G.set.map(c => c.a), grid: [],
+      text: `国旗マスター タイムアタック ${cond}\n${time} でクリア！\n${SHARECARD.SHARE.tag}` });
+  }
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
   else SND.play(G.wrongs === 0 ? 'perfect' : 'clear');
@@ -1581,7 +1588,8 @@ addEventListener('load', () => loadMap().catch(() => {}));
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
 <script src="badges.js?v=10"></script>
-<script src="daily.js?v=4"></script>
+<script src="share-card.js?v=1"></script>
+<script src="daily.js?v=5"></script>
 <script src="streak.js?v=1"></script>
 </body>
 </html>
