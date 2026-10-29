@@ -40,6 +40,24 @@ test('play_hash_all_and_region', { timeout: 60_000 }, async () => {
   for (const r of ['all', 'アフリカ', '北・中央アメリカ']) await playRegion(r);
 });
 
+// 前回がタイムアタックでも、細かい地域を受けたら練習にして、その地域を選んだ状態にする（タイムアタックは大きい地域だけ）
+test('play_hash_sub_after_ta', { timeout: 60_000 }, () => open({ path: 'index.html#play=' + encodeURIComponent('西ヨーロッパ'), storage: { setup: { kind: 'ta' }, settings: { region: 'ヨーロッパ', sub: '東ヨーロッパ' } } }, async page => {
+  await page.locator('#scr-setup').waitFor({ state: 'visible' });
+  assert.equal(await page.evaluate(() => S.region), '西ヨーロッパ');
+  assert.equal(await savedRegion(page), '西ヨーロッパ');
+  assert.equal(await pressedRegion(page), '西ヨーロッパ');
+  assert.equal(await page.evaluate(() => P.kind), 'practice');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('setup')).kind), 'practice');
+  assert.equal(await page.locator('#kinds .modecard[aria-pressed="true"]').getAttribute('data-k'), 'practice');
+}));
+
+// 6地域ならタイムアタックのまま（ランキングの区分なので変えない）
+test('play_hash_region_keeps_ta', { timeout: 60_000 }, () => open({ path: 'index.html#play=' + encodeURIComponent('アフリカ'), storage: { setup: { kind: 'ta' } } }, async page => {
+  await page.locator('#scr-setup').waitFor({ state: 'visible' });
+  assert.equal(await pressedRegion(page), 'アフリカ');
+  assert.equal(await page.evaluate(() => P.kind), 'ta');
+}));
+
 test('play_hash_unknown', { timeout: 60_000 }, () => open({ path: 'index.html#play=xx' }, async page => {
   await page.locator('#scr-home').waitFor({ state: 'visible' });
   assert.equal(await savedRegion(page), undefined);   // 知らない値は書かない

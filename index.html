@@ -1576,7 +1576,12 @@ applyTheme();
 applyDopa();
 // #play=<地域> はその地域を選んで保存し、モード選択を開く。知らない値は無視してホーム
 const playR = playRegionOf(location.hash);
-if (playR) { S.region = playR; store.set('settings', S); }
+// 細かい地域はタイムアタックで選べない（renderSetup が親の地域に直してしまう）ので、前回がタイムアタックなら練習にする。
+// 前の S.sub（タイムアタック中に覚えた細かい地域）も、選んだ地域を上書きしないよう消す
+if (playR) {
+  S.region = playR; delete S.sub; store.set('settings', S);
+  if (SUBREGIONS[playR] && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
+}
 const start = playR ? 'setup' : { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 // #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く。
 // 地図を使う画面を直接開いたときは、地図を待つあいだ真っ白にならないよう先にホームを出す
