@@ -374,13 +374,20 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <p class="eyebrow">FLAGS · NAMES · MAP</p>
     <h1>国旗<br>マスター</h1>
     <div class="flags" id="home-flags"></div>
-    <div class="menu">
-      <button class="btn" id="home-play">プレイ</button>
-      <button class="btn ghost" id="home-rank">ランキング</button>
-      <button class="btn ghost" id="home-profile" hidden>プロフィール</button>
-      <button class="btn ghost" id="home-settings">設定</button>
+    <div class="home-status" id="home-status"></div>
+    <!-- 入口は全部ここに置く。本体以外のファイルが使う入口は hidden で始め、そのファイルが homeEntry() で出す -->
+    <div class="home-big" id="home-big">
+      <button class="hbig main" id="home-play"><b class="hb-title">クイズで遊ぶ</b><span class="hb-desc">国旗・国名・場所を当てる</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-daily" hidden><b class="hb-title">今日の難問</b><span class="hb-desc">毎日かわる問題で、みんなと競う</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-rpg" hidden><b class="hb-title">冒険</b><span class="hb-desc">コインで仲間を集めてダンジョンへ</span><span class="hb-note"></span></button>
     </div>
-    <button class="linkbtn" id="home-book">国旗図鑑を見る</button>
+    <div class="home-icons" id="home-icons">
+      <button class="hicon" id="home-rank"><span class="hi-ico" aria-hidden="true">🏆</span><span class="hi-label">ランキング</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-badges" hidden><span class="hi-ico" aria-hidden="true">🎖️</span><span class="hi-label">バッジ</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-book"><span class="hi-ico" aria-hidden="true">📖</span><span class="hi-label">図鑑</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-profile" hidden><span class="hi-ico" aria-hidden="true">👤</span><span class="hi-label">プロフィール</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-settings"><span class="hi-ico" aria-hidden="true">⚙️</span><span class="hi-label">設定</span><span class="hi-sub"></span></button>
+    </div>
   </section>
 
   <!-- 設定 -->
@@ -799,6 +806,16 @@ function registerScreen(name, render) {             // 機能ファイルが自�
   if (!$('scr-' + name)) throw new Error('no section scr-' + name);
   if (!SCREENS.includes(name)) SCREENS.push(name);
   if (render) screenRender[name] = render;
+}
+// ホームの入口（index.html の #scr-home に hidden で置いてある）を出す。open は押したときの動き、note は .hb-note / .hi-sub に入れる HTML（呼ぶ側で esc() 済み）。
+// 何度呼んでもよい。その id が無ければ null
+function homeEntry(id, { open, note } = {}) {
+  const el = $('scr-home')?.querySelector('#' + id);
+  if (!el) return null;
+  el.hidden = false;
+  if (open) el.onclick = open;
+  if (note !== undefined) { const box = el.querySelector('.hb-note, .hi-sub'); if (box) box.innerHTML = note; }
+  return el;
 }
 function toast(html, ms = 2800) {
   let box = $('toasts');
@@ -1441,12 +1458,12 @@ if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(st
 </script>
 <script src="profile.js?v=4"></script>
 <script src="rpg-core.js?v=13"></script>
-<script src="rpg.js?v=12"></script>
+<script src="rpg.js?v=13"></script>
 <script src="rpg-cards.js?v=6"></script>
 <script src="rpg-battle.js?v=15"></script>
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
-<script src="badges.js?v=9"></script>
-<script src="daily.js?v=3"></script>
+<script src="badges.js?v=10"></script>
+<script src="daily.js?v=4"></script>
 </body>
 </html>

@@ -166,3 +166,10 @@ test('sitemap_lists_pages', () => {
   for (const p of ['privacy.html', 'about.html', 'howto.html']) assert.ok(locs.includes(`https://chikokunn1011.github.io/country-drill/${p}`), p);
 });
 test('profile_name_note', () => assert.equal(read('profile.js').match(/本名や学校名は使わないでね/g)?.length, 1));   // 1つの定数を3か所で使う
+
+// ホームの作り直し（B6）: はじめかたの入口の名前を新しいホームに合わせる（「プレイ」はもう無い）
+test('howto_start_names', () => {
+  const s = read('howto.html').split('<h2 id="start"')[1].split('<h2 ')[0];
+  for (const w of ['クイズで遊ぶ', '今日の難問', '冒険']) assert.ok(s.includes(w), w);
+  assert.ok(!/［プレイ］|「プレイ」/.test(s));
+});

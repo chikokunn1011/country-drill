@@ -44,7 +44,7 @@ async function startPractice(page) {
 t('loads_and_counts', async page => {
   assert.deepEqual(await page.evaluate(() => ({
     title: typeof BADGES.title, count: BADGES.count(), text: BADGES.title(), key: BADGES.titleKey(),
-    css: !!document.querySelector('link[href="badges.css?v=1"]'), js: !!document.querySelector('script[src="badges.js?v=9"]'),
+    css: !!document.querySelector('link[href^="badges.css?v="]'), js: !!document.querySelector('script[src^="badges.js?v="]'),   // ?v= の数は cache_bust が見る
   })), { title: 'function', count: { got: 0, total: 26, byColor: { 1: 0, 2: 0, 3: 0, 4: 0 } }, text: '', key: null, css: true, js: true });
 });
 
@@ -197,7 +197,7 @@ const tileTops = (page, n) => page.evaluate(n => [...document.querySelector('.bd
 const listenTitle = page => page.evaluate(() => document.addEventListener('badge:title', e => (window.__bt ||= []).push(e.detail)));
 
 t('home_button_and_count', async page => {
-  assert.equal(await page.evaluate(() => $('home-badges').nextElementSibling.id), 'home-settings');
+  assert.equal(await page.evaluate(() => $('home-badges').previousElementSibling.id), 'home-rank');
   assert.match(await text(page, '#home-badges'), /バッジ\s*0\/26/);
   assert.equal(await count(page, '#home-badges .bdg-dot'), 0);
   await playPractice(page);
@@ -209,7 +209,7 @@ t('home_button_and_count', async page => {
 t('home_title_chip', async page => {
   await playPractice(page);
   await page.click('#brand');
-  assert.equal(await page.evaluate(() => document.querySelector('#scr-home .menu').firstElementChild.className), 'bdg-titlerow');
+  assert.equal(await page.evaluate(() => $('home-status').firstElementChild.className), 'bdg-titlerow');
   assert.equal(await text(page, '#home-title'), '〈ドリルの新人〉');
   await page.click('#home-title');
   await page.waitForSelector('#detail[open] .bdg-picker');

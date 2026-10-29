@@ -69,3 +69,8 @@ test('events_doc_badges_rpg_tower', () => {
   const row = rows.find(l => l.startsWith('| `rpg:tower` |')) ?? '';
   assert.ok(row.includes('英雄の塔') && row.includes('RPG.snapshot().tower'), `rpg:tower の行がない: ${row}`);
 });
+
+// ホームの入口を出す共通の部品と、ホームの差し込み口（B6）
+test('events_doc_home_entry', () => {
+  for (const s of ['homeEntry', '#home-status']) assert.ok(doc().includes('`' + s), s);
+});

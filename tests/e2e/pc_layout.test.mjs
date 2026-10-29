@@ -193,15 +193,16 @@ test('kinds_field_id', async () => {
 });
 
 // openScene の badges（バッジのセーブ。既定は3個取ってあって札の無い QUIET_BADGES、null なら入れない）と blockScripts（止めるファイル）が両方効く
+// （ホームの入口は index.html に hidden で置いてあるので、数ではなく見えるかで見る）
 test('open_scene_options', { timeout: 60_000 }, async () => {
-  const count = (page, sel) => page.locator(sel).count();
+  const count = (page, sel) => page.locator(sel).count(), shown = (page, sel) => page.isVisible(sel);
   await inScene('home', PHONE, async page => {
     assert.match(await page.locator('#home-badges').innerText(), /バッジ\s*3\/\d+/);
-    assert.deepEqual([await count(page, '#home-title'), await count(page, '#home-rpg')], [0, 1]);
+    assert.deepEqual([await count(page, '#home-title'), await shown(page, '#home-rpg')], [0, true]);
   });
   await inScene('home', PHONE, async page => assert.match(await page.locator('#home-badges').innerText(), /バッジ\s*0\/\d+/), { badges: null });
-  await inScene('home', PHONE, async page => assert.deepEqual([await count(page, '#home-badges'), await count(page, '#home-rpg')], [0, 1]), { blockScripts: ['badges.js'] });
-  await inScene('home', PHONE, async page => assert.deepEqual([await count(page, '#home-badges'), await count(page, '#home-rpg')], [1, 0]), { blockScripts: RPG_FILES });
+  await inScene('home', PHONE, async page => assert.deepEqual([await shown(page, '#home-badges'), await shown(page, '#home-rpg')], [false, true]), { blockScripts: ['badges.js'] });
+  await inScene('home', PHONE, async page => assert.deepEqual([await shown(page, '#home-badges'), await shown(page, '#home-rpg')], [true, false]), { blockScripts: RPG_FILES });
 });
 
 // 1〜4 キーで答えると #next にフォーカスが移り、Enter で次の問題へ進む（Task 3 が PC の大きさでも呼ぶ）

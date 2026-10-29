@@ -58,8 +58,9 @@ const fireBadges = (page, ids, retro) => page.evaluate(({ ids, retro }) => ids.m
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 t('home_button', async page => {
-  assert.deepEqual(await page.evaluate(() => ({ prev: $('home-rpg')?.previousElementSibling?.id, cls: $('home-rpg')?.className })),
-    { prev: 'home-play', cls: 'btn ghost' });
+  assert.deepEqual(await page.evaluate(() => ({ parent: $('home-rpg')?.parentElement?.id, prev: $('home-rpg')?.previousElementSibling?.id, cls: $('home-rpg')?.className })),
+    { parent: 'home-big', prev: 'home-daily', cls: 'hbig' });
+  assert.equal(await page.locator('#home-rpg').count(), 1);
   assert.equal(await visible(page, '#home-rpg'), true);
   let s = await text(page, '#home-rpg');
   assert.ok(s.includes('冒険') && s.includes('NEW'), s);
