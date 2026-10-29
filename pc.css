@@ -22,7 +22,9 @@ body {
 body > .wrap { max-width: var(--page-max); gap: var(--vgap); min-height: calc(100vh - 2 * var(--pad-y)); min-height: calc(100dvh - 2 * var(--pad-y)); }
 .wrap .wrap { width: 100%; max-width: none; }
 .hint, .panel p { max-inline-size: var(--measure); }
-footer { margin-top: auto; }
+footer { margin-top: auto; display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; column-gap: 18px; }
+footer .foot-links { margin-top: 0; }   /* PC: credit text and footer links share one line (same height as the old one-line footer) */
+footer .foot-links a { padding-block: 0; }
 body[data-screen="quiz"] footer { display: none; }
 
 /* topbar: same edges as the content, one line */

@@ -1,0 +1,74 @@
+// 読み物のページ（privacy・about・howto）とフッターを、ファイルの文字のまま確かめる
+// （B1 の country/*.html は PAGES に足す。PR9 の embed.html は BLOCKS・PAGE_VARS・varsOf で変数を比べる）
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+
+const root = new URL('../../', import.meta.url);
+const read = p => readFileSync(new URL(p, root), 'utf8');
+
+// フッター（<!-- footer:start -->〜<!-- footer:end -->）を持つページ
+export const PAGES = ['index.html', 'privacy.html', 'about.html', 'howto.html'];
+// 目印の間の href（先頭の ../ は外す）
+export const footerHrefs = html => {
+  const m = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/.exec(html);
+  if (!m) return [];
+  return [...m[1].matchAll(/href="([^"]*)"/g)].map(x => x[1].replace(/^(\.\.\/)+/, ''));
+};
+
+// 色の変数のかたまり。順は :root・端末がダークのとき・設定がダークのとき
+export const BLOCKS = [':root', ':root:not([data-theme="light"])', ':root[data-theme="dark"]'];
+// 読み物のページが使う変数（index.html と同じ値にする）
+export const PAGE_VARS = ['--bg', '--surface', '--ink', '--muted', '--line', '--accent', '--accent-ink', '--font-display', '--font-body', '--font-mono'];
+// block のかたまりにある変数 → 値。:root は最初の「:root {」、ほかはそのセレクタの { } の中
+export const varsOf = (css, block) => {
+  const esc = block.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = new RegExp(`(?:^|[\\s}])${esc}\\s*\\{([^}]*)\\}`).exec(css);
+  if (!m) return {};
+  const out = {};
+  for (const d of m[1].replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) out[d[1]] = d[2].trim();
+  return out;
+};
+// head の先読み script のうち、テーマを当てる文（dataset.theme を含む行）
+export const themeScript = html => {
+  const head = html.split('</head>')[0];
+  const lines = [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)].flatMap(m => m[1].split('\n'));
+  return lines.filter(l => l.includes('dataset.theme')).join('\n').trim();
+};
+
+test('footer_links_same', () => {
+  for (const p of PAGES) assert.deepEqual(footerHrefs(read(p)), ['howto.html', 'about.html', 'about.html#contact', 'privacy.html'], p);
+});
+
+test('footer_not_in_admin', () => assert.ok(!read('admin.html').includes('footer:start')));
+
+test('pages_css_vars_match_index', () => {
+  const index = read('index.html'), pages = read('pages.css');
+  for (const block of BLOCKS) {
+    const want = varsOf(index, block), got = varsOf(pages, block);
+    assert.ok(Object.keys(want).length > 0, `index.html に ${block} が無い`);
+    for (const v of PAGE_VARS) if (v in want) assert.equal(got[v], want[v], `${block} ${v}`);
+  }
+});
+
+test('pages_head', () => {
+  const indexTheme = themeScript(read('index.html'));
+  assert.match(indexTheme, /dataset\.theme/);
+  for (const p of ['privacy.html', 'about.html', 'howto.html']) {
+    const h = read(p);
+    assert.match(h, /<html lang="ja">/, p); assert.match(h, /<meta name="viewport" content="width=device-width, initial-scale=1">/, p);
+    assert.match(h, /<title>[^<]+｜国旗マスター<\/title>/, p); assert.match(h, /<meta name="description" content="[^"]{20,}">/, p);
+    assert.ok(h.includes(`<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/${p}">`), p);
+    assert.match(h, /<link rel="stylesheet" href="pages\.css\?v=\d+">/, p);
+    assert.equal(themeScript(h), indexTheme, p);   // head の先読み script（dataset.theme を含む）が同じ文
+    assert.match(h, /<a class="back" href="\.\/">← 国旗マスターで遊ぶ<\/a>/, p);
+  }
+});
+
+test('footer_targets_exist', () => {
+  for (const p of PAGES) for (const href of footerHrefs(read(p))) {
+    const [file, id] = href.split('#');
+    assert.ok(existsSync(new URL(file, root)), `${p}: ${file} が無い`);
+    if (id) assert.ok(read(file).includes(`id="${id}"`), `${p}: ${file} に id="${id}" が無い`);
+  }
+});
