@@ -68,3 +68,99 @@
 
   globalThis.DOJO = { ROUND, MODES, LABEL, build, pairKey, rival, sanitize, topPairs };
 })();
+
+// ---- 画面（#scr-dojo）とモード選択の帯（#to-dojo）。DOM が無い（unit テストの vm）ときは何もしない ----
+(() => {
+  'use strict';
+  if (typeof document === 'undefined') return;
+  const NEED = {
+    C: typeof C, byA: typeof byA, flag: typeof flag, esc: typeof esc, $: typeof $, store: typeof store, show: typeof show,
+    registerScreen: typeof registerScreen, startDojo: typeof startDojo, DAILY_CORE: typeof DAILY_CORE, DOJO: typeof DOJO,
+  };
+  const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
+  if (missing.length) { console.error(`[dojo] 必要なものが読み込めなかったので、似た国旗の道場はお休み: ${missing.join(' ')}`); return; }
+
+  const D = DOJO, KEY = 'dojo';
+  const load = () => D.sanitize(store.get(KEY, null));
+  const save = st => store.set(KEY, st);
+  // グループ（id → この版の countries.js にある国だけ）。2か国未満になったグループは出さない
+  const GROUPS = DAILY_CORE.SIMILAR.map(g => g.filter(a => byA.has(a))).filter(g => g.length >= 2 && Object.hasOwn(D.LABEL, g[0]));
+  const groupOf = id => GROUPS.find(g => g[0] === id) || null;
+  let mine = null;   // いま遊んでいる道場の1回 { sid, id }（ほかの sid の drill:dojo は見ない）
+  let last = '';     // 終わった1回の結果の1行
+
+  // ---- クイズからの知らせ ----
+  document.addEventListener('drill:dojo', e => {
+    const d = e.detail || {};
+    if (!mine || d.sid !== mine.sid) return;
+    const st = load();
+    if (d.phase === 'answer' && !d.right && typeof d.a === 'string' && typeof d.pick === 'string' && d.a !== d.pick) {
+      const k = D.pairKey(d.a, d.pick);
+      st.mix[k] = Math.min(1e5, (st.mix[k] || 0) + 1);
+      save(st);
+    }
+    if (d.phase === 'end') {
+      if (d.outcome === 'clear') {
+        last = `${D.LABEL[mine.id]}：一発正解 ${d.firstTry} / ${d.n}${d.wrongs === 0 ? '・ノーミス！' : ''}`;
+        if (d.wrongs === 0) { st.clear[mine.id] = 1; save(st); }
+      }
+      mine = null;
+    }
+  });
+
+  // ---- 画面 ----
+  const sec = document.createElement('section');
+  sec.id = 'scr-dojo'; sec.className = 'wrap'; sec.hidden = true;
+  sec.innerHTML = `<div class="panel dojo">
+    <h2>似た国旗の道場</h2>
+    <p class="hint">にている国旗のグループを選ぶと、そのグループの国だけで${D.ROUND}問。まちがえた問題はあとでもう一度出るよ。</p>
+    <div class="seg" id="dj-mode" role="group" aria-label="出し方"><button type="button" data-m="f2n">国旗 → 国名</button><button type="button" data-m="n2f">国名 → 国旗</button></div>
+    <p class="dj-last" id="dj-last" role="status"></p>
+    <div class="dj-pairs" id="dj-pairs" hidden><h3>よく取りちがえるペア</h3><ol></ol></div>
+    <div class="dj-groups" id="dj-groups"></div>
+  </div>`;
+  const wrap = document.querySelector('body > .wrap'), foot = wrap?.querySelector(':scope > footer');
+  if (foot) foot.before(sec); else (wrap || document.body).append(sec);
+  registerScreen('dojo', render);
+
+  function render() {
+    const st = load();
+    for (const b of sec.querySelectorAll('#dj-mode button')) b.setAttribute('aria-pressed', String(b.dataset.m === st.mode));
+    $('dj-last').textContent = last;
+    const pairs = D.topPairs(st.mix).filter(p => byA.has(p.a) && byA.has(p.b)), box = $('dj-pairs');
+    box.hidden = !pairs.length;
+    box.querySelector('ol').innerHTML = pairs.map(p => {
+      const x = byA.get(p.a), y = byA.get(p.b);
+      return `<li><span class="dj-pf"><img src="${flag(x.a)}" alt=""><img src="${flag(y.a)}" alt=""></span><span class="dj-pn">${esc(x.n)}・${esc(y.n)}</span><b class="mono">${p.k}回</b></li>`;
+    }).join('');
+    $('dj-groups').innerHTML = GROUPS.map(g => {
+      const id = g[0], ok = st.clear[id] === 1;
+      return `<button type="button" class="dj-card" data-g="${id}"><span class="dj-flags">${g.map(a => `<img src="${flag(a)}" alt="${esc(byA.get(a).n)}の国旗" loading="lazy">`).join('')}</span>` +
+        `<span class="dj-label">${esc(D.LABEL[id])}</span>${ok ? '<span class="dj-ok" aria-label="ノーミスでクリアずみ">✓</span>' : ''}</button>`;
+    }).join('');
+  }
+  $('dj-mode').addEventListener('click', e => {
+    const b = e.target.closest('button[data-m]');
+    if (!b) return;
+    const st = load(); st.mode = D.MODES.includes(b.dataset.m) ? b.dataset.m : st.mode; save(st); render();
+  });
+  $('dj-groups').addEventListener('click', e => {
+    const b = e.target.closest('.dj-card'), group = b && groupOf(b.dataset.g);
+    if (!group) return;
+    const sid = 'dojo-' + Date.now().toString(36);
+    mine = { sid, id: group[0] };
+    startDojo({ seq: D.build(group), group, mode: load().mode, sid });
+  });
+
+  // ---- モード選択の帯: 見出し「モードを選ぶ」と同じ行の右（高さを足さない。1366×657 の PC で縦スクロールを出さないため） ----
+  const panel = document.querySelector('#scr-setup .panel');
+  if (panel) {
+    const band = document.createElement('div');
+    band.className = 'dj-band';
+    band.innerHTML = '<button type="button" class="linkbtn" id="to-dojo">🔍 似た国旗の道場 →</button>';
+    band.querySelector('button').onclick = () => show('dojo');
+    const h2 = panel.querySelector(':scope > h2');
+    if (h2) { const head = document.createElement('div'); head.className = 'dj-head'; h2.before(head); head.append(h2, band); }
+    else panel.prepend(band);
+  }
+})();

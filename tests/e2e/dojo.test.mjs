@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events } from './helpers.mjs';
+import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, pickSetup } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -89,3 +89,81 @@ t('no_name_hint', async page => {
   await go(page, SEQ, TD, 'n2f'); assert.equal(await page.locator('#qcard .cname').count(), 0);
   assert.equal(await page.locator('#qcard .choice.flagc').count(), 4);
 }, { storage: { setup: { mode: 'n2f', name: true, kind: 'practice', count: 10 } } });
+
+// ---- 道場の画面・帯（dojo.js の後半） ----
+const dojoRec = page => page.evaluate(() => JSON.parse(localStorage.getItem('dojo')));
+
+t('band_opens_dojo', async page => {
+  await pickSetup(page, {}); assert.match(await page.innerText('#to-dojo'), /似た国旗の道場/);
+  await page.click('#to-dojo'); assert.equal(await page.isVisible('#scr-dojo'), true);
+  assert.equal(await page.locator('.dj-card').count(), 25); assert.equal(await page.locator('.dj-card img').count(), 93);
+  assert.equal(await page.locator('#dj-pairs').isHidden(), true);
+  assert.doesNotMatch(await page.innerText('#scr-dojo'), /首都|場所/);
+});
+
+t('mode_switch_saved', async page => {
+  await page.evaluate(() => show('dojo')); await page.click('#dj-mode [data-m="n2f"]');
+  assert.equal(await page.getAttribute('#dj-mode [data-m="n2f"]', 'aria-pressed'), 'true');
+  assert.equal(await page.getAttribute('#dj-mode [data-m="f2n"]', 'aria-pressed'), 'false');
+  assert.equal((await dojoRec(page)).mode, 'n2f');
+  await page.click('.dj-card[data-g="no"]'); assert.equal(await page.evaluate(() => G.mode.k), 'n2f');
+  assert.deepEqual(await page.evaluate(() => [...new Set(G.set.map(c => c.a))].sort()), ['dk', 'fi', 'is', 'no', 'se']);
+});
+
+t('round_mix_and_clear', async page => {
+  await page.evaluate(() => show('dojo')); await page.click('.dj-card[data-g="qa"]');
+  await answerWrong(page); await page.click('#next');
+  await clearRound(page);
+  assert.match(await page.innerText('#dj-last'), /ギザギザの白：一発正解 9 \/ 10/);
+  assert.doesNotMatch(await page.innerText('#dj-last'), /ノーミス/);
+  assert.deepEqual((await dojoRec(page)).mix, { 'bh-qa': 1 });
+  assert.equal(await page.locator('#dj-pairs li').count(), 1); assert.match(await page.innerText('#dj-pairs li'), /1回/);
+  assert.equal(await page.locator('.dj-card[data-g="qa"] .dj-ok').count(), 0);
+  await page.click('.dj-card[data-g="qa"]'); await clearRound(page);   // もう1回ノーミスで
+  assert.match(await page.innerText('#dj-last'), /一発正解 10 \/ 10・ノーミス！/);
+  assert.equal(await page.locator('.dj-card[data-g="qa"] .dj-ok').count(), 1);
+  assert.deepEqual((await dojoRec(page)).clear, { qa: 1 });
+});
+
+t('broken_storage', async page => {
+  await page.evaluate(() => show('dojo'));
+  assert.equal(await page.getAttribute('#dj-mode [data-m="f2n"]', 'aria-pressed'), 'true');
+  assert.equal(await page.locator('#dj-pairs li').count(), 1); assert.equal(await page.locator('.dj-ok').count(), 1);
+  await page.click('.dj-card[data-g="td"]'); await answerCorrect(page);   // 壊れた値があっても遊べる
+}, { storage: { dojo: { v: 1, mode: 'x', mix: { 'ro-td': 'a', 'bh-qa': 2, zz: 3 }, clear: { td: 1, foo: 1, qa: 2 } } } });
+
+t('broken_storage_string', async page => {
+  await page.evaluate(() => show('dojo'));
+  assert.equal(await page.locator('.dj-card').count(), 25); assert.equal(await page.locator('#dj-pairs').isHidden(), true);
+}, { storage: { dojo: 'こわれた' } });
+
+t('dark_theme', async page => {
+  await page.evaluate(() => show('dojo'));
+  const [bg, surface] = await page.evaluate(() => [getComputedStyle(document.querySelector('.dj-card')).backgroundColor,
+    (d => (d.style.background = 'var(--surface)', document.body.append(d), getComputedStyle(d).backgroundColor))(document.createElement('div'))]);
+  assert.equal(bg, surface); assert.notEqual(bg, 'rgb(255, 255, 255)');
+}, { storage: { settings: { theme: 'dark' } } });
+
+t('phone_width_no_scroll', async page => {
+  for (const s of ['setup', 'dojo']) {
+    await page.evaluate(s => show(s), s);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), s);
+  }
+  await page.click('#dj-mode [data-m="n2f"]'); await page.click('.dj-card[data-g="no"]'); await answerWrong(page);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+}, { viewport: { width: 360, height: 740 } });
+
+t('before_map_loads', async page => {
+  assert.equal(await page.evaluate(() => mapReady), false);
+  await page.evaluate(() => show('dojo'));
+  await page.click('.dj-card[data-g="td"]');
+  await clearRound(page);
+  assert.equal(await page.evaluate(() => mapReady), false);
+}, { waitMap: false, routes: [['**/world.js*', () => {}]] });
+
+t('missing_daily_core', async (page, app) => {
+  assert.equal(await page.locator('#to-dojo').count(), 0);
+  assert.equal(await page.locator('#scr-dojo').count(), 0);
+  assert.ok(app.consoleErrors.some(m => /\[dojo\]/.test(m)));
+}, { blockScripts: ['daily-core.js'] });
+
