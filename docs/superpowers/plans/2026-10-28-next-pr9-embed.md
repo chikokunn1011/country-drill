@@ -16,7 +16,7 @@
 
 - 出題は国旗・国名だけ（`f2n`・`n2f`）。地図の問題と首都の問題は出さない。埋めこみの画面に首都を出さない。
 - 新しい色は作らない。embed.html の `<style>` に index.html の変数を3か所写す: `:root`／`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`／`:root[data-theme="dark"]`。値は index.html と同じ（unit で比べる）。
-- `daily-core.js?v=` は index.html と embed.html で同じ数にし、main +1（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。daily-core.js は PR8 の `tools/make_country_pages.mjs` の入力なので、変えたあとも `regenerate_same` が通ること（`SIMILAR` を変えないので国のページは変わらない）。`embed.js?v=1`。`build`・`RULES`・`SIMILAR`・`FAMOUS` は変えない（今日の難問とランキングがずれる）。
+- `daily-core.js?v=` は index.html と embed.html で同じ数にし、main +1（今の main は `?v=1` なので `?v=2`。PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。daily-core.js は PR8 の `tools/make_country_pages.mjs` の入力なので、変えたあとも `regenerate_same` が通ること（`SIMILAR` を変えないので国のページは変わらない）。`embed.js?v=1`。`build`・`RULES`・`SIMILAR`・`FAMOUS` は変えない（今日の難問とランキングがずれる）。
 - 種は `kokki-embed:1:${day}`。候補は FAMOUS（57か国）から、その日の `build(day)` の20問の答えを外したもの。国はコード順に並べてから選ぶ。
 - localStorage・sessionStorage・Supabase・広告・Google Fonts・CDN を使わない。`TRANSFER_KEYS`・`LOCAL_KEYS`・`drill:*` イベントにさわらない。
 - 色の初期値はライト。`?theme=dark` でダーク、`?theme=auto` で端末に合わせる、それ以外の値はライト。
@@ -124,7 +124,7 @@ test('embed_head', () => {
   for (const s of [h, read('embed.js')]) assert.ok(!/localStorage|sessionStorage|supabase|adsbygoogle/i.test(s));
 });
 ```
-- [ ] **Step 2: e2e を書く**（`tests/e2e/embed.test.mjs`。日付は daily.test.mjs の `at(iso)` と同じ Date の差しかえを `init` に。f2n の日・n2f の日は、テストの頭で vm に countries.js と daily-core.js を読み、`2026-10-28` から1日ずつ見て最初に見つかった日を使う。開くのは `openApp(browser, { url: server.url + 'embed.html' + qs, init: at(day + 'T03:00:00Z'), … })`。各テストの最後に `app.errors` が0件）
+- [ ] **Step 2: e2e を書く**（`tests/e2e/embed.test.mjs`。日付は daily.test.mjs の `at(iso)` と同じ Date の差しかえを `init` に。f2n の日・n2f の日は、テストの頭で vm に countries.js と daily-core.js を読み、`2026-10-28` から1日ずつ見て最初に見つかった日を使う。開くのは `openApp(browser, { url: server.url, path: 'embed.html' + qs, init: at(day + 'T03:00:00Z'), … })`（helpers の openApp は `new URL(path, url)` を開く）。各テストの最後に `app.errors` が0件）
 
 ```js
 test('answer_wrong_then_right', ...)  // f2n の日と n2f の日の両方: まちがいを押す → .e-opt.ng が1つ、#e-msg /ちがう/、#e-links が見え、
