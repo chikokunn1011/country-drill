@@ -86,6 +86,15 @@ test('privacy_text', () => {
   assert.ok(h.includes('コードは24時間で使えなくなります。預けたデータは、そのあとの整理で消えます'));
   for (const s of ['Supabase', 'IP アドレス', 'GitHub Pages', 'Google Fonts', 'cdnjs', 'jsDelivr', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', '利用する場合があります', 'アクセス解析']) assert.ok(h.includes(s), s);
   assert.match(h, /最終更新日: \d{4}年\d{1,2}月\d{1,2}日/);
+  // 端末のデータは引き継ぎで外に出る。外に出ないと言い切るのはエラーの記録だけ
+  assert.ok(!h.includes('このサイトの外には送りません'));
+  assert.ok(h.includes('外に出るのは、あなたが自分で引き継ぎを使ったときだけです'));
+  assert.match(h, /<a href="#transfer">引き継ぎ<\/a>/);
+  assert.match(h, /<h3 id="transfer">/);
+  // 非公開でしぼるのはプロフィールのカードだけ。ランキングの表には名前と記録が出る
+  assert.ok(h.includes('プロフィールのカードには'));
+  assert.ok(h.includes('ランキングの表には、非公開でも名前と記録'));
+  assert.ok(!h.includes('ほかの人には名前・かざり'));
   // キーの名前は並べない（種類で書く）
   const upper = keysWithUpper(read('profile.js'));
   assert.ok(upper.includes('rpgRank') && upper.includes('adminErrors'), upper.join(','));
