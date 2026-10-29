@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerWrong, answerTap } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -99,3 +99,78 @@ for (const [fs, k] of [['l', 1.125], ['xl', 1.25]]) t(`pc_fs_${fs}_scales_pc_roo
   const px = parseFloat(await rootPx(page));
   assert.ok(Math.abs(px - base * k) < 0.1, `${px} != ${base * k}`);
 }, { viewport: { width: 1366, height: 657 }, storage: { settings: { fs } } });
+
+/* ---------- Task 3: 色と印 ---------- */
+// 色の移り変わり（.choice の transition）で途中の色を測らないよう、このあとのテストは reducedMotion: 'reduce' で開く
+// 練習・全世界・5問で始めて、1問まちがえる（正解の選択肢が .ok、押したのが .ng になる）
+const wrongOnce = async (page, mode = 'f2n') => {
+  await pickSetup(page, { mode, kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await page.waitForSelector('#qcard .choice');
+  await answerWrong(page);
+  await page.waitForSelector('#next');
+};
+const looks = page => page.evaluate(() => {
+  const one = sel => { const el = document.querySelector(sel), a = getComputedStyle(el, '::after');
+    return { border: getComputedStyle(el).borderTopColor, mark: a.content, markBg: a.backgroundColor }; };
+  return { ok: one('#qcard .choice.ok'), ng: one('#qcard .choice.ng'), verdict: getComputedStyle(document.querySelector('.verdict')).color };
+});
+const BLUE = 'rgb(0, 114, 178)', ORANGE = 'rgb(213, 94, 0)', SKY = 'rgb(86, 180, 233)', AMBER = 'rgb(230, 159, 0)';
+const GREEN = 'rgb(46, 139, 87)', RED = 'rgb(196, 61, 61)';
+const hasMark = (m, ch) => m.includes(ch);
+
+// 設定に関係なく、正解に ✓・まちがいに ✗ の印。色はいまのまま
+t('marks_always_and_default_colors', async page => {
+  await wrongOnce(page);
+  const l = await looks(page);
+  assert.equal(l.ok.border, GREEN); assert.equal(l.ng.border, RED);
+  assert.ok(hasMark(l.ok.mark, '✓'), l.ok.mark); assert.ok(hasMark(l.ng.mark, '✗'), l.ng.mark);
+}, { reducedMotion: 'reduce' });
+
+t('cvd_light_blue_orange', async page => {
+  await wrongOnce(page);
+  const l = await looks(page);
+  assert.deepEqual([l.ok.border, l.ng.border, l.ok.markBg, l.ng.markBg], [BLUE, ORANGE, BLUE, ORANGE]);
+  assert.equal(l.verdict, ORANGE);   // まちがえたので「ざんねん」の文字もオレンジ
+}, { storage: { settings: { cvd: true } }, reducedMotion: 'reduce' });
+
+// ドパガキ ON でも色の見分けやすさが勝つ（ライト・ダーク・端末に合わせるのダーク）
+t('cvd_beats_dopa_light', async page => {
+  await wrongOnce(page);
+  const l = await looks(page);
+  assert.deepEqual([l.ok.border, l.ng.border], [BLUE, ORANGE]);
+}, { storage: { settings: { cvd: true, dopa: true, sound: false } }, reducedMotion: 'reduce' });
+
+t('cvd_dark_theme', async page => {
+  await wrongOnce(page);
+  const l = await looks(page);
+  assert.deepEqual([l.ok.border, l.ng.border], [SKY, AMBER]);
+}, { storage: { settings: { cvd: true, dopa: true, sound: false, theme: 'dark' } }, reducedMotion: 'reduce' });
+
+t('cvd_auto_on_dark_device', async page => {
+  await wrongOnce(page);
+  const l = await looks(page);
+  assert.deepEqual([l.ok.border, l.ng.border], [SKY, AMBER]);
+}, { colorScheme: 'dark', storage: { settings: { cvd: true, dopa: true, sound: false, theme: 'auto' } }, reducedMotion: 'reduce' });
+
+// 国旗の選択肢でも印は国旗の絵に重ならない
+t('flag_choice_mark_does_not_cover_flag', async page => {
+  await wrongOnce(page, 'n2f');
+  const r = await page.evaluate(() => [...document.querySelectorAll('#qcard .choice.ok, #qcard .choice.ng')].map(el => {
+    const img = el.querySelector('img').getBoundingClientRect(), b = el.getBoundingClientRect(), a = getComputedStyle(el, '::after');
+    const h = parseFloat(a.height), top = b.top + parseFloat(a.top);
+    return { markBottom: top + h, imgTop: img.top };
+  }));
+  assert.equal(r.length, 2);
+  for (const x of r) assert.ok(x.markBottom <= x.imgTop + 0.5, JSON.stringify(x));
+}, { reducedMotion: 'reduce' });
+
+// 白地図タップの外れの線（.tapline）も変数経由でオレンジになる
+t('cvd_tapmap_line_is_orange', async page => {
+  await pickSetup(page, { mode: 'tap', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await page.waitForSelector('#qcard .tapmap');
+  await answerTap(page, { right: false });
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#qcard .tapmap .tapline')).stroke), ORANGE);
+}, { storage: { settings: { cvd: true } }, reducedMotion: 'reduce' });

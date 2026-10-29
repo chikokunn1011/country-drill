@@ -224,6 +224,10 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .choice span { min-width: 0; overflow-wrap: anywhere; }
 .choice.ok { border-color: var(--ok); background: var(--ok-soft); }
 .choice.ng { border-color: var(--ng); background: var(--ng-soft); }
+/* 色だけに頼らない印（設定に関係なくいつも）。角の外に小さく出して、文字や国旗の絵に重ねない */
+.choice.ok::after, .choice.ng::after { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; border-radius: 50%; color: var(--surface); font: 900 .75rem/20px var(--font-body); text-align: center; pointer-events: none; }
+.choice.ok::after { content: "✓"; content: "✓" / "正解"; background: var(--ok); }
+.choice.ng::after { content: "✗"; content: "✗" / "まちがい"; background: var(--ng); }
 .choice:disabled { cursor: default; }
 .choice.flagc, .choice.mapc { flex-direction: column; align-items: stretch; padding: 10px; gap: 6px; }
 .choice.flagc kbd, .choice.mapc kbd { align-self: flex-start; }
@@ -373,6 +377,13 @@ body.dopa { --accent: #ff1f7a; --accent-ink: #ffffff; --hl: #ffc400; --ok: #00b8
   :root:not([data-theme="light"]) body.dopa { --accent: #ff4f9a; --accent-ink: #1a0010; --hl: #ffd400; --ok: #2bff88; --ok-soft: #0c3a22; --ng: #ff5a52; --ng-soft: #3d1414; }
 }
 :root[data-theme="dark"] body.dopa { --accent: #ff4f9a; --accent-ink: #1a0010; --hl: #ffd400; --ok: #2bff88; --ok-soft: #0c3a22; --ng: #ff5a52; --ng-soft: #3d1414; }
+/* 色の見分けやすさ（設定の cvd → <html data-cvd>）: 正解を青、まちがいをオレンジに（Okabe–Ito）。
+   body に置いて、ドパガキ（body.dopa）の色より強くする（ダークの2つは dopa と同じ強さなので、dopa より後ろに書く） */
+:root[data-cvd] body { --ok: #0072b2; --ok-soft: #dcecf7; --ng: #d55e00; --ng-soft: #fbe6d6; }
+@media (prefers-color-scheme: dark) {
+  :root[data-cvd]:not([data-theme="light"]) body { --ok: #56b4e9; --ok-soft: #12304a; --ng: #e69f00; --ng-soft: #3d2c08; }
+}
+:root[data-cvd][data-theme="dark"] body { --ok: #56b4e9; --ok-soft: #12304a; --ng: #e69f00; --ng-soft: #3d2c08; }
 body.dopa .btn:not(.ghost) { background: linear-gradient(120deg, #ff1f7a, #ff7a00, #ffc400, #ff1f7a); background-size: 300% 100%; color: #fff; animation: dopa-grad 3s linear infinite; box-shadow: 0 4px 0 rgb(120 0 50 / .35); text-shadow: 0 1px 2px rgb(0 0 0 / .3); }
 body.dopa .btn:not(.ghost):active { transform: translateY(3px); box-shadow: 0 1px 0 rgb(120 0 50 / .35); }
 body.dopa .bar { height: 12px; border-radius: 6px; }
