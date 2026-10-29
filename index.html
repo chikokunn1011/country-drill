@@ -330,6 +330,10 @@ body[data-screen="quiz"] footer { display: none; }   /* 出題中はフッター
   .qcard { padding: 16px; }
   .facts { grid-template-columns: 72px 1fr; } .facts img { width: 72px; }
   .modegrid, .kind { grid-template-columns: 1fr; }
+  /* スマホのアイコンは幅が 50〜67px。「プロフィール」（6文字）が途中で折れないよう、左右の余白をなくし、字を画面の幅に合わせて小さくする
+     （アイコン1つの中身 ≒ (100vw − 余白32 − すき間24) ÷ 5 − 枠3。6文字 × 0.98 がそこに入る大きさ。広ければ .72rem のまま） */
+  .hicon { padding-inline: 0; }
+  .hi-label { font-size: min(.72rem, calc((100vw - 56px) / 32)); letter-spacing: -.02em; }
 }
 /* 2列の入れ物とクイズの問題欄（スマホの見た目。PC は pc.css で上書き） */
 .cols, .col { display: flex; flex-direction: column; gap: 14px; }

@@ -40,8 +40,8 @@ body[data-screen="home"] #scr-home { flex: 1 0 auto; justify-content: center; }
 .home .flags { max-width: 820px; gap: 8px; }
 .home .flags img { width: 44px; }
 .home .flags img:nth-child(n+8) { display: block; }
-/* 900〜1279: カード3枚を横3列。アイコンの列はその下 */
-.home-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 960px); }
+/* 900〜1279: カードを横1行（1枚は3等分の幅）。見えているカードだけで列を作り、2枚なら詰めて中央に寄せる（冒険 OFF など）。アイコンの列はその下 */
+.home-big { display: grid; grid-auto-flow: column; grid-auto-columns: calc((100% - 20px) / 3); justify-content: center; width: min(100%, 960px); }
 /* PC は字が大きくなる（≥1280 で rem が 18px まで）ので、アイコンを少し広げて「プロフィール」を1行に */
 .home-icons { width: min(100%, 520px); }
 .hicon { max-width: 100px; }

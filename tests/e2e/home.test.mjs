@@ -54,8 +54,15 @@ for (const [files, gone] of [[['daily.js'], 'home-daily'], [RPG_FILES, 'home-rpg
     assert.equal(seen.length, 7, seen.join());
   }, { blockScripts: files });
 
+// 冒険 OFF: カードは2枚。900〜1279（カードが横1行）でも空いた列を残さず、2枚は詰めて中央に寄る（左右の余りが同じ）
 t('rpg_off_hides_card', async page => {
   assert.deepEqual(await ids(page, '#home-big > .hbig'), ['home-play', 'home-daily']);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await settleLayout(page);
+  const [a, b] = await page.$$eval('#home-big > .hbig', es => es.filter(e => e.checkVisibility()).map(e => e.getBoundingClientRect().toJSON()));
+  assert.equal(Math.round(a.top), Math.round(b.top));   // 横1行
+  const left = a.left, right = await page.evaluate(() => innerWidth) - b.right;
+  assert.ok(Math.abs(left - right) <= 2, `中央に寄っていない 左${left} 右${right}`);
 }, { storage: { badges: QUIET_BADGES, rpg: saveWith({ show: false }) } });
 
 t('ranking_disabled', async page => {
@@ -131,6 +138,24 @@ t('phone_360_fits', async page => {
   const icons = await page.$$eval('#home-icons > .hicon', es => es.filter(e => e.checkVisibility()).map(e => Math.round(e.getBoundingClientRect().top)));
   assert.equal(new Set(icons).size, 1);   // アイコンは1行
 }, { viewport: { width: 360, height: 640 }, storage: LONGEST });
+
+// スマホの3サイズ: アイコンの名前（いちばん長い「プロフィール」）が途中で折れず1行（pc_fits の oneLine と同じ見方）
+t('phone_labels_one_line', async page => {
+  for (const width of [390, 360, 320]) {
+    await page.setViewportSize({ width, height: 700 });
+    await settleLayout(page);
+    const wrapped = await page.$$eval('.hi-label', es => es.filter(e => e.checkVisibility()).filter(el => {
+      const rs = [];
+      for (const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); w.nextNode();) {
+        const rg = document.createRange(); rg.selectNodeContents(w.currentNode); rs.push(...rg.getClientRects());
+      }
+      const live = rs.filter(r => r.width);
+      return !(live.length > 0 && Math.max(...live.map(r => r.top)) < Math.min(...live.map(r => r.bottom)));
+    }).map(e => e.closest('button').id));
+    assert.deepEqual(wrapped, [], `${width}: 名前が2行になっている`);
+    assert.ok(await noHScroll(page), String(width));
+  }
+}, { viewport: { width: 390, height: 844 }, storage: LONGEST });
 
 // PC の7サイズ: 横にも縦にもスクロールせず、入口8つと称号の札が画面の中にあって、たがいに重ならない。カードの名前とアイコンの名前は1行
 t('pc_fits', async page => {
