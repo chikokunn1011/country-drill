@@ -105,3 +105,38 @@ test('SQL の問題数と同じ', () => {
   assert.equal(D.COUNT, 20);
   assert.match(read('supabase/schema.sql'), /daily_count\(\) returns int\s+language sql immutable set search_path = public, pg_temp as \$\$ select 20 \$\$/);
 });
+
+// 埋めこみ（embed.html）の1日1問
+test('oneOfDay: 同じ日に同じ結果、並びが変わっても同じ', () => {
+  const q = plain(D.oneOfDay('2026-10-28', C));
+  assert.deepEqual(Object.keys(q), ['day', 'mode', 'a', 'opts']);   // 首都の項目は無い
+  assert.equal(q.day, '2026-10-28');
+  assert.deepEqual(plain(D.oneOfDay('2026-10-28', C.slice().reverse())), q);
+  assert.throws(() => D.oneOfDay('2026-02-30', C));
+  assert.deepEqual(plain(D.EMBED_MODES), ['f2n', 'n2f']);
+});
+test('oneOfDay: 366日ぶん、答えバレなし・選択肢4つ・FAMOUS・国旗と国名だけ', () => {
+  for (const d of days) {
+    const q = D.oneOfDay(d, C), answers = new Set(D.build(d, C).map(x => x.a));
+    assert.ok(['f2n', 'n2f'].includes(q.mode), d);
+    assert.ok(D.FAMOUS.has(q.a) && !answers.has(q.a), d);
+    assert.equal(q.opts.length, 4, d); assert.equal(new Set(q.opts).size, 4, d);
+    assert.equal(q.opts.filter(a => a === q.a).length, 1, d);
+    assert.ok(q.opts.every(a => codes.has(a)), d);
+  }
+});
+test('oneOfDay: 選択肢は同じ地域から（足りる地域なら）', () => {
+  for (const d of days) {
+    const q = D.oneOfDay(d, C), r = byA.get(q.a).r;
+    if (C.filter(c => c.r === r).length >= 4) assert.ok(q.opts.every(a => byA.get(a).r === r), d);
+  }
+});
+test('oneOfDay: 出る国と形のかたより', () => {
+  const qs = days.map(d => D.oneOfDay(d, C)), n = new Map();
+  for (const q of qs) n.set(q.a, (n.get(q.a) ?? 0) + 1);
+  assert.ok(n.size >= 45, `${n.size}か国`); assert.ok(Math.max(...n.values()) <= 20);
+  for (const m of ['f2n', 'n2f']) assert.ok(qs.filter(q => q.mode === m).length >= 140, m);
+});
+test('oneOfDay は build を変えない', () => {   // oneOfDay を足す前の daily-core.js で取った 2026-10-28 の答えの列
+  assert.equal(D.build('2026-10-28', C).map(q => q.a).join(), 'si,kn,rs,na,ws,sc,mv,gn,hu,pw,ro,lr,gw,mc,tv,me,bn,kw,km,xk');
+});
