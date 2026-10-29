@@ -32,6 +32,8 @@
 <script>
 // 画面の色（設定の theme、未設定はライト）を描く前に当てる。'auto' なら data-theme を付けず、端末の設定に合わせる
 try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+// 見やすさ（設定の fs・cvd）も同じく最初から。文字の大きさ 'l' / 'xl' は <html data-fs>、色の見分けやすさ ON は <html data-cvd>（'m'・OFF は属性なし）
+try { const s = JSON.parse(localStorage.getItem('settings')) || {}, de = document.documentElement; if (s.fs === 'l' || s.fs === 'xl') de.dataset.fs = s.fs; if (s.cvd === true) de.dataset.cvd = ''; } catch {}
 // 起きたエラーを localStorage adminErrors に新しい50件まで残す（admin.html のログタブで見る）。ここでは例外を出さない
 (() => { const rec = (msg, src, line, pre = '') => { try { let a; try { a = JSON.parse(localStorage.getItem('adminErrors')); } catch {} a = Array.isArray(a) ? a : [];
   let m; try { m = String(msg); } catch { m = typeof msg; } // Symbol や null-prototype でも止まらない
@@ -646,7 +648,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light', quick: false }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light', quick: false, fs: 'm', cvd: false }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -1056,6 +1058,12 @@ function renderSettings() {
 }
 // 'light' / 'dark' は <html data-theme> で色を固定、'auto' は外して prefers-color-scheme に任せる（head の先読みと同じ）
 const applyTheme = () => { if (S.theme === 'light' || S.theme === 'dark') document.documentElement.dataset.theme = S.theme; else delete document.documentElement.dataset.theme; };
+// 見やすさ: 文字の大きさ（'l' / 'xl' だけ <html data-fs>）と色の見分けやすさ（true だけ <html data-cvd>）。head の先読みと同じ
+const applyA11y = () => {
+  const de = document.documentElement;
+  if (S.fs === 'l' || S.fs === 'xl') de.dataset.fs = S.fs; else delete de.dataset.fs;
+  if (S.cvd === true) de.dataset.cvd = ''; else delete de.dataset.cvd;
+};
 $('set-theme').onclick = e => {
   const b = e.target.closest('[data-th]'); if (!b) return;
   S.theme = b.dataset.th; store.set('settings', S); applyTheme(); renderSettings();
@@ -1750,6 +1758,7 @@ function playRegionOf(hash) {
   return r === 'all' || REGIONS.includes(r) || Object.hasOwn(SUBREGIONS, r) ? r : null;
 }
 applyTheme();
+applyA11y();
 applyDopa();
 // #play=<地域> はその地域を選んで保存し、モード選択を開く。知らない値は無視してホーム
 const playR = playRegionOf(location.hash);
