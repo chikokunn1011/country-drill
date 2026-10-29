@@ -189,9 +189,18 @@ test('contact_form_url', () => {   // URL が入っていれば本物の Google 
 
 test('howto_sections', () => {
   const h = read('howto.html');
-  for (const id of ['start', 'modes', 'kinds', 'daily', 'rpg', 'book', 'badges', 'profile', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`));
+  for (const id of ['start', 'modes', 'kinds', 'daily', 'rpg', 'book', 'badges', 'profile', 'embed', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`));
   assert.ok(!/<img\b/.test(h));
   assert.ok(!/首都を(当てる|答える)/.test(h.replace('首都を当てる問題はない', '')));   // 首都を問うと読める文がない
+});
+// 埋めこみの貼り付けコード（高さと幅は tests/e2e/embed.test.mjs の fits_snippet_box と同じ）
+test('howto_embed', () => {
+  const h = read('howto.html'), snip = '<iframe src="https://chikokunn1011.github.io/country-drill/embed.html" title="今日の国旗（国旗マスター）" width="100%" height="440" style="max-width:400px;border:0" loading="lazy"></iframe>';
+  assert.match(h, /<h2 id="embed"/);
+  assert.ok(h.includes(snip.replace(/</g, '&lt;').replace(/>/g, '&gt;')));   // < と > だけエスケープ（" はそのまま）
+  assert.ok(h.includes('?theme=dark') && h.includes('?theme=auto'));
+  assert.ok(!/<iframe\b/.test(h));   // ページの中で実際に埋めこまない（コードとして見せるだけ）
+  assert.ok(!footerHrefs(h).some(x => x.includes('embed')));   // フッターには足さない
 });
 test('sitemap_lists_pages', () => {
   const locs = [...read('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
