@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「B4」の節・「実装の順番」・「チコに決めてほしいこと」17・18・「テストの方針」）
 
-前提: PR0（#25・#26 のあとの整理）と PR1（B2 静的ページ）はマージ済み。ファイル:行は #25・#26 マージ前の main のもので、**マージ後に再確認**する。
+前提: PR0（#25・#26 のあとの整理）はマージ済み。PR1（B2 静的ページ）はこの作業ツリーに入っていて、まもなく main にマージされる。ファイル:行は PR1 を含む pr2-work の始まり（752d01b）のもの（2026-10-29 に見直した）。
 
 ## Global Constraints
 
@@ -30,7 +30,7 @@
 2. タイムアタックの「じゅんび中」に［やめる］→ あとで国旗が読み終わっても1問目が出ない・タイマーが動かない（`quit` は G を入れかえないので `G !== g || g.ended` で見る。Task 3 `quit_during_prep`）。
 3. 「じゅんび中」に数字キー・Enter → 例外が出ない（`if (!G?.cur) return`。Task 3 `keys_during_prep`）。
 4. 地図が読めない（world.js が 404）ときに［もう一度］で直る。d3 だけ読めていて world.js だけ足りない場合も二重に読まない（Task 2 `world_blocked_retry`）。
-5. `startGame()` の直後に同期で `G.cur` を読む既存テスト（`timeattack.test.mjs:182`、`hooks.test.mjs:370` など）→ `await startGame()` か settle に直す（Task 3 Step 4）。
+5. `startGame()` の直後に同期で `G.cur` を読む既存テスト（`timeattack.test.mjs:182`、`hooks.test.mjs:161` など）→ `await startGame()` か settle に直す（Task 3 Step 4）。
 
 ---
 
@@ -38,7 +38,7 @@
 
 **Files:**
 - Create: `tools/split_flags.mjs`、`flags/*.svg`（195個）、`tests/unit/flag-files.test.mjs`
-- Modify: `index.html:507`（`<script src="flags.js">` を消す）、`index.html:533-534`（`flagCache`・`flag`）、`index.html:810`（`#home-flags` に `loading="lazy"`）、`README.md:57`
+- Modify: `index.html:524`（`<script src="flags.js">` を消す）、`index.html:553-554`（`flagCache`・`flag`）、`index.html:830`（`#home-flags` に `loading="lazy"`）、`README.md:68`
 - Delete: `flags.js`
 
 **Interfaces:**
@@ -75,7 +75,7 @@ test('home_flags_lazy', () => assert.match(read('index.html'), /\$\('home-flags'
 
 **Files:**
 - Create: `vendor/d3-7.9.0.min.js`、`vendor/d3-LICENSE`、`vendor/topojson-client-3.1.0.min.js`、`vendor/topojson-client-LICENSE`（`tests/e2e/node_modules/{d3,topojson-client}` から写す）、`tests/e2e/load.test.mjs`
-- Modify: `index.html:504-508`（d3・topojson・world.js の script を消す）、`index.html:526-531`（`feats` など）、`index.html:586`（`graticule`）、`index.html:789-801`（`show`）、`index.html:354` 付近（`#mapwait` の HTML と CSS）、`index.html:1398-1400`（起動）、`rpg.js:15`・`rpg-battle.js:13`（NEED から `d3`）と両方の `?v=`、`tests/e2e/helpers.mjs`（`openApp` の `waitMap`）、`privacy.html` の `#external` と `tests/unit/pages.test.mjs` の `privacy_text`（cdnjs・jsDelivr を外す）、`tests/unit/flag-files.test.mjs`、`README.md:58`
+- Modify: `index.html:521-525`（d3・topojson・world.js の script を消す）、`index.html:546-551`（`feats` など）、`index.html:606`（`graticule`）、`index.html:809-822`（`show`）、`index.html:366` の `#topbar` の直後と CSS（`#mapwait`）、`index.html:1435-1440`（起動）、`rpg.js:15`・`rpg-battle.js:13`（NEED から `d3`）と両方の `?v=`（rpg.js 12→13、rpg-battle.js 15→16。どちらも main の歴史で使っていない数）、`tests/e2e/helpers.mjs:447-479`（`openApp` の `waitMap`）、`privacy.html:75` の `#external` と `tests/unit/pages.test.mjs:106` の `privacy_text`（cdnjs・jsDelivr を外す）、`tests/unit/flag-files.test.mjs`、`README.md:69`
 
 **Interfaces:**
 - Produces（index.html のグローバル。A6・A7・B1 が前提にする）:
@@ -132,7 +132,7 @@ test('navigate_while_waiting', ...) // world.js を 1000ms 遅らせる → #hom
 ### Task 3: 国旗の先読みと「じゅんび中」
 
 **Files:**
-- Modify: `index.html:941-967`（`startGame`・`startDaily`）、`index.html:979-1016`（`nextQuestion`）、`index.html:1245`（クイズの keydown）、`rpg-battle.js`（`showQ` の最後と `RPG_BATTLE.state()`。`?v=` は Task 2 で上げたので同じ PR の中では上げない）、`tests/e2e/helpers.mjs:98`（`settle`）、`tests/e2e/load.test.mjs`、`startGame()` を同期で使う既存 e2e
+- Modify: `index.html:961-989`（`startGame`・`startDaily`）、`index.html:999-1040`（`nextQuestion`）、`index.html:1281`（クイズの keydown）、`rpg-battle.js`（`showQ` の最後と `RPG_BATTLE.state()`。`?v=` は Task 2 で上げたので同じ PR の中では上げない）、`tests/e2e/helpers.mjs:501`（`settle`）、`tests/e2e/load.test.mjs`、`startGame()` を同期で使う既存 e2e
 - Test: `tests/e2e/load.test.mjs`
 
 **Interfaces:**
@@ -162,6 +162,6 @@ test('battle_preloads_next', ...) // rpg_helpers の openRpg → startBattle(pag
 ```
 - [ ] **Step 2: 落ちるのを見る** — `node --test --test-concurrency=1 tests/e2e/load.test.mjs` → 新しいテストが FAIL
 - [ ] **Step 3: 作る** — Interfaces のとおり。`const PRELOAD_MS = 10000`。keydown（1–4・Enter）の先頭に `if (!G?.cur) return`。`$('start').onclick`・`r-again`・daily.js の `startDaily(...)` は Promise を待たなくてよい。settle を直す。
-- [ ] **Step 4: 既存 e2e を直す** — `grep -n "startGame()\|G\.t0\|G\.cur" tests/e2e/*.mjs` で、タイムアタック・今日の難問を始めた直後に同期で `G.cur`/`G.t0` を読むところを `await page.evaluate(async () => { await startGame(); … })` か `await settle(page)` にする（少なくとも `timeattack.test.mjs:182`、`hooks.test.mjs:370`、`daily.test.mjs:38` を見る）。テストの意味は変えない。
+- [ ] **Step 4: 既存 e2e を直す** — `grep -n "startGame()\|G\.t0\|G\.cur" tests/e2e/*.mjs` で、タイムアタック・今日の難問を始めた直後に同期で `G.cur`/`G.t0` を読むところを `await page.evaluate(async () => { await startGame(); … })` か `await settle(page)` にする（少なくとも `timeattack.test.mjs:182`、`hooks.test.mjs:161`・`hooks.test.mjs:365` の `ta_time_excludes_listener`、`daily.test.mjs:22` の `startDailyFromHome` を見る）。テストの意味は変えない。
 - [ ] **Step 5: 通るのを見る** — e2e 全部 → PASS。`GEOM_BASE=origin/main node --test --test-concurrency=1 tests/e2e/pc_layout.test.mjs` で `phone_geometry_unchanged` を流し、差が `#mapwait`・ホームの国旗まわり・「じゅんび中」だけか見る（README のとおり、わざとの差はコミットの説明に書く）。
 - [ ] **Step 6: 全テスト → コミット** `git add index.html rpg-battle.js tests/e2e`、メッセージ「タイムアタックと今日の難問は国旗を読み終えてから始め、練習・冒険は次の国旗を先に読む」
