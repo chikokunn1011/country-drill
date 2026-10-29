@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「B1」の節・「実装の順番」・「チコに決めてほしいこと」12・13・「テストの方針」）
 
-前提: PR0〜PR7 はマージ済み。とくに PR1（フッターの目印 `<!-- footer:start -->`〜`<!-- footer:end -->`、`pages.css`、`tests/unit/pages.test.mjs` の `PAGES`・`footerHrefs`、sitemap の3ページ）と PR2（`const FLAG_V = 1`、`flags/<a>.svg`、`MAP_SCREENS`・`show()` の地図待ち、`openApp` の `waitMap`）。#25 の起動の分かれ道 `if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(start);` もある。ファイル:行は #25・#26 マージ前の main のもので、**マージ後に再確認**する。
+前提: PR0〜PR4 はマージ済み（PR5 A1・PR6 A6・PR7 A7 はまだ main に無く、別の作業ツリーで並行して作る。このPRはそれらに頼らない）。とくに PR1（フッターの目印 `<!-- footer:start -->`〜`<!-- footer:end -->`、`pages.css`、`tests/unit/pages.test.mjs` の `PAGES`・`footerHrefs`、sitemap の3ページ）と PR2（`const FLAG_V = 1`、`flags/<a>.svg`、`MAP_SCREENS`・`show()` の地図待ち、`openApp` の `waitMap`）。#25 の起動の分かれ道 `if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(start);` もある。#25・#26 もマージ済み。ファイル:行は PR4 マージ後の main（ca18e5b）で確かめた。
 
 ## Global Constraints
 
@@ -22,10 +22,10 @@
 - 生成は決まった出力: 日付・乱数を使わない。国はコード順（`a` の昇順）。作ったファイルはコミット（決めてほしいこと12）。
 - sitemap は `<!-- country:start -->`〜`<!-- country:end -->` のあいだだけ書く。国のページに `<lastmod>` を付けない。
 - localStorage のキー・Supabase・イベント（`drill:*`）は変えない。`TRANSFER_KEYS`・`LOCAL_KEYS` にさわらない。
-- `?v=` は「そのとき main にある数 +1」、中身を変えた js/css だけ（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。新しい `country/country.css` は `?v=1`。
+- `?v=` は「そのとき main にある数 +1」、中身を変えた js/css だけ（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。新しい `country/country.css` は `?v=1`。このPRは index.html の中の script とフッターだけを変え、外の js/css（`pages.css` も）は変えないので、上げる `?v=` は無い。
 - サイトの URL の頭: `https://chikokunn1011.github.io/country-drill/`。
 - コミットメッセージは日本語、末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` と `Claude-Session: https://claude.ai/code/session_0165YqqRbQ9cLHPBbRkUzhmj`。
-- 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`node --test --test-concurrency=1 'tests/e2e/*.test.mjs'`（tests/e2e で `npm ci` 済み）、`bash tests/sql/run.sh`。
+- 毎タスクの終わりに: unit は全部（`node --test tests/unit/*.test.mjs`）。e2e は変えた所に関係するファイルだけ（`cd tests/e2e && node --test --test-concurrency=1 a.test.mjs b.test.mjs`）。e2e の全体は最後に別の手順で流す。SQL は変えないので `bash tests/sql/run.sh` は不要。
 
 ## Review Focus
 
@@ -48,7 +48,7 @@
 - Produces:
   - フッター（4ページで同じ）の最後に `<a href="country/">国の一覧</a>`。国のページでは相対 href の頭に `../`（`http`・`#` で始まるものは変えない）。
   - `tools/make_country_pages.mjs`（ESM。CLI は `node tools/make_country_pages.mjs [--root DIR] [--out DIR]`、どちらも既定はリポジトリの根）。テストのために export:
-    - `readInputs(root: string) -> { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles: Set<string> }` — `REGIONS`・`SUBREGIONS` は index.html から `/const REGIONS = (\[[^\]]*\]);/`・`/const SUBREGIONS = (\{[\s\S]*?\n\});/` で抜き、`vm` で評価。`themeScript` は head の最初の `<script>…</script>`、`fontLink` は `fonts.googleapis.com/css2` の `<link>` の行。
+    - `readInputs(root: string) -> { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles: Set<string> }` — `REGIONS`・`SUBREGIONS` は index.html から `/const REGIONS = (\[[^\]]*\]);/`・`/const SUBREGIONS = (\{[\s\S]*?\n\});/` で抜き、`vm` で評価。`themeScript` は index.html の head の script のうち `dataset.theme` を含む行（pages.test の `themeScript` と同じ取り方。head の最初の `<script>` には adminErrors を残す文も入っているので、それは写さない）。国のページでは privacy.html と同じく1行のコメントと合わせて `<script>…</script>` に入れる。`fontLink` は `fonts.googleapis.com/css2` の `<link>` の行。
     - `check(inp) -> string[]`（空なら OK）: `SIMILAR に知らないコード: xx`／`豆知識が0件: xx`／`flags/xx.svg が無い`／`フッターの目印が無い`。
     - `render(inp) -> Record<string, string>`（出力の相対パス → 中身。`country/index.html`・`country/<a>.html`×195・`sitemap.xml`）。
     - CLI: `check` が1件でもあれば stderr に全部出して `process.exit(1)`、何も書かない。なければ `render` を `--out` に書く。
@@ -134,7 +134,7 @@ test('escapes_text', () => withTmp(dir => {   // 豆知識に `<b>&"` → ペー
 ### Task 2: 起動の `#play=<地域>`
 
 **Files:**
-- Modify: `index.html` の起動（今の `index.html:1399-1400`、#25 マージ後は `const start = …` と `#ranking` の行。マージ後に再確認）
+- Modify: `index.html` の起動（今の `index.html:1568` の `const start = …` と `1571` の `#ranking` の行）
 - Test: `tests/e2e/country.test.mjs`（新規）
 
 **Interfaces:**
@@ -165,7 +165,7 @@ test('play_plain_unchanged', ...) // '#play'（値なし）は今までどおり
 ### Task 3: 図鑑からのリンク・国のページの e2e・README
 
 **Files:**
-- Modify: `index.html`（`selectBook` の `$('binfo').innerHTML`、`$('grid').onclick` の `inner.innerHTML`。今の `index.html:1379`・`1388`、マージ後に再確認。CSS に `.cpage` を1行）、`README.md`
+- Modify: `index.html`（`selectBook` の `$('binfo').innerHTML`、`$('grid').onclick` の `inner.innerHTML`。今の `index.html:1548`・`1557`。CSS に `.cpage` を1行）、`README.md`
 - Test: `tests/e2e/country.test.mjs`
 
 **Interfaces:**
