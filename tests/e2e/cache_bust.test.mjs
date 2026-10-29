@@ -28,3 +28,27 @@ test('changed_files_bump_version', t => {
   }
   assert.deepEqual(problems, []);
 });
+
+// 同じ ?v= なら同じ中身: 作業中の index.html の「ファイル?v=数」が origin/main の歴史（first-parent）に出ていたら、
+// そのときのファイルと今のファイルが同じであること（別の中身を同じ ?v= で配ると、古いキャッシュを持つ人に混ざる）
+test('same_version_same_content', t => {
+  let commits;
+  try { commits = git('rev-list', '--first-parent', 'origin/main').trim().split('\n'); } catch {
+    t.diagnostic('origin/main が無いので比べない');
+    return;
+  }
+  const mine = versions(readFileSync(join(ROOT, 'index.html'), 'utf8'));
+  const now = Object.fromEntries(Object.keys(mine).map(file => [file, git('hash-object', file).trim()]));
+  const problems = new Map();   // ファイル → 最初に見つけた（いちばん新しい）食いちがい
+  for (const c of commits) {
+    let old;
+    try { old = versions(git('show', `${c}:index.html`)); } catch { continue; }   // index.html が無いころ
+    for (const [file, v] of Object.entries(mine)) {
+      if (old[file] !== v) continue;
+      let blob;
+      try { blob = git('rev-parse', `${c}:${file}`).trim(); } catch { blob = null; }
+      if (blob !== now[file] && !problems.has(file)) problems.set(file, `${file}?v=${v}（${c.slice(0, 7)} で別の中身）`);
+    }
+  }
+  assert.deepEqual([...problems.values()], []);
+});
