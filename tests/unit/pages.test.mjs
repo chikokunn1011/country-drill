@@ -72,3 +72,22 @@ test('footer_targets_exist', () => {
     if (id) assert.ok(read(file).includes(`id="${id}"`), `${p}: ${file} に id="${id}" が無い`);
   }
 });
+
+// profile.js の TRANSFER_KEYS・LOCAL_KEYS のうち、大文字をふくむキーの名前（rpgRank・adminErrors など）
+const keysWithUpper = src => ['TRANSFER_KEYS', 'LOCAL_KEYS'].flatMap(name => {
+  const m = new RegExp(`const ${name} = \\[([^\\]]*)\\]`).exec(src);
+  assert.ok(m, `profile.js に ${name} が無い`);
+  return [...m[1].matchAll(/'([^']+)'/g)].map(x => x[1]).filter(k => /[A-Z]/.test(k));
+});
+
+test('privacy_text', () => {
+  const h = read('privacy.html');
+  for (const id of ['collect', 'device', 'ranking', 'names', 'delete', 'external', 'ads', 'analytics', 'changes']) assert.match(h, new RegExp(`<h2 id="${id}"`));
+  assert.ok(h.includes('コードは24時間で使えなくなります。預けたデータは、そのあとの整理で消えます'));
+  for (const s of ['Supabase', 'IP アドレス', 'GitHub Pages', 'Google Fonts', 'cdnjs', 'jsDelivr', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', '利用する場合があります', 'アクセス解析']) assert.ok(h.includes(s), s);
+  assert.match(h, /最終更新日: \d{4}年\d{1,2}月\d{1,2}日/);
+  // キーの名前は並べない（種類で書く）
+  const upper = keysWithUpper(read('profile.js'));
+  assert.ok(upper.includes('rpgRank') && upper.includes('adminErrors'), upper.join(','));
+  for (const k of upper) assert.ok(!h.includes(k), k);
+});
