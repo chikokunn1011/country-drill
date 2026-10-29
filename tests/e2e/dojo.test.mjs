@@ -167,3 +167,10 @@ t('missing_daily_core', async (page, app) => {
   assert.ok(app.consoleErrors.some(m => /\[dojo\]/.test(m)));
 }, { blockScripts: ['daily-core.js'] });
 
+// ---- れんぞく日数（streak.js が drill:dojo の end・clear を数える） ----
+t('dojo_counts_streak', async page => {
+  await page.evaluate(() => show('dojo')); await page.click('.dj-card[data-g="td"]');
+  await page.click('#quit'); assert.equal(await page.evaluate(() => localStorage.getItem('streak')), null);
+  await page.click('.dj-card[data-g="td"]'); await clearRound(page);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('streak')).last), await page.evaluate(() => DAILY_CORE.jstDay()));
+});

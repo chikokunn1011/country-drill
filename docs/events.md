@@ -24,6 +24,7 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `drill:book-open` | 図鑑で国の詳細を開いたとき: 一覧のカードで詳細を開いた／地図で国をタップした | `{a}` | 開くたびに1回（同じ国でも毎回）。地図の検索で1件にしぼったときの自動選択では出ない |
 | `drill:misses-reset` | 設定の［まちがえた記録を消す］を押したとき（`misses` を空にして保存した直後） | `{}` | 押すたびに1回 |
 | `drill:daily` | 今日の難問（`startDaily()`、`kind: 'daily'`）で正解したとき（最後の問題以外）と、終わったとき（全問正解・まちがえ・途中で離れた・ページを閉じた `pagehide`） | `{sid, phase: 'answer', done, timeMs}` か `{sid, phase: 'end', outcome, done, timeMs}`。`timeMs` は1問目からその時点まで（ミリ秒）。受け取るのは `daily.js` | 正解ごとに1回、終わりは1回のゲームにつき1回。今日の難問では `drill:start` `drill:answer` `drill:result` は出ない（バッジ・冒険のコイン・苦手の記録に入れない） |
+| `drill:dojo` | 似た国旗の道場（`startDojo()`、`kind: 'dojo'`）で答えたとき（正解・まちがえ）と、終わったとき（全問覚えた・やめた・ほかの画面へ） | `{sid, phase: 'answer', a, pick, right}` か `{sid, phase: 'end', outcome, n, firstTry, wrongs}`。`pick` は押した国、`outcome` は `'clear'` か `'quit'`、`n` は問題数（10）、`firstTry` は一発正解の問題の数（同じ国が何度も出るので問題ごとに数える）。受け取るのは `dojo.js` と `streak.js` | 答えるごとに1回、終わりは1回のゲームにつき1回（`endGame`）。道場では `drill:start` `drill:answer` `drill:result` は出ない（バッジ・冒険のコイン・苦手の記録に入れない） |
 
 `drill:result` の決まり:
 
@@ -155,7 +156,8 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 
 - 本体のインライン script → `rpg-core.js` → `rpg.js` → `rpg-cards.js` → `rpg-battle.js` → `rpg-team.js` → `rpg-rank.js` → `badges.js`（RPG が無ければ `badges.js` は本体のインライン script のすぐ後）。どれも本体のあとなので、index.html のグローバルが使える。豆知識の `trivia.js` は本体より前（`ranking.js` の直後）に読む。
 - 結果画像のシェアの `share-card.js`（`window.SHARECARD`）は `badges.js` のあと、`daily.js` の直前に読む（daily.js が `SHARECARD.attach` を使う）。イベントは出さないし受けない。読めないときはタイムアタックの結果画面に［結果をシェア］を出さず、今日の難問は文だけのシェアのまま。
-- れんぞく日数の `streak.js` はいちばん最後（`daily.js` の後）に読む。`daily-core.js`（本体より前）の `DAILY_CORE` と、本体の `store` `$` を使う。`streak.css` は機能の css のいちばん最後。
+- れんぞく日数の `streak.js` は `daily.js` の後に読む。`daily-core.js`（本体より前）の `DAILY_CORE` と、本体の `store` `$` を使う。`streak.css` は `profile.css` の後。
+- 似た国旗の道場の `dojo.js` はいちばん最後（`streak.js` の後）に読む。前半は DOM にさわらない `window.DOJO`（`DAILY_CORE.SIMILAR` を使う）、後半は `#scr-dojo` とモード選択の帯 `#to-dojo`（本体の `startDojo` `registerScreen` などを使う）。`dojo.css` は機能の css のいちばん最後。`DAILY_CORE` が無いときは `console.error('[dojo] …')` を出して帯も画面も作らない。
 - CSS は head の `<style>` → `pc.css` → `rpg.css` → `badges.css` の順（`rpg.css` `badges.css` を `pc.css` より前に置かない。前に置くと、同じ強さのルールは `pc.css` が勝つ）。
 - badges.js の起動時には、もう rpg.js がリスナーを付けている（`badge:earned` の `paid` が返る）。rpg.js は読み込み時に `BADGES` を使わない。
 - 各ファイルは即時関数で包む（一番外側の `const` / `let` が index.html の名前とぶつかると、ファイル全体が SyntaxError で読み込まれないため）。
@@ -207,10 +209,10 @@ streak.js（れんぞく日数・A5）は、遊び終わった日を localStorag
 |---|---|---|
 | `drill:result` | `outcome` | `outcome` が `'clear'` か `'fail'` なら今日を数える。`'quit'`（途中で離れた）は数えない |
 | `drill:daily` | `phase` `outcome` | `phase === 'end'` で、`outcome` が `'clear'` か `'fail'` なら今日を数える |
+| `drill:dojo` | `phase` `outcome` | `phase === 'end'` で、`outcome` が `'clear'` なら今日を数える（`'quit'` は数えない） |
 | `rpg:battle` | （なし） | 出たら今日を数える（勝ち負け・逃げたは見ない） |
 | `drill:screen` | `name` | `name === 'home'` のとき、`streak` を読み直して行を描き直す（ほかのタブとそろえる `storage` や `visibilitychange` は使わない） |
 
 - 1日に何回遊んでも1日と数える（日付は日本時間の0時で切りかえ。`DAILY_CORE.jstDay()`）。端末の時計が戻った日（前に数えた日より前）は何もしない。
 - 数えるときは画面を描き直さない（次の `drill:screen {name: 'home'}` で描く）。トーストは出さない。
 - リスナーは try/catch で包む（例外はクイズにもバトルにも伝えない）。
-- 似た国旗の道場（A6）の `drill:dojo` は、`phase === 'end'` かつ `outcome === 'clear'` で数える1行を A6 の PR で足す（この表にも1行足す）。
