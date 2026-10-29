@@ -33,11 +33,12 @@ export const readSave = page => page.evaluate(() => {
   const s = localStorage.getItem('rpg');
   return s === null ? null : JSON.parse(s);
 });
-// 'rpg' に v（文字列はそのまま、ほかは JSON）を入れて読み込み直す
+// 'rpg' に v（文字列はそのまま、ほかは JSON）を入れて読み込み直す。地図（load のあとにうしろで読む）が読み終わるまで待つ
+// （RPG_BATTLE.start で冒険ホームを通らずにバトルへ入るテストが、地図の問題を描けるように。mapReady が無い古いコードでは待たない）
 export async function writeSave(page, v) {
   await page.evaluate(s => localStorage.setItem('rpg', s), typeof v === 'string' ? v : JSON.stringify(v));
   await page.reload();
-  await page.waitForFunction(() => document.readyState === 'complete');
+  await page.waitForFunction(() => document.readyState === 'complete' && (typeof mapReady === 'undefined' || mapReady));
 }
 
 // node 側の端末の日付（'YYYY-MM-DD'）

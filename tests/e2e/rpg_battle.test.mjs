@@ -564,7 +564,7 @@ t('mirror_reveal_shows_picked', async page => {
   assert.ok(s.includes('えらんだのは「ルーマニア」'), s);
   const srcs = await page.$$eval('#bt-reveal .rpg-rv-pair img', els => els.map(e => e.getAttribute('src')));
   assert.equal(srcs.length, 2, srcs.join());
-  assert.ok(srcs[0].includes("flag-icons-ro") && srcs[1].includes("flag-icons-td"), srcs.join());
+  assert.ok(srcs[0].includes("flags/ro.svg") && srcs[1].includes("flags/td.svg"), srcs.join());
 });
 
 t('earth_reveal_has_no_pair', async page => {

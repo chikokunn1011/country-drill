@@ -103,8 +103,10 @@ test('privacy_text', () => {
   const h = read('privacy.html');
   for (const id of ['collect', 'device', 'ranking', 'names', 'delete', 'external', 'ads', 'analytics', 'changes']) assert.match(h, new RegExp(`<h2 id="${id}"`));
   assert.ok(h.includes('コードは24時間で使えなくなります。預けたデータは、そのあとの整理で消えます'));
-  for (const s of ['Supabase', 'IP アドレス', 'GitHub Pages', 'Google Fonts', 'cdnjs', 'jsDelivr', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', '利用する場合があります', 'アクセス解析']) assert.ok(h.includes(s), s);
+  for (const s of ['Supabase', 'IP アドレス', 'GitHub Pages', 'Google Fonts', '地図の部品（d3・topojson-client）はこのサイトの中に置いて配っています', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', '利用する場合があります', 'アクセス解析']) assert.ok(h.includes(s), s);
   assert.match(h, /最終更新日: \d{4}年\d{1,2}月\d{1,2}日/);
+  // B4 のあとは CDN を使わない
+  for (const s of ['cdnjs', 'jsDelivr']) assert.ok(!h.includes(s), s);
   // 端末のデータは引き継ぎで外に出る。外に出ないと言い切るのはエラーの記録だけ
   assert.ok(!h.includes('このサイトの外には送りません'));
   assert.ok(h.includes('外に出るのは、あなたが自分で引き継ぎを使ったときだけです'));

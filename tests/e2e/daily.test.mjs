@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, PC } from './helpers.mjs';
+import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, mapLoaded, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -19,7 +19,8 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 60_000 }, async () => {
 const text = (page, sel) => page.locator(sel).innerText();
 const rec = page => page.evaluate(() => JSON.parse(localStorage.getItem('daily')));
 const today = page => page.evaluate(() => DAILY.today());
-const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); };
+// 1問目の前に国旗を読む「じゅんび中」があるので、問題が出る（G.cur が入る）まで待つ
+const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); await page.waitForFunction(() => G?.cur); };
 // プロフィールが無い人の「載せる」箱: 名前を入れて［プロフィールを作って載せる］
 const createAndPost = async (page, name) => { await page.fill('#dl-post input', name); await page.click('#dl-post form button'); };
 // 偽DB と localStorage にプロフィール（チコ）を入れて開き直す
@@ -142,6 +143,7 @@ t('yesterday_record_lets_play_today_and_shows_answers', async page => {
   const yday = await page.evaluate(() => DAILY_CORE.addDays(DAILY.today(), -1));
   await page.evaluate(y => localStorage.setItem('daily', JSON.stringify({ day: y, status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null })), yday);
   await page.reload();
+  await mapLoaded(page);
   assert.match(await text(page, '#home-daily'), /NEW/);
   await page.click('#home-daily');
   assert.equal(await page.isVisible('#dl-start'), true);
@@ -175,6 +177,7 @@ t('second_tab_does_not_stop_play', async (page, app) => {
   await answerCorrect(page);
   const other = await app.context.newPage();
   await other.goto(page.url());
+  await mapLoaded(other);
   await other.click('#home-daily');
   assert.match(await other.locator('#dl-main').innerText(), /別のタブで挑戦中/);
   assert.equal(await other.locator('#dl-start').count(), 0);

@@ -286,6 +286,9 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .rmap .map .dot { fill: var(--hl); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .rmap .map .frame { fill: color-mix(in srgb, var(--hl) 16%, transparent); stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .rmap { margin-bottom: 4px; }
+/* 地図を読みこみ中・読めなかったときの帯（index.html の waitMap） */
+.mapwait { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-weight: 700; }
+.mapwait[hidden] { display: none; }
 .opts { display: flex; flex-direction: column; gap: 14px; }
 .rgroups { display: flex; flex-direction: column; gap: 8px; }
 .rgroups .subs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; border-radius: 12px; background: color-mix(in srgb, var(--hl) 10%, var(--surface)); }
@@ -394,6 +397,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <div id="topbar-extra" class="row"></div>
     <div class="row"><button class="linkbtn" id="to-book">図鑑</button><button class="linkbtn" id="to-settings">設定</button></div>
   </div>
+  <div class="mapwait" id="mapwait" role="status" hidden><span id="mapwait-msg"></span><button class="btn ghost" id="mapwait-retry" hidden>もう一度</button></div>
 
   <!-- ホーム -->
   <section id="scr-home" class="home">
@@ -551,11 +555,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 
 <dialog id="detail"><div class="inner" id="detail-inner"></div></dialog>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="countries.js"></script>
-<script src="flags.js"></script>
-<script src="world.js"></script>
 <script src="ranking.js?v=5"></script>
 <script src="daily-core.js?v=1"></script>
 <script src="trivia.js"></script>
@@ -576,15 +576,17 @@ window.RANKING ??= {
 };
 const C = window.COUNTRIES;
 const byA = new Map(C.map(c => [c.a, c]));
-const feats = topojson.feature(WORLD, WORLD.objects.countries).features;
+// 地図の形（world.js・d3・topojson はホームが出たあとに loadMap() で読む）。読み終わるまでは空の入れ物で、buildMap() が中身を入れる。
+// 地図を使う画面（MAP_SCREENS）は show() が地図を待つので、描くときにはいつも入っている
+const feats = [];
 const featById = new Map();
-for (const f of feats) { const k = String(f.id), prev = featById.get(k); if (!prev || d3.geoArea(f) > d3.geoArea(prev)) featById.set(k, f); } // 同じIDが複数ある国（豪州と周辺の島）は本土を代表にする
 const featOf = c => featById.get(c.a === 'xk' ? 'XK' : c.id);
 const cOfFeat = g => C.find(c => c.a === 'xk' ? String(g.id) === 'XK' : c.id === String(g.id));
-const featCountry = new Map(feats.map(g => [g, cOfFeat(g)]));
+const featCountry = new Map();
 const isSmall = c => c.ar < 25000 || !featOf(c);
-const flagCache = {};
-const flag = a => flagCache[a] ||= 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(FLAGS[a]);
+// 国旗は flags/<a>.svg（1枚ずつのファイル）。中身を変えたら FLAG_V を上げる（ページからの相対 URL）
+const FLAG_V = 1;
+const flag = a => `flags/${a}.svg?v=${FLAG_V}`;
 const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
 // 地域ごとの地図の切り出し範囲 [西経度, 南緯度, 東経度, 北緯度]（オセアニアは日付変更線をまたぐので180を超える）
 const REGION_BOX = {
@@ -636,7 +638,45 @@ const poolFor = r => r === 'all' ? C : SUBREGIONS[r] ? C.filter(c => SUBREGIONS[
 const modeOf = k => MODES.find(m => m.k === k);
 
 /* ---------- 地図 ---------- */
-const graticule = d3.geoGraticule10();
+// 地図を使う画面。ここへ進むときは地図を読み終わるまで待つ（道場は地図を出さないので入れない）
+const MAP_SCREENS = ['setup', 'book', 'daily', 'rpg', 'cards'];
+const MAP_WAIT_MS = 300;       // これより長く待つときは帯 #mapwait を出す
+const MAP_TIMEOUT_MS = 15000;  // これより長くかかったら読めなかったことにする
+let mapReady = false;          // buildMap() が終わったら true
+let graticule = null;
+let mapLoading = null;         // 読んでいる最中の loadMap() の Promise（失敗したら捨てて、次に呼ばれたら読み直す）
+const mapFiles = {};           // ファイル → 読みこみの Promise（読めなかったファイルは消して、次に足し直す）
+const mapScript = src => mapFiles[src] ||= new Promise((ok, ng) => {
+  const el = document.createElement('script');
+  el.src = src; el.async = false;
+  el.onload = ok;
+  el.onerror = () => { el.remove(); delete mapFiles[src]; ng(new Error(`${src} を読めなかった`)); };
+  document.head.append(el);
+});
+// 地図の3ファイルを読み、形を作る。足りないものだけ足す（d3 だけ読めていれば world.js だけ）
+function loadMap() {
+  if (mapReady) return Promise.resolve();
+  return mapLoading ||= new Promise((ok, ng) => {
+    const timer = setTimeout(() => ng(new Error(`${MAP_TIMEOUT_MS}ms で読み終わらなかった`)), MAP_TIMEOUT_MS);
+    const need = [];
+    if (!window.d3) need.push(mapScript('vendor/d3-7.9.0.min.js'));
+    if (!window.topojson) need.push(mapScript('vendor/topojson-client-3.1.0.min.js'));
+    if (!window.WORLD) need.push(mapScript('world.js?v=1'));
+    Promise.all(need).then(() => { clearTimeout(timer); buildMap(); ok(); }).catch(e => { clearTimeout(timer); ng(e); });
+  }).catch(e => {
+    mapLoading = null;
+    console.error('[map] 地図を読みこめなかった', e);
+    throw e;
+  });
+}
+function buildMap() {
+  feats.length = 0; featById.clear(); featCountry.clear();
+  feats.push(...topojson.feature(WORLD, WORLD.objects.countries).features);
+  for (const f of feats) { const k = String(f.id), prev = featById.get(k); if (!prev || d3.geoArea(f) > d3.geoArea(prev)) featById.set(k, f); } // 同じIDが複数ある国（豪州と周辺の島）は本土を代表にする
+  for (const g of feats) featCountry.set(g, cOfFeat(g));
+  graticule = d3.geoGraticule10();
+  mapReady = true;
+}
 const W = 640, H = 360;
 const bboxPoints = (x0, y0, x1, y1) => ({ type: 'MultiPoint', coordinates: [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [(x0 + x1) / 2, y0], [(x0 + x1) / 2, y1], [x0, (y0 + y1) / 2], [x1, (y0 + y1) / 2]] });
 const WORLD_BOX = [-169, -57, 191, 84]; // 南極は省く。ベーリング海峡で切ってロシアの東端もつなげる
@@ -849,7 +889,11 @@ function toast(html, ms = 2800) {
   const el = document.createElement('div'); el.className = 'toast'; el.innerHTML = html; box.append(el);
   setTimeout(() => el.remove(), ms);
 }
+// 地図を待っている画面（{ name }。待っていなければ null）と、帯を出すまでのタイマー
+let mapWait = null, mapWaitTimer = 0;
 function show(name) {
+  clearTimeout(mapWaitTimer); mapWait = null; $('mapwait').hidden = true;
+  if (MAP_SCREENS.includes(name) && !mapReady) return waitMap(name);
   if (name !== 'quiz' && name !== 'result' && G && !G.ended) endGame('quit'); // クイズを途中で離れた（やめる・トップバー）
   for (const s of SCREENS) $('scr-' + s).hidden = s !== name;
   document.body.dataset.screen = name;
@@ -862,6 +906,21 @@ function show(name) {
   emit('drill:screen', { name });
   window.scrollTo({ top: 0 });
 }
+// 地図が読み終わるまで今の画面のまま待つ。MAP_WAIT_MS たっても読めていなければ帯を出す。
+// 読めたら、待っているのがまだこの画面のときだけ進む（待つあいだにほかの画面へ行っていたら何もしない）。読めなかったら［もう一度］
+function waitMap(name) {
+  const w = mapWait = { name }, box = $('mapwait'), msg = $('mapwait-msg'), retry = $('mapwait-retry');
+  mapWaitTimer = setTimeout(() => {
+    if (mapWait !== w) return;
+    msg.textContent = '地図を読みこみ中…'; retry.hidden = true; box.hidden = false;
+  }, MAP_WAIT_MS);
+  loadMap().then(() => { if (mapWait === w) show(name); }, () => {
+    if (mapWait !== w) return;
+    clearTimeout(mapWaitTimer);
+    msg.textContent = '地図を読みこめなかった'; retry.hidden = false; box.hidden = false;
+    retry.onclick = () => show(name);
+  });
+}
 $('brand').onclick = () => show('home');
 $('home-play').onclick = () => show('setup');
 $('home-rank').onclick = () => openRanking();
@@ -870,7 +929,7 @@ $('home-settings').onclick = () => show('settings');
 $('home-book').onclick = () => show('book');
 $('to-book').onclick = () => show('book');
 $('to-settings').onclick = () => show('settings');
-$('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="">`).join('');
+$('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="" loading="lazy">`).join('');
 
 /* ---------- 設定 ---------- */
 const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末に合わせる']];
@@ -1001,7 +1060,29 @@ const timed = () => G.kind === 'ta' || G.kind === 'daily';
 // 正解したら答えを出さずにすぐ次へ進むか。タイムアタック・今日の難問はいつも、練習・挑戦は設定「正解したらすぐ次の問題へ」（S.quick）のとき
 const quick = () => timed() || !!S.quick;
 const QUIT_LABEL = 'やめてモード選択へ';
-function startGame() {
+const PRELOAD_MS = 10000;   // 国旗の先読みを待つのはここまで（こえたら待つのをやめて始める）
+// 国旗をまとめて読む。全部が読み終わる（読めなかったものもふくむ）か ms たったら resolve する（reject しない）
+function preloadFlags(codes, ms = PRELOAD_MS) {
+  const list = [...new Set(codes)];
+  return new Promise(ok => {
+    let left = list.length;
+    if (!left) return ok();
+    const timer = setTimeout(ok, ms);
+    const one = () => { if (--left === 0) { clearTimeout(timer); ok(); } };
+    for (const a of list) { const img = new Image(); img.onload = img.onerror = one; img.src = flag(a); }
+  });
+}
+// タイムアタック・今日の難問は、国旗を読み終えてから1問目を出す（待った時間をタイムに入れない）。そのあいだは「じゅんび中…」で G.cur は null。
+// 待つあいだにやめた・別のゲームを始めたら（G !== g か g.ended）何もしない
+async function prepThenStart(codes) {
+  const g = G, box = $('qcard');
+  box.className = 'qcard'; box.innerHTML = '<p class="qlabel prep" role="status">じゅんび中…</p>';
+  updateProgress();   // 上の進み具合は新しいゲームの1問目のものにしておく（［もう一回］で前のゲームの数字が残らないように）
+  await preloadFlags(codes);
+  if (G !== g || g.ended) return;
+  nextQuestion();
+}
+async function startGame() {
   if (G && !G.ended) endGame('quit');
   $('quit').textContent = QUIT_LABEL;
   const pool = poolFor(S.region);
@@ -1015,11 +1096,13 @@ function startGame() {
   emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: S.region, n: set.length, hint: G.hint });
   $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
+  // タイムアタック: 国名→国旗・場所→国旗は選択肢が世界中から出るので195か国、ほかは出る国だけ
+  if (G.kind === 'ta') return prepThenStart(G.mode.a === 'flag' ? C.map(c => c.a) : set.map(c => c.a));
   nextQuestion();
 }
 // 今日の難問（daily.js が DAILY_CORE.build で作った [{ mode, a, opts }]）を遊ぶ。全員同じ問題なので、形式・選択肢・並びはそのまま使う。
 // 地図は全世界、国名表示なし、苦手の記録・drill:* のイベント（バッジ・冒険のコイン）には入れない。進み具合は drill:daily で daily.js に知らせる
-function startDaily(qs, sid) {
+async function startDaily(qs, sid) {
   if (G && !G.ended) endGame('quit');
   const set = qs.map(q => byA.get(q.a));
   G = { mode: modeOf(qs[0].mode), kind: 'daily', region: 'all', daily: qs, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0, endMs: 0, hint: false };
@@ -1027,7 +1110,7 @@ function startDaily(qs, sid) {
   $('ptime').textContent = RANKING.formatTime(0);
   $('quit').textContent = 'やめる（今日の挑戦はここまで）';
   show('quiz');
-  nextQuestion();
+  return prepThenStart(qs.flatMap(q => [q.a, ...q.opts]));
 }
 // region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）
 function makeQuestion(c, region) {
@@ -1076,6 +1159,8 @@ function nextQuestion() {
   G.shownAt = performance.now();
   updateProgress();
   if (timed() && G.done === 0) startTimer();
+  // 練習・挑戦は、次の問題の国旗だけうしろで先に読んでおく（待たない。選択肢はまだ決まっていないので読まない）
+  if (!timed() && G.queue.length) preloadFlags([G.queue[0].a]);
 }
 // タイムアタックの計測は1問目を出した瞬間から。クリア・失格・クイズ画面を離れたら表示の更新をやめる
 function startTimer() {
@@ -1323,6 +1408,7 @@ function taResult(board, timeMs, questions) {
 }
 document.addEventListener('keydown', e => {
   if ($('scr-quiz').hidden || e.target.matches('input, select, textarea') || $('detail').open) return;
+  if (!G?.cur) return;   // 「じゅんび中」（1問目の前に国旗を読んでいるあいだ）
   // すぐ次へ進むときは数字キーの押しっぱなし（自動リピート）で次の問題に答えないようにする
   if (/^[1-4]$/.test(e.key) && !(e.repeat && quick())) { const b = document.querySelectorAll('.choice')[+e.key - 1]; if (b && !b.disabled) b.click(); }
   if (e.key === 'Enter' && $('next') && !(document.activeElement instanceof HTMLButtonElement)) $('next').click();
@@ -1479,14 +1565,18 @@ $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); 
 applyTheme();
 applyDopa();
 const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
-// #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く
-if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(start);
+// #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く。
+// 地図を使う画面を直接開いたときは、地図を待つあいだ真っ白にならないよう先にホームを出す
+if (location.hash === '#ranking' && RANKING.enabled) openRanking();
+else { if (MAP_SCREENS.includes(start) && !mapReady) show('home'); show(start); }
+// 地図はホームが出たあと（load のあと）に、うしろで読みはじめる。失敗は loadMap が console.error に書く（地図の画面へ進むときに読み直す）
+addEventListener('load', () => loadMap().catch(() => {}));
 </script>
 <script src="profile.js?v=4"></script>
 <script src="rpg-core.js?v=13"></script>
-<script src="rpg.js?v=13"></script>
+<script src="rpg.js?v=14"></script>
 <script src="rpg-cards.js?v=6"></script>
-<script src="rpg-battle.js?v=15"></script>
+<script src="rpg-battle.js?v=16"></script>
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
 <script src="badges.js?v=10"></script>

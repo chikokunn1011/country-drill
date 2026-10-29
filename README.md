@@ -65,8 +65,9 @@
 
 ## クレジット
 
-- 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）
-- 地図: [world-atlas](https://github.com/topojson/world-atlas)（Natural Earth, ISC）
+- 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）。`flags/*.svg` は flag-icons の svg を `tools/split_flags.mjs` で1枚ずつのファイルに分けたもの（中身は変えていない）。作り直すときは消す前の flags.js を取り出して渡す: `git show $(git log -1 --format=%h --diff-filter=D -- flags.js)^:flags.js > /tmp/flags.js && node tools/split_flags.mjs /tmp/flags.js flags`。svg の中身を変えたら `index.html` の `FLAG_V` を上げる
+- 地図: [world-atlas](https://github.com/topojson/world-atlas)（Natural Earth, ISC）。`world.js` は起動時には読まず、ホームが出たあとに `index.html` の `loadMap()` が `world.js?v=1` として読む（中身を変えたら `loadMap()` の `?v=` を上げる）
+- 地図を描く部品: [d3](https://github.com/d3/d3) 7.9.0（ISC）と [topojson-client](https://github.com/topojson/topojson-client) 3.1.0（ISC）。CDN は使わず、npm の配布物をそのまま `vendor/` に LICENSE といっしょに置いている（`vendor/d3-7.9.0.min.js`・`vendor/topojson-client-3.1.0.min.js`）
 - 国データ: [world-countries](https://github.com/mledoze/countries)（ODbL）
 
 ## テクスチャ
