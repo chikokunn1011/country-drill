@@ -265,7 +265,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .rmap .map .frame { fill: color-mix(in srgb, var(--hl) 16%, transparent); stroke: var(--accent); stroke-width: 1.6; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 .rmap { margin-bottom: 4px; }
 /* 地図を読みこみ中・読めなかったときの帯（index.html の waitMap） */
-.mapwait { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-weight: 700; }
+.mapwait { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; display: flex; gap: 10px; align-items: center; justify-content: center; padding: 8px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); font-weight: 700; }
 .mapwait[hidden] { display: none; }
 .opts { display: flex; flex-direction: column; gap: 14px; }
 .rgroups { display: flex; flex-direction: column; gap: 8px; }

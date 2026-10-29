@@ -102,6 +102,33 @@ t('navigate_while_waiting', async page => {
   assert.equal(await page.isHidden('#mapwait'), true);
 }, { path: 'about.html', routes: [['**/world.js*', delay(1000)]] });
 
+// スマホでホームを下までスクロールしてから［図鑑］を押しても、帯は画面の中に見えている
+const inView = page => page.$eval('#mapwait', el => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; });
+t('mapwait_visible_after_scroll', async page => {
+  await page.goto(server.url);
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+  assert.ok(await page.evaluate(() => scrollY > 0));
+  await page.click('#home-book');
+  await sleep(400);
+  assert.equal(await inView(page), true);
+  await page.locator('#scr-book').waitFor();
+}, { path: 'about.html', routes: [['**/world.js*', delay(1500)]] });
+
+// 背の低い端末で読みこみに失敗しても、［もう一度］が画面の中に見えて押せる
+t('mapwait_retry_visible_after_scroll', async page => {
+  let blocked = true;
+  await page.route('**/world.js*', r => blocked ? r.abort() : r.continue());
+  await page.goto(server.url);
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+  assert.ok(await page.evaluate(() => scrollY > 0));
+  await page.click('#home-book');
+  await page.locator('#mapwait-retry').waitFor();
+  assert.equal(await inView(page), true);
+  blocked = false;
+  await page.click('#mapwait-retry');
+  await page.locator('#scr-book').waitFor();
+}, { path: 'about.html', viewport: { width: 320, height: 568 } });
+
 /* ---------- 国旗の先読みと「じゅんび中」 ---------- */
 // 195枚の国旗を数えるので、resource の記録の枠を広げておく（既定は250件）
 const BIG_BUFFER = 'performance.setResourceTimingBufferSize(2000);';
