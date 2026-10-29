@@ -154,3 +154,10 @@ test('contact_form_url', () => {   // URL が入っていれば本物の Google 
   if (m) assert.match(m[1], /^https:\/\/(docs\.google\.com\/forms\/d\/e\/[\w-]{20,}\/viewform|forms\.gle\/\w{10,})$/);
   else assert.ok(h.includes('id="contact-pending"'), 'フォームが無いときは #contact-pending');
 });
+
+test('howto_sections', () => {
+  const h = read('howto.html');
+  for (const id of ['start', 'modes', 'kinds', 'daily', 'rpg', 'book', 'badges', 'profile', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`));
+  assert.ok(!/<img\b/.test(h));
+  assert.ok(!/首都を(当てる|答える)/.test(h.replace('首都を当てる問題はない', '')));   // 首都を問うと読める文がない
+});
