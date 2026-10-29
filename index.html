@@ -224,6 +224,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .facts dt { color: var(--muted); font-size: .78rem; letter-spacing: .06em; align-self: center; }
 .facts dd { margin: 0; font-weight: 500; min-width: 0; }
 .facts .name { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; grid-column: 1 / -1; }
+.cpage { margin: 10px 0 0; } .cpage a { color: var(--accent); font-weight: 700; } /* 図鑑の「この国のページ ›」 */
 .next { align-self: flex-end; }
 .trivia { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; contain: inline-size; } /* 長い文で欄を横に広げない（スマホでは .wrap が中身の幅になるので、問題の国旗や選択肢が動く） */
 .tv { font-size: .88rem; line-height: 1.5; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--hl) 12%, var(--surface)); }
@@ -1541,11 +1542,13 @@ function renderBookMap(matches) {
   if (matches.length === 1) bsel = matches[0].a;
   selectBook(bsel, false);
 }
+// 図鑑の情報欄から国のページ（country/<a>.html）へ。クイズの答えの欄には出さない
+const countryLink = c => `<p class="cpage"><a href="country/${c.a}.html">この国のページ ›</a></p>`;
 function selectBook(a, tapped) {
   bsel = a;
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
-  $('binfo').innerHTML = c ? factsHTML(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').innerHTML = c ? factsHTML(c) + countryLink(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
   $('binfo').scrollTop = 0; // PC では情報欄が中でスクロールする。前の国の位置のままだと国旗が上で隠れる
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   if (c && tapped) emit('drill:book-open', { a });
@@ -1554,7 +1557,7 @@ $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
   const b = e.target.closest('.card'); if (!b) return;
   const c = byA.get(b.dataset.a), inner = $('detail-inner');
-  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
+  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${countryLink(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
   inner.append(mapSvg(c, `${c.n}の位置`));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
