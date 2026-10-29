@@ -5,7 +5,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, QUIET_BADGES } from './helpers.mjs';
+import { openApp, pickSetup, answerCorrect, answerWrong, answerTap, clearTimeAttack, QUIET_BADGES } from './helpers.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const sh = s => `'${String(s).replaceAll("'", `'\\''`)}'`; // シェルに渡す文字をくくる
@@ -38,6 +38,14 @@ async function named(page, mode) {
   await waitChoices(page);
   await answerWrong(page);
   await waitNext(page);
+}
+// 白地図タップ（練習・全世界・5問）を始める。named なら国名表示 ON、wrong なら1問目をまちがえる（選択肢は無いので白地図が出るまで待つ）
+async function startTap(page, { named = false, wrong = false } = {}) {
+  await pickSetup(page, { mode: 'tap', kind: 'practice', region: 'all', count: 5 });
+  if (named) await page.check('#nameopt');
+  await page.click('#start');
+  await page.waitForSelector('#qcard .tapbox');
+  if (wrong) { await answerTap(page, { right: false }); await waitNext(page); }
 }
 // 名前の長い国（a）を今の問題にして、まちがえる
 async function longName(page, a) {
@@ -110,6 +118,9 @@ export const SCENES = {
   ...Object.fromEntries(MODES.map(m => [`reveal_${m}`, async page => { await startPractice(page, m); await answerCorrect(page); await waitNext(page); }])),
   ...Object.fromEntries(['f2n', 'n2f'].map(m => [`wrong_${m}`, async page => { await startPractice(page, m); await answerWrong(page); await waitNext(page); }])),
   ...Object.fromEntries(['m2f', 'f2m'].map(m => [`named_${m}`, page => named(page, m)])),
+  quiz_tap: page => startTap(page),
+  wrong_tap: page => startTap(page, { wrong: true }),
+  named_tap: page => startTap(page, { named: true, wrong: true }),
   long_f2n: async page => { await SCENES.quiz_f2n(page); await longName(page, 'kn'); }, // セントクリストファー・ネービス
   long_n2f: async page => { await SCENES.quiz_n2f(page); await longName(page, 'vc'); }, // セントビンセント及びグレナディーン諸島
   // タイマーを止めて表示を固定する（timeMs が null でないと tick() が止まる。止めないと比べるたびに時間の文字が変わる）

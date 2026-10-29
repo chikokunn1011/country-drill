@@ -41,11 +41,11 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | キー | 出るイベント | 中身 |
 |---|---|---|
 | `sid` | start・answer・result | 1回のゲームの id（文字列）。`drill:start` で作り、同じゲームの `drill:answer` `drill:result` に同じ値が入る |
-| `mode` | start・answer・result | `'f2n'｜'n2f'｜'m2f'｜'f2m'`（国旗→国名／国名→国旗／場所→国旗／国旗→場所） |
+| `mode` | start・answer・result | `'f2n'｜'n2f'｜'m2f'｜'f2m'｜'tap'`（国旗→国名／国名→国旗／場所→国旗／国旗→場所／白地図タップ）。`'tap'` は練習・挑戦だけ（タイムアタック・ランキングには無い） |
 | `kind` | start・answer・result | `'practice'｜'challenge'｜'ta'`（練習／挑戦／タイムアタック） |
 | `region` | start・answer・result | `S.region` の値そのもの。`'all'` か日本語の地域名（`'アジア'` `'ヨーロッパ'` `'アフリカ'` `'北・中央アメリカ'` `'南アメリカ'` `'オセアニア'`）。`asia` などのキーに直すのは受け取る側 |
 | `n` | start・result | そのゲームの問題数（`G.set.length`）。「全部」で遊んだかは `n === その地域の国の数` で判断する（`P.count` はイベントに入っていない） |
-| `hint` | start・answer・result | 国名表示ありで遊んだか（`true`／`false`）。場所のモード（`m2f` `f2m`）で「国名も表示する」がオン、かつタイムアタックでないとき `true` |
+| `hint` | start・answer・result | 国名表示ありで遊んだか（`true`／`false`）。場所のモード（`m2f` `f2m` `tap`）で「国名も表示する」がオン、かつタイムアタックでないとき `true` |
 | `a` | answer・book-open | 国の ISO コード（小文字2文字。`'jp'` など。`countries.js` の `a`） |
 | `right` | answer | 正解したか |
 | `first` | answer | このゲームでその国が初めて出たか。挑戦のやり直しをまたいで数えるので、やり直しのあとや練習で後ろに回った2回目以降は `false` |

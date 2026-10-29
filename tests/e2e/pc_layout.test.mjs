@@ -36,7 +36,8 @@ test('scenes_reach_their_screen', { timeout: 180_000 }, async () => {
       check(screen, '見えているはずの画面が決まっていない（SCREEN_OF に足す）');
       if (screen) check(await page.isVisible(`#scr-${screen}`), `#scr-${screen} が見えていない`);
       if (/^(reveal|wrong|named|long)_|^ta_fail/.test(scene)) check(await page.isVisible('#next'), '#next が見えていない');
-      if (/^named_/.test(scene)) check(await count('.cname') === 4, '.cname が4つでない');
+      if (/^named_/.test(scene) && scene !== 'named_tap') check(await count('.cname') === 4, '.cname が4つでない');
+      if (scene === 'named_tap') check(await page.evaluate(() => document.querySelector('#qcard .qmain .qsub')?.textContent === G.cur.c.n), '問題に国名が出ていない');
       if (scene === 'long_f2n') check(await page.evaluate(() => G.cur.c.a) === 'kn', '今の問題が kn でない');
       if (scene === 'long_n2f') check(await page.evaluate(() => G.cur.c.a) === 'vc', '今の問題が vc でない');
       if (scene === 'ta_result') check(await page.locator('#ta-time').innerText() === '12.34秒', '#ta-time が 12.34秒 でない');
@@ -367,16 +368,16 @@ test('tier_layouts', { timeout: 180_000 }, async () => {
     const [side, main] = await rects(page, ...RK);
     assert.ok(main.top > side.bottom, `ranking 1024: ${json({ side, main })}`);
   });
-  // モード選択（設計書 5.3）: ≥1280 はモード4つ・あそび方3つがそれぞれ1行、900〜1279 はモードが 2×2
+  // モード選択（設計書 5.3）: ≥1280 はモード5つ・あそび方3つがそれぞれ1行、900〜1279 はモードが 3列×2行（5枚目の白地図タップは2列ぶん）
   const tops = (page, sel) => page.$$eval(sel, els => els.map(e => Math.round(e.getBoundingClientRect().top)));
   await inScene('setup', W1366, async page => {
     const modes = await tops(page, '#modes .modecard'), kinds = await tops(page, '#kinds .modecard');
-    assert.ok(modes.length === 4 && new Set(modes).size === 1, `modes 1366: ${json(modes)}`);
+    assert.ok(modes.length === 5 && new Set(modes).size === 1, `modes 1366: ${json(modes)}`);
     assert.ok(kinds.length === 3 && new Set(kinds).size === 1, `kinds 1366: ${json(kinds)}`);
   });
   await inScene('setup', W1024, async page => {
     const modes = await tops(page, '#modes .modecard');
-    assert.ok(modes.length === 4 && new Set(modes).size === 2, `modes 1024: ${json(modes)}`);
+    assert.ok(modes.length === 5 && new Set(modes).size === 2, `modes 1024: ${json(modes)}`);
   });
 });
 

@@ -6,7 +6,7 @@
   const KEY_RE = /^[a-z0-9-]{1,32}@[1-9]$/;            // ステップのキー '<バッジid>@<段>'
   const ID_RE = /^[a-z0-9-]{1,32}$/;                   // バッジ id
   const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
-  const CF_RE = /^(f2n|n2f|m2f|f2m):[a-z]+:\d{1,3}$/;  // つまずいた挑戦の条件 'モード:地域キー:問題数'
+  const CF_RE = /^(f2n|n2f|m2f|f2m|tap):[a-z]+:\d{1,3}$/;  // つまずいた挑戦の条件 'モード:地域キー:問題数'
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8 };
   const RPG_MODES = ['f2n', 'n2f', 'm2f'];             // バトルの出題のうち、モードのビットを立てるもの
   // index.html の地域名（S.region の値）→ 地域キー。ダンジョン id も同じキー（ranking.js には頼らない）
