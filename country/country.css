@@ -1,0 +1,28 @@
+/* country.css — 国ごとのページ（country/*.html）だけの決まり。pages.css のあとに読む。
+   色は pages.css の変数（3か所で定義）だけを使い、ここでは色の変数を作らない（tests/unit/country-pages.test.mjs） */
+.crumbs { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+.crumbs a { color: var(--muted); }
+
+/* 国旗と、地域・面積・首都・ISO */
+.cflag { margin: 0 0 16px; }
+.cflag img { display: block; width: min(100%, 360px); height: auto; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--line); background: var(--surface); }
+.cfacts { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 0 0 8px; }
+.cfacts dt { color: var(--muted); font-weight: 700; }
+.cfacts dd { margin: 0; }
+
+/* 豆知識 */
+.page .trivia { list-style: none; padding-left: 0; }
+.trivia li { margin: 0 0 10px; }
+.tv-k { display: inline-block; font: 700 .72rem/1.7 var(--font-display); color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 0 6px; margin-right: 8px; }
+
+/* 似ている国旗と、一覧のカード（国旗＋国名） */
+.page .similar, .ccards { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.similar a, .ccard { display: flex; flex-direction: column; gap: 4px; color: var(--ink); text-decoration: none; font-size: .8rem; line-height: 1.4; text-align: center; }
+.similar img, .ccard img { display: block; width: 100%; height: auto; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--line); background: var(--surface); }
+.similar a:hover span, .ccard:hover span { text-decoration: underline; }
+.rplay { font-size: .85rem; }
+
+/* 遊ぶ・図鑑へのリンク（押しやすい高さ） */
+.cplay { display: flex; flex-wrap: wrap; gap: 10px; margin: 32px 0 0; }
+.cplay a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: 700 .9rem var(--font-display); text-decoration: none; }
+.cplay a.play-region { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

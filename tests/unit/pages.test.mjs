@@ -1,8 +1,8 @@
 // 読み物のページ（privacy・about・howto）とフッターを、ファイルの文字のまま確かめる
-// （B1 の country/*.html は PAGES に足す。PR9 の embed.html は BLOCKS・PAGE_VARS・varsOf で変数を比べる）
+// （B1 の country/*.html も PAGES に入る。PR9 の embed.html は BLOCKS・PAGE_VARS・varsOf で変数を比べる）
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 import { MOFA_NAMES, MOFA_OTHER } from './mofa-names.mjs';
 
@@ -10,7 +10,8 @@ const root = new URL('../../', import.meta.url);
 const read = p => readFileSync(new URL(p, root), 'utf8');
 
 // フッター（<!-- footer:start -->〜<!-- footer:end -->）を持つページ
-export const PAGES = ['index.html', 'privacy.html', 'about.html', 'howto.html'];
+export const PAGES = ['index.html', 'privacy.html', 'about.html', 'howto.html',
+  ...readdirSync(new URL('country/', root)).filter(f => f.endsWith('.html')).sort().map(f => `country/${f}`)];
 // 目印の間の href（先頭の ../ は外す）
 export const footerHrefs = html => {
   const m = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/.exec(html);
@@ -56,7 +57,7 @@ export const themeScript = html => {
 };
 
 test('footer_links_same', () => {
-  for (const p of PAGES) assert.deepEqual(footerHrefs(read(p)), ['howto.html', 'about.html', 'about.html#contact', 'privacy.html'], p);
+  for (const p of PAGES) assert.deepEqual(footerHrefs(read(p)), ['howto.html', 'about.html', 'about.html#contact', 'privacy.html', 'country/'], p);
 });
 
 test('footer_not_in_admin', () => assert.ok(!read('admin.html').includes('footer:start')));
@@ -86,7 +87,7 @@ test('pages_head', () => {
 
 test('footer_targets_exist', () => {
   for (const p of PAGES) for (const href of footerHrefs(read(p))) {
-    const [file, id] = href.split('#');
+    const [path, id] = href.split('#'), file = path.endsWith('/') ? path + 'index.html' : path;   // country/ → country/index.html
     assert.ok(existsSync(new URL(file, root)), `${p}: ${file} が無い`);
     if (id) assert.ok(read(file).includes(`id="${id}"`), `${p}: ${file} に id="${id}" が無い`);
   }
