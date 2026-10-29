@@ -14,6 +14,8 @@
   if (missing.length) { console.error(`[profile] 必要なものが読み込めなかったので、プロフィールはお休み: ${missing.join(' ')}`); return; }
   // 接続先が無い・古い ranking.js がキャッシュに残っているときは出さない（ホームの［プロフィール］も隠れたまま）
   if (!RANKING.enabled || typeof RANKING.profileCreate !== 'function') return;
+  // 名前の入力欄（プロフィール画面の作る・名前を変える、結果画面の「載せる」箱）の下に出す注意書き
+  const NAME_NOTE = '<p class="hint pf-name-note">本名や学校名は使わないでね（<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>）</p>';
 
   // localStorage の profile: { token, pid, name, auto, isPublic, sent: { isPublic, title, deco, badges, badgesTotal } }
   // sent は最後にサーバーへ送った公開・称号・かざり・バッジの数（無い項目 = まだ送っていない）。
@@ -265,7 +267,7 @@
             + `<div class="row"><input type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）" aria-label="ニックネーム" value="${esc(v)}">`
             + '<button class="btn">プロフィールを作って載せる</button></div></form>';
         } else body.innerHTML = `<p class="pf-post-q">${esc(label)}</p><button type="button" class="btn" data-pf="send">${esc(p.name)} で載せる</button>`;
-        tail.innerHTML = kind === 'form' ? '<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p>' : '';
+        tail.innerHTML = kind === 'form' ? '<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p>' + NAME_NOTE : '';
       }
       // フォーカスが箱の中にあったときだけ移す（自動 ON で描いたとき・ほかの場所を触っているときは動かさない）。
       // 次に押せるもの（fail は［もう一回送る］、done は next）があればそこへ。無ければ、消えた要素に残って <body> に落ちたとき・空になった状態の文に
@@ -476,7 +478,7 @@
         + field('<label for="pf-name">プロフィールを作る</label>', '<form class="pf-form" id="pf-form" novalidate><div class="row">'
           + '<input id="pf-name" type="text" autocomplete="nickname" enterkeyhint="done" placeholder="ニックネーム（12文字まで）">'
           + '<button class="btn" id="pf-create">作る</button></div></form><p class="tamsg" id="pf-msg" role="status"></p>'
-          + '<p class="hint">ほかの人と同じニックネームは使えないよ。名前はあとから変えられる</p>');
+          + '<p class="hint">ほかの人と同じニックネームは使えないよ。名前はあとから変えられる</p>' + NAME_NOTE);
       $('pf-name').value = store.get('nickname', '');
       $('pf-form').onsubmit = async e => {
         e.preventDefault();
@@ -492,7 +494,7 @@
       + field('<label for="pf-rename-in">名前を変える</label>', '<form class="pf-form" id="pf-rename-form" novalidate><div class="row">'
         + '<input id="pf-rename-in" type="text" autocomplete="nickname" enterkeyhint="done">'
         + '<button class="btn ghost" id="pf-rename">変える</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>'
-        + '<p class="hint">ランキングの名前は、前の記録もふくめて新しい名前になるよ</p>')
+        + '<p class="hint">ランキングの名前は、前の記録もふくめて新しい名前になるよ</p>' + NAME_NOTE)
       + field('かざり', '<p class="hint">冒険の仲間の国旗を3つまで、名前の横にかざれるよ</p>'
         + (canDeco() ? '<button type="button" class="linkbtn pf-deco" id="pf-deco">冒険でかざりを選ぶ</button>' : ''))
       + field('設定', '<label class="switch"><input type="checkbox" id="pf-public"> プロフィールを公開する</label>'

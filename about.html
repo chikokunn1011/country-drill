@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>運営者｜国旗マスター</title>
+<meta name="description" content="国旗マスターを作っている運営者の紹介と、サイトの目的、お問い合わせの方法をまとめたページです。">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/about.html">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="pages.css?v=1">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← 国旗マスターで遊ぶ</a>
+  <h1>運営者</h1>
+  <p>国旗マスター（このサイト）を作っている人と、サイトのきまりをまとめました。</p>
+
+  <h2 id="purpose">サイトの目的</h2>
+  <p>世界の国（国連に入っている193か国と、バチカン・コソボの195か国）の国旗・国名・場所を、4択のクイズで楽しく覚えるためのサイトです。登録しなくても、全部の遊びが使えます。</p>
+
+  <h2 id="operator">運営者</h2>
+  <p>チコ（大学生の個人運営）が作っています。会社や団体のサイトではありません。</p>
+
+  <h2 id="rules">出題のきまり</h2>
+  <p>出題は国旗・国名・場所だけ。首都は答えのあとの説明と図鑑で見られる（首都を当てる問題はない）。</p>
+
+  <h2 id="country-names">国名の書き方</h2>
+  <p>国名は、外務省の「国・地域」の一覧（<a href="https://www.mofa.go.jp/mofaj/area/index.html">外務省のページ</a>）にある名前を元にして、後ろの「共和国」「王国」「連邦」などを省いた書き方にしています（例: イタリア共和国 → イタリア。アメリカ合衆国・ミクロネシア連邦などは、そのまま）。省くだけでは同じにならない国は、次の表のとおりです。</p>
+  <table id="names">
+    <thead><tr><th>このサイト</th><th>外務省</th></tr></thead>
+    <tbody>
+      <tr><td>イギリス</td><td>英国（グレートブリテン及び北アイルランド連合王国）</td></tr>
+      <tr><td>韓国</td><td>大韓民国</td></tr>
+      <tr><td>中国</td><td>中華人民共和国</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="borders">地図の国境について</h2>
+  <p>地図の国境は、Natural Earth という地図のデータを使って描いています。国境の線は、日本政府の立場を表すものではありません。</p>
+
+  <h2 id="credits">使っている素材とライセンス</h2>
+  <ul>
+    <li>国旗: <a href="https://github.com/lipis/flag-icons">flag-icons</a>（MIT）</li>
+    <li>地図: <a href="https://github.com/topojson/world-atlas">world-atlas</a>（Natural Earth のデータ、ISC）</li>
+    <li>国のデータ: <a href="https://github.com/mledoze/countries">world-countries</a>（ODbL）</li>
+    <li>地図を描くプログラム: <a href="https://d3js.org/">d3</a>（ISC）・<a href="https://github.com/topojson/topojson-client">topojson-client</a>（ISC）</li>
+    <li>文字の形: Zen Maru Gothic・Noto Sans JP・IBM Plex Mono（Google Fonts、SIL Open Font License）</li>
+    <li>紙・等高線・海の模様（テクスチャ）: 運営者が自分で作ったもの</li>
+  </ul>
+
+  <h2 id="contact">お問い合わせ</h2>
+  <p>まちがいを見つけたとき、ランキングの名前や記録を消してほしいとき、そのほか気になることがあるときは、お問い合わせフォームから送ってください。返事がほしい人だけメールアドレスを書いてね。</p>
+  <p><a id="contact-form" href="https://forms.gle/66hqFeGYF47CggGS7" target="_blank" rel="noopener">お問い合わせフォームを開く</a></p>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>

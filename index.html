@@ -290,6 +290,9 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 dialog .inner { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 dialog .close { align-self: flex-end; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
 footer { font-size: .75rem; color: var(--muted); text-align: center; }
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; margin-top: 4px; }
+.foot-links a { color: var(--muted); padding: 4px 2px; }
+body[data-screen="quiz"] footer { display: none; }   /* 出題中はフッターを出さない（スマホも PC も。リンクで離れると今日の難問がそこで終わるため） */
 #toasts { position: fixed; z-index: 50; left: 50%; top: calc(12px + env(safe-area-inset-top)); transform: translateX(-50%);
   display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px;
@@ -352,7 +355,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-<link rel="stylesheet" href="pc.css" media="(min-width: 900px)">
+<link rel="stylesheet" href="pc.css?v=1" media="(min-width: 900px)">
 <link rel="stylesheet" href="rpg.css?v=21">
 <link rel="stylesheet" href="badges.css?v=1">
 <link rel="stylesheet" href="daily.css?v=1">
@@ -506,7 +509,11 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     </div>
   </section>
 
-  <footer>国連加盟193か国＋バチカン・コソボ（日本が承認している国）。国旗: flag-icons（MIT）／地図: Natural Earth・world-atlas</footer>
+  <footer>国連加盟193か国＋バチカン・コソボ（日本が承認している国）。国旗: flag-icons（MIT）／地図: Natural Earth・world-atlas
+    <!-- footer:start -->
+    <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a></nav>
+    <!-- footer:end -->
+  </footer>
 </div>
 
 <dialog id="detail"><div class="inner" id="detail-inner"></div></dialog>
@@ -1432,7 +1439,7 @@ const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[loc
 // #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く
 if (location.hash === '#ranking' && RANKING.enabled) openRanking(); else show(start);
 </script>
-<script src="profile.js?v=3"></script>
+<script src="profile.js?v=4"></script>
 <script src="rpg-core.js?v=13"></script>
 <script src="rpg.js?v=12"></script>
 <script src="rpg-cards.js?v=6"></script>

@@ -10,18 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「B2」の節・「実装の順番」・「テストの方針」）
 
-前提: PR0（#25・#26 のあとの整理）はマージ済み。ファイル:行は #25・#26 マージ前のもので、**マージ後に再確認**する。
+前提: #25（管理用サイト）・#26（共通プロフィール）・PR0（#28。`same_version_same_content` のテストを足しただけ。`LOCAL_KEYS` の `adminSnaps`・`adminErrors`・`adminAuth` は #25・#26 の時点で main に入っていた）はマージ済み。ファイル:行は main（aadab35）で確かめたもの。
 
 ## Global Constraints
 
 - 出題は国旗・国名・場所だけ。首都を問う問題は作らない（about.html の文: 「出題は国旗・国名・場所だけ。首都は答えのあとの説明と図鑑で見られる（首都を当てる問題はない）」）。
 - 新しい色は作らない。色の変数を書くときは3か所: `:root`／`@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }`／`:root[data-theme="dark"]`。
-- `?v=` は「そのとき main にある数 +1」。中身を変えた js/css だけ上げる（`cache_bust`）。PR0 の `same_version_same_content` が落ちたら、そのファイルが main の歴史で使った最大の数 +1 にする。`pc.css` は今 `?v=` が無いので、上げるときは `pc.css?v=1` を付ける（PR3・PR7 も同じ決まり）。
-- localStorage のキーと Supabase は変えない。`TRANSFER_KEYS`・`LOCAL_KEYS` にさわらない。
+- `?v=` は「そのとき main にある数 +1」。中身を変えた js/css だけ上げる（`cache_bust`）。PR0 の `same_version_same_content` が落ちたら、そのファイルが main の歴史で使った最大の数 +1 にする。`pc.css` は今 `?v=` が無いので、上げるときは `pc.css?v=1` を付ける（PR3・PR7 も同じ決まり）。今の main で PR1 がさわる数: `profile.js?v=3`（index.html:1435。歴史の最大も 3 → 上げるなら 4）。`pages.css` は新しいファイルなので `?v=1` から（cache_bust は index.html の中だけを見る）。
+- localStorage のキーと Supabase は変えない。`TRANSFER_KEYS`・`LOCAL_KEYS`（profile.js:155-157）にさわらない。
 - 文は小学生にも読めるやさしい言葉。運営者はハンドル名と「大学生の個人運営」だけ（本名を出さない）。
 - admin.html にはフッターを付けない。画像は使わない（howto）。
 - コミットメッセージは日本語、末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` と `Claude-Session: https://claude.ai/code/session_0165YqqRbQ9cLHPBbRkUzhmj`。
-- 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`node --test --test-concurrency=1 'tests/e2e/*.test.mjs'`、`bash tests/sql/run.sh`。
+- 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`cd tests/e2e && node --test --test-concurrency=1 '*.test.mjs'`、`bash tests/sql/run.sh`。
 
 ## Review Focus
 
@@ -37,7 +37,7 @@
 
 **Files:**
 - Create: `pages.css`、`privacy.html`、`about.html`、`howto.html`（骨組みだけ）、`tests/unit/pages.test.mjs`、`tests/e2e/pages.test.mjs`
-- Modify: `index.html:284`（footer の CSS）、`index.html:499`（`<footer>`）。必要なら `pc.css:25` と `?v=`
+- Modify: `index.html:292`（footer の CSS）、`index.html:509`（`<footer>`）。必要なら `pc.css:25`（`footer { margin-top: auto; }`。:26 はクイズ中に footer を隠す）と `?v=`
 
 **Interfaces:**
 - Produces（B1・B5 が使う）:
@@ -87,7 +87,7 @@ test('footer_targets_exist', () => { /* 各 href のファイルがあり、#con
   - `pages.css`: 3か所の変数（index.html から写す。`--grain` などは写さない）、body（背景 `var(--bg)`、左右 `max(16px, env(safe-area-inset-*))`、`overflow-x: clip`）、`.page { max-width: 720px; margin: 0 auto; }`、本文の `overflow-wrap: anywhere`、表は `display: block; overflow-x: auto`、フッターは index と同じ見た目。
   - 3ページ: Step 1 の head、`<main class="page">` に `.back`・`<h1>`・中身は Task 2〜4 で書く、`<footer>` にフッター HTML。about.html は空の `<h2 id="contact">お問い合わせ</h2>` まで置く。
 
-- [ ] **Step 4: e2e を書いて流す**（`tests/e2e/pages.test.mjs`、`openApp(browser, { url: server.url + p, viewport, storage, colorScheme })`）
+- [ ] **Step 4: e2e を書いて流す**（`tests/e2e/pages.test.mjs`、`const server = await startServer()` のあと `openApp(browser, { path: p, viewport, storage, colorScheme })`。`PHONE`（390×844）・`PC`（1280×800）は helpers.mjs のもの）
 
 ```js
 // 3ページ × PHONE・{ width: 360, height: 740 }・PC
@@ -116,7 +116,7 @@ test('privacy_text', () => {
   assert.ok(h.includes('コードは24時間で使えなくなります。預けたデータは、そのあとの整理で消えます'));
   for (const s of ['Supabase', 'IP アドレス', 'GitHub Pages', 'Google Fonts', 'cdnjs', 'jsDelivr', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', '利用する場合があります', 'アクセス解析']) assert.ok(h.includes(s), s);
   assert.match(h, /最終更新日: \d{4}年\d{1,2}月\d{1,2}日/);
-  // キーの名前は並べない: TRANSFER_KEYS・LOCAL_KEYS のうち大文字をふくむ名前（rpgRank・adminErrors など）が出てこない
+  // キーの名前は並べない: TRANSFER_KEYS・LOCAL_KEYS（profile.js:155-157）のうち大文字をふくむ名前（rpgRank・adminSnaps・adminErrors・adminAuth など）が出てこない。keysWithUpper はテストの中の小さな関数
   for (const k of keysWithUpper(read('profile.js'))) assert.ok(!h.includes(k), k);
 });
 ```
@@ -178,7 +178,7 @@ test('howto_sections', () => {
 
 ### Task 5: profile.js の1行・sitemap・README
 
-**Files:** Modify `profile.js`（名前の入力欄の3か所。マージ後に再確認: postBox の作る欄 約 l.248、`#pf-form` 約 l.453、`#pf-rename-form` 約 l.469）、`index.html`（`profile.js?v=`）、`sitemap.xml`、`README.md`、`tests/unit/pages.test.mjs`、`tests/e2e/profile.test.mjs`
+**Files:** Modify `profile.js`（名前の入力欄の3か所: postBox の `kind === 'form'` の欄 l.263-266（ヒントは tail の l.268）、`#pf-form` l.476-479、`#pf-rename-form` l.492-495）、`index.html`（`profile.js?v=3` → 4、l.1435）、`sitemap.xml`、`README.md`、`tests/unit/pages.test.mjs`、`tests/e2e/profile.test.mjs`
 
 **Interfaces:** Produces: sitemap の3つの `<url>` は先頭（`/`）のすぐ後ろ。B1 の目印はこの後ろに置く。
 
@@ -196,6 +196,6 @@ test('profile_name_note', () => assert.equal(read('profile.js').match(/本名や
 //   TA の結果画面（プロフィールなし）の「載せる」箱にも見える
 ```
 - [ ] **Step 2: 落ちるのを見る** → FAIL
-- [ ] **Step 3: 作る** — profile.js に `const NAME_NOTE = '<p class="hint pf-name-note">本名や学校名は使わないでね（<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>）</p>';`（IIFE の中。外側に const を書かない）を足し、3つの名前の入力欄の下に入れる。`profile.js?v=` を main +1。sitemap に3ページ（`<lastmod>` はその日）。README に「静的ページ」の節: 3ページとフッターの目印（4ファイルで同じ、テストで確かめる）、pages.css の変数は index.html と同じにする、フォーム URL の置き場所、「広告を入れるときは privacy.html の広告の項目（`#ads`）を見直す」、admin.html にはフッターを付けない。
-- [ ] **Step 4: 流す** — 全テスト（とくに `cache_bust`・`transfer-keys`・`pc_layout`・`result_guard`）→ PASS。結果画面が PC で収まらなくなったら、postBox だけ NAME_NOTE を既存の hint の文につなげる。
+- [ ] **Step 3: 作る** — profile.js に `const NAME_NOTE = '<p class="hint pf-name-note">本名や学校名は使わないでね（<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>）</p>';`（IIFE の中。外側に const を書かない）を足し、3つの名前の入力欄の下に入れる。`profile.js?v=` を main +1（3 → 4）。sitemap に3ページ（`<lastmod>` はその日）。README に「静的ページ」の節: 3ページとフッターの目印（4ファイルで同じ、テストで確かめる）、pages.css の変数は index.html と同じにする、フォーム URL の置き場所、「広告を入れるときは privacy.html の広告の項目（`#ads`）を見直す」、admin.html にはフッターを付けない。
+- [ ] **Step 4: 流す** — 全テスト（とくに `cache_bust`・`transfer-keys`・`pc_layout`・`result_guard`）→ PASS。結果画面が PC で収まらなくなったら、postBox だけ NAME_NOTE を既存の hint の文（tail の l.268）につなげる。
 - [ ] **Step 5: コミット** — 「プロフィールの名前の欄に注意書きを足し、sitemap と README に静的ページを書く」

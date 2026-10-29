@@ -53,6 +53,16 @@
 - `node --test tests/unit/trivia.test.mjs` で、全部の国にあるか・作り直すと同じになるかを確かめる
 - `trivia.js` が読めないときや形がおかしいときは、豆知識を出さないだけでクイズと図鑑はそのまま動く
 
+## 静的ページ
+
+- 読み物のページは `privacy.html`（プライバシーポリシー）・`about.html`（運営者・お問い合わせ）・`howto.html`（遊び方）の3つ。見た目は `pages.css` を共通で使う
+- フッターは `<!-- footer:start -->`〜`<!-- footer:end -->` の目印の間に書き、`index.html` と3ページの4ファイルで同じリンクにする（`tests/unit/pages.test.mjs` の `footer_links_same` で確かめる）。リンクを変えるときは4ファイルとも直す
+- `pages.css` の色と文字の変数（`--bg`・`--ink`・`--accent` など）は `index.html` と同じ値にする。`:root`・端末がダークのとき（`:root:not([data-theme="light"])`）・設定がダークのとき（`[data-theme="dark"]`）の3か所とも合わせる（同じテストで比べる）
+- お問い合わせフォームの URL は `about.html` の `<h2 id="contact">` の下に `<a id="contact-form" href="…">` として置く。まだ無いあいだは `<p id="contact-pending">`（準備中）の文だけにしておく（`contact_form_url` のテストが、Google フォームの URL か準備中の文かを確かめる）。URL を置くときは `privacy.html` も見直す（`#collect` のお問い合わせの文・`#external` の Google フォーム・最終更新日が、実際のフォームと合っているか）
+- 広告を入れるときは、`privacy.html` の広告の項目（`#ads`）を見直す
+- `admin.html` にはフッターを付けない（`footer_not_in_admin`）
+- 新しいページを足したら `sitemap.xml` にも書く
+
 ## クレジット
 
 - 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）

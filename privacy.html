@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>プライバシーポリシー｜国旗マスター</title>
+<meta name="description" content="国旗マスターで集める情報、端末に保存するもの、ランキングに送るもの、広告とアクセス解析、お問い合わせの方法をまとめたページです。">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/privacy.html">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="pages.css?v=1">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← 国旗マスターで遊ぶ</a>
+  <h1>プライバシーポリシー</h1>
+  <p>国旗マスター（このサイト）で、どんな情報をあつかうのかをまとめました。</p>
+
+  <h2 id="collect">集めるものと集めないもの</h2>
+  <p>このサイトには、会員の登録はありません。登録しなくても、全部の遊びが使えます。</p>
+  <p>遊ぶために、本名・メールアドレス・住所・電話番号を集めることはありません。</p>
+  <p>お問い合わせで送られた内容（書いてくれたときはメールアドレスも）は、返事をするためだけに使います（送り先は Google フォームです）。</p>
+  <p>ランキングに記録をのせるときだけ、あなたが決めた名前と記録を送ります（くわしくは「<a href="#ranking">ランキングに送るもの</a>」）。</p>
+
+  <h2 id="device">あなたの端末の中だけに保存するもの</h2>
+  <p>遊んだ内容は、ふだんはあなたの端末（スマホやパソコンのブラウザ）の中だけに保存します。外に出るのは、あなたが自分で引き継ぎを使ったときだけです（くわしくは「<a href="#transfer">引き継ぎ</a>」）。</p>
+  <ul>
+    <li>設定（音・画面の色・出し方など）</li>
+    <li>成績（まちがえた国、今日の難問の結果など）</li>
+    <li>冒険の進み具合</li>
+    <li>バッジ</li>
+    <li>エラーの記録（うまく動かなかったときのメモ。これは引き継ぎのときも預けず、外には送りません）</li>
+  </ul>
+  <p>ブラウザのサイトデータを消すと、これらも消えます。</p>
+
+  <h2 id="ranking">ランキングに送るもの</h2>
+  <p>ランキングにのせると決めたときだけ、次のものを送ります。送り先は Supabase というデータベースのサービスです。</p>
+  <h3>プロフィール</h3>
+  <ul>
+    <li>名前・公開するかどうか・いまつけている称号・かざり・取ったバッジの数を送ります。</li>
+    <li>プロフィールをあなたの端末と結びつけるために、端末が「合言葉」を作ります。サイトには合言葉そのものは残さず、元にもどせない形（ハッシュ）にしたものだけを保存します。</li>
+  </ul>
+  <h3>記録</h3>
+  <p>のせる記録の種類は、タイムアタック・今日の難問・冒険の3つです。名前とタイム・正解の数・レベルなど、順位を決めるのに使う数を送ります。</p>
+  <h3>非公開にしたとき</h3>
+  <p>プロフィールを非公開にすると、プロフィールのカードには、名前・かざりと「このプロフィールは非公開だよ」というひとことだけが見えます。カードに称号やバッジの数、記録のまとめは出ません。</p>
+  <p>ランキングの表には、非公開でも名前と記録（タイムなど）がのります。</p>
+  <h3 id="transfer">引き継ぎ</h3>
+  <p>別の端末に引き継ぐときは、いまの端末のデータ（設定・成績・冒険・バッジなど。エラーの記録はのぞく）を預けて、引き継ぎのコードを出します。コードは24時間で使えなくなります。預けたデータは、そのあとの整理で消えます。</p>
+  <h3>Supabase について</h3>
+  <p>Supabase とやりとりするとき、Supabase の記録（ログ）に、あなたの通信の IP アドレスが残ることがあります。</p>
+
+  <h2 id="names">名前のルール</h2>
+  <p>ランキングの名前に、本名や学校名は使わないでください。人がいやな気持ちになる名前も使えません。</p>
+  <p>ルールに合わない名前や、おかしな記録があったときは、運営者が名前や記録を消したり、変えたりすることがあります。</p>
+
+  <h2 id="delete">消してほしいとき</h2>
+  <p>ランキングの名前や記録を消してほしいときは、<a href="about.html#contact">お問い合わせ</a>から送ってください。</p>
+  <p>消した記録は、まちがえて消したときのための控えに、しばらく残ることがあります。</p>
+
+  <h2 id="external">使っている外のサービス</h2>
+  <p>サイトを表示するために、次のサービスを使っています。ページを開くと、あなたのブラウザがこれらのサービスとやりとりします。</p>
+  <ul>
+    <li>GitHub Pages（このサイトの置き場所）</li>
+    <li>Google Fonts（文字の形）</li>
+    <li>cdnjs・jsDelivr（地図を描くためのプログラム）</li>
+    <li>Google フォーム（お問い合わせ。送ったときだけ）</li>
+  </ul>
+
+  <h2 id="ads">広告</h2>
+  <p>このサイトでは、Google などの広告のサービスを利用する場合があります。</p>
+  <p>広告のサービスは、あなたの興味に合った広告を出すために、Cookie（クッキー）を使うことがあります。Cookie には、名前やメールアドレスなど、あなたがだれかが分かる情報はふくまれません。</p>
+  <p>あなたに合わせた広告を出さないようにするには、<a href="https://adssettings.google.com">Google の広告設定</a>で変えられます。Google が Cookie をどう使うかは、<a href="https://policies.google.com/technologies/ads">Google のポリシーと規約（広告）</a>に書いてあります。</p>
+
+  <h2 id="analytics">アクセス解析</h2>
+  <p>このサイトでは、アクセス解析のサービス（何人が来たかなどを調べる道具）は使っていません。</p>
+
+  <h2 id="changes">このページの変更</h2>
+  <p>このページの中身は、必要に応じて変えることがあります。変えたときは、このページでお知らせします。</p>
+  <p>最終更新日: 2026年10月29日</p>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>

@@ -1,0 +1,52 @@
+/* pages.css — 読み物のページ（privacy・about・howto）の見た目。色と字は index.html の変数と同じ値（tests/unit/pages.test.mjs で確かめる） */
+:root {
+  --bg: #eef2f1;
+  --surface: #ffffff;
+  --ink: #1b2a33;
+  --muted: #5b6b73;
+  --line: #d3dcdc;
+  --accent: #1f5f8b;
+  --accent-ink: #ffffff;
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Noto Sans JP", sans-serif;
+  --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171c; --surface: #18232a; --ink: #e5edf0; --muted: #93a4ac; --line: #2c3a42;
+    --accent: #6fb3e0; --accent-ink: #0c1820;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171c; --surface: #18232a; --ink: #e5edf0; --muted: #93a4ac; --line: #2c3a42;
+  --accent: #6fb3e0; --accent-ink: #0c1820;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.8; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px; overflow-x: clip;
+}
+a { color: var(--accent); }
+a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* 本文の箱。長い URL も折り返して横にはみ出さない */
+.page { max-width: 720px; margin: 0 auto; overflow-wrap: anywhere; }
+.back { display: inline-block; font: 700 .9rem var(--font-display); text-decoration: none; padding: 6px 0; }
+.page h1 { font-family: var(--font-display); font-weight: 900; font-size: 1.6rem; line-height: 1.4; margin: 16px 0 20px; text-wrap: balance; }
+.page h2 { font-family: var(--font-display); font-weight: 900; font-size: 1.2rem; line-height: 1.4; margin: 32px 0 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.page h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.02rem; margin: 22px 0 6px; }
+.page p, .page ul, .page ol { margin: 0 0 12px; }
+.page ul, .page ol { padding-left: 1.4em; }
+
+/* 表は幅に収まらないときだけ横に動かす（ページ全体は横に動かない） */
+table { display: block; overflow-x: auto; max-width: 100%; border-collapse: collapse; margin: 0 0 16px; font-size: .9rem; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--surface); }
+
+/* フッター（index.html と同じ見た目） */
+footer { font-size: .75rem; color: var(--muted); text-align: center; max-width: 720px; margin: 40px auto 0; }
+.foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; margin-top: 4px; }
+.foot-links a { color: var(--muted); padding: 4px 2px; }

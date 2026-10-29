@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遊び方｜国旗マスター</title>
+<meta name="description" content="国旗マスターの遊び方。国旗・国名・場所の4択クイズ、タイムアタック、国旗図鑑、冒険RPGの楽しみ方を説明します。">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/howto.html">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="pages.css?v=1">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← 国旗マスターで遊ぶ</a>
+  <h1>遊び方</h1>
+  <p>国旗マスターは、世界195か国の国旗・国名・場所を4択クイズで覚えるサイトです。登録しなくても、全部の遊びが使えます。</p>
+
+  <h2 id="start">はじめかた</h2>
+  <ol>
+    <li>ホームの［プレイ］を押します。</li>
+    <li>「モードを選ぶ」の画面で、出し方・あそび方・出題する地域・問題数を選びます。</li>
+    <li>［スタート］を押すと、クイズがはじまります。4つの答えから1つを選んでください。</li>
+  </ol>
+  <p>音や画面の色、「正解したらすぐ次の問題へ」などは、ホームの［設定］で変えられます。</p>
+
+  <h2 id="modes">4つの出し方</h2>
+  <p>出題は国旗・国名・場所の組み合わせです。</p>
+  <ul>
+    <li><b>国旗 → 国名</b>: 国旗を見て、国名を選びます。</li>
+    <li><b>国名 → 国旗</b>: 国名を見て、国旗を選びます。</li>
+    <li><b>場所 → 国旗</b>: 地図で示した場所を見て、その国の国旗を選びます。</li>
+    <li><b>国旗 → 場所</b>: 国旗を見て、地図の上でその国の場所を選びます。</li>
+  </ul>
+  <p>場所を使う2つの出し方では、「国名も表示する（ヒントあり）」をオンにすると、国名も出ます。</p>
+
+  <h2 id="kinds">練習・挑戦・タイムアタック</h2>
+  <ul>
+    <li><b>練習</b>: まちがえた問題は、後半にもう一度出ます。全部正解したら終わりです。</li>
+    <li><b>挑戦</b>: まちがえたら最初からやり直しです。ノーミスでのクリアを目指します。</li>
+    <li><b>タイムアタック</b>: 1ミスで失格です。クリアしたタイムで、ランキングに挑戦できます。</li>
+  </ul>
+  <p>まちがえた国は記録しておき、終わったあとにまとめて見られます。記録はホームの［設定］から消せます。</p>
+
+  <h2 id="daily">今日の難問</h2>
+  <p>毎日1回だけ挑戦できる20問です。その日に遊ぶ人は、全員同じ問題です。</p>
+  <p>タイムアタックと同じく、1ミスでそこまで。全問正解すればタイムが出て、その日のランキングにのせられます。途中でページを閉じても、やり直しはできません。</p>
+
+  <h2 id="rpg">冒険</h2>
+  <p>クイズで正解すると、コインがたまります。コインは冒険で使えます。国旗ガチャで仲間の国を集めて、チームを組み、ダンジョンを進みましょう。</p>
+  <p>冒険は、ホームの［冒険］から遊べます。表示したくないときは、［設定］で消せます。</p>
+
+  <h2 id="book">国旗図鑑</h2>
+  <p>ホームの［国旗図鑑を見る］から、195か国の国旗を一覧や地図で見られます。国を押すと、首都やその国のちょっとした話が出ます。</p>
+  <p>首都はクイズでは出題しません。答えのあとの説明と図鑑で見られます。</p>
+
+  <h2 id="badges">バッジ</h2>
+  <p>クイズや今日の難問、冒険で決まったことをすると、バッジがもらえます。バッジをとると称号もつきます。どうすればもらえるか分からない「ひみつのバッジ」もあります。</p>
+
+  <h2 id="profile">プロフィールと引き継ぎ</h2>
+  <p>ホームの［プロフィール］で名前を決めてプロフィールを作ると、タイムアタック・今日の難問・冒険のランキングに、その名前でのります。本名や学校名は使わないでください（<a href="privacy.html#names">名前のルール</a>）。</p>
+  <p>別の端末で続きを遊びたいときは、プロフィールの画面で引き継ぎのコードを出し、新しい端末でそのコードを入れます。コードは24時間で使えなくなり、1回だけ使えます。</p>
+
+  <h2 id="faq">よくある質問</h2>
+  <details>
+    <summary>お金はかかりますか？</summary>
+    <p>かかりません。全部の遊びが無料です。</p>
+  </details>
+  <details>
+    <summary>登録は必要ですか？</summary>
+    <p>いりません。ランキングにのせたいときだけ、名前を決めてプロフィールを作ります。</p>
+  </details>
+  <details>
+    <summary>首都を当てる問題はないのですか？</summary>
+    <p>ありません。出題は国旗・国名・場所だけです。首都は、答えのあとの説明と国旗図鑑で見られます。</p>
+  </details>
+  <details>
+    <summary>遊んだ記録が消えてしまいました。</summary>
+    <p>記録はあなたの端末のブラウザの中に保存しています。ブラウザのサイトデータを消すと、記録も消えます。端末を変えるときは、先に<a href="#profile">引き継ぎ</a>を使ってください。</p>
+  </details>
+  <details>
+    <summary>国名の書き方がほかとちがいます。</summary>
+    <p>国名は外務省の書き方をもとにしています。くわしくは<a href="about.html">運営者のページ</a>に書いています。</p>
+  </details>
+  <details>
+    <summary>まちがいを見つけました。</summary>
+    <p><a href="about.html#contact">お問い合わせ</a>から教えてください。</p>
+  </details>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="サイトの案内"><a href="howto.html">遊び方</a><a href="about.html">運営者</a><a href="about.html#contact">お問い合わせ</a><a href="privacy.html">プライバシーポリシー</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>
