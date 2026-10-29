@@ -124,5 +124,24 @@
   // ランキングの並べ方: 正答数が多い順（全問正解がいちばん上）→ タイムが短い順 → 先に載せた順
   const compare = (x, y) => (y.correct - x.correct) || (x.timeMs - y.timeMs) || (x.at - y.at);
 
-  globalThis.DAILY_CORE = { COUNT, MODES, FAMOUS, SIMILAR, stageOf, jstDay, msToNextDay, addDays, validDay, hash, rng, build, compare };
+  // 埋めこみ（embed.html）の1日1問。形は国旗→国名か国名→国旗だけ（地図と首都は出さない）
+  const EMBED_MODES = ['f2n', 'n2f'];
+  // 返すのは { day, mode, a, opts: [国コード4つ] }。国はよく知られた国から、その日の build の答えを外して選ぶ。
+  // 種は build と別（kokki-embed）なので、build の問題は変わらない。乱数を使う順番を変えると、その日の1問が変わる
+  function oneOfDay(day, countries) {
+    if (!validDay(day)) throw new Error(`daily: 日付がおかしい ${day}`);
+    const r = rng(hash(`kokki-embed:1:${day}`));
+    const all = countries.slice().sort((x, y) => x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
+    const answers = new Set(build(day, countries).map(q => q.a));
+    const mode = pick(r, EMBED_MODES);
+    const a = pick(r, all.filter(c => FAMOUS.has(c.a) && !answers.has(c.a)).map(c => c.a));
+    const region = all.find(c => c.a === a).r, opts = [a];
+    // 選択肢: 同じ地域から。足りなければ全部から
+    for (const list of [shuffle(r, all.filter(c => c.r === region).map(c => c.a)), shuffle(r, all.map(c => c.a))]) {
+      for (const x of list) { if (opts.length >= 4) break; if (!opts.includes(x)) opts.push(x); }
+    }
+    return { day, mode, a, opts: shuffle(r, opts) };
+  }
+
+  globalThis.DAILY_CORE = { COUNT, MODES, FAMOUS, SIMILAR, stageOf, jstDay, msToNextDay, addDays, validDay, hash, rng, build, compare, EMBED_MODES, oneOfDay };
 })();
