@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「A7 白地図タップ（PR7・プレイだけ）」・「実装の順番」・「チコに決めてほしいこと」6・8・9・10・11・「テストの方針」）
 
-前提: PR0〜PR6 はマージ済み。PR2 の `loadMap()`・`mapReady`・`MAP_SCREENS`（setup に入るとき地図は読めている）、`async startGame()`、helpers の `settle`（「`G?.cur` と `#qcard .choices`」を待つ）。PR6 の `G.kind === 'dojo'` の分かれ道・`startDojo`・`#to-dojo`・`drill:dojo`。ファイル:行は #26（`origin/claude/project-thread-e4qf97`）のもので、**マージ後に再確認**する。
+前提: PR0〜PR6 はマージ済み。PR2 の `loadMap()`・`mapReady`・`MAP_SCREENS`（setup に入るとき地図は読めている）、`async startGame()`、helpers の `settle`（「`G?.cur` と `#qcard .choices`」を待つ）。PR6 の `G.kind === 'dojo'` の分かれ道・`startDojo`・`#to-dojo`・`drill:dojo`。ファイル:行は PR0〜PR6・PR8 をマージしたあとの main（`79e80a7`）のもの。PR6 の道場の入口 `#to-dojo` は帯ではなく、「モードを選ぶ」見出し行の右（`.dj-head` の中の `.dj-band`、dojo.js が h2 を包んで作る）にあり、高さを使わない。
 
 ## Global Constraints
 
@@ -38,7 +38,7 @@
 ### Task 1: 冒険のコイン（rpg-core.js）
 
 **Files:**
-- Modify: `rpg-core.js:12`（`modeMul`）、`rpg-core.js:514`（`runAnswer` の `feDone`）、`index.html` の `rpg-core.js?v=`
+- Modify: `rpg-core.js:12`（`modeMul`）、`rpg-core.js:525`（`runAnswer` の `feDone`）、`index.html:1659` の `rpg-core.js?v=13` → `14`
 - Test: `tests/unit/rpg-core.test.mjs`
 
 **Interfaces:**
@@ -62,14 +62,14 @@ test('tap_coins', () => {
 ```
 
 - [ ] **Step 2: 落ちるのを確かめる** — `node --test tests/unit/rpg-core.test.mjs` → `tuning_and_tables` と `tap_coins` が FAIL（coin 0）。
-- [ ] **Step 3: 2行を変え、`rpg-core.js?v=` を +1。**
+- [ ] **Step 3: 2行を変え、`rpg-core.js?v=13` を `14` に。**
 - [ ] **Step 4: 全テストが通る**（unit・e2e・sql）。
 - [ ] **Step 5: コミット** — `git commit -m "冒険のコインに白地図タップ（倍率1.3、はじめての+20なし）を足す"`（末尾2行つき）。
 
 ### Task 2: MODES の tap と noTa（モード選択・ランキング）
 
 **Files:**
-- Modify: `index.html:564-569`（`MODES`）、`index.html:900-922`（`renderSetup`・`$('modes').onclick`）、`index.html:948-951`（`startGame` の kind）、`index.html:1263-1279`（`boardConds`・`openRanking`・`renderRanking`）、`index.html` の CSS（`.modegrid > .modecard[data-k="tap"] { grid-column: 1 / -1 }`、スマホの2列でも穴をあけない）、`pc.css`（同じ指定が PC で上書きされないこと、`?v=` +1）
+- Modify: `index.html:621-626`（`MODES`）、`index.html:1024-1043`（`renderSetup`・`$('modes').onclick`・`$('kinds').onclick`）、`index.html:1095-1102`（`startGame` の kind）、`index.html:1488-1505`（`boardConds`・`openRanking`・`renderRanking`）、`index.html` の CSS（`.modegrid > .modecard[data-k="tap"] { grid-column: 1 / -1 }`、スマホの2列でも穴をあけない）、`pc.css`（PC の `#modes` は4列1行なので、5枚目は2行目で横いっぱい。`index.html:394` の `pc.css?v=2` → `3`）
 - Test: `tests/e2e/tap_map.test.mjs`（新規。`map_zoom.test.mjs` と同じ `t(name, fn)` の形で、最後に `app.errors` が空）
 
 **Interfaces:**
@@ -97,7 +97,7 @@ t('ranking_without_tap', ...)   // P.mode = 'tap' で openRanking() → RK.mode 
 ### Task 3: tapMap と判定（出題・答え）
 
 **Files:**
-- Modify: `index.html`（`zoomableMap` の下に `TAP`・`tapMap`・`tapJudge`・`tapMiss`。`nextQuestion:986-1031`、`answer:1048-1112`、CSS）、`tests/e2e/helpers.mjs`（`settle` と `answerTap`）
+- Modify: `index.html`（`zoomableMap`（771-807）の下に `TAP`・`tapMap`・`tapJudge`・`tapMiss`。`nextQuestion:1151-1192`、`answer:1220-1295`、CSS）、`tests/e2e/helpers.mjs`（`settle` と `answerTap`）
 - Test: `tests/e2e/tap_map.test.mjs`
 
 **Interfaces:**
@@ -135,7 +135,7 @@ t('quiz_only_flag_name_place', ...) // tap の問題の #qcard .qmain に img.qf
 ### Task 4: 外れたときの表示・PC の列・つながり
 
 **Files:**
-- Modify: `index.html`（`tapMiss` と `answer` の km の1行、CSS）、`pc.css`（tap の列）、`docs/events.md:43`（mode の一覧に `'tap'`＝白地図タップ）、`howto.html` の `#modes`（PR1 の「4つの出し方」に5つ目の白地図タップを足す。練習と挑戦だけで遊べる、と書く）と `tests/unit/pages.test.mjs`（`howto_tap`）、`tests/e2e/layout.mjs`（場面 `quiz_tap`・`wrong_tap`・`named_tap`）、高さがあふれたときだけ `dojo.js`・`dojo.css`（帯の置き場所、`?v=` +1）
+- Modify: `index.html`（`tapMiss` と `answer` の km の1行、CSS）、`pc.css`（tap の列）、`docs/events.md:44`（mode の一覧に `'tap'`＝白地図タップ。50行目の `hint` の説明にも `tap` を足す）、`howto.html` の `#modes`（PR1 の「4つの出し方」に5つ目の白地図タップを足す。練習と挑戦だけで遊べる、と書く。44行目の「場所を使う2つの出し方」も白地図タップを入れた言い方に）と `tests/unit/pages.test.mjs`（`howto_tap`）、`tests/e2e/layout.mjs`（場面 `quiz_tap`・`wrong_tap`・`named_tap`。今の `startPractice`・`named` は `#qcard .choice` を待つので、tap の場面は `#qcard .tapbox` を待ち、外すのは `answerTap`）、高さがあふれたときだけ `dojo.js`・`dojo.css`（帯の置き場所、`?v=` +1）
 - Test: `tests/e2e/tap_map.test.mjs`、`tests/e2e/pc_layout.test.mjs`（場面名が `QUIZ_SCENES` の正規表現に入るので NO_SCROLL に自動で入る）
 
 **Interfaces:**
@@ -164,6 +164,6 @@ t('dojo_round_still_works', ...)  // dojo.test と同じく drill:dojo を windo
 
 - [ ] **Step 2: 落ちるのを確かめる。**
 - [ ] **Step 3: Interfaces のとおりに作る。** `pc.css?v=` は Task 2 で上げていれば同じ PR の中なのでそのまま。
-- [ ] **Step 4: 1366×657 を確かめる** — `node --test --test-concurrency=1 tests/e2e/pc_layout.test.mjs`。`setup` が縦スクロールしたら、設計書のとおり A6 の帯（`.dj-band` と中の `#to-dojo`）を `#scr-setup .panel` の先頭から `#modes` の直後へ移して1行リンクにし（id・文字・押したときの動きは同じ）、dojo.test の帯の位置のテストがあれば合わせる。`phone_geometry_unchanged` は setup・quiz の場面でわざと差が出る（README のとおり、差がその場面だけかを確かめる）。
+- [ ] **Step 4: 1366×657 を確かめる** — `node --test --test-concurrency=1 tests/e2e/pc_layout.test.mjs`。道場の入口はもう見出し行の右（`.dj-head`）にあって高さを使わないので、`setup` が縦スクロールしても入口は動かさない（モードカードの下へ移すと1行ぶん高くなる）。そのときは pc.css で `#modes` を5列1行にして（5枚目を横いっぱいにする行を作らない）、収まることを確かめる。`phone_geometry_unchanged` は setup・quiz の場面でわざと差が出る（README のとおり、差がその場面だけかを確かめる）。
 - [ ] **Step 5: 全テストが通る**（`events-doc` も）。
 - [ ] **Step 6: コミット** — 「白地図タップで外れたときの距離と色、PC の列、場面と events.md・遊び方ページを足す」。
