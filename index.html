@@ -1117,6 +1117,7 @@ async function startDaily(qs, sid) {
   G = { mode: modeOf(qs[0].mode), kind: 'daily', region: 'all', daily: qs, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0, endMs: 0, hint: false };
   G.sid = sid || 'daily-' + Date.now().toString(36);
   $('ptime').textContent = RANKING.formatTime(0);
+  $('pcoin')?.remove();   // 今日の難問はコインを出さない（前の練習・挑戦の #pcoin を残さない。rpg.js は drill:start でしか作り直さない）
   $('quit').textContent = 'やめる（今日の挑戦はここまで）';
   show('quiz');
   return prepThenStart(qs.flatMap(q => [q.a, ...q.opts]));
@@ -1131,6 +1132,7 @@ function startDojo({ seq, group, mode, sid }) {
   G.sid = sid || 'dojo-' + Date.now().toString(36);
   $('quit').textContent = 'やめて道場へ';
   $('ptime').textContent = '';
+  $('pcoin')?.remove();   // 道場はコインを出さない（前の練習・挑戦の #pcoin を残さない）
   preloadFlags(group);   // 待たない（選択肢はグループの国だけなので、先に読んでおく）
   show('quiz');
   nextQuestion();

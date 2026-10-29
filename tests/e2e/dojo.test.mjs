@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, pickSetup } from './helpers.mjs';
+import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, pickSetup, clearByAnswering } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -173,4 +173,18 @@ t('dojo_counts_streak', async page => {
   await page.click('#quit'); assert.equal(await page.evaluate(() => localStorage.getItem('streak')), null);
   await page.click('.dj-card[data-g="td"]'); await clearRound(page);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('streak')).last), await page.evaluate(() => DAILY_CORE.jstDay()));
+});
+
+// 道場はコインを出さない: 練習のあとに道場を遊んでも、練習の #pcoin（コインの数）が残らない（今日の難問も同じ）
+t('no_pcoin_after_practice', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 }); await page.click('#start');
+  await answerCorrect(page);
+  await page.waitForFunction(() => /^\+\d/.test(document.getElementById('pcoin')?.textContent || ''));
+  await page.click('#next'); await clearByAnswering(page);
+  await go(page, SEQ, TD);
+  assert.equal(await page.locator('#pcoin').count(), 0);
+  await answerCorrect(page); await page.waitForTimeout(100);
+  assert.equal(await page.locator('#pcoin').count(), 0);
+  await page.click('#next'); await answerWrong(page); await page.waitForTimeout(100);
+  assert.equal(await page.locator('#pcoin').count(), 0);
 });
