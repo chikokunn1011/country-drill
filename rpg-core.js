@@ -9,7 +9,7 @@
   const TUNING = {
     hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 99 },
     levelBase: 100, levelStep: 30,
-    quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2 }, hintMul: 0.6, weakMul: 2,
+    quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2, tap: 1.3 }, hintMul: 0.6, weakMul: 2,
             decay: [[3, 1], [6, 0.5], [Infinity, 0.2]], firstEver: 20, taMinMsPerQ: 400 },
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
@@ -522,7 +522,7 @@
     const r = answerCoins({
       kind: run.kind, mode, right, first, hint, weak,
       nth: (b.day.n[a] || 0) + (g.cnt[a] || 0) + 1,
-      retryUsed: !!g.re[a], feDone: !!((b.fe[a] | g.fe[a]) & bit),
+      retryUsed: !!g.re[a], feDone: !bit || !!((b.fe[a] | g.fe[a]) & bit),   // MODE_BIT に無いモード（tap）は +20 なし
     });
     if (r.base > 0) {
       g.cnt[a] = (g.cnt[a] || 0) + 1;

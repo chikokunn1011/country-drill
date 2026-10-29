@@ -26,7 +26,7 @@ test('tuning_and_tables', () => {
   assert.deepEqual(plain(TUNING), plain({
     hero: { hp0: 30, hpLv: 6, atk0: 8, atkLv: 2, maxLv: 99 },
     levelBase: 100, levelStep: 30,
-    quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2 }, hintMul: 0.6, weakMul: 2,
+    quiz: { base: 10, retry: 3, ta: 5, modeMul: { f2n: 1, n2f: 1, m2f: 1.2, f2m: 1.2, tap: 1.3 }, hintMul: 0.6, weakMul: 2,
             decay: [[3, 1], [6, 0.5], [Infinity, 0.2]], firstEver: 20, taMinMsPerQ: 400 },
     clear: { practiceHalf: 2, practicePerfect: 3, challenge: 5, challengeNoMiss: 5, ta: 3, dailyMinN: 5 },
     daily: 100, start: 1000, overcome: 30, bounty: 30, bountyAll: 100, badge: 50,
@@ -600,6 +600,20 @@ const pendEmpty = run => Object.values(plain(run.pend)).every(v => Object.keys(v
 
 // 練習・f2n・一発正解・ヒントなし・苦手なし・今日1回目・はじめて正解は払い済み
 const AC = { kind: 'practice', mode: 'f2n', right: true, first: true, hint: false, weak: false, nth: 1, retryUsed: false, feDone: true };
+
+// 白地図タップ（tap）: 倍率1.3。MODE_BIT に無いモードなので「はじめて正解した国」の +20 は付けない（毎回もらえないように）
+test('tap_coins', () => {
+  const K = loadCore();
+  assert.equal(K.answerCoins({ ...AC, mode: 'tap' }).coin, 13);                 // 10 × 1.3
+  const d = dWith(K), game = sid => K.newRun({ sid, kind: 'practice', mode: 'tap', region: 'all', n: 3, hint: false }, d);
+  const ans = { a: 'jp', right: true, first: true, hint: false, mode: 'tap', missesBefore: 0, missesAfter: 0 };
+  const run = game('tp'), r1 = K.runAnswer(run, ans);
+  assert.equal(r1.firstEver, 0); assert.equal(r1.coin, 13);
+  assert.equal(plain(run.pend).fe.jp ?? 0, 0);
+  K.settleRun(d, run, clearRes('practice', 1, { mode: 'tap' }), T0);
+  assert.equal(K.runAnswer(game('tp2'), ans).firstEver, 0);   // 次のゲームでも +20 は出ない
+  assert.equal(K.runAnswer(K.newRun({ sid: 'f', kind: 'practice', mode: 'f2n', region: 'all', n: 3, hint: false }, d), { ...ans, mode: 'f2n' }).firstEver, 20);   // f2n は今までどおり
+});
 
 test('answer_coins_table', () => {
   const K = loadCore(), c = o => K.answerCoins({ ...AC, ...o }).coin;
