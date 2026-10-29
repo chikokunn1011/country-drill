@@ -1563,9 +1563,18 @@ $('grid').onclick = e => {
 $('detail').onclick = e => { if (e.target === $('detail')) $('detail').close(); };
 
 /* ---------- 起動 ---------- */
+// '#play=<地域>'（国のページの［この地域で遊ぶ］）の地域。'all'・6地域・細かい地域のどれかならそれ、ほか（こわれた % も）は null
+function playRegionOf(hash) {
+  if (!hash.startsWith('#play=')) return null;
+  let r; try { r = decodeURIComponent(hash.slice(6)); } catch { return null; }
+  return r === 'all' || REGIONS.includes(r) || Object.hasOwn(SUBREGIONS, r) ? r : null;
+}
 applyTheme();
 applyDopa();
-const start = { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
+// #play=<地域> はその地域を選んで保存し、モード選択を開く。知らない値は無視してホーム
+const playR = playRegionOf(location.hash);
+if (playR) { S.region = playR; store.set('settings', S); }
+const start = playR ? 'setup' : { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 // #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く。
 // 地図を使う画面を直接開いたときは、地図を待つあいだ真っ白にならないよう先にホームを出す
 if (location.hash === '#ranking' && RANKING.enabled) openRanking();
