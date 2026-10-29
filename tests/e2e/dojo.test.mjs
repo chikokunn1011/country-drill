@@ -67,10 +67,10 @@ t('quiz_wrong_compare', async page => {
 
 t('quiz_right_compare_rival', async page => {
   await go(page, SEQ, TD); await answerCorrect(page);
-  assert.equal(await page.getAttribute('.reveal .dj-compare figure:nth-child(2) img', 'src'), await page.evaluate(() => flag('ro')));
+  assert.equal(await page.getAttribute('.reveal .dj-compare figure:nth-child(2) img', 'src'), await page.evaluate(() => flag('md')));
   assert.match(await page.innerText('.reveal .dj-compare'), /にている/);
   assert.equal(await page.locator('.reveal .tv[data-k="flag"]').count(), 1);
-}, { storage: { dojo: { v: 1, mode: 'f2n', mix: { 'md-td': 1, 'ro-td': 3 }, clear: {} } } });
+}, { storage: { dojo: { v: 1, mode: 'f2n', mix: { 'md-td': 3, 'ro-td': 1 }, clear: {} } } });
 
 t('requeue_no_repeat', async page => {
   await go(page, ['td', 'td', 'ro'], TD); await answerCorrect(page); await page.click('#next');
@@ -96,7 +96,9 @@ const dojoRec = page => page.evaluate(() => JSON.parse(localStorage.getItem('doj
 t('band_opens_dojo', async page => {
   await pickSetup(page, {}); assert.match(await page.innerText('#to-dojo'), /似た国旗の道場/);
   await page.click('#to-dojo'); assert.equal(await page.isVisible('#scr-dojo'), true);
-  assert.equal(await page.locator('.dj-card').count(), 25); assert.equal(await page.locator('.dj-card img').count(), 93);
+  assert.equal(await page.locator('.dj-card').count(), 25); assert.equal(await page.locator('.dj-card img').count(), 92);
+  // モナコは flags/*.svg ではインドネシアと同じ絵なので、赤と白のグループに出さない
+  assert.deepEqual(await page.$$eval('.dj-card[data-g="id"] img', is => is.map(i => i.getAttribute('src').match(/flags\/(\w+)\.svg/)[1])), ['id', 'pl', 'sg']);
   assert.equal(await page.locator('#dj-pairs').isHidden(), true);
   assert.doesNotMatch(await page.innerText('#scr-dojo'), /首都|場所/);
 });

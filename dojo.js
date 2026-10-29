@@ -84,7 +84,9 @@
   const load = () => D.sanitize(store.get(KEY, null));
   const save = st => store.set(KEY, st);
   // グループ（id → この版の countries.js にある国だけ）。2か国未満になったグループは出さない
-  const GROUPS = DAILY_CORE.SIMILAR.map(g => g.filter(a => byA.has(a))).filter(g => g.length >= 2 && Object.hasOwn(D.LABEL, g[0]));
+  // flags/*.svg はどれも 4:3 なので、モナコはインドネシアとまったく同じ絵になり見分けられない。道場では出さない
+  const SAME_PICTURE = new Set(['mc']);
+  const GROUPS = DAILY_CORE.SIMILAR.map(g => g.filter(a => byA.has(a) && !SAME_PICTURE.has(a))).filter(g => g.length >= 2 && Object.hasOwn(D.LABEL, g[0]));
   const groupOf = id => GROUPS.find(g => g[0] === id) || null;
   let mine = null;   // いま遊んでいる道場の1回 { sid, id }（ほかの sid の drill:dojo は見ない）
   let last = '';     // 終わった1回の結果の1行
