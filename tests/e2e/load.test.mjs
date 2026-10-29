@@ -102,7 +102,8 @@ t('navigate_while_waiting', async page => {
   assert.equal(await page.isHidden('#mapwait'), true);
 }, { path: 'about.html', routes: [['**/world.js*', delay(1000)]] });
 
-// スマホでホームを下までスクロールしてから［図鑑］を押しても、帯は画面の中に見えている
+// スマホ（幅390）でホームを下までスクロールしてから［図鑑］を押しても、帯は画面の中に見えている。
+// PR3 のホームは 390×844 では画面に収まりスクロールしないので、ホームがはみ出す背の低さ（ブラウザのバーが出た 390×664）で確かめる
 const inView = page => page.$eval('#mapwait', el => { const r = el.getBoundingClientRect(); return r.height > 0 && r.top >= 0 && r.bottom <= innerHeight; });
 t('mapwait_visible_after_scroll', async page => {
   await page.goto(server.url);
@@ -112,7 +113,7 @@ t('mapwait_visible_after_scroll', async page => {
   await sleep(400);
   assert.equal(await inView(page), true);
   await page.locator('#scr-book').waitFor();
-}, { path: 'about.html', routes: [['**/world.js*', delay(1500)]] });
+}, { path: 'about.html', viewport: { width: 390, height: 664 }, routes: [['**/world.js*', delay(1500)]] });
 
 // 背の低い端末で読みこみに失敗しても、［もう一度］が画面の中に見えて押せる
 t('mapwait_retry_visible_after_scroll', async page => {
