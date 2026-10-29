@@ -75,7 +75,7 @@ test('home_flags_lazy', () => assert.match(read('index.html'), /\$\('home-flags'
 
 **Files:**
 - Create: `vendor/d3-7.9.0.min.js`、`vendor/d3-LICENSE`、`vendor/topojson-client-3.1.0.min.js`、`vendor/topojson-client-LICENSE`（`tests/e2e/node_modules/{d3,topojson-client}` から写す）、`tests/e2e/load.test.mjs`
-- Modify: `index.html:521-525`（d3・topojson・world.js の script を消す）、`index.html:546-551`（`feats` など）、`index.html:606`（`graticule`）、`index.html:809-822`（`show`）、`index.html:366` の `#topbar` の直後と CSS（`#mapwait`）、`index.html:1435-1440`（起動）、`rpg.js:15`・`rpg-battle.js:13`（NEED から `d3`）と両方の `?v=`（rpg.js 12→13、rpg-battle.js 15→16。どちらも main の歴史で使っていない数）、`tests/e2e/helpers.mjs:447-479`（`openApp` の `waitMap`）、`privacy.html:75` の `#external` と `tests/unit/pages.test.mjs:106` の `privacy_text`（cdnjs・jsDelivr を外す）、`tests/unit/flag-files.test.mjs`、`README.md:69`
+- Modify: `index.html:521-525`（d3・topojson・world.js の script を消す）、`index.html:546-551`（`feats` など）、`index.html:606`（`graticule`）、`index.html:809-822`（`show`）、`index.html:366` の `#topbar` の直後と CSS（`#mapwait`）、`index.html:1435-1440`（起動）、`rpg.js:15`・`rpg-battle.js:13`（NEED から `d3`）と両方の `?v=`（rpg.js 12→14（main が #30 で 13 を使ったため）、rpg-battle.js 15→16。どちらも main の歴史で使っていない数）、`tests/e2e/helpers.mjs:447-479`（`openApp` の `waitMap`）、`privacy.html:75` の `#external` と `tests/unit/pages.test.mjs:106` の `privacy_text`（cdnjs・jsDelivr を外す）、`tests/unit/flag-files.test.mjs`、`README.md:69`
 
 **Interfaces:**
 - Produces（index.html のグローバル。A6・A7・B1 が前提にする）:
