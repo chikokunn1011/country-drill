@@ -65,7 +65,7 @@
 
 ## クレジット
 
-- 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）
+- 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）。`flags/*.svg` は flag-icons の svg を `tools/split_flags.mjs` で1枚ずつのファイルに分けたもの（中身は変えていない）。作り直すときは消す前の flags.js を取り出して渡す: `git show $(git log -1 --format=%h --diff-filter=D -- flags.js)^:flags.js > /tmp/flags.js && node tools/split_flags.mjs /tmp/flags.js flags`。svg の中身を変えたら `index.html` の `FLAG_V` を上げる
 - 地図: [world-atlas](https://github.com/topojson/world-atlas)（Natural Earth, ISC）
 - 国データ: [world-countries](https://github.com/mledoze/countries)（ODbL）
 

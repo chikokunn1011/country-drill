@@ -521,7 +521,6 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="countries.js"></script>
-<script src="flags.js"></script>
 <script src="world.js"></script>
 <script src="ranking.js?v=5"></script>
 <script src="daily-core.js?v=1"></script>
@@ -550,8 +549,9 @@ const featOf = c => featById.get(c.a === 'xk' ? 'XK' : c.id);
 const cOfFeat = g => C.find(c => c.a === 'xk' ? String(g.id) === 'XK' : c.id === String(g.id));
 const featCountry = new Map(feats.map(g => [g, cOfFeat(g)]));
 const isSmall = c => c.ar < 25000 || !featOf(c);
-const flagCache = {};
-const flag = a => flagCache[a] ||= 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(FLAGS[a]);
+// 国旗は flags/<a>.svg（1枚ずつのファイル）。中身を変えたら FLAG_V を上げる（ページからの相対 URL）
+const FLAG_V = 1;
+const flag = a => `flags/${a}.svg?v=${FLAG_V}`;
 const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
 // 地域ごとの地図の切り出し範囲 [西経度, 南緯度, 東経度, 北緯度]（オセアニアは日付変更線をまたぐので180を超える）
 const REGION_BOX = {
@@ -827,7 +827,7 @@ $('home-settings').onclick = () => show('settings');
 $('home-book').onclick = () => show('book');
 $('to-book').onclick = () => show('book');
 $('to-settings').onclick = () => show('settings');
-$('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="">`).join('');
+$('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="" loading="lazy">`).join('');
 
 /* ---------- 設定 ---------- */
 const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末に合わせる']];
