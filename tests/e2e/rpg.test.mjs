@@ -391,9 +391,10 @@ t('works_without_rpg', async (page, app) => {
     await playPractice(p);
     assert.equal(await p.locator('#pcoin').count(), 0);
     await clearTimeAttack(p);
-    await p.fill('#ta-name', 'チコ');
-    await p.click('#ta-submit');
-    await p.locator('#ta-msg', { hasText: '載せたよ！' }).waitFor();
+    // プロフィールが無いので、「載せる」箱で名前を入れて作って載せる
+    await p.fill('#ta-post input', 'チコ');
+    await p.click('#ta-post form .btn');
+    await p.locator('#ta-post .tamsg', { hasText: '載せたよ！' }).waitFor();
     assert.deepEqual(bare.errors.map(String), []);
     assert.deepEqual(bare.consoleErrors.filter(s => s.startsWith('[rpg]')), []);
   } finally { await bare.close(); }

@@ -473,7 +473,7 @@ t('hash_opens_badges', async page => {
   assert.equal(await page.evaluate(() => document.body.dataset.screen), 'badges');
 });
 
-// 横に並ぶホーム（900〜1279）で、本物の［冒険］（rpg.js）を入れたボタン5つが1行に収まり（rpg.css）、札は自分の行に出る。≥1280 の2列ヒーローでは札を左に寄せる
+// 横に並ぶホーム（900〜1279）で、本物の［冒険］（rpg.js）と［プロフィール］（profile.js）を入れたボタン6つが3つずつ2行に収まり（profile.css）、札は自分の行に出る。≥1280 の2列ヒーローでは札を左に寄せる
 t('home_menu_pc', async page => {
   await page.evaluate(() => { BADGES.debug.grant('first-clear@1'); BADGES.open('first-clear'); });
   await page.click('[data-bdg-equip="first-clear@1"]');
@@ -485,14 +485,14 @@ t('home_menu_pc', async page => {
       const btns = [...document.querySelectorAll('.menu .btn')].map(b => b.getBoundingClientRect()).filter(r => r.width);
       return { n: btns.length, inside: btns.every(r => r.right <= innerWidth), below: btns.every(r => row.bottom <= r.top), rows: new Set(btns.map(r => Math.round(r.top))).size };
     });
-    assert.deepEqual(m, { n: 5, inside: true, below: true, rows: 1 }, `${width}x${height}`);
+    assert.deepEqual(m, { n: 6, inside: true, below: true, rows: 2 }, `${width}x${height}`);
     assert.ok(await noHScroll(page), `${width}x${height}`);
   }
   await page.setViewportSize({ width: 1366, height: 768 });
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.bdg-titlerow')).justifyContent), 'flex-start');
 }, { viewport: { width: 900, height: 700 }, blockScripts: [] });
 
-// 背の低い PC（150% 表示のノートなど）と、高さ 760 を少し超える PC で、本物の［冒険］を入れたボタン5つと札があってもホームが縦にスクロールしない
+// 背の低い PC（150% 表示のノートなど）と、高さ 760 を少し超える PC で、本物の［冒険］と［プロフィール］を入れたボタン6つと札があってもホームが縦にスクロールしない
 t('home_short_pc_fits', async page => {
   for (const [i, viewport] of [{ width: 1280, height: 577 }, { width: 1366, height: 657 }, { width: 1024, height: 768 }, { width: 1366, height: 768 }, { width: 1920, height: 800 }].entries()) {
     const key = `${viewport.width}x${viewport.height}`;
@@ -508,10 +508,10 @@ t('home_short_pc_fits', async page => {
   }
 }, { viewport: { width: 1280, height: 577 }, blockScripts: [], storage: { badges: TITLED } });
 
-// 本物の rpg.js と badges.js: ホームのボタン5つ（プレイ・冒険・ランキング・バッジ・設定）と称号の札が、PC の5サイズで
+// 本物の rpg.js と badges.js と profile.js: ホームのボタン6つ（プレイ・冒険・ランキング・プロフィール・バッジ・設定）と称号の札が、PC の5サイズで
 // 横にも縦にもスクロールせず、たがいに重ならず、画面の中にあり、ボタンの文字は1行（NEW とコインの小さい字もふくめて）。
 // セーブはコイン 9,999 で旅立ち前（「冒険 ●9,999 NEW」= いちばん長い現実的な文字。1.2万 の形より 4桁のほうが長い）
-t('home_five_buttons_pc', async page => {
+t('home_six_buttons_pc', async page => {
   const hit = (p, q) => p.l < q.r && q.l < p.r && p.t < q.b && q.t < p.b;
   for (const [width, height] of [[900, 700], [1024, 768], [1280, 577], [1366, 657], [1920, 1080]]) {
     const key = `${width}x${height}`;
@@ -532,7 +532,7 @@ t('home_five_buttons_pc', async page => {
       return { ids: btns.map(b => b.id), boxes: [...btns, $('home-title')].map(box), wrapped: btns.filter(b => !oneLine(b)).map(b => b.id),
         hscroll: document.documentElement.scrollWidth > innerWidth, docH: document.documentElement.scrollHeight, iw: innerWidth, ih: innerHeight };
     });
-    assert.deepEqual(m.ids, ['home-play', 'home-rpg', 'home-rank', 'home-badges', 'home-settings'], key);
+    assert.deepEqual(m.ids, ['home-play', 'home-rpg', 'home-rank', 'home-profile', 'home-badges', 'home-settings'], key);
     assert.deepEqual(m.wrapped, [], `${key}: ボタンの文字が2行になっている`);
     assert.equal(m.hscroll, false, key);
     assert.ok(m.docH <= m.ih, `${key}: 縦にスクロールする ${m.docH}/${m.ih}`);

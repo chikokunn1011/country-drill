@@ -86,3 +86,42 @@ if ! wait "$P" || ! grep -q 'row-lock:' "$TMP/p.out"; then
 fi
 grep -q '"ok": true' "$TMP/a.out" || { echo "FAIL: admin_rename の結果"; cat "$TMP/a.out"; exit 1; }
 echo 'ok'
+
+echo '- admin_rename_profile_takes_name_lock_before_row_lock'
+# プロフィールにつながった行は、本編の profile_rename と同じ「名前の鍵（pfname:）→ プロフィールの行の鍵 → 表の行」の順で取る。
+# P が名前の鍵を持っているあいだに admin_rename を呼び、admin_rename が待っているあいだに P がプロフィールの行と表の行の鍵を（待たずに）取れることを確かめる
+sql <<'SQL'
+truncate scores, daily_scores, rpg_players, profile_transfers, profiles;
+insert into profiles (pid, token_hash, nickname) values ('pidlocktest1', '\x72', 'locktest');
+insert into scores (board, nickname, time_ms, questions, profile_id) values ('f2n:asia:10', 'locktest', 8000, 10, (select id from profiles));
+SQL
+sql >"$TMP/p2.out" 2>&1 <<'SQL' &
+begin;
+select pg_advisory_xact_lock(hashtext('pfname:neko'));
+do $$ begin
+  for i in 1..200 loop
+    exit when exists (select 1 from pg_locks where locktype = 'advisory' and not granted);
+    perform pg_sleep(0.05);
+  end loop;
+end $$;
+select 'profile-lock:' || id from profiles where pid = 'pidlocktest1' for update nowait;
+select 'score-lock:' || id from scores where nickname = 'locktest' for update nowait;
+commit;
+SQL
+P=$!
+sql -t -A >"$TMP/a2.out" 2>&1 <<'SQL'
+select id as sid from scores where nickname = 'locktest' \gset
+do $$ begin
+  for i in 1..200 loop
+    exit when exists (select 1 from pg_locks where locktype = 'advisory' and granted and pid <> pg_backend_pid());
+    perform pg_sleep(0.05);
+  end loop;
+end $$;
+set role authenticated; set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select admin_rename('scores', :sid, 'Neko');
+SQL
+if ! wait "$P" || ! grep -q 'profile-lock:' "$TMP/p2.out" || ! grep -q 'score-lock:' "$TMP/p2.out"; then
+  echo "FAIL: admin_rename（プロフィールの行）が名前の鍵より先に行の鍵を取っている"; cat "$TMP/p2.out"; exit 1
+fi
+grep -q '"pid": "pidlocktest1"' "$TMP/a2.out" || { echo "FAIL: admin_rename（プロフィールの行）の結果"; cat "$TMP/a2.out"; exit 1; }
+echo 'ok'

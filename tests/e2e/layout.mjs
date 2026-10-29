@@ -129,9 +129,13 @@ export const SCENES = {
     await page.waitForFunction(() => document.getElementById('ta-rank').textContent !== '');
   },
   ranking: async page => {
+    // 記録はプロフィールで載せる（1人ずつ別の合言葉でプロフィールを作ってから submit_score2。この端末の profile は作らない）
     await page.evaluate(async () => {
-      for (const [nickname, timeMs] of [['チコ', 8000], ['たろう', 9100], ['ながいなまえのひとですよ', 12000]])
-        await RANKING.submit({ board: 'f2n:all:10', nickname, timeMs, questions: 10 });
+      for (const [i, [nickname, timeMs]] of [['チコ', 8000], ['たろう', 9100], ['ながいなまえのひとですよ', 12000]].entries()) {
+        const token = `tok-rank-${i}`;
+        await RANKING.profileCreate({ token, nickname });
+        await RANKING.submit2({ token, board: 'f2n:all:10', timeMs, questions: 10 });
+      }
     });
     await page.click('#home-rank');
     await page.waitForFunction(() => document.querySelectorAll('#rk-list li').length === 3);
@@ -184,6 +188,13 @@ export async function settleLayout(page) {
       .map(i => new Promise(ok => { i.addEventListener('load', ok, { once: true }); i.addEventListener('error', ok, { once: true }); }));
     await Promise.race([Promise.all(loading), t(3000)]);
     await Promise.all(document.getAnimations().filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+    // なめらかなスクロール（scrollIntoView の smooth など）が止まるまで待つ。止まる前に測ると position: fixed の要素の y が毎回ずれる
+    const frame = () => new Promise(ok => requestAnimationFrame(ok));
+    for (let still = 0, last = scrollY, end = performance.now() + 3000; still < 5 && performance.now() < end;) {
+      await frame();
+      still = scrollY === last ? still + 1 : 0;
+      last = scrollY;
+    }
     await new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok)));
   });
 }

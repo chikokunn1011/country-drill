@@ -20,6 +20,22 @@ const text = (page, sel) => page.locator(sel).innerText();
 const rec = page => page.evaluate(() => JSON.parse(localStorage.getItem('daily')));
 const today = page => page.evaluate(() => DAILY.today());
 const startDailyFromHome = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); };
+// プロフィールが無い人の「載せる」箱: 名前を入れて［プロフィールを作って載せる］
+const createAndPost = async (page, name) => { await page.fill('#dl-post input', name); await page.click('#dl-post form button'); };
+// 偽DB と localStorage にプロフィール（チコ）を入れて開き直す
+const PID = 'dailypid0001';
+async function openWithProfile(page, db, { auto = true } = {}) {
+  db.profiles.push({ id: 1, token: 'tok-d', nickname: 'チコ', pid: PID });
+  await page.evaluate(a => localStorage.setItem('profile', JSON.stringify({ token: 'tok-d', pid: 'dailypid0001', name: 'チコ', auto: a, isPublic: true, sent: { isPublic: true } })), auto);
+  await page.reload();
+  await page.waitForFunction(() => window.PROFILE);
+}
+const failAt3 = async page => {
+  await startDailyFromHome(page);
+  for (let i = 0; i < 3; i++) await answerCorrect(page);
+  await answerWrong(page);
+  await page.click('#next');
+};
 
 t('home_entry_and_intro', async page => {
   assert.match(await text(page, '#home-daily'), /今日の難問[\s\S]*NEW/);
@@ -63,13 +79,14 @@ t('fail_ends_and_submit', async (page, app) => {
   // 苦手の記録・バッジや冒険のイベントには入れない
   assert.equal(await page.evaluate(() => localStorage.getItem('misses')), missesBefore);
   assert.deepEqual((await events(page)).filter(e => e.type !== 'drill:screen'), []);
-  await page.fill('#dl-name', 'チコ');
-  await page.click('#dl-submit');
+  await createAndPost(page, 'チコ');
   await page.locator('#dl-list li').first().waitFor();
   assert.equal(app.db.dailyRows.length, 1);
-  assert.deepEqual({ ...app.db.dailyRows[0], created_at: 0 }, { day: await today(page), nickname: 'チコ', correct: 3, total: 20, time_ms: Math.floor(r.timeMs), created_at: 0 });
+  assert.equal(app.db.profiles.length, 1, 'プロフィールができる');
+  assert.deepEqual({ ...app.db.dailyRows[0], created_at: 0 }, { day: await today(page), profile_id: app.db.profiles[0].id, nickname: 'チコ', correct: 3, total: 20, time_ms: Math.floor(r.timeMs), created_at: 0 });
   assert.match(await text(page, '#dl-list'), /チコ\s*3問/);
-  assert.equal(await page.locator('#dl-form').count(), 0, '載せたらフォームは消える');
+  assert.equal(await page.locator('#dl-post form').count(), 0, '載せたらフォームは消える');
+  assert.match(await text(page, '#dl-main'), /「チコ」で載せたよ！/);
   assert.equal((await rec(page)).sent.name, 'チコ');
   // ホームの NEW は消える
   await page.click('#brand');
@@ -84,8 +101,7 @@ t('clear_all_20', async (page, app) => {
   const r = await rec(page);
   assert.equal(r.correct, 20); assert.equal(r.outcome, 'clear');
   assert.equal(await page.locator('#dl-main .dl-qs li').count(), 20, '全問といたら全部見える');
-  await page.fill('#dl-name', 'はやい人');
-  await page.click('#dl-submit');
+  await createAndPost(page, 'はやい人');
   await page.locator('#dl-list li').first().waitFor();
   assert.match(await text(page, '#dl-list'), /はやい人\s*全問正解/);
   assert.equal(app.db.dailyRows[0].correct, 20);
@@ -103,7 +119,7 @@ t('reload_cannot_retry', async page => {
   assert.equal(await page.locator('#dl-start').count(), 0, 'もう挑戦できない');
   assert.match(await text(page, '#dl-main'), /とちゅうでやめた/);
   assert.match(await text(page, '#dl-main'), /2\s*\/ 20 問正解/);
-  assert.equal(await page.isVisible('#dl-form'), true, '途中までの記録も載せられる');
+  assert.equal(await page.isVisible('#dl-post form'), true, '途中までの記録も載せられる');
 });
 
 t('quit_button_confirms', async page => {
@@ -148,10 +164,9 @@ t('ranking_down_quiz_still_works', async page => {
   await page.click('#dl-start');
   await answerWrong(page);
   await page.click('#next');
-  await page.fill('#dl-name', 'チコ');
-  await page.click('#dl-submit');
-  await page.locator('#dl-msg.ng').waitFor();
-  assert.match(await text(page, '#dl-msg'), /接続できなかった/);
+  await createAndPost(page, 'チコ');
+  await page.locator('#dl-post .tamsg.ng').waitFor();
+  assert.match(await text(page, '#dl-post .tamsg'), /接続できなかった/);
 }, { supabase: 'down' });
 
 // 別のタブで開いても、遊んでいるタブの記録は止まらない
@@ -179,8 +194,7 @@ t('after_midnight_can_send_yesterday', async (page, app) => {
   await page.click('#home-daily');
   assert.match(await text(page, '#dl-main'), /昨日（10月28日）の挑戦の記録/);
   assert.match(await text(page, '#dl-main'), /5\s*\/ 20 問正解/);
-  await page.fill('#dl-name', 'よふかし');
-  await page.click('#dl-submit');
+  await createAndPost(page, 'よふかし');
   await page.locator('#dl-list li').first().waitFor();
   assert.equal(app.db.dailyRows[0].day, '2026-10-28');
   // 載せたあとは今日の挑戦ができる
@@ -190,5 +204,91 @@ t('after_midnight_can_send_yesterday', async (page, app) => {
 t('after_half_past_midnight_yesterday_is_closed', async page => {
   await page.click('#home-daily');
   assert.equal(await page.isVisible('#dl-start'), true);
-  assert.equal(await page.locator('#dl-form').count(), 0);
+  assert.equal(await page.locator('#dl-post').count(), 0);
 }, { init: at('2026-10-28T15:31:00Z'), storage: { daily: { day: '2026-10-28', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
+
+// プロフィールがあって自動 ON なら、終わったらすぐ載る（名前の入力は出ない）
+t('auto_submit_after_daily', async (page, app) => {
+  await openWithProfile(page, app.db);
+  await failAt3(page);
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.match(await text(page, '#dl-post'), /「チコ」で載せたよ！ 今日1位/);
+  assert.equal(await page.locator('#dl-post form').count(), 0);
+  assert.equal(app.db.dailyRows.length, 1);
+  assert.equal(app.db.dailyRows[0].profile_id, 1);
+  assert.deepEqual((await rec(page)).sent, { name: 'チコ', rank: 1 });
+  // 表の自分の行は pid で色を変え、名前は押せる
+  await page.locator('#dl-list li.me').waitFor();
+  assert.equal(await page.locator('#dl-list li.me .pf-name').getAttribute('data-pid'), PID);
+  // 開き直しても送り直さない
+  await page.reload();
+  await page.click('#home-daily');
+  assert.match(await text(page, '#dl-main'), /「チコ」で載せたよ！/);
+  assert.equal(app.db.dailyRows.length, 1);
+});
+
+// 自動 OFF なら［チコ で載せる］を押したときだけ
+t('manual_when_auto_off', async (page, app) => {
+  await openWithProfile(page, app.db, { auto: false });
+  await failAt3(page);
+  await page.locator('#dl-post [data-pf="send"]').waitFor();
+  assert.equal(app.db.dailyRows.length, 0);
+  await page.click('#dl-post [data-pf="send"]');
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.equal(app.db.dailyRows.length, 1);
+});
+
+// 送っている途中に開き直しても、送るのは1回。新しい箱にも順位つきの「載せたよ！」が出る
+t('reopen_while_sending_sends_once', async (page, app) => {
+  await page.route('**/rest/v1/rpc/submit_daily2', async route => { await new Promise(ok => setTimeout(ok, 1500)); await route.fallback(); });
+  await openWithProfile(page, app.db);
+  await failAt3(page);
+  await page.locator('#dl-post .tamsg', { hasText: '送信中' }).waitFor();
+  await page.click('#brand');
+  await page.click('#home-daily');
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.match(await text(page, '#dl-post'), /「チコ」で載せたよ！ 今日1位/);
+  assert.equal(app.db.calls.filter(c => c.name === 'submit_daily2').length, 1);
+  assert.equal(app.db.dailyRows.length, 1);
+  assert.deepEqual((await rec(page)).sent, { name: 'チコ', rank: 1 });
+});
+
+// 今日の難問の画面を離れたら「載せる」箱を外す。あとで自動を ON にしても、載せないままにした記録は送らない
+t('left_daily_box_stays_quiet', async (page, app) => {
+  await openWithProfile(page, app.db, { auto: false });
+  await failAt3(page);
+  await page.locator('#dl-post [data-pf="send"]').waitFor();
+  await page.click('#brand');
+  assert.equal(await page.locator('#dl-post').count(), 0);
+  await page.evaluate(() => PROFILE.setAuto(true));
+  await page.waitForTimeout(300);
+  assert.equal(app.db.calls.filter(c => c.name === 'submit_daily2').length, 0);
+  assert.equal(app.db.dailyRows.length, 0);
+});
+
+// 前に送ったのに返事が届かなかった（サーバーにはもう今日の行がある）: 「もう載せてあるよ」で、載せたことにする
+t('already', async (page, app) => {
+  await openWithProfile(page, app.db);
+  app.db.dailyRows.push({ day: await today(page), profile_id: 1, nickname: 'チコ', correct: 3, total: 20, time_ms: 5000, created_at: new Date().toISOString() });
+  await failAt3(page);
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.match(await text(page, '#dl-post'), /もう載せてあるよ/);
+  assert.equal(app.db.dailyRows.length, 1);
+  assert.equal((await rec(page)).sent.name, 'チコ');
+});
+
+// ランキングの名前の横にかざり、押すとプロフィールの窓。古い記録（pid なし）は押せない
+t('daily_ranking_opens_card', async (page, app) => {
+  const day = await today(page), at = new Date().toISOString();
+  app.db.profiles.push({ id: 1, pid: 'mikepid00001', token: 'mike', nickname: 'ミケ', deco: ['jp', 'br'] });
+  app.db.dailyRows.push({ day, profile_id: 1, nickname: 'ミケ', correct: 20, total: 20, time_ms: 30000, created_at: at });
+  app.db.dailyRows.push({ day, nickname: 'むかし', correct: 5, total: 20, time_ms: 9000, created_at: at });
+  await page.click('#home-daily');
+  await page.locator('#dl-list li').nth(1).waitFor();
+  assert.equal(await page.locator('#dl-list li').first().locator('.rr-deco img').count(), 2);
+  assert.equal(await page.locator('#dl-list li').nth(1).locator('.pf-name').count(), 0, '古い記録は押せない');
+  assert.equal(await page.locator('#dl-list li.me').count(), 0);
+  await page.click('#dl-list .pf-name');
+  await page.locator('#pf-card .pf-card-name').waitFor();
+  assert.match(await text(page, '#pf-card'), /ミケ/);
+});

@@ -1,4 +1,4 @@
-// タイムアタックと冒険のランキング（Supabase）とのやりとりと、送る前の入力チェックだけを持つ小さいモジュール。
+// サイト共通のプロフィールと、タイムアタック・今日の難問・冒険のランキング（Supabase）とのやりとりと、送る前の入力チェックだけを持つ小さいモジュール。
 // ブラウザでは <script src="ranking.js"> で window.RANKING になる（テストでは vm で読み込む）
 (() => {
   // 接続先。publishable キーはブラウザに載せる前提の鍵なので公開してOK（書き込みは DB 側の関数でしか通らない）
@@ -19,11 +19,14 @@
     bad_board: 'この条件はランキングに載せられない',
     bad_record: 'この記録はランキングに載せられない',
     name_taken: 'そのニックネームはもうほかの人が使っているみたい',
-    already: 'この端末はもう登録ずみだよ',
-    not_found: '登録が見つからなかった。もう一回載せてね',
+    already: 'もう載せてあるよ',
+    not_found: 'プロフィールが見つからなかった',
     bad_deco: 'かざりの国が正しくないみたい',
     bad_token: '登録の合言葉がおかしいみたい',
     bad_day: '日付が変わったので、この記録は載せられない',
+    bad_code: 'コードがちがうか、期限が切れているみたい',
+    too_big: 'データが大きすぎて預けられなかった',
+    old_version: '新しい版が出たよ。ページを読み直してね',
     network: 'ランキングに接続できなかった',
   };
 
@@ -43,16 +46,21 @@
       return await res.json();
     } finally { clearTimeout(timer); }
   }
-  // 冒険のランキングの書きこみ（rpg_register / rpg_update / rpg_rename / rpg_unregister / rpg_set_deco）。返事の rank_lv などは rankLv などにする
-  async function rpgCall(name, args) {
+  // 書きこみ系（プロフィール・記録・引き継ぎ）を1回呼ぶ。失敗しても例外は投げず { ok:false, reason } で返す（原因はコンソールに残す）。
+  // ok なら map で返事を JS の名前（rank_all → rankAll など）にして ok:true に足す
+  async function write(name, args, map = () => ({})) {
     try {
       const r = await rpc(name, args);
-      return r.ok ? { ok: true, rankLv: r.rank_lv, rankDg: r.rank_dg, nickname: r.nickname } : { ok: false, reason: r.reason };
+      return r.ok ? { ok: true, ...map(r) } : { ok: false, reason: r.reason };
     } catch (e) {
       console.warn(`ranking ${name}`, e);
       return { ok: false, reason: 'network' };
     }
   }
+  // ランキングの行の共通部分。pid は古い記録（プロフィールにひもづかない）なら null、deco は配列でなければ空
+  const who = r => ({ nickname: r.nickname, pid: r.pid ?? null, deco: Array.isArray(r.deco) ? r.deco : [] });
+  // undefined は「変えない」の null で送る（JSON.stringify は undefined の項目を落としてしまうため）
+  const orNull = v => v === undefined ? null : v;
   // DB 側は int。performance.now() の端数があると受け付けてもらえないので切り捨てる（formatTime の表示ともそろう）
   const wholeMs = ms => Math.floor(ms);
   const pad2 = n => String(n).padStart(2, '0');
@@ -70,95 +78,77 @@
       if (NG_WORDS.some(w => norm.includes(w))) return { ok: false, reason: 'ng_name' };
       return { ok: true, name };
     },
-    // 記録を送る。失敗しても例外は投げず { ok:false, reason } で返す（原因はコンソールに残す）
-    async submit({ board, nickname, timeMs, questions }) {
-      try {
-        const r = await rpc('submit_score', { p_board: board, p_nickname: nickname, p_time_ms: wholeMs(timeMs), p_questions: questions });
-        return r.ok ? { ok: true, rankAll: r.rank_all, rankWeek: r.rank_week } : { ok: false, reason: r.reason };
-      } catch (e) {
-        console.warn('ranking submit', e);
-        return { ok: false, reason: 'network' };
-      }
+    // プロフィール。token は端末が作った合言葉。作る（同じ合言葉がもうあれば reason 'already'）・自分のを読む・名前を変える
+    profileCreate: ({ token, nickname }) => write('profile_create', { p_token: token, p_nickname: nickname }, r => ({ pid: r.pid, nickname: r.nickname })),
+    profileMe: ({ token }) => write('profile_me', { p_token: token },
+      r => ({ pid: r.pid, nickname: r.nickname, isPublic: r.is_public, title: r.title, deco: Array.isArray(r.deco) ? r.deco : [] })),
+    profileRename: ({ token, nickname }) => write('profile_rename', { p_token: token, p_nickname: nickname }, r => ({ nickname: r.nickname })),
+    // 公開・称号・かざり・バッジの数を一度に送る。渡さなかった項目はサーバー側で前の値のまま
+    profileSet: ({ token, isPublic, title, deco, badges, badgesTotal }) => write('profile_set', { p_token: token, p_is_public: orNull(isPublic),
+      p_title: orNull(title), p_deco: orNull(deco), p_badges: orNull(badges), p_badges_total: orNull(badgesTotal) }),
+    // ランキングから開くプロフィールの窓の中身（rpg.tower は英雄の塔の最高記録の階。無ければ 0）。非公開なら { ok, private:true, pid, nickname, deco } だけ。無ければ { ok:false, reason }。つながらなければ reject
+    async profileCard({ pid }) {
+      const r = await rpc('profile_card', { p_pid: pid });
+      if (!r.ok) return { ok: false, reason: r.reason };
+      const base = { ok: true, private: !!r.private, pid: r.pid, nickname: r.nickname, deco: Array.isArray(r.deco) ? r.deco : [] };
+      if (r.private) return base;
+      return { ...base, title: r.title ?? '', badges: r.badges, badgesTotal: r.badges_total, rpg: r.rpg ? { lv: r.rpg.lv, dungeons: r.rpg.dungeons, tower: r.rpg.tower ?? 0 } : null,
+        ta: (r.ta ?? []).map(t => ({ board: t.board, timeMs: t.time_ms, rank: t.rank })),
+        daily: { plays: r.daily?.plays ?? 0, perfect: r.daily?.perfect ?? 0 }, since: new Date(r.since) };
     },
-    // 上位50件。period は 'all'（歴代）か 'week'（今週）。失敗したら reject
-    async top({ board, period }) {
-      const rows = await rpc('top_scores', { p_board: board, p_period: period });
-      return rows.map(r => ({ nickname: r.nickname, timeMs: r.time_ms, at: new Date(r.created_at) }));
+    // 引き継ぎ: 前の端末でデータを預けてコード（ハイフン無し12文字）をもらう・新しい端末でコードと新しい合言葉を送って受け取る。
+    // コードは全角・小文字・ハイフン・空白まじりでも、大文字だけにして送る
+    transferStart: ({ token, data }) => write('profile_transfer_start', { p_token: token, p_data: data }, r => ({ code: r.code, expiresAt: new Date(r.expires_at) })),
+    transferClaim: ({ code, newToken }) => write('profile_transfer_claim',
+      { p_code: String(code ?? '').normalize('NFKC').replace(/[\s\-\u2010-\u2015\u2212\u30fc]/g, '').toUpperCase(), p_new_token: newToken },
+      r => ({ pid: r.pid, nickname: r.nickname, data: r.data })),
+    // タイムアタックの記録をプロフィールで送る
+    submit2: ({ token, board, timeMs, questions }) => write('submit_score2', { p_token: token, p_board: board, p_time_ms: wholeMs(timeMs), p_questions: questions },
+      r => ({ rankAll: r.rank_all, rankWeek: r.rank_week })),
+    // 上位50件（同じ人は自己ベストだけ）。period は 'all'（歴代）か 'week'（今週）。失敗したら reject
+    async top2({ board, period }) {
+      const rows = await rpc('top_scores2', { p_board: board, p_period: period });
+      return rows.map(r => ({ ...who(r), timeMs: r.time_ms, at: new Date(r.created_at) }));
     },
     // このタイムなら何位相当か（歴代・今週）。失敗したら reject
     async rankOf({ board, timeMs }) {
       const r = await rpc('rank_of', { p_board: board, p_time_ms: wholeMs(timeMs) });
       return { rankAll: r.rank_all, rankWeek: r.rank_week };
     },
-    // 冒険（国旗クエスト）: はじめて載せる（token は端末が作った合言葉）・記録を新しくする・名前だけ変える。
-    // lv・dungeons（ボスを倒したダンジョンの数）・floors（クリアしたフロアの合計）。失敗しても例外は投げず { ok:false, reason }
-    async rpgRegister({ token, nickname, lv, dungeons, floors }) {
-      return rpgCall('rpg_register', { p_token: token, p_nickname: nickname, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
-    },
-    async rpgUpdate({ token, lv, dungeons, floors }) {
-      return rpgCall('rpg_update', { p_token: token, p_lv: lv, p_dungeons: dungeons, p_floors: floors });
-    },
-    async rpgRename({ token, nickname }) {
-      return rpgCall('rpg_rename', { p_token: token, p_nickname: nickname });
-    },
-    // 冒険のランキングからこの端末の記録を消す（冒険データを消したとき）。もう無いときは reason 'not_found'
-    async rpgUnregister({ token }) {
-      return rpgCall('rpg_unregister', { p_token: token });
-    },
-    // かざり（仲間の国コード3つまで）を変える。記録の rpg_update とは別に送る（10秒の連投よけも別）
-    async rpgSetDeco({ token, deco }) {
-      const r = await rpgCall('rpg_set_deco', { p_token: token, p_deco: deco });
-      return r.ok ? { ok: true } : r;
-    },
-    // 冒険の上位50件（かざりつき）。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject。
-    // DB にまだ top_rpg2 が無い（404）ときは、かざりの無い top_rpg にもどす（deco は空）
-    async rpgTop({ sort }) {
-      let rows;
-      try { rows = await rpc('top_rpg2', { p_sort: sort }); } catch (e) {
-        if (e?.status !== 404) throw e;
-        rows = await rpc('top_rpg', { p_sort: sort });
-      }
-      return rows.map(r => ({ nickname: r.nickname, lv: r.lv, dungeons: r.dungeons, floors: r.floors,
-        deco: Array.isArray(r.deco) ? r.deco : [], at: new Date(r.created_at) }));
+    // 冒険（国旗クエスト）: 記録を入れる／新しくする（行が無ければサーバーが作る。名前・かざりはプロフィールのもの）。
+    // lv・dungeons（ボスを倒したダンジョンの数）・floors（クリアしたフロアの合計）
+    rpgUpdate2: ({ token, lv, dungeons, floors }) => write('rpg_update2', { p_token: token, p_lv: lv, p_dungeons: dungeons, p_floors: floors },
+      r => ({ rankLv: r.rank_lv, rankDg: r.rank_dg })),
+    // 冒険のランキングからこの人の記録を消す（冒険データを消したとき。プロフィールは残る）。もう無いときは reason 'not_found'
+    rpgUnregister2: ({ token }) => write('rpg_unregister2', { p_token: token }),
+    // 冒険の上位50件（かざりつき）。sort は 'lv'（レベル順）か 'dg'（ダンジョン順）。失敗したら reject
+    async rpgTop3({ sort }) {
+      const rows = await rpc('top_rpg3', { p_sort: sort });
+      return rows.map(r => ({ ...who(r), lv: r.lv, dungeons: r.dungeons, floors: r.floors, at: new Date(r.created_at) }));
     },
     // この記録なら何位相当か（レベル順・ダンジョン順）。失敗したら reject
     async rpgRankOf({ lv, dungeons, floors }) {
       const r = await rpc('rpg_rank_of', { p_lv: lv, p_dungeons: dungeons, p_floors: floors });
       return { rankLv: r.rank_lv, rankDg: r.rank_dg };
     },
-    // 英雄の塔: 最高記録の階を送る（記録・かざりとは別。10秒の連投よけも別）。返事の rank_tower は rankTower に。失敗しても例外は投げず { ok:false, reason }
-    async rpgSetTower({ token, tower }) {
-      try {
-        const r = await rpc('rpg_set_tower', { p_token: token, p_tower: tower });
-        return r.ok ? { ok: true, rankTower: r.rank_tower } : { ok: false, reason: r.reason };
-      } catch (e) {
-        console.warn('ranking rpg_set_tower', e);
-        return { ok: false, reason: 'network' };
-      }
-    },
-    // 塔の上位50件（塔 → レベルの順、かざりつき）。失敗したら reject（DB にまだ top_tower が無いときは e.status が 404）
-    async topTower() {
-      const rows = await rpc('top_tower', {});
-      return rows.map(r => ({ nickname: r.nickname, tower: r.tower, lv: r.lv, deco: Array.isArray(r.deco) ? r.deco : [], at: new Date(r.created_at) }));
+    // 英雄の塔: 最高記録の階をプロフィールで送る（行が無ければサーバーが作る。記録・かざりとは別。10秒の連投よけも別）。返事の rank_tower は rankTower に
+    rpgSetTower2: ({ token, tower }) => write('rpg_set_tower2', { p_token: token, p_tower: tower }, r => ({ rankTower: r.rank_tower })),
+    // 塔の上位50件（塔 → レベルの順、かざりつき）。失敗したら reject（DB にまだ top_tower2 が無いときは e.status が 404）
+    async topTower2() {
+      const rows = await rpc('top_tower2', {});
+      return rows.map(r => ({ ...who(r), tower: r.tower, lv: r.lv, at: new Date(r.created_at) }));
     },
     // この塔の記録なら何位相当か（数を返す）。失敗したら reject
     async rpgTowerRankOf({ tower, lv }) {
       return (await rpc('rpg_tower_rank_of', { p_tower: tower, p_lv: lv })).rank;
     },
-    // 今日の難問: 記録を送る（day は日本時間の 'YYYY-MM-DD'、total は問題数）。失敗しても例外は投げず { ok:false, reason }
-    async dailySubmit({ day, nickname, correct, total, timeMs }) {
-      try {
-        const r = await rpc('submit_daily', { p_day: day, p_nickname: nickname, p_correct: correct, p_total: total, p_time_ms: wholeMs(timeMs) });
-        return r.ok ? { ok: true, rank: r.rank } : { ok: false, reason: r.reason };
-      } catch (e) {
-        console.warn('ranking dailySubmit', e);
-        return { ok: false, reason: 'network' };
-      }
-    },
+    // 今日の難問: 記録をプロフィールで送る（day は日本時間の 'YYYY-MM-DD'、total は問題数。1日1回で2回目は reason 'already'）
+    dailySubmit2: ({ token, day, correct, total, timeMs }) => write('submit_daily2',
+      { p_token: token, p_day: day, p_correct: correct, p_total: total, p_time_ms: wholeMs(timeMs) }, r => ({ rank: r.rank })),
     // その日の上位50件（正答数が多い順 → 速い順）。失敗したら reject
-    async dailyTop({ day }) {
-      const rows = await rpc('top_daily', { p_day: day });
-      return rows.map(r => ({ nickname: r.nickname, correct: r.correct, total: r.total, timeMs: r.time_ms, at: new Date(r.created_at) }));
+    async dailyTop2({ day }) {
+      const rows = await rpc('top_daily2', { p_day: day });
+      return rows.map(r => ({ ...who(r), correct: r.correct, total: r.total, timeMs: r.time_ms, at: new Date(r.created_at) }));
     },
     // この記録なら何位相当か。失敗したら reject
     async dailyRankOf({ day, correct, timeMs }) {

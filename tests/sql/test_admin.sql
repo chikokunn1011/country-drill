@@ -356,9 +356,8 @@ do $$ declare r jsonb; begin
 end $$;
 reset role;
 -- 消したあいだに、NFKC＋小文字で同じ名前（ＴＡＲＯ → taro）で別の人が登録した
-do $$ declare r jsonb := rpg_register('00000000-0000-4000-8000-0000000000aa', 'ＴＡＲＯ', 1, 0, 0); begin
-  assert r->>'ok' = 'true', format('Taro が消えたので ＴＡＲＯ は登録できる: %s', r);
-end $$;
+-- （rpg_register は schema.sql の old_version の間で「ページを読み直してね」になっているので、行を直に入れる）
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x13', 'ＴＡＲＯ', 1, 0, 0);
 set role authenticated;
 do $$ declare r jsonb; begin
   r := admin_restore((select array_agg((x->>'id')::bigint) from jsonb_array_elements(admin_list('trash', '{}')->'rows') x));
@@ -412,10 +411,11 @@ do $$ declare r jsonb; begin
 end $$;
 reset role;
 do $$ begin
-  -- 文字の並びが schema.sql の submit_score と同じ（\u で書いてある）
-  assert position(
-    (select substring(prosrc from 'btrim\(p_nickname, E''([^'']*)''') from pg_proc where proname = 'submit_score')
-    in (select prosrc from pg_proc where proname = 'admin_rename')) > 0, 'admin_rename の trim 文字は submit_score と同じ';
+  -- 落とす文字は schema.sql の profile_clean_name（profile_create / profile_rename と同じ）を呼んで決める。
+  -- submit_score は old_version の間で中身が「ページを読み直してね」になるので、もう比べる相手にしない
+  assert position('profile_clean_name(p_name)' in (select prosrc from pg_proc where proname = 'admin_rename')) > 0,
+    'admin_rename は profile_clean_name で trim する';
+  assert profile_clean_name(chr(160) || chr(12288) || ' ハチ' || chr(8201) || chr(65279)) = 'ハチ', 'profile_clean_name の文字';
 end $$;
 
 \echo '- rename_rules'
@@ -479,5 +479,133 @@ do $$ begin
   assert (select array_agg(row_data->>'nickname' order by id) from admin_trash) = array['まだ戻せる', 'けす'],
     format('31日前のごみだけ消える: %s', (select array_agg(row_data->>'nickname') from admin_trash));
 end $$;
+
+-- ---- プロフィールにつながった行（profile_id がある） ----
+\echo '- list_shows_pid_and_profile_name'
+truncate scores, daily_scores, rpg_players, profile_transfers, profiles, admin_log, admin_trash;
+insert into profiles (pid, token_hash, nickname) values ('pidchiko0001', '\xa1', 'チコ'), ('pidmike00002', '\xa2', 'ミケ');
+-- 表の nickname は古いことがある（rpg は「名前#pid」になっていることもある）
+insert into scores (board, nickname, time_ms, questions, profile_id) values
+  ('f2n:asia:10', 'ちこ旧', 8000, 10, (select id from profiles where pid = 'pidchiko0001')),
+  ('f2n:asia:10', 'ふるい', 9000, 10, null);
+insert into daily_scores (day, nickname, correct, total, time_ms, profile_id) values
+  ('2026-10-01', 'チコ', 20, 20, 60000, (select id from profiles where pid = 'pidchiko0001'));
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, profile_id) values
+  ('\xa1', 'チコ#pidchiko0001', 5, 1, 5, (select id from profiles where pid = 'pidchiko0001')),
+  ('\xa3', 'タマ', 5, 1, 5, null);
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_list('scores', '{"sort": "best"}');
+  assert r->'rows'->0->>'pid' = 'pidchiko0001' and r->'rows'->0->>'profile_nickname' = 'チコ', format('pid・profile_nickname: %s', r->'rows'->0);
+  assert not (r->'rows'->1 ? 'pid') and not (r->'rows'->1 ? 'profile_nickname'), format('古い記録には pid を足さない: %s', r->'rows'->1);
+  assert not (r->'rows'->0 ? 'token_hash'), 'token_hash は出さない';
+  r := admin_list('scores', '{"q": "チコ"}');
+  assert (r->>'total')::int = 1, format('q はプロフィールの名前にも当たる: %s', r);
+  r := admin_list('rpg', '{"pid": "pidchiko0001"}');
+  assert (r->>'total')::int = 1 and r->'rows'->0->>'profile_nickname' = 'チコ', format('rpg を pid で絞る: %s', r);
+  r := admin_list('daily', '{"pid": "pidchiko0001"}');
+  assert (r->>'total')::int = 1, format('daily を pid で絞る: %s', r);
+  r := admin_list('scores', '{"pid": "nope"}');
+  assert (r->>'total')::int = 0, format('知らない pid: %s', r);
+  r := admin_list('rpg', '{}');
+  assert (r->>'total')::int = 2, format('pid が無ければ絞らない: %s', r);
+end $$;
+reset role;
+
+\echo '- rename_profile_row_renames_profile'
+set role authenticated;
+do $$ declare r jsonb; v_s bigint; v_d bigint; v_r bigint; v_old bigint; begin
+  v_s := (admin_list('scores', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint;
+  v_d := (admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint;
+  v_r := (admin_list('rpg', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint;
+  v_old := (admin_list('scores', '{"q": "ふるい"}')->'rows'->0->>'id')::bigint;
+  r := admin_rename('scores', v_s, ' ハチ ');
+  assert r = '{"ok":true,"nickname":"ハチ","pid":"pidchiko0001"}'::jsonb, format('プロフィールの行: %s', r);
+  r := admin_list('rpg', '{"pid": "pidchiko0001"}')->'rows'->0;
+  assert r->>'profile_nickname' = 'ハチ' and r->>'nickname' = 'ハチ', format('rpg の表の名前もそろう: %s', r);
+  assert admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'nickname' = 'ハチ', 'daily の表の名前もそろう';
+  r := admin_log_list(1, 0)->'rows'->0->'detail';
+  assert r->>'before' = 'チコ' and r->>'after' = 'ハチ' and r->>'pid' = 'pidchiko0001' and r ? 'profile_id', format('log: %s', r);
+  -- ほかのプロフィールの名前（NFKC＋小文字で同じ）
+  assert admin_rename('daily', v_d, 'ﾐｹ') = '{"ok":false,"reason":"profile_name_taken"}'::jsonb, 'ほかのプロフィールの名前';
+  assert admin_rename('rpg', v_r, 'ＦＵＣＫ')->>'reason' = 'ng_name', 'NG';
+  assert admin_rename('rpg', v_r, 'あいうえおかきくけこさしす')->>'reason' = 'bad_name', '13文字';
+  assert admin_rename('rpg', v_r, 'はち')->>'ok' = 'true', 'ひらがなは別の名前';
+  assert admin_rename('rpg', v_r, 'ハチ')->>'ok' = 'true', '自分の名前に戻すのは ok';
+  -- 名無しにする（rpg の行から）。プロフィールの名前が変わる
+  r := admin_rename('rpg', v_r, null);
+  assert r->>'nickname' ~ '^名無しの旅人[0-9]{3}$' and r->>'pid' = 'pidchiko0001', format('名無し: %s', r);
+  assert admin_list('scores', '{"pid": "pidchiko0001"}')->'rows'->0->>'profile_nickname' = r->>'nickname', 'プロフィールに効く';
+  -- 古い記録（profile_id が null）は今までどおり行の名前だけ。プロフィールの名前とは比べない
+  r := admin_rename('scores', v_old, 'ミケ');
+  assert r = '{"ok":true,"nickname":"ミケ"}'::jsonb, format('古い記録: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select nickname from profiles where pid = 'pidmike00002') = 'ミケ', 'ほかのプロフィールは変わらない';
+  assert (select nickname from profiles where pid = 'pidchiko0001') ~ '^名無しの旅人', 'プロフィールの名前が変わった';
+  assert (select count(*) from scores where nickname = 'ミケ' and profile_id is null) = 1, '古い記録の名前が変わった';
+end $$;
+
+\echo '- rename_profile_keeps_conflicting_table_names'
+-- 表の名前の unique（daily は同じ日に同じ名前・rpg は同じ名前）で古い記録とぶつかる行は、表の nickname をそのままにする（profile_rename と同じ）
+insert into daily_scores (day, nickname, correct, total, time_ms) values ('2026-10-01', 'ポチ', 10, 20, 60000);
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\xa4', 'ポチ', 1, 0, 0);
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_rename('scores', (admin_list('scores', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint, 'ポチ');
+  assert r->>'ok' = 'true', format('プロフィールの名前は古い記録とはぶつからない: %s', r);
+  assert admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'nickname' ~ '^名無しの旅人', 'daily の表の名前はそのまま';
+  assert admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'profile_nickname' = 'ポチ', 'でもプロフィールの名前は変わる';
+  assert admin_list('rpg', '{"pid": "pidchiko0001"}')->'rows'->0->>'nickname' ~ '^名無しの旅人', 'rpg の表の名前もそのまま';
+  assert admin_list('scores', '{"pid": "pidchiko0001"}')->'rows'->0->>'nickname' = 'ポチ', 'scores は unique が無いのでそろう';
+end $$;
+reset role;
+
+\echo '- rename_profile_nameless_all_taken'
+-- 名無しが全部ほかのプロフィールにうまっていても止まらない（何回か振り直してから profile_name_taken）
+insert into profiles (token_hash, nickname) select int4send(i + 5000), '名無しの旅人' || lpad(i::text, 3, '0') from generate_series(0, 999) i
+  on conflict do nothing;
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_rename('daily', (admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint, null);
+  assert r = '{"ok":false,"reason":"profile_name_taken"}'::jsonb, format('全部うまっている: %s', r);
+end $$;
+reset role;
+do $$ begin
+  assert (select nickname from profiles where pid = 'pidchiko0001') = 'ポチ', '名前は変わらない';
+end $$;
+delete from profiles where nickname like '名無しの旅人%';
+
+\echo '- delete_restore_profile_rows'
+-- 消したプロフィールの行もゴミ箱に pid つきで出て、同じ profile_id で戻る。
+-- 消したあいだに同じプロフィールの行がまたできていたら（rpg は1人1行・daily は1日1回）戻さない
+truncate admin_log, admin_trash;
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_delete('rpg', array[(admin_list('rpg', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint]);
+  assert r->>'deleted' = '1', format('rpg delete: %s', r);
+  r := admin_delete('daily', array[(admin_list('daily', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint]);
+  assert r->>'deleted' = '1', format('daily delete: %s', r);
+  r := admin_delete('scores', array[(admin_list('scores', '{"pid": "pidchiko0001"}')->'rows'->0->>'id')::bigint]);
+  assert r->>'deleted' = '1', format('scores delete: %s', r);
+  r := admin_list('trash', '{"pid": "pidchiko0001"}');
+  assert (r->>'total')::int = 3, format('trash を pid で絞る: %s', r);
+  assert r->'rows'->0->>'pid' = 'pidchiko0001' and r->'rows'->0->>'profile_nickname' = 'ポチ', format('trash の pid: %s', r->'rows'->0);
+  assert not (r->'rows'->0->'row_data' ? 'token_hash'), 'trash の token_hash は出さない';
+  assert (admin_list('trash', '{"q": "ポチ"}')->>'total')::int = 3, 'trash の q もプロフィールの名前に当たる';
+end $$;
+reset role;
+-- 消したあいだに、同じプロフィールが冒険の記録を送り直した・同じ日の難問をやり直した
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors, profile_id) values ('\xa1', 'ポチ#new', 6, 1, 5, (select id from profiles where pid = 'pidchiko0001'));
+insert into daily_scores (day, nickname, correct, total, time_ms, profile_id) values ('2026-10-01', 'ポチ#new', 3, 20, 60000, (select id from profiles where pid = 'pidchiko0001'));
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := admin_restore((select array_agg((x->>'id')::bigint) from jsonb_array_elements(admin_list('trash', '{}')->'rows') x));
+  assert r = '{"ok":true,"restored":1,"failed":2}'::jsonb, format('rpg・daily はぶつかるので戻さず、scores は戻す: %s', r);
+  r := admin_list('scores', '{"pid": "pidchiko0001"}');
+  assert (r->>'total')::int = 1 and r->'rows'->0->>'profile_nickname' = 'ポチ', format('scores は同じ profile_id で戻る: %s', r);
+end $$;
+reset role;
 
 \echo 'ALL ADMIN SQL TESTS PASSED'

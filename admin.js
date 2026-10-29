@@ -378,27 +378,30 @@
   const KIND_LABEL = { scores: 'タイムアタック', daily: '今日の難問', rpg: '冒険', trash: 'ゴミ箱' };
   const ACTION = { delete: '消す', restore: '戻す', rename: '名前を変える' };
   const LOGIN_MSG = { bad_login: 'メールかパスワードがちがうよ', not_admin: 'このアカウントは管理者じゃないよ', network: 'つながらなかった', rate_limited: 'ログインを試しすぎ。少し待ってね' };
-  const RENAME_MSG = { bad_name: '名前は1〜12文字だよ', ng_name: '使えない言葉が入ってるよ', name_taken: 'その名前はもう使われてるよ', not_found: 'その記録はもう無いよ' };
+  const RENAME_MSG = { bad_name: '名前は1〜12文字だよ', ng_name: '使えない言葉が入ってるよ', name_taken: 'その名前はもう使われてるよ', not_found: 'その記録はもう無いよ',
+    profile_name_taken: 'ほかのプロフィールがその名前を使ってるよ' };
   const fmtMs = ms => Number.isFinite(+ms) ? `${(ms / 1000).toFixed(2)}秒` : '';
   const fmtFull = iso => { const d = new Date(iso); return iso == null || Number.isNaN(+d) ? '' : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
   const str = v => v == null ? '' : String(v);
-  // 表の列: [見出し, 値を文字にする関数, td の class]
+  // 見せる名前: プロフィールにつながった行（pid がある）はプロフィールの名前（ランキングに出るのはこちら。表の nickname は古いことがある）
+  const nameOf = r => str(r.profile_nickname ?? r.nickname);
+  // 表の列: [見出し, 値を文字にする関数, td の class]。pid はプロフィールの公開用ID（プロフィールより前の古い記録は空）
   const COLS = {
-    scores: [['id', r => str(r.id), 'n'], ['ボード', r => str(r.board), 'brk'], ['名前', r => str(r.nickname), 'name'], ['タイム', r => fmtMs(r.time_ms), 'n'],
+    scores: [['id', r => str(r.id), 'n'], ['ボード', r => str(r.board), 'brk'], ['名前', nameOf, 'name'], ['pid', r => str(r.pid), 'n'], ['タイム', r => fmtMs(r.time_ms), 'n'],
       ['問題', r => str(r.questions), 'n'], ['いつ', r => fmtFull(r.created_at), 'n']],
-    daily: [['id', r => str(r.id), 'n'], ['日付', r => str(r.day), 'n'], ['名前', r => str(r.nickname), 'name'], ['正解', r => `${str(r.correct)}/${str(r.total)}`, 'n'],
+    daily: [['id', r => str(r.id), 'n'], ['日付', r => str(r.day), 'n'], ['名前', nameOf, 'name'], ['pid', r => str(r.pid), 'n'], ['正解', r => `${str(r.correct)}/${str(r.total)}`, 'n'],
       ['タイム', r => fmtMs(r.time_ms), 'n'], ['いつ', r => fmtFull(r.created_at), 'n']],
-    rpg: [['id', r => str(r.id), 'n'], ['名前', r => str(r.nickname), 'name'], ['Lv', r => str(r.lv), 'n'], ['ダンジョン', r => str(r.dungeons), 'n'],
+    rpg: [['id', r => str(r.id), 'n'], ['名前', nameOf, 'name'], ['pid', r => str(r.pid), 'n'], ['Lv', r => str(r.lv), 'n'], ['ダンジョン', r => str(r.dungeons), 'n'],
       ['フロア', r => str(r.floors), 'n'], ['塔', r => str(r.tower ?? 0), 'n'], ['登録', r => fmtFull(r.created_at), 'n'], ['更新', r => fmtFull(r.updated_at ?? r.at), 'n']],
-    trash: [['id', r => str(r.id), 'n'], ['種類', r => KIND_LABEL[r.kind] ?? str(r.kind), ''], ['名前', r => str(r.row_data?.nickname), 'name'],
-      ['中身', r => trashSummary(r), 'brk'], ['消した', r => fmtFull(r.at), 'n']],
+    trash: [['id', r => str(r.id), 'n'], ['種類', r => KIND_LABEL[r.kind] ?? str(r.kind), ''], ['名前', r => str(r.profile_nickname ?? r.row_data?.nickname), 'name'],
+      ['pid', r => str(r.pid), 'n'], ['中身', r => trashSummary(r), 'brk'], ['消した', r => fmtFull(r.at), 'n']],
   };
-  // CSV の列（行の生の値。ゴミ箱は row_data を JSON のまま）
+  // CSV の列（行の生の値。ゴミ箱は row_data を JSON のまま）。pid・profile_nickname はプロフィールにつながった行だけ入る
   const CSV_COLS = {
-    scores: ['id', 'board', 'nickname', 'time_ms', 'questions', 'created_at'],
-    daily: ['id', 'day', 'nickname', 'correct', 'total', 'time_ms', 'created_at'],
-    rpg: ['id', 'nickname', 'lv', 'dungeons', 'floors', 'tower', 'created_at', 'updated_at'],
-    trash: ['id', 'kind', 'at', 'row_data'],
+    scores: ['id', 'board', 'nickname', 'time_ms', 'questions', 'created_at', 'pid', 'profile_nickname'],
+    daily: ['id', 'day', 'nickname', 'correct', 'total', 'time_ms', 'created_at', 'pid', 'profile_nickname'],
+    rpg: ['id', 'nickname', 'lv', 'dungeons', 'floors', 'tower', 'created_at', 'updated_at', 'pid', 'profile_nickname'],
+    trash: ['id', 'kind', 'at', 'row_data', 'pid', 'profile_nickname'],
   };
   function trashSummary(t) {
     const d = t.row_data || {};
@@ -411,7 +414,7 @@
     const d = l.detail || {};
     if (l.action === 'delete') { const ids = Array.isArray(d.ids) ? d.ids : []; return `${ids.length}件（id ${ids.slice(0, 20).join(', ')}${ids.length > 20 ? ' …' : ''}）`; }
     if (l.action === 'restore') return `戻した ${str(d.restored)}件・戻せなかった ${str(d.failed)}件`;
-    if (l.action === 'rename') return `id ${str(d.id)}: ${str(d.before)} → ${str(d.after)}`;
+    if (l.action === 'rename') return `id ${str(d.id)}: ${str(d.before)} → ${str(d.after)}${d.pid ? `（プロフィール ${str(d.pid)}）` : ''}`;
     try { return JSON.stringify(d).slice(0, 300); } catch { return ''; }
   }
 
@@ -655,22 +658,25 @@
     await reloadAfterChange();
   }
   // ---- S7 名前を変える（空で OK なら「名無しの旅人」＋数字） ----
+  // プロフィールにつながった行は、サーバーがプロフィールの名前を変える（その人の記録が全部その名前になる）ので、そう書いて確かめる
   async function rename(id, nameless = false) {
     if (!listReady()) return;
     const kind = R.rowsKind, row = R.rows.find(r => Number(r.id) === id);
     if (!row) return;
+    const whose = row.pid ? `プロフィール ${str(row.pid)}（${KIND_LABEL[kind]}の id ${id}）` : `${KIND_LABEL[kind]}の id ${id}`;
+    const all = row.pid ? '\n（プロフィールの名前が変わるので、この人の記録が全部この名前になるよ）' : '';
     let name;
     if (nameless) {   // S7 不適切な名前をワンタップで「名無しの旅人」＋数字に
-      if (!confirm(`${KIND_LABEL[kind]}の id ${id}「${str(row.nickname)}」を「名無しの旅人」＋数字にしていい？`)) return;
+      if (!confirm(`${whose}「${nameOf(row)}」を「名無しの旅人」＋数字にしていい？${all}`)) return;
       name = '';
     } else {
-      name = prompt(`${KIND_LABEL[kind]}の id ${id} の新しい名前（1〜12文字。空にすると「名無しの旅人」＋数字になるよ）`, str(row.nickname));
+      name = prompt(`${whose} の新しい名前（1〜12文字。空にすると「名無しの旅人」＋数字になるよ）${all}`, nameOf(row));
       if (name == null) return;
     }
     const r = await rpc('admin_rename', { p_kind: kind, p_id: id, p_name: name.trim() === '' ? null : name });
     if (!r) return;
     if (r.ok === false) { toast(RENAME_MSG[r.reason] ?? '名前を変えられなかった', true); return; }
-    toast(`「${str(r.nickname)}」にしたよ`);
+    toast(r.pid ? `プロフィールの名前を「${str(r.nickname)}」にしたよ（この人の記録が全部この名前になる）` : `「${str(r.nickname)}」にしたよ`);
     await Promise.all([loadList(R.offset, { same: true }), loadStats()]);
   }
   // admin_list を全部のページ読む（500件ずつ、max 件まで）。だめなら null。{ rows, total }
@@ -688,27 +694,31 @@
   }
   const ALL_MAX = 5000;
   const norm = v => String(v ?? '').normalize('NFKC').toLowerCase();
-  // S6 「この名前の記録を全部」: タイムアタック・今日の難問・冒険の全部のページから、同じ名前（NFKC＋小文字で同じ）の記録を集めて消す
+  // S6 「この名前の記録を全部」: タイムアタック・今日の難問・冒険の全部のページから、同じ人の記録を集めて消す。
+  // プロフィールにつながった行（pid がある）は同じ pid の記録（表の名前が古くても）。古い記録は同じ名前（NFKC＋小文字で同じ）で、
+  // プロフィールにつながっていないものだけ（同じ名前のプロフィールが同じ人とは限らない）
   async function delByName(id) {
     if (!listReady()) return;
     const row = R.rows.find(r => Number(r.id) === id);
     if (!row) return;
+    const pid = row.pid ? str(row.pid) : null;
     // 見せる名前は改行・タブを空白にする（確かめる文の行がくずれないように）
-    const name = str(row.nickname), want = norm(name), shown = name.replace(/[\r\n\t\v\f\u0085\u2028\u2029]/g, ' '), found = {};
+    const name = pid ? nameOf(row) : str(row.nickname), want = norm(name), found = {};
+    const shown = name.replace(/[\r\n\t\v\f\u0085\u2028\u2029]/g, ' ') + (pid ? `（プロフィール ${pid}）` : '');
     for (const k of ['scores', 'daily', 'rpg']) {
-      const r = await listAll(k, { q: name });
+      const r = await listAll(k, pid ? { pid } : { q: name });
       if (!r) { toast('記録を集められなかった。何も消してない', true); return; }
       // 候補（名前にこの文字を含む記録）が多すぎて全部は読めなかったら、一部だけ消さずにやめる
       if (r.total > r.rows.length) {
-        toast(`${KIND_LABEL[k]}で名前に「${shown}」を含む記録が ${r.total}件あって、一度に集められる ${ALL_MAX}件をこえるので、やめておいた。何も消してない`, true);
+        toast(`${KIND_LABEL[k]}で${pid ? '' : '名前に'}「${shown}」${pid ? 'の' : 'を含む'}記録が ${r.total}件あって、一度に集められる ${ALL_MAX}件をこえるので、やめておいた。何も消してない`, true);
         return;
       }
-      found[k] = r.rows.filter(x => norm(x.nickname) === want).map(x => Number(x.id));
+      found[k] = r.rows.filter(x => pid ? x.pid === pid : !x.pid && norm(x.nickname) === want).map(x => Number(x.id));
     }
     const n = Object.values(found).reduce((a, b) => a + b.length, 0);
     if (!n) { toast('その名前の記録はもう無いよ', true); return; }
     const parts = Object.entries(found).filter(([, ids]) => ids.length).map(([k, ids]) => `${KIND_LABEL[k]} ${ids.length}件`);
-    if (!confirm(`「${shown}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ名前のものを集めたよ。ゴミ箱に30日のこる）`)) return;
+    if (!confirm(`「${shown}」の記録を全部（${parts.join('・')}、合わせて ${n}件）消していい？\n（全部のページから同じ${pid ? 'プロフィール' : '名前'}のものを集めたよ。ゴミ箱に30日のこる）`)) return;
     let gone = 0, stopped = false, lost = false;
     for (const [k, ids] of Object.entries(found)) {
       if (!ids.length) continue;

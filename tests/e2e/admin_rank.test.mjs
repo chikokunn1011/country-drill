@@ -1001,3 +1001,99 @@ for (const [days, warn] of [[4, false], [5, true]]) t(`stale_warning_boundary_${
   await page.locator('#r-stale', { hasText: `最後の記録から ${days}日` }).waitFor();
   assert.equal(await page.evaluate(() => document.getElementById('r-stale').classList.contains('warn')), warn);
 });
+
+// ---- プロフィールにつながった行（profile_id がある） ----
+// 表の nickname は古いことがある（rpg は「名前#pid」など）。一覧にはプロフィールの名前と pid を出す
+const seedProfile = db => {
+  db.profiles.push({ id: 1, pid: 'pidchiko0001', token: 'pt', nickname: 'チコ' }, { id: 2, pid: 'pidmike00002', token: 'pt2', nickname: 'ミケ' });
+  db.rows.push({ board: 'f2n:all:10', nickname: 'ちこ旧', time_ms: 11111, questions: 10, created_at: ago(1), profile_id: 1 });
+  db.dailyRows.push({ day: '2026-10-27', nickname: 'ちこ旧', correct: 19, total: 20, time_ms: 50000, created_at: ago(2), profile_id: 1 });
+  db.rpgRows.push({ token: 'pt', nickname: 'チコ#pidchiko0001', lv: 9, dungeons: 2, floors: 9, deco: [], created_at: ago(3), at: ago(3), profile_id: 1 });
+  // 同じ名前の古い記録（プロフィールにつながっていない）
+  db.rows.push({ board: 'f2n:all:10', nickname: 'チコ', time_ms: 22222, questions: 10, created_at: ago(4) });
+};
+
+t('profile_rows_show_profile_name_and_pid', async (page, { db }) => {
+  seedProfile(db);
+  await login(page);
+  await kind(page, 'scores');
+  const heads = await page.locator('#r-table thead th').allTextContents();
+  const i = heads.indexOf('pid'), n = heads.indexOf('名前');
+  assert.ok(i >= 0 && n >= 0, heads.join(','));
+  const row = page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' });
+  assert.equal((await row.locator('td').nth(n).textContent()).trim(), 'チコ', '表の古い名前ではなくプロフィールの名前');
+  const old = page.locator('#r-table tbody tr', { hasText: '22.22' });
+  assert.equal((await old.locator('td').nth(i).textContent()).trim(), '', '古い記録の pid は空');
+  await kind(page, 'rpg');
+  const rn = (await page.locator('#r-table thead th').allTextContents()).indexOf('名前');
+  assert.equal((await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).locator('td').nth(rn).textContent()).trim(), 'チコ', 'rpg の「名前#pid」ではなく');
+});
+
+t('rename_profile_row_renames_profile', async (page, { db }) => {
+  seedProfile(db);
+  const msgs = [];
+  page.on('dialog', d => { msgs.push([d.message(), d.defaultValue()]); d.accept('ハチ'); });
+  await login(page);
+  await kind(page, 'daily');
+  await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).locator('[data-rename]').click();
+  await page.locator('#adm-toast', { hasText: 'プロフィールの名前を「ハチ」にしたよ' }).waitFor();
+  assert.match(msgs[0][0], /プロフィール pidchiko0001/);
+  assert.match(msgs[0][0], /この人の記録が全部この名前になる/);
+  assert.equal(msgs[0][1], 'チコ', '欄にはプロフィールの名前');
+  assert.equal(db.profiles[0].nickname, 'ハチ');
+  assert.deepEqual([db.rows[2].nickname, db.dailyRows[1].nickname, db.rpgRows[1].nickname], ['ハチ', 'ハチ', 'ハチ'], 'この人の行がそろう');
+  assert.equal(db.rows[3].nickname, 'チコ', '同じ名前の古い記録は変わらない');
+  await page.locator('#r-table tbody tr', { hasText: 'ハチ' }).waitFor();
+});
+
+t('rename_profile_name_taken_message', async (page, { db }) => {
+  seedProfile(db);
+  page.on('dialog', d => d.accept('ﾐｹ'));
+  await login(page);
+  await kind(page, 'rpg');
+  await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).locator('[data-rename]').click();
+  await page.locator('#adm-toast', { hasText: 'ほかのプロフィールがその名前を使ってるよ' }).waitFor();
+  assert.equal(db.profiles[0].nickname, 'チコ');
+});
+
+t('nameless_profile_row', async (page, { db }) => {
+  seedProfile(db);
+  let msg;
+  page.on('dialog', d => { msg = d.message(); d.accept(); });
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).locator('[data-nameless]').click();
+  await page.locator('#adm-toast', { hasText: 'プロフィールの名前を「名無しの旅人' }).waitFor();
+  assert.match(msg, /プロフィール pidchiko0001.*「チコ」を「名無しの旅人」/);
+  assert.match(db.profiles[0].nickname, /^名無しの旅人\d{3}$/);
+  assert.deepEqual(db.calls.find(c => c.name === 'admin_rename').args.p_name, null);
+});
+
+// 「この名前の記録を全部消す」: プロフィールの行は同じ pid の記録（表の名前が古くても）。同じ名前の古い記録は消さない
+t('delete_all_of_profile_by_pid', async (page, { db }) => {
+  seedProfile(db);
+  let msg;
+  page.on('dialog', d => { msg = d.message(); d.accept(); });
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: '記録を 3件消したよ' }).waitFor();
+  assert.match(msg, /「チコ（プロフィール pidchiko0001）」の記録を全部（タイムアタック 1件・今日の難問 1件・冒険 1件、合わせて 3件）/);
+  assert.match(msg, /同じプロフィールのもの/);
+  assert.ok(db.calls.filter(c => c.name === 'admin_list').some(c => c.args.p_filter?.pid === 'pidchiko0001'), 'pid で集める');
+  assert.equal(db.rows.filter(r => r.profile_id === 1).length + db.dailyRows.filter(r => r.profile_id === 1).length + db.rpgRows.filter(r => r.profile_id === 1).length, 0);
+  assert.ok(db.rows.some(r => r.nickname === 'チコ' && r.profile_id == null), '同じ名前の古い記録は残る');
+  // ゴミ箱にはプロフィールの名前と pid で出る
+  await kind(page, 'trash');
+  assert.equal(await page.locator('#r-table tbody tr', { hasText: 'pidchiko0001' }).count(), 3);
+});
+
+t('delete_all_of_old_name_skips_profile_rows', async (page, { db }) => {
+  seedProfile(db);
+  page.on('dialog', d => d.accept());
+  await login(page);
+  await kind(page, 'scores');
+  await page.locator('#r-table tbody tr', { hasText: '22.22' }).locator('[data-byname]').click();
+  await page.locator('#adm-toast', { hasText: '「チコ」の記録を 1件消したよ' }).waitFor();
+  assert.equal(db.rows.filter(r => r.profile_id === 1).length, 1, '同じ名前のプロフィールの記録は消さない');
+});

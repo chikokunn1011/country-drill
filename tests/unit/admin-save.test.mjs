@@ -141,7 +141,7 @@ test('rpg_coins_pity_card_story', () => {
 test('rpg_wipe_keeps_rankdel', () => {
   const { A, st } = load({ rpg: '{"v":1}', rpgRank: '1', rpgRankPending: '2', rpgRankDel: '["3"]', other: 'o' });
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
-  assert.deepEqual(st.dump(), { rpgRankDel: '["3"]', other: 'o' });
+  assert.deepEqual(st.dump(), { rpgRank: '1', rpgRankDel: '["3"]', other: 'o' });
 });
 
 test('badges_all_marks_sent', () => {
@@ -291,7 +291,8 @@ test('rpg_wipe_queues_rank_tokens', () => {
   st.setItem('rpgRankDel', JSON.stringify(['tok-old', 'tok-a']));
   assert.deepEqual(plain(A.rpgWipe()), { ok: true });
   assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-old', 'tok-a', 'tok-b'], '重ならないように足す');
-  for (const k of ['rpg', 'rpgRank', 'rpgRankPending']) assert.equal(st.getItem(k), null, k);
+  for (const k of ['rpg', 'rpgRankPending']) assert.equal(st.getItem(k), null, k);
+  assert.equal(JSON.parse(st.getItem('rpgRank')).token, 'tok-a', 'rpgRank は残す（本編と同じ）');
 });
 
 test('rpg_wipe_on_broken_save_backs_up_first', () => {
@@ -317,6 +318,78 @@ test('first_time_queues_rank_tokens_and_keeps_backups', () => {
   }, () => T0);
   assert.deepEqual(plain(A.firstTime()), { ok: true });
   assert.deepEqual(st.dump(), { rpgRankDel: JSON.stringify(['tok-a', 'tok-b']), 'rpg-broken-1-0': 'x', 'badges-broken': 'y' });
+});
+
+// プロフィールの合言葉は rpgUnreg（rpg-rank.js が rpg_unregister2 で消す列）に積む。前の版の合言葉は今までどおり rpgRankDel。
+// 送った記録の覚え（rpgSent）も消す。プロフィール自体は消さない（本編の「冒険データを消す」と同じ）
+test('rpg_wipe_queues_profile_token_to_unreg', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  st.setItem('profile', JSON.stringify({ token: 'tok-p', pid: 'abc123def456', name: 'チコ' }));
+  st.setItem('rpgSent', JSON.stringify({ pid: 'abc123def456', lv: 3, dungeons: 1, floors: 2 }));
+  st.setItem('rpgUnreg', JSON.stringify(['tok-x', 5]));
+  st.setItem('rpgRank', JSON.stringify({ name: 'チコ', token: 'tok-a' }));
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual(JSON.parse(st.getItem('rpgUnreg')), ['tok-x', 'tok-p'], '文字列でないものは落として、後ろに足す');
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+  for (const k of ['rpg', 'rpgSent']) assert.equal(st.getItem(k), null, k);
+  assert.equal(JSON.parse(st.getItem('profile')).token, 'tok-p', 'プロフィールは残す');
+  // もう列にある合言葉は重ねない（rpgRankDel にあるものも）
+  st.setItem('rpg', v1(R));
+  st.setItem('rpgRankDel', JSON.stringify(['tok-p']));
+  st.removeItem('rpgUnreg');
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.equal(st.getItem('rpgUnreg'), null, 'rpgRankDel にある合言葉は rpgUnreg に積まない');
+});
+
+// 冒険データを消しても rpgRank は残す（本編の rpg-rank.js unregister と同じ）。まだ引っ越していない端末でも
+// profile.js の引っ越しでサーバーのプロフィールにつながれるように。合言葉は列に積むので、ランキングの行は消える
+test('rpg_wipe_keeps_unmigrated_rpgrank_for_profile_migrate', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  const rank = JSON.stringify({ name: 'チコ', token: 'tok-a' });
+  st.setItem('rpgRank', rank);
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.equal(st.getItem('rpgRank'), rank, 'さわらずに残す');
+  assert.equal(st.getItem('profile'), null);
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+  // 2回目は同じ合言葉を重ねない。初回状態に戻すときは消す
+  st.setItem('rpg', v1(R));
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+  assert.deepEqual(plain(A.firstTime()), { ok: true });
+  assert.equal(st.getItem('rpgRank'), null);
+  assert.deepEqual(JSON.parse(st.getItem('rpgRankDel')), ['tok-a']);
+});
+
+test('rpg_wipe_same_token_in_profile_and_rpgrank_once', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  st.setItem('profile', JSON.stringify({ token: 'tok-a', pid: 'abc123def456', name: 'チコ' }));
+  st.setItem('rpgRank', JSON.stringify({ name: 'チコ', token: 'tok-a' }));
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.deepEqual([JSON.parse(st.getItem('rpgRankDel')), st.getItem('rpgUnreg')], [['tok-a'], null], '同じ合言葉は1回だけ積む');
+});
+
+test('rpg_wipe_ignores_broken_profile', () => {
+  const { A, R, st } = load({}, () => T0);
+  st.setItem('rpg', v1(R));
+  st.setItem('profile', '{broken');
+  st.setItem('rpgUnreg', '{}');
+  assert.deepEqual(plain(A.rpgWipe()), { ok: true });
+  assert.equal(st.getItem('rpgUnreg'), '{}', '積むものが無ければさわらない');
+  assert.equal(st.getItem('profile'), '{broken');
+});
+
+test('first_time_queues_profile_token_and_drops_profile_keys', () => {
+  const { A, st } = load({
+    rpg: '{}', profile: JSON.stringify({ token: 'tok-p', pid: 'abc123def456', name: 'チコ' }), profilePending: JSON.stringify('tok-q'),
+    transferPending: JSON.stringify({ code: 'ABCDEFGHJKLM', token: 'tok-t' }), rpgSent: '{}',
+    transferBackup: JSON.stringify({ at: 1, keys: {} }), rpgUnreg: JSON.stringify(['tok-z']),
+  }, () => T0);
+  assert.deepEqual(plain(A.firstTime()), { ok: true });
+  assert.deepEqual(st.dump(), { rpgUnreg: JSON.stringify(['tok-z', 'tok-p']), transferBackup: JSON.stringify({ at: 1, keys: {} }) },
+    'プロフィールのキーは消し、消しに行く合言葉の列と引き継ぐ前の写しは残す');
 });
 
 test('auto_snapshots_never_push_out_manual_ones', () => {
@@ -407,7 +480,8 @@ test('game_keys_with_wrong_outer_shape_are_not_saved', () => {
   const { A, st } = load({ misses: '{}', setup: '{"mode":"f2n"}' });
   const before = st.dump();
   for (const [k, v] of [['misses', 'null'], ['misses', '[1]'], ['settings', '5'], ['setup', '{"mode":"zzz"}'], ['setup', '{"kind":"nope"}'],
-    ['daily', 'null'], ['nickname', '5'], ['rpgRank', '"x"'], ['rpgRankDel', '{}']]) {
+    ['daily', 'null'], ['nickname', '5'], ['rpgRank', '"x"'], ['rpgRankDel', '{}'],
+    ['profile', '"x"'], ['profilePending', '{}'], ['transferPending', '[]'], ['transferBackup', 'null'], ['rpgSent', '1'], ['rpgUnreg', '"t"']]) {
     assert.deepEqual(plain(A.write(k, v)), { ok: false, reason: 'bad_shape' }, `${k} = ${v}`);
     assert.deepEqual(plain(A.writeCheck(k, v)), { ok: false, reason: 'bad_shape' }, `${k} = ${v}`);
     assert.deepEqual(plain(A.importAll({ app: 'country-drill', kind: 'save', data: { [k]: v } })), { ok: false, reason: 'bad_file' }, `import ${k} = ${v}`);

@@ -830,7 +830,8 @@
     // マップと図版は ch の章だけ。選ぶダンジョンは マップで選んだもの → 次に挑むダンジョン → その章の最後
     const ch = chNow(d, nf), list = K.dungeonsOf(ch);
     const sel = list.some(g => g.id === dgSel) ? dgSel : list.some(g => g.id === nf?.id) ? nf.id : list[list.length - 1].id;
-    const nick = store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
+    // 名前はサイト共通のプロフィールのもの（無ければ前に使った nickname）
+    const nick = window.PROFILE?.get?.()?.name ?? store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
     const max = d.lv >= T.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
     const lvup = max ? 'MAX' : `レベルアップ ${COIN}${fmt(cost)}${can ? '' : ` <small class="rpg-short">あと${COIN}${fmt(cost - d.coins)}</small>`}`;
     return `<div class="rpg-side">${warnHTML()}`

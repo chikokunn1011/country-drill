@@ -213,7 +213,7 @@ t('works_without_ranking_js', async page => {
 
   await clearTimeAttack(page);
   assert.match(await text(page, '#ta-time'), /^(\d+分)?\d+\.\d{2}秒$/);
-  assert.equal(await page.locator('#ta-form').count(), 0);
+  assert.equal(await page.locator('#ta-post').count(), 0);
   assert.equal(await page.isVisible('#r-again'), true);
   await page.click('#brand');
   assert.equal(await page.isHidden('#home-rank'), true);

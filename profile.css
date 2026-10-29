@@ -1,0 +1,64 @@
+/* サイト共通のプロフィール（profile.js の #scr-profile・結果画面の「載せる」箱 .pf-post・ランキングの名前 .pf-name・窓 #pf-card）。色は index.html の変数だけ使う */
+.pf-main { display: flex; flex-direction: column; gap: 18px; }
+.pf .field { min-width: 0; }
+.pf-lead { margin: 0; }
+.pf-form { width: 100%; }
+.pf-form input { flex: 1 1 140px; min-width: 0; font: inherit; font-size: 1rem; color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 10px; }
+.pf-form input::placeholder { font-size: .85rem; } /* スマホ幅でも「12文字まで」まで見えるように */
+.pf-form .row { gap: 8px; } .pf-form .btn { padding-inline: 16px; }
+.pf .tamsg { text-align: left; }
+.pf .switch { align-self: flex-start; }
+.pf-deco { align-self: flex-start; padding-inline: 0; }
+/* プロフィールのカード（自分の画面と、ランキングから開く窓で同じ見た目） */
+.pf-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pf-card-name { margin: 0; font: 900 1.3rem var(--font-display); overflow-wrap: anywhere; }
+.pf-card-title { margin: 0; color: var(--accent); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.pf-card-line { margin: 0; font-size: .92rem; }
+.pf-card-sub { margin: 6px 0 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.pf-card-ta { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: .88rem; overflow-wrap: anywhere; }
+.pf-card-ta .mono { font-family: var(--font-mono); white-space: nowrap; }
+.pf-card .hint { margin: 0; }
+/* かざり（rpg.css と同じ。冒険の表示が OFF で rpg.css が無くても、TA・今日の難問のランキングで出るように） */
+.rr-deco { display: inline-flex; gap: 3px; margin-left: 6px; white-space: nowrap; vertical-align: -.1em; }
+.rr-deco img { height: 1em; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
+/* ランキングの名前（押すとプロフィールの窓）。見た目は文字のまま、下線で押せるとわかるように */
+.pf-name { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; text-align: inherit; cursor: pointer;
+  text-decoration: underline dotted color-mix(in srgb, currentColor 45%, transparent); text-underline-offset: 3px; overflow-wrap: anywhere; }
+.pf-name:hover { color: var(--accent); }
+/* プロフィールの窓 */
+#pf-card { width: min(420px, calc(100vw - 32px)); }
+#pf-card .inner { gap: 10px; }
+.pf-card-err { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.pf-card-err p { margin: 0; }
+/* 引き継ぎ（#pf-transfer。カードや設定の下に同じ間あきで並べる）。コードは大きく、長押しで全部選べるように */
+#pf-transfer { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+#pf-transfer:empty { display: none; }
+.pf-tr-start { align-self: flex-start; }
+.pf-tr-box { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 4px; }
+.pf-tr-box p { margin: 0; }
+.pf-tr-code { font: 700 1.6rem var(--font-mono); letter-spacing: .06em; color: var(--ink); user-select: all; -webkit-user-select: all; overflow-wrap: anywhere; }
+#pf-tr-in { font-family: var(--font-mono); letter-spacing: .04em; }
+/* 結果画面の「載せる」箱。中身の入れ物（状態の文の前と後ろ）は並びに出さず、中の要素が外枠の flex に並ぶ。自動 OFF のときの問いかけ */
+.pf-post-body, .pf-post-tail { display: contents; }
+/* 状態の文（role=status）は空のときも読み上げの木に残す（index.html の .tamsg:empty は display: none）。見た目は場所を取らない */
+.pf-post .tamsg:empty { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* 描き直しで状態の文にフォーカスを置いたとき: キーボードなら居場所が見えるようにボタンと同じ枠、クリック・タップのあとは出さない */
+.pf-post .tamsg:focus { outline: none; }
+.pf-post .tamsg:focus-visible { outline: 3px solid var(--hl); outline-offset: 2px; border-radius: 4px; }
+.pf-post .pf-post-q { margin: 0; font-size: .78rem; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+.pf-post .btn { max-width: 100%; overflow-wrap: anywhere; }
+/* ホームの［プロフィール］: 横に並ぶホーム（900〜1279）で［冒険］もあって6つのときは、rpg.css の1行の均等割りだと1つ 130px ほどになり
+   「冒険 ●9,999 NEW」と「プロフィール」が2行に折れるので、3つずつ2行にする。札（.bdg-titlerow）と .dl-homerow は全幅のまま自分の行 */
+@media (min-width: 900px) and (max-width: 1279.98px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 720px); }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > :not(.btn) { grid-column: 1 / -1; }
+}
+/* ≥1280 で6つのとき: badges.css の2列（高さ 1000 まで）は［プレイ］が全幅なので［設定］だけの行ができ、1280×577・1366×768・1920×800 で
+   縦にスクロールする。高さ 1000 を超える PC は1列のままだと 1920×1080 でもスクロールする。どちらも2列にして［プレイ］も1マスにし、2×3 に収める
+   幅は pc.css の 340px だと 1920 の大きい字で「冒険 ●9,999 NEW」が2行に折れるので 440px まで広げる（1280 では左の列いっぱいの約 425px）。
+   （冒険の表示が OFF・rpg.js が無いと5つなので、badges.css のまま。［プレイ］は塗りのボタンなので並んでも目立つ） */
+@media (min-width: 1280px) {
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: min(100%, 440px); }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > #home-play { grid-column: auto; }
+  body:not(.rpg-off) .home .menu:has(> #home-rpg):has(> #home-profile:not([hidden])) > :not(.btn) { grid-column: 1 / -1; }
+}
