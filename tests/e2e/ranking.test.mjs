@@ -35,20 +35,22 @@ const noHScroll = page => page.evaluate(() => document.documentElement.scrollWid
 const namesFit = page => page.$$eval('#rk-list .nick', els => els.every(e => e.scrollWidth <= e.clientWidth));
 const wait = ms => new Promise(ok => setTimeout(ok, ms));
 
-// バッジのボタンは設定の前（称号の札も button なので、札が出ない QUIET_BADGES で開く）。いちばん上は今日の難問の帯（daily.js）
+// ホームの入口（見えているもの）の並び: 大きなカード（クイズで遊ぶ・今日の難問・冒険）、小さいアイコン（ランキング・バッジ・図鑑・プロフィール・設定）
+const entries = page => page.$$eval('#home-big > .hbig, #home-icons > .hicon', es => es.filter(e => e.checkVisibility()).map(e => e.id));
+// ランキングはアイコンの列の先頭（rpg.js を止めたので冒険のカードは出ない）
 t('home_button_order', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rank', 'home-profile', 'home-badges', 'home-settings']);
-  assert.equal(await text(page, '#home-rank'), 'ランキング');
-  assert.equal(await page.getAttribute('#home-rank', 'class'), 'btn ghost');
+  assert.deepEqual(await entries(page), ['home-play', 'home-daily', 'home-rank', 'home-badges', 'home-book', 'home-profile', 'home-settings']);
+  assert.match(await text(page, '#home-rank'), /ランキング/);
+  assert.equal(await page.getAttribute('#home-rank', 'class'), 'hicon');
   await page.click('#home-rank');
   assert.equal(await page.isVisible('#scr-ranking'), true);
   assert.equal(await page.isHidden('#scr-home'), true);
   assert.equal(await page.isVisible('#topbar'), true);
 }, { storage: { badges: QUIET_BADGES }, blockScripts: RPG_FILES });
 
-// 何も止めないとき（本物の rpg.js と badges.js）は プレイ / 冒険 / ランキング / プロフィール / バッジ / 設定（RPG 設計 §3.1「プレイの次に冒険」、バッジ設計 §6.1「設定の直前」）
+// 何も止めないとき（本物の rpg.js と badges.js）は 冒険のカードが今日の難問の次に出る
 t('home_button_order_with_rpg', async page => {
-  assert.deepEqual(await page.$$eval('.menu button', bs => bs.map(b => b.id)), ['home-daily', 'home-play', 'home-rpg', 'home-rank', 'home-profile', 'home-badges', 'home-settings']);
+  assert.deepEqual(await entries(page), ['home-play', 'home-daily', 'home-rpg', 'home-rank', 'home-badges', 'home-book', 'home-profile', 'home-settings']);
 }, { storage: { badges: QUIET_BADGES } });
 
 t('home_button_hidden_when_disabled', async page => {

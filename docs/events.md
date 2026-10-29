@@ -90,6 +90,8 @@ index.html（クイズ本体）と機能ファイル（`rpg-core.js` `rpg.js` `r
 | `toast(html, ms)` | お知らせを出す（`ms` の既定は 2800）。`html` は innerHTML になるので、文字は `esc()` を通す。`#toasts`（初めて呼ばれたときに `body` の最後に作る。`aria-live="polite"`）に足し、`ms` ミリ秒で消える。位置はスマホは画面の上のまん中、PC（900px〜）は右上（トップバーの［図鑑］［設定］の下）。CSS はバッジ設計 §5.3 |
 | `endGame(outcome)` | `drill:result` を出してゲームを閉じる（`G.ended = true`）。2回目からは何もしない。index.html の中で使う。機能ファイルが別の画面に移れば `show()` が `'quit'` で閉じるので、ふつうは呼ばない |
 | `#topbar-extra` | トップバーの差し込み口（`<div id="topbar-extra" class="row">`。ロゴと［図鑑］［設定］の間）。コイン・称号などのチップを入れる。空なら見えない（`:empty`）。トップバーはホームでは隠れる |
+| `homeEntry(id, { open, note })` | ホームの入口を出す。入口（`#home-big` の `.hbig` 3枚と `#home-icons` の `.hicon` 5つ）は全部 index.html の `#scr-home` に置いてあり、本体以外のファイルが使うもの（`#home-daily` `#home-rpg` `#home-badges` `#home-profile`）は `hidden` で始まる。呼ぶと `hidden = false` にし、`open` があれば押したときの動き（`onclick`）にし、`note` が `undefined` でなければ `.hb-note`（カード）か `.hi-sub`（アイコン）の `innerHTML` にする（文字は呼ぶ側で `esc()` を通す）。何度呼んでもよい。その id が無ければ `null`。機能ファイルはボタンを作らず、`typeof homeEntry === 'function'` を確かめてから呼ぶ（読めなかったファイルの入口は出ないだけ） |
+| `#home-status` | ホームの差し込み口（`<div class="home-status" id="home-status"></div>`。タイトルとカードの間）。先頭は badges.js の称号の札（`.bdg-titlerow` を `prepend`）、ほかの機能は1行のかたまりを `append` する。空なら見えない（`:empty`。HTML の中に空白も書かない） |
 | `#r-ext` | 結果画面の差し込み口（`<div class="r-ext" id="r-ext">`）。中身は rpg.js のもの（表の下を見る）。結果カードの `#r-side` の中の最後（ランキングの欄・まちがえた国の下）。空なら見えない。PC は `#r-side` に何か入ったときだけ右の列が出る |
 | `document.body.dataset.screen` | 今の画面の名前（`show()` が毎回入れる）。起動時に今の画面を知るのに使う |
 | `window.TRIVIA` | 豆知識（`trivia.js`）。`{ [a]: [{k, t}] }`。`k` は `'flag'｜'geo'｜'culture'`、`t` は文。読めないこともあるので `window.TRIVIA?.[a]` で読み、`Array.isArray` で配列か確かめる。中の項目も壊れているかもしれない前提で読み、文字は `esc()` を通す |

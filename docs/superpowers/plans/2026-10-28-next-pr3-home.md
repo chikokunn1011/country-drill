@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「B6 ホームの作り直し（PR3）」・「実装の順番」・「チコに決めてほしいこと」22・23・「テストの方針」）
 
-前提: PR0（整理）・PR1（B2 フッター `<!-- footer:start -->`〜、pages.css）・PR2（B4 `flag(a)` = `flags/${a}.svg?v=${FLAG_V}`、`#home-flags` の `loading="lazy"`、`loadMap()`）はマージ済み。#25・#26 もマージ済み（`#home-profile` は index.html にあり、profile.js が `hidden = false` と `onclick` を付ける）。下のファイル:行は #25・#26 マージ前の main のもので、**マージ後に再確認**する。
+前提: PR0（整理）・PR1（B2 フッター `<!-- footer:start -->`〜、pages.css）はマージ済み。#25・#26 もマージ済み（`#home-profile` は index.html にあり、profile.js が `hidden = false` と `onclick` を付ける）。**PR2（B4 `flag()`・起動・`show`・`startGame`・helpers の settle・`#home-flags` の `loading="lazy"`）はまだ main に無く、別の作業ツリーで同時に作っている。** PR3 は PR2 の変更に頼らない形で作り、index.html では B4 が変える所（スクリプトの読み込み・`flag()`・`$('home-flags').innerHTML = …` の行・起動処理）をさわらない（あとで PR2 の上に載せ直す）。下のファイル:行は 2026-10-29 の main（0e95b82、PR1 マージ後）で確かめたもの。
 
 ## Global Constraints
 
@@ -37,12 +37,12 @@
 ### Task 1: homeEntry と新しいホームの HTML、機能ファイルの呼び出し
 
 **Files:**
-- Modify: `index.html:361-371`（`#scr-home` の中）、`index.html:803-807`（ボタンの onclick）、index.html の script に `homeEntry`
-- Modify: `daily.js:238-251`、`rpg.js:395-401`（`drawEntrances`）・`rpg.js:998-1001`、`badges.js:779-801`（`renderHome`）
+- Modify: `index.html:373-384`（`#scr-home` の中）、`index.html:822-827`（ボタンの onclick）、index.html の script に `homeEntry`（`registerScreen` の近く）
+- Modify: `daily.js:245-257`、`rpg.js:396-403`（`drawEntrances`）・`rpg.js:999-1002`（`setupEntrances`）、`badges.js:781-803`（`renderHome`）
 - Modify: `docs/events.md` §6
-- Modify: `howto.html`（PR1 の `#start`。入口の名前と並びを新しいホームに合わせる）、`tests/unit/pages.test.mjs`（`howto_start_names`）
+- Modify: `howto.html`（PR1 の `#start`。入口の名前と並びを新しいホームに合わせる。`#book` の「［国旗図鑑を見る］」も「［図鑑］」に）、`tests/unit/pages.test.mjs`（`howto_start_names`）
 - Create: `tests/e2e/home.test.mjs`
-- Modify tests: `tests/unit/events-doc.test.mjs`、`tests/e2e/ranking.test.mjs:38-52`、`tests/e2e/rpg_home.test.mjs:60-62`、`tests/e2e/badges.test.mjs:199-212`、`tests/e2e/pc_layout.test.mjs:196-205`
+- Modify tests: `tests/unit/events-doc.test.mjs`、`tests/e2e/ranking.test.mjs:38-52`、`tests/e2e/rpg_home.test.mjs:60-62`、`tests/e2e/badges.test.mjs:199-212`、`tests/e2e/pc_layout.test.mjs:195-205`
 
 **Interfaces:**
 - Produces（A5・ほかの機能ファイルが使う）:
@@ -94,7 +94,7 @@ t('entries_open', async page => { /* 各入口を押す → #scr-setup・#scr-da
   - daily.js: `row`・`hb` を作るのをやめ、`markHome()` は `homeEntry('home-daily', { open: () => { V.tab = 'today'; show('daily'); }, note: \`<span class="mono dl-homeday">${mdShort(today())}</span>${done ? '<span class="dl-homedone">挑戦ずみ</span>' : '<span class="dl-new">NEW</span>'}\` })`（open は初回だけでもよい）。`drill:screen` の home で呼び直すのは今のまま。
   - rpg.js: ボタンを作るのをやめ、起動で `homeEntry('home-rpg', { open: () => show('rpg') })`。`drawEntrances` は `homeEntry('home-rpg', { note: \`<small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}\` })`。
   - badges.js `renderHome()`: `#home-status` が無ければ return。`homeEntry('home-badges', { open: () => open(), note: \`${got}/${total}\` + (NEW があれば '<span class="bdg-dot" role="img" aria-label="新しいバッジあり"></span>') })`。札の行は `$('home-status')` の `:scope > .bdg-titlerow` を探し、無ければ作って `prepend`（ボタンは作り直さない）。
-  - 3ファイルの `?v=` を main +1。
+  - 3ファイルの `?v=` を main +1（main は rpg.js?v=12・badges.js?v=9・daily.js?v=3 → 13・10・4）。
 
 - [ ] **Step 5: howto.html の `#start`** — 「［プレイ］」などの古い名前を、新しいホームの「クイズで遊ぶ」「今日の難問」「冒険」と、下のアイコンの列（ランキング・バッジ・図鑑・プロフィール・設定）に書きかえる。フッターの目印のあいだはさわらない。
 
@@ -113,10 +113,10 @@ t('entries_open', async page => { /* 各入口を押す → #scr-setup・#scr-da
 ### Task 2: ホームの CSS（スマホ・PC）と古いルールの片づけ
 
 **Files:**
-- Modify: `index.html:138-142`（`.home .flags`・`.home .menu`）、`index.html:304`（モザイクの枚数）
-- Modify: `pc.css:39-43`・`pc.css:170-183`・`pc.css:278-284`
-- Delete rules: `rpg.css:117-134`（`:has(> #home-rpg)` の4つ。135行目の `body.rpg-off …` は残す）、`badges.css:9-30` のうち `.home .menu` と `#home-badges` のルール（`.bdg-titlerow`・`.bdg-titlechip`・`.bdg-dot` の見た目は残す）、`daily.css:23-31`（`.dl-new` は残す）、`profile.css:44-58`
-- Modify tests: `tests/e2e/home.test.mjs`、`tests/e2e/badges.test.mjs:476-544`（`home_menu_pc`・`home_short_pc_fits`・`home_five_buttons_pc` を消して home.test に移す）
+- Modify: `index.html:145-148`（`.home .flags`・`.home .menu`）、`index.html:315`（モザイクの枚数）
+- Modify: `pc.css:36-44`・`pc.css:170-190`・`pc.css:277-285`
+- Delete rules: `rpg.css:117-134`（`:has(> #home-rpg)` の4つ。135行目の `body.rpg-off …` は残す）、`badges.css:9-31` のうち `.home .menu` と `#home-badges` のルール（`.bdg-titlerow`・`.bdg-titlechip`・`.bdg-dot` の見た目は残す）、`daily.css:22-31`（`.dl-new` は 32 行目で残す）、`profile.css:50-64`
+- Modify tests: `tests/e2e/home.test.mjs`、`tests/e2e/badges.test.mjs:476-545`（`home_menu_pc`・`home_short_pc_fits`・`home_six_buttons_pc` を消して home.test に移す。#26 で［プロフィール］が入って「five」は「six」になった）
 
 **Interfaces:**
 - Consumes: Task 1 の HTML の形とクラス（`.home-status` `.home-big` `.hbig` `.hbig.main` `.hb-title` `.hb-desc` `.hb-note` `.home-icons` `.hicon` `.hi-ico` `.hi-label` `.hi-sub`）。
@@ -135,7 +135,7 @@ t('phone_360_fits', async page => {
   const big = await page.$$eval('#home-big > .hbig', es => es.map(e => Math.round(e.getBoundingClientRect().left)));
   assert.equal(new Set(big).size, 1);                                      // スマホは縦に並ぶ
 }, { viewport: { width: 360, height: 640 }, blockScripts: [] });
-// 旧 home_five_buttons_pc を移す: 入口は '.hbig, .hicon'（見えているもの8つ）と #home-title。サイズも同じ5つ
+// 旧 home_six_buttons_pc を移す: 入口は '.hbig, .hicon'（見えているもの8つ）と #home-title。サイズも同じ5つ
 t('pc_fits', ...)   // [[900,700],[1024,768],[1280,577],[1366,657],[1920,1080]]: hscroll なし、docH <= ih、画面の中、たがいに重ならない、.hb-title と .hi-label は1行
 t('pc_rows', async page => {
   // 1024×768: .hbig 3枚の top が同じ（横3列）。1366×768: .hbig の right < #home-flags の left（左の列）
@@ -147,12 +147,12 @@ t('pc_rows', async page => {
 
 - [ ] **Step 3: スマホの CSS（index.html）** — `.home .menu` の2行を消し、次の値で書く: `.home-status`（上の Produces、`gap: 6px`、`:empty { display: none }`）、`.home-big`（縦の flex、`gap: 10px`、幅 `min(340px, 100%)`）、`.hbig`（`--surface` の地・`1.5px solid var(--line)`・角丸 14px・左寄せ、`.hb-title` は `--font-display` 700 1.2rem、`.hb-desc` は .8rem `--muted`、`.hb-note` は右上）、`.hbig.main`（`.btn` と同じ `--accent` の地・`--accent-ink` の字）、`.home-icons`（flex、`justify-content: center`、`gap: 6px`、幅 `min(440px, 100%)`）、`.hicon`（`flex: 1 1 0; max-width: 84px; min-width: 0`、縦の flex、`position: relative`（`.bdg-dot` のため）、`.hi-label` は .72rem `overflow-wrap: anywhere`、`.hi-sub` は .68rem mono `--muted`）。モザイクは `nth-child(n+15)` を `nth-child(n+8)` にし、7枚が1行に入る幅にする。
 
-- [ ] **Step 4: pc.css** — 42-43・181-183・283 を消し、次にする: ≥900 は `.home .flags img:nth-child(n+8) { display: block }`（41行目の n+15 を直す）、900〜1279 は `.home-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 960px) }`。≥1280 は grid-template-areas を `". flags" "eyebrow flags" "title flags" "status flags" "big flags" "icons flags" ". flags"`（rows は `1fr auto auto auto auto auto 1fr`）、`#home-status`・`#home-big`・`#home-icons` に grid-area、左寄せ（`justify-content: flex-start`）、`.home-big` は縦1列で幅 `min(440px, 100%)`。`@media (max-height: 760px)` に `.hb-desc { display: none }`。
+- [ ] **Step 4: pc.css** — 43-44・182-184・284 を消し、次にする: ≥900 は `.home .flags img:nth-child(n+8) { display: block }`（42行目の n+15 を直す）、900〜1279 は `.home-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 960px) }`。≥1280 は grid-template-areas を `". flags" "eyebrow flags" "title flags" "status flags" "big flags" "icons flags" ". flags"`（rows は `1fr auto auto auto auto auto 1fr`）、`#home-status`・`#home-big`・`#home-icons` に grid-area、左寄せ（`justify-content: flex-start`）、`.home-big` は縦1列で幅 `min(440px, 100%)`。`@media (max-height: 760px)` に `.hb-desc { display: none }`。
 
 - [ ] **Step 5: 古いルールを消す** — 上の Files の Delete rules。消したあと `grep -n ':has(> #home-\|\.home \.menu\|dl-homerow\|dl-homebtn' *.css index.html` が0件。
 
-- [ ] **Step 6: badges.test の3つを消し、`?v=` を上げる** — rpg.css・badges.css・daily.css・profile.css を main +1、pc.css も（無ければ `?v=1`）。
+- [ ] **Step 6: badges.test の3つを消し、`?v=` を上げる** — rpg.css・badges.css・daily.css・profile.css を main +1、pc.css も（main は rpg.css?v=21・badges.css?v=1・daily.css?v=1・profile.css?v=2・pc.css?v=1 → 22・2・2・3・2。どれも main の歴史の最大と同じなので same_version_same_content も通る）。
 
-- [ ] **Step 7: 全テスト** — unit・e2e・sql → PASS。とくに `pc_layout`（1366×657 の NO_SCROLL_SCENES の home）、`theme`、`layout.mjs` の場面。落ちたら `.hbig` の padding と `.home` の gap だけで詰める。`GEOM_BASE=origin/main` で `phone_geometry_unchanged` を流し、差がホームだけか見る（README のとおり。わざと変えた差）。
+- [ ] **Step 7: 全テスト** — unit・sql と、ホームにさわる e2e（home・ranking・rpg_home・badges・pc_layout・theme・profile・daily・pages）→ PASS（e2e の全体はこの計画の外で4本同時に流す）。とくに `pc_layout`（1366×657 の NO_SCROLL_SCENES の home）、`theme`、`layout.mjs` の場面。落ちたら `.hbig` の padding と `.home` の gap だけで詰める。`GEOM_BASE=origin/main` で `phone_geometry_unchanged` を流し、差がホームだけか見る（README のとおり。わざと変えた差）。
 
 - [ ] **Step 8: コミット** — `git add index.html pc.css rpg.css badges.css daily.css profile.css tests/e2e/home.test.mjs tests/e2e/badges.test.mjs`、メッセージ「ホームをカード3枚とアイコンの列に並べ、:has() の並べ直しを消す」

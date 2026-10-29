@@ -778,27 +778,20 @@
   const monthDay = t => { const dt = new Date(t); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
   const catsOf = x => ['all', ...Object.keys(CAT_LABEL).filter(c => c !== 'rpg' || x.rpg)];   // 分類のチップ（冒険は rpg.js があるときだけ）
 
-  // ホーム（§6.1）: バッジのボタン（#home-settings の直前）と称号の札（.home .menu の1つ目）。何度呼んでも同じ要素を書きかえる
+  // ホーム（§6.1）: バッジのアイコン（index.html の #home-badges を homeEntry で出す）と称号の札（#home-status の先頭）。何度呼んでも同じ要素を書きかえる
   function renderHome() {
-    const menu = document.querySelector('.home .menu');
-    if (!menu) return;
-    let btn = $('home-badges');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.className = 'btn ghost'; btn.id = 'home-badges'; btn.dataset.bdgOpen = '';
-      const next = $('home-settings');
-      if (next?.parentElement === menu) next.before(btn); else menu.append(btn);
-    }
+    const status = $('home-status');
+    if (!status || typeof homeEntry !== 'function') return;
     const d = bs.st, x = ctx(), { got, total } = summarize(CAT, d, x);
-    btn.innerHTML = `バッジ <small class="mono">${got}/${total}</small>`
-      + (visible(CAT, x).some(b => isNew(b, d)) ? '<span class="bdg-dot" role="img" aria-label="新しいバッジあり"></span>' : '');
+    homeEntry('home-badges', { open: () => open(), note: `${got}/${total}`
+      + (visible(CAT, x).some(b => isNew(b, d)) ? '<span class="bdg-dot" role="img" aria-label="新しいバッジあり"></span>' : '') });
     const title = titleText();
-    let row = menu.querySelector(':scope > .bdg-titlerow');
+    let row = status.querySelector(':scope > .bdg-titlerow');
     if (!title) { row?.remove(); return; }
     if (!row) {
       row = document.createElement('div'); row.className = 'bdg-titlerow';
       row.innerHTML = '<button class="bdg-titlechip" id="home-title" data-bdg-picker></button>';
-      menu.prepend(row);
+      status.prepend(row);
     }
     row.firstElementChild.innerHTML = `〈${esc(title)}〉`;   // ボタンは作り直さない（フォーカスを残す）
   }
