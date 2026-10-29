@@ -242,16 +242,12 @@
   $('dl-tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; V.tab = b.dataset.t; for (const x of $('dl-tabs').children) x.setAttribute('aria-pressed', String(x === b)); load(); };
   $('dl-retry').onclick = () => load();
 
-  // ---- ホームの入口。メニューのボタンとは別の、プレイの上の細い帯（ボタンの並びを変えない）。今日まだなら「NEW」 ----
-  const row = document.createElement('div'), hb = document.createElement('button');
-  row.className = 'dl-homerow';
-  hb.type = 'button'; hb.className = 'dl-homebtn'; hb.id = 'home-daily';
-  hb.onclick = () => { V.tab = 'today'; show('daily'); };
-  row.append(hb);
-  $('home-play')?.before(row);
+  // ---- ホームの入口（index.html の #home-daily。クイズで遊ぶの次の大きなカード）。日付と、今日まだなら「NEW」 ----
+  const openToday = () => { V.tab = 'today'; show('daily'); };
   function markHome() {
+    if (typeof homeEntry !== 'function') return;
     const done = !!todayRec();
-    hb.innerHTML = `<span aria-hidden="true">📅</span>今日の難問<span class="mono dl-homeday">${mdShort(today())}</span>${done ? '<span class="dl-homedone">挑戦ずみ</span>' : '<span class="dl-new">NEW</span>'}`;
+    homeEntry('home-daily', { open: openToday, note: `<span class="mono dl-homeday">${mdShort(today())}</span>${done ? '<span class="dl-homedone">挑戦ずみ</span>' : '<span class="dl-new">NEW</span>'}` });
   }
   markHome();
   document.addEventListener('drill:screen', e => { if (e.detail?.name === 'home') markHome(); });

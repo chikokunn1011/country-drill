@@ -394,8 +394,8 @@
 
   // ホームの［冒険］の小さいコインと NEW、トップバーのチップ
   const drawEntrances = (d = get()) => {
-    const hb = $('home-rpg'), chip = $('rpg-chip');
-    if (hb) hb.innerHTML = `冒険 <small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}`;
+    const chip = $('rpg-chip');
+    if (typeof homeEntry === 'function') homeEntry('home-rpg', { note: `<small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}` });
     if (chip) {
       chip.innerHTML = `${COIN}<b>${K.shortCoins(d.coins)}</b><span class="rpg-chip-l"> コイン</span>`;
       chip.setAttribute('aria-label', `コイン ${fmt(d.coins)}（冒険へ）`);
@@ -988,7 +988,7 @@
   };
   // 起動時に1回: 冒険ホームの画面（<section> を作ってから登録）、ホームのボタン、トップバーのチップ、設定のスイッチ
   const setupEntrances = () => {
-    document.body.classList.toggle('rpg-off', get().show === false);   // ボタンとチップを作る前に（OFF の人に一瞬でも見せない）
+    document.body.classList.toggle('rpg-off', get().show === false);   // 入口を出す・チップを作る前に（OFF の人に一瞬でも見せない）
     // 画面: footer の直前に <section> を作ってから登録する（ガチャ・仲間は rpg-cards.js、バトルは rpg-battle.js がこの後ろに足す）
     const wrap = document.querySelector('body > .wrap'), foot = wrap.querySelector(':scope > footer');
     const sec = document.createElement('section');
@@ -996,10 +996,7 @@
     if (foot) foot.before(sec); else wrap.append(sec);
     registerScreen('rpg', renderHome);
 
-    const hb = document.createElement('button');
-    hb.className = 'btn ghost'; hb.id = 'home-rpg';
-    hb.onclick = () => show('rpg');
-    $('home-play')?.after(hb);
+    if (typeof homeEntry === 'function') homeEntry('home-rpg', { open: () => show('rpg') });   // ホームの入口は index.html にある（hidden で始まる）
     const chip = document.createElement('button');
     chip.type = 'button'; chip.className = 'rpg-chip'; chip.id = 'rpg-chip'; chip.title = 'コイン（冒険へ）';
     chip.onclick = () => show('rpg');

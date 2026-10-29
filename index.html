@@ -144,8 +144,30 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .home h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(2.4rem, 9vw, 3.6rem); line-height: 1.1; margin: 0; text-wrap: balance; }
 .home .flags { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; max-width: 420px; }
 .home .flags img { width: 36px; aspect-ratio: 4/3; border-radius: 3px; border: 1px solid var(--line); object-fit: cover; }
-.home .menu { display: flex; flex-direction: column; gap: 10px; width: min(280px, 100%); }
-.home .menu .btn { padding: 15px; font-size: 1.2rem; }
+/* タイトルとカードの間の差し込み口（称号の札・れんぞく日数）。空なら見えない（HTML の中に空白も書かない） */
+.home-status { display: flex; flex-direction: column; align-items: center; gap: 6px; width: min(340px, 100%); }
+.home-status:empty { display: none; }
+/* 大きなカード3枚（クイズで遊ぶ → 今日の難問 → 冒険）。スマホは縦に並ぶ。PC は pc.css */
+.home-big { display: flex; flex-direction: column; gap: 10px; width: min(340px, 100%); }
+.hbig { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; text-align: left; cursor: pointer;
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+.hbig:hover { border-color: var(--accent); }
+.hbig.main { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hb-title { font: 700 1.2rem/1.3 var(--font-display); }
+.hb-desc { font-size: .8rem; color: var(--muted); }
+.hbig.main .hb-desc { color: inherit; }
+.hb-note { position: absolute; top: 10px; right: 12px; display: flex; align-items: center; gap: 6px; font-size: .8rem; }
+.hb-note:empty { display: none; }
+/* 小さいアイコンの列（ランキング・バッジ・図鑑・プロフィール・設定） */
+.home-icons { display: flex; justify-content: center; gap: 6px; width: min(440px, 100%); }
+.hicon { flex: 1 1 0; max-width: 84px; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer;
+  background: var(--surface); color: var(--ink); border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 2px; }
+.hicon:hover { border-color: var(--accent); }
+.hi-ico { font-size: 1.35rem; line-height: 1.2; }
+.hi-label { font-size: .72rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.hi-sub { font: .68rem/1.3 var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.hi-sub:empty { display: none; }
+.hbig[hidden], .hicon[hidden] { display: none; }
 
 /* モード選択 */
 .modegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -311,11 +333,15 @@ body[data-screen="quiz"] footer { display: none; }   /* 出題中はフッター
   .qcard { padding: 16px; }
   .facts { grid-template-columns: 72px 1fr; } .facts img { width: 72px; }
   .modegrid, .kind { grid-template-columns: 1fr; }
+  /* スマホのアイコンは幅が 50〜67px。「プロフィール」（6文字）が途中で折れないよう、左右の余白をなくし、字を画面の幅に合わせて小さくする
+     （アイコン1つの中身 ≒ (100vw − 余白32 − すき間24) ÷ 5 − 枠3。6文字 × 0.98 がそこに入る大きさ。広ければ .72rem のまま） */
+  .hicon { padding-inline: 0; }
+  .hi-label { font-size: min(.72rem, calc((100vw - 56px) / 32)); letter-spacing: -.02em; }
 }
 /* 2列の入れ物とクイズの問題欄（スマホの見た目。PC は pc.css で上書き） */
 .cols, .col { display: flex; flex-direction: column; gap: 14px; }
 .qmain { display: flex; flex-direction: column; gap: 18px; align-items: center; width: 100%; }
-.home .flags img:nth-child(n+15) { display: none; }
+.home .flags img:nth-child(n+8) { display: none; }   /* スマホは7枚で1行 */
 /* PCレイアウト（900px以上）は pc.css。スマホ幅では読み込まれても適用されない */
 .rslot { display: none; }
 .rside { display: contents; }
@@ -358,11 +384,11 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-<link rel="stylesheet" href="pc.css?v=1" media="(min-width: 900px)">
-<link rel="stylesheet" href="rpg.css?v=21">
-<link rel="stylesheet" href="badges.css?v=1">
-<link rel="stylesheet" href="daily.css?v=1">
-<link rel="stylesheet" href="profile.css?v=2">
+<link rel="stylesheet" href="pc.css?v=2" media="(min-width: 900px)">
+<link rel="stylesheet" href="rpg.css?v=22">
+<link rel="stylesheet" href="badges.css?v=2">
+<link rel="stylesheet" href="daily.css?v=2">
+<link rel="stylesheet" href="profile.css?v=3">
 </head>
 <body>
 <div class="wrap">
@@ -378,13 +404,20 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <p class="eyebrow">FLAGS · NAMES · MAP</p>
     <h1>国旗<br>マスター</h1>
     <div class="flags" id="home-flags"></div>
-    <div class="menu">
-      <button class="btn" id="home-play">プレイ</button>
-      <button class="btn ghost" id="home-rank">ランキング</button>
-      <button class="btn ghost" id="home-profile" hidden>プロフィール</button>
-      <button class="btn ghost" id="home-settings">設定</button>
+    <div class="home-status" id="home-status"></div>
+    <!-- 入口は全部ここに置く。本体以外のファイルが使う入口は hidden で始め、そのファイルが homeEntry() で出す -->
+    <div class="home-big" id="home-big">
+      <button class="hbig main" id="home-play"><b class="hb-title">クイズで遊ぶ</b><span class="hb-desc">国旗・国名・場所を当てる</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-daily" hidden><b class="hb-title">今日の難問</b><span class="hb-desc">毎日かわる問題で、みんなと競う</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-rpg" hidden><b class="hb-title">冒険</b><span class="hb-desc">コインで仲間を集めてダンジョンへ</span><span class="hb-note"></span></button>
     </div>
-    <button class="linkbtn" id="home-book">国旗図鑑を見る</button>
+    <div class="home-icons" id="home-icons">
+      <button class="hicon" id="home-rank"><span class="hi-ico" aria-hidden="true">🏆</span><span class="hi-label">ランキング</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-badges" hidden><span class="hi-ico" aria-hidden="true">🎖️</span><span class="hi-label">バッジ</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-book"><span class="hi-ico" aria-hidden="true">📖</span><span class="hi-label">図鑑</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-profile" hidden><span class="hi-ico" aria-hidden="true">👤</span><span class="hi-label">プロフィール</span><span class="hi-sub"></span></button>
+      <button class="hicon" id="home-settings"><span class="hi-ico" aria-hidden="true">⚙️</span><span class="hi-label">設定</span><span class="hi-sub"></span></button>
+    </div>
   </section>
 
   <!-- 設定 -->
@@ -839,6 +872,16 @@ function registerScreen(name, render) {             // 機能ファイルが自�
   if (!$('scr-' + name)) throw new Error('no section scr-' + name);
   if (!SCREENS.includes(name)) SCREENS.push(name);
   if (render) screenRender[name] = render;
+}
+// ホームの入口（index.html の #scr-home に hidden で置いてある）を出す。open は押したときの動き、note は .hb-note / .hi-sub に入れる HTML（呼ぶ側で esc() 済み）。
+// 何度呼んでもよい。その id が無ければ null
+function homeEntry(id, { open, note } = {}) {
+  const el = $('scr-home')?.querySelector('#' + id);
+  if (!el) return null;
+  el.hidden = false;
+  if (open) el.onclick = open;
+  if (note !== undefined) { const box = el.querySelector('.hb-note, .hi-sub'); if (box) box.innerHTML = note; }
+  return el;
 }
 function toast(html, ms = 2800) {
   let box = $('toasts');
@@ -1536,7 +1579,7 @@ addEventListener('load', () => loadMap().catch(() => {}));
 <script src="rpg-battle.js?v=16"></script>
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
-<script src="badges.js?v=9"></script>
-<script src="daily.js?v=3"></script>
+<script src="badges.js?v=10"></script>
+<script src="daily.js?v=4"></script>
 </body>
 </html>
