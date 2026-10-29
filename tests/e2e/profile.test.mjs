@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, PHONE, PC } from './helpers.mjs';
+import { startServer, openApp, clearTimeAttack, PHONE, PC } from './helpers.mjs';
 import { measureFit, settleLayout } from './layout.mjs';
 import { RPG_FILES } from './rpg_helpers.mjs';
 
@@ -151,6 +151,29 @@ t('rename', async (page, { db }) => {
   assert.equal(db.profiles[0].nickname, 'ハチ');
   assert.equal((await stored(page, 'profile')).name, 'ハチ');
   assert.equal(await stored(page, 'nickname'), 'ハチ');
+});
+
+// 名前の入力欄の下の注意書き（プライバシーポリシーへのリンクは新しいタブで開く）
+async function nameNoteShown(page, scope) {
+  const a = page.locator(`${scope} .pf-name-note a`);
+  assert.equal(await a.count(), 1, scope);
+  assert.equal(await a.isVisible(), true, scope);
+  assert.equal(await a.getAttribute('href'), 'privacy.html');
+  assert.equal(await a.getAttribute('target'), '_blank');
+  assert.match(await a.getAttribute('rel'), /\bnoopener\b/);
+  assert.match(await page.locator(`${scope} .pf-name-note`).innerText(), /本名や学校名は使わないでね/);
+}
+t('name note on profile screen', async (page, { db }) => {
+  await openProfile(page);
+  await nameNoteShown(page, '#pf-main');   // 作る欄
+  await openWithProfile(page, db);
+  await openProfile(page);
+  await nameNoteShown(page, '#pf-main');   // 名前を変える欄
+});
+t('name note on TA result without profile', async page => {
+  await clearTimeAttack(page);
+  await page.locator('#ta-post form').waitFor();
+  await nameNoteShown(page, '#ta-post');
 });
 
 // 結果画面の「載せる」箱を body の下に作って描く。send は profile_me を呼んで、通れば text を返す

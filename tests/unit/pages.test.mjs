@@ -161,3 +161,8 @@ test('howto_sections', () => {
   assert.ok(!/<img\b/.test(h));
   assert.ok(!/首都を(当てる|答える)/.test(h.replace('首都を当てる問題はない', '')));   // 首都を問うと読める文がない
 });
+test('sitemap_lists_pages', () => {
+  const locs = [...read('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
+  for (const p of ['privacy.html', 'about.html', 'howto.html']) assert.ok(locs.includes(`https://chikokunn1011.github.io/country-drill/${p}`), p);
+});
+test('profile_name_note', () => assert.equal(read('profile.js').match(/本名や学校名は使わないでね/g)?.length, 1));   // 1つの定数を3か所で使う
