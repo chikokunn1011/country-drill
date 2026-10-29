@@ -96,8 +96,11 @@
     const rest = upto < N ? `<p class="hint">${upto ? 'ここから先' : '問題と答え'}は、明日「昨日」のタブで見られるよ。</p>` : '';
     return `<details class="dl-ans"${r ? ' open' : ''}><summary>${title}</summary>${li ? `<ol class="dl-qs">${li}</ol>` : ''}${rest}</details>`;
   }
-  // □■ でどこまで正解したか（シェア用）
-  const bar = r => Array.from({ length: N }, (_, i) => i < r.correct ? '🟩' : i === r.correct && r.outcome === 'fail' ? '🟥' : '⬜').join('');
+  // どこまで正解したか（シェア用）。grid は画像の20マス（share-card.js）、bar は文の 🟩🟥⬜。決まりは grid の1か所
+  const grid = r => Array.from({ length: N }, (_, i) => i < r.correct ? 'ok' : i === r.correct && r.outcome === 'fail' ? 'ng' : 'skip');
+  const bar = r => grid(r).map(g => ({ ok: '🟩', ng: '🟥', skip: '⬜' })[g]).join('');
+  const resultLine = r => r.correct >= N ? `全問正解！ ${RANKING.formatTime(r.timeMs)}` : `${r.correct} / ${N} 問正解`;
+  const shareText = r => `国旗マスター 今日の難問 ${mdShort(r.day)}\n${bar(r)}\n${resultLine(r)}\n#国旗マスター`;
 
   function render() {
     settle();
@@ -136,9 +139,12 @@
         ${r.day !== day ? '<div class="row center"><button class="btn" id="dl-start">今日の難問に挑戦する</button></div>' : ''}
       </div>${answersHTML(r.day, r.day === day ? '今日の問題と答え' : '昨日の問題と答え', r, r.day === day ? Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)) : N)}`;
       if ($('dl-start')) $('dl-start').onclick = start;
-      $('dl-share').onclick = () => share(r);
-      if (canSend(r) && P()) post(r);
       const dayWord = r.day === day ? '今日' : '昨日';
+      // 結果画像のシェア（share-card.js）。国旗は出さない（答えは明日まで隠す）。読めなければ文だけのシェア
+      if (window.SHARECARD) SHARECARD.attach($('dl-share'), { kind: 'daily', title: `今日の難問 ${mdShort(r.day)}`, big: resultLine(r), sub: '',
+        rank: r.sent?.rank ? `${dayWord}${r.sent.rank}位` : null, flags: [], grid: grid(r), text: shareText(r) });
+      else $('dl-share').onclick = () => share(r);
+      if (canSend(r) && P()) post(r);
       if (RANKING.enabled && !r.sent) RANKING.dailyRankOf({ day: r.day, correct: r.correct, timeMs: r.timeMs })
         .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = `${dayWord}${n}位 相当`; }, e => console.warn('daily rankOf', e));
       if (r.sent?.rank) $('dl-rank').textContent = `${dayWord}${r.sent.rank}位（載せたとき）`;
@@ -203,8 +209,9 @@
   // postBox は箱が DOM から外れると聞くのをやめる。開き直せば render が作り直す）
   document.addEventListener('drill:screen', e => { if (e.detail?.name !== 'daily') $('dl-post')?.remove(); });
 
+  // share-card.js が読めなかったときのシェア（文だけ。share が無ければクリップボード）
   function share(r) {
-    const text = `国旗マスター 今日の難問 ${mdShort(r.day)}\n${bar(r)}\n${r.correct >= N ? `全問正解！ ${RANKING.formatTime(r.timeMs)}` : `${r.correct} / ${N} 問正解`}\n#国旗マスター`;
+    const text = shareText(r);
     const url = location.origin + location.pathname;
     const copied = () => { const b = $('dl-share'); if (b) { b.textContent = 'コピーしたよ'; setTimeout(() => { if ($('dl-share')) $('dl-share').textContent = '結果をシェア'; }, 2000); } };
     if (typeof navigator.share === 'function') {

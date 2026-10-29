@@ -4,13 +4,13 @@
 
 **Goal:** タイムアタックのクリア画面と今日の難問の結果に［結果をシェア］を置き、押すと 1200×675 の結果画像と短い文を OS の共有シートに渡す（渡せないときは X の投稿画面）。
 
-**Architecture:** 新しい `share-card.js`（`window.SHARECARD`）の前半は DOM にさわらない `SHARE`・`normalize`・`layout`（vm で unit テスト）、後半は `attach(btn, data)` で、結果画面を出したときに画像を先に作って File を持っておき、押されたら同期で `navigator.share` に渡す。index.html の `showResult()` と daily.js の `render()` が data を作って `attach` を呼ぶだけ。
+**Architecture:** 新しい `share-card.js`（`globalThis.SHARECARD`。ブラウザでは `window.SHARECARD`）の前半は DOM にさわらない `SHARE`・`normalize`・`layout`（vm で unit テスト）、後半は `attach(btn, data)` で、結果画面を出したときに画像を先に作って File を持っておき、押されたら同期で `navigator.share` に渡す。index.html の `showResult()` と daily.js の `render()` が data を作って `attach` を呼ぶだけ。
 
 **Tech Stack:** HTML / クラシック script、canvas、node:test（unit、vm）、Playwright（e2e、`tests/e2e/helpers.mjs`）
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「A1 結果画像のシェア（PR5）」・「実装の順番」・「チコに決めてほしいこと」1・2・3・「テストの方針」）
 
-前提: PR0〜PR4 はマージ済み。PR2（B4）の `flag(a)` は `flags/${a}.svg?v=${FLAG_V}` を返し、`startGame`/`startDaily` は async（e2e は `settle` で待つ）。ファイル:行は #26 のブランチ（`origin/claude/project-thread-e4qf97`）のもので、**マージ後に再確認**する。
+前提: PR1（B2）・PR2（B4）・PR3（B6）は main にマージ済み。PR4（A5 れんぞく日数、`streak.js`・`#home-status`）は別に作っていてまだ main に無いので、PR5 は PR4 に頼らない（index.html のスクリプト読み込みの行は `share-card.js` を足す1行以外さわらない）。PR2（B4）の `flag(a)` は `flags/${a}.svg?v=${FLAG_V}` を返し、`startGame`/`startDaily` は async（e2e は `settle` で待つ）。ファイル:行は main（`b52b518`）で確かめたもの。
 
 ## Global Constraints
 
@@ -21,9 +21,9 @@
 - フォントは `document.fonts.load('900 80px "Zen Maru Gothic"')` を最大 2000ms 待つ（`FONT_MS = 2000`）。待ちきれなければ予備のフォントで描く。
 - X は `https://twitter.com/intent/tweet?text=…&url=…` を `window.open(…, '_blank', 'noopener')`（rpg-cards.js の `share` と同じ）。`AbortError` は何もしない。保存用の小窓は作らない。
 - 失敗は `console.warn('sharecard', e)`。新しいイベント・localStorage のキー・Supabase の変更は無い（`TRANSFER_KEYS` にさわらない）。
-- `?v=`: `share-card.js?v=1`（新規、daily.js の `<script>` の直前）、`daily.js?v=` は「そのとき main にある数 +1」（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。index.html はインラインなので数は無い。
+- `?v=`: `share-card.js?v=1`（新規、daily.js の `<script>` の直前）、`daily.js?v=4` → `daily.js?v=5`（main は 4、main の歴史で使った最大も 4。PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。index.html はインラインなので数は無い。
 - コミットメッセージは日本語、末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` と `Claude-Session: https://claude.ai/code/session_0165YqqRbQ9cLHPBbRkUzhmj`。
-- 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`node --test --test-concurrency=1 'tests/e2e/*.test.mjs'`（tests/e2e で `npm ci` 済み）、`bash tests/sql/run.sh`。とくに `cache_bust` `events-doc` `theme` `pc_layout` `result_guard`。
+- 毎タスクの終わりに: unit は全部 `node --test tests/unit/*.test.mjs`。e2e は変えた所に関係するファイルだけ `cd tests/e2e && node --test --test-concurrency=1 a.test.mjs b.test.mjs`（e2e の全体は PR の最後に別の手順で流す）。この PR は SQL を変えないので `bash tests/sql/run.sh` はいらない。とくに `cache_bust` `events-doc` `theme` `pc_layout` `result_guard` `timeattack` `daily`。
 
 ## Review Focus
 
@@ -42,7 +42,7 @@
 - Test: `tests/unit/share-card.test.mjs`（新規。daily-core.test.mjs と同じく `vm` で `share-card.js` だけ読む。`ctx = { window: {} }`、`ctx.globalThis = ctx`）
 
 **Interfaces:**
-- Produces（`window.SHARECARD = { SHARE, normalize, layout, attach }`。アプリが使うのは `attach` だけ、`SHARE` `normalize` `layout` はテスト用に見せる。`window` が無いときは `globalThis`）:
+- Produces（`globalThis.SHARECARD = { SHARE, normalize, layout, attach }`。daily-core.js と同じく `globalThis` に置く。ブラウザでは `window.SHARECARD`。vm のテストでは `ctx.SHARECARD`。アプリが使うのは `attach` だけ、`SHARE` `normalize` `layout` はテスト用に見せる）:
   - `SHARE`（Global Constraints の値、`Object.freeze`）
   - `normalize(d: any) -> Data` — `kind` は `'ta'|'daily'`（それ以外は `'ta'`）。上の8つのキーだけを新しいオブジェクトに写す。`title` `big` `sub` `text` は文字列（無ければ `''`）、`rank` は文字列か `null`、`flags` は文字列の配列、`grid` は `'ok'|'ng'|'skip'` の配列（ほかの値は `'skip'`）。`kind === 'daily'` なら `flags = []`。
   - `layout(d: Data) -> { cells: string[], more: number, cols: number, rows: number }` — `flags.length ≤ 24` なら全部・`more 0`、それより多ければ先頭23枚と `more = length − 23`。`cols = min(8, マスの数)`、`rows = ceil(マスの数 / 8)`（マスの数 = `cells.length + (more ? 1 : 0)`）。daily は `{ cells: [], more: 0, cols: 0, rows: 0 }`。
@@ -77,7 +77,7 @@ test('normalize_does_not_mutate', () => { const x = { kind: 'daily', flags: ['jp
 
 - [ ] **Step 2: 落ちるのを見る** — `node --test tests/unit/share-card.test.mjs` → FAIL（share-card.js が無い）
 - [ ] **Step 3: 作る** — Interfaces のとおり。`attach` はこのタスクでは `() => {}` の仮。
-- [ ] **Step 4: 通るのを見る** — unit → PASS。全テスト → PASS（まだ index.html から読まない）。
+- [ ] **Step 4: 通るのを見る** — unit → PASS（まだ index.html から読まないので e2e は流さない）。
 - [ ] **Step 5: コミット** — `git add share-card.js tests/unit/share-card.test.mjs`、`git commit -m "結果画像のシェア: マスの数と+Nを決める layout を足す"`（末尾2行）
 
 ---
@@ -85,7 +85,7 @@ test('normalize_does_not_mutate', () => { const x = { kind: 'daily', flags: ['jp
 ### Task 2: attach（描く・File にする・共有）とタイムアタックのボタン
 
 **Files:**
-- Modify: `share-card.js`（後半）、`index.html:1203-1215`（`showResult`）、`index.html:1420` 付近（`<script src="share-card.js?v=1">` を `daily.js` の直前に）
+- Modify: `share-card.js`（後半）、`index.html:1323-1357`（`showResult`）、`index.html:1583`（`<script src="daily.js?v=4">` の行）の直前に `<script src="share-card.js?v=1"></script>` を1行
 - Test: `tests/e2e/share_card.test.mjs`（新規）
 
 **Interfaces:**
@@ -119,9 +119,9 @@ t('blocked_no_button', ..., { blockScripts: ['share-card.js'] }) // タイムア
 t('pc_result_fits', ..., { viewport: { width: 1366, height: 657 } }) // 結果画面で documentElement.scrollHeight <= innerHeight
 ```
 
-- [ ] **Step 2: 落ちるのを見る** — `node --test tests/e2e/share_card.test.mjs` → FAIL（`#r-share` が無い）
+- [ ] **Step 2: 落ちるのを見る** — `cd tests/e2e && node --test --test-concurrency=1 share_card.test.mjs` → FAIL（`#r-share` が無い）
 - [ ] **Step 3: 作る** — Interfaces のとおり。`attach` の「前の処理を捨てる」は btn ごとの番号（`WeakMap<btn, number>`）で見る。フォントは `Promise.race([document.fonts.load(…), 2000ms])`、`fonts` が無い環境でも止まらない。
-- [ ] **Step 4: 通るのを見る** — `share_card` → PASS。全テスト → PASS（`result_guard`・`pc_layout`・`theme`・`timeattack` を特に見る）。
+- [ ] **Step 4: 通るのを見る** — `share_card` → PASS。unit 全部と e2e の `share_card` `result_guard` `pc_layout` `theme` `timeattack` `cache_bust` → PASS。
 - [ ] **Step 5: コミット** — `git add share-card.js index.html tests/e2e/share_card.test.mjs`、`git commit -m "結果画像のシェア: タイムアタックのクリア画面に［結果をシェア］を足す"`（末尾2行）
 
 ---
@@ -129,7 +129,7 @@ t('pc_result_fits', ..., { viewport: { width: 1366, height: 657 } }) // 結果�
 ### Task 3: 今日の難問を画像つきに
 
 **Files:**
-- Modify: `daily.js:101`（`bar`）、`daily.js:139`（`#dl-share` の onclick）、`daily.js:206-213`（`share`）、`index.html`（`daily.js?v=` を +1）、`docs/events.md` の「9. 読み込みの順番」（share-card.js を1行）、`README.md`（ファイルの説明に share-card.js を1行）
+- Modify: `daily.js:100`（`bar`）、`daily.js:139`（`#dl-share` の onclick）、`daily.js:206-213`（`share`）、`index.html`（`daily.js?v=4` → `?v=5`）、`docs/events.md` の「9. 読み込みの順番」（share-card.js を1行）、`README.md`（ファイルの説明に share-card.js を1行）
 - Test: `tests/e2e/share_card.test.mjs`（足す）
 
 **Interfaces:**
@@ -154,7 +154,7 @@ t('daily_blocked_text_only', ..., { blockScripts: ['share-card.js'] }) // #dl-sh
 t('daily_fallback_url', ...)     // init で toBlob を止める（作り中に押す）→ __shared.url === 'https://chikokunn1011.github.io/country-drill/'（テストのサーバーの URL ではない）
 ```
 
-- [ ] **Step 2: 落ちるのを見る** — `node --test tests/e2e/share_card.test.mjs` → 新しい6つが FAIL
+- [ ] **Step 2: 落ちるのを見る** — `cd tests/e2e && node --test --test-concurrency=1 share_card.test.mjs` → 新しい6つが FAIL
 - [ ] **Step 3: 作る** — Interfaces のとおり。`daily.js?v=` を「main の数 +1」、events.md と README を1行ずつ。
-- [ ] **Step 4: 通るのを見る** — 全テスト → PASS（`daily` `cache_bust` `events-doc` を特に見る）。
+- [ ] **Step 4: 通るのを見る** — unit 全部と e2e の `share_card` `daily` `cache_bust` → PASS（`events-doc` は unit）。
 - [ ] **Step 5: コミット** — `git add daily.js index.html docs/events.md README.md tests/e2e/share_card.test.mjs`、`git commit -m "結果画像のシェア: 今日の難問のシェアを画像つきにする"`（末尾2行）
