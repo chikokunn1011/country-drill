@@ -27,3 +27,15 @@ test('flags_js_gone', () => {
   assert.match(h, /flags\/\$\{a\}\.svg\?v=\$\{FLAG_V\}/);
 });
 test('home_flags_lazy', () => assert.match(read('index.html'), /\$\('home-flags'\)\.innerHTML = [^\n]*loading="lazy"/));
+
+test('vendor_files', () => {
+  assert.match(read('vendor/d3-7.9.0.min.js'), /^\/\/ https:\/\/d3js\.org v7\.9\.0 /);
+  assert.match(read('vendor/topojson-client-3.1.0.min.js'), /v3\.1\.0/);
+  for (const f of ['vendor/d3-LICENSE', 'vendor/topojson-client-LICENSE']) assert.ok(read(f).length > 100, f);
+});
+test('no_cdn_or_map_at_boot', () => {
+  const h = read('index.html');
+  for (const s of ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', '<script src="world.js', '<script src="vendor/']) assert.ok(!h.includes(s), s);
+  assert.match(h, /const MAP_SCREENS = \['setup', 'book', 'daily', 'rpg', 'cards'\];/);
+  for (const f of ['rpg.js', 'rpg-battle.js']) assert.ok(!/\bd3: typeof d3\b/.test(read(f)), f);
+});

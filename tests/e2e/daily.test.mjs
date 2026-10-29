@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, PC } from './helpers.mjs';
+import { startServer, openApp, answerCorrect, answerWrong, recordEvents, events, mapLoaded, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -142,6 +142,7 @@ t('yesterday_record_lets_play_today_and_shows_answers', async page => {
   const yday = await page.evaluate(() => DAILY_CORE.addDays(DAILY.today(), -1));
   await page.evaluate(y => localStorage.setItem('daily', JSON.stringify({ day: y, status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null })), yday);
   await page.reload();
+  await mapLoaded(page);
   assert.match(await text(page, '#home-daily'), /NEW/);
   await page.click('#home-daily');
   assert.equal(await page.isVisible('#dl-start'), true);
@@ -175,6 +176,7 @@ t('second_tab_does_not_stop_play', async (page, app) => {
   await answerCorrect(page);
   const other = await app.context.newPage();
   await other.goto(page.url());
+  await mapLoaded(other);
   await other.click('#home-daily');
   assert.match(await other.locator('#dl-main').innerText(), /別のタブで挑戦中/);
   assert.equal(await other.locator('#dl-start').count(), 0);
