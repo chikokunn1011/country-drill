@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-28-next-improvements-design.md`（「A6 似た国旗の道場（PR6）」・「実装の順番」・「チコに決めてほしいこと」6・7・「テストの方針」）
 
-前提: PR0〜PR5 はマージ済み。PR2 の `flag(a)`（URL を返す）・`preloadFlags(codes)`・`MAP_SCREENS`（道場は入れない）・`mapReady`、PR4 の `streak.js`（`countToday()`、`TRANSFER_KEYS` に `'streak'`）、PR5 の `showResult` の変更がある。ファイル:行は今の main のもので、**マージ後に再確認**する。
+前提: PR0〜PR5 はマージ済み。PR2 の `flag(a)`（URL を返す）・`preloadFlags(codes)`・`MAP_SCREENS`（道場は入れない）・`mapReady`、PR4 の `streak.js`（`countToday()`、`TRANSFER_KEYS` に `'streak'`）、PR5 の `showResult` の変更がある。ファイル:行は PR5 マージ後の main（9918467）で確かめた値。
 
 ## Global Constraints
 
@@ -19,7 +19,7 @@
 - ほかのモードの動きは変えない。index.html の変更は全部 `G.kind === 'dojo'` の分かれ道。`misses` を書かず、`drill:start` `drill:answer` `drill:result` を出さない（バッジ・冒険のコイン・苦手に入れない）。
 - `DAILY_CORE.SIMILAR` を書きかえない。グループの id は最初の国コード。
 - localStorage のキーは `dojo` の1つ（`const KEY = 'dojo'`）: `{ v:1, mode, mix:{'ro-td':3}, clear:{td:1} }`。変な値はその部分だけ捨てる。Supabase は変えない。
-- `?v=`: `dojo.js?v=1` `dojo.css?v=1`（新規）。`profile.js?v=` `streak.js?v=` は「そのとき main にある数 +1」（PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。
+- `?v=`: `dojo.js?v=1` `dojo.css?v=1`（新規）。`profile.js?v=5→6`、`streak.js?v=1→2`（main の数 +1。PR0 の `same_version_same_content` が落ちたら、main の歴史で使った最大の数 +1）。
 - 足りないもの（`DAILY_CORE` など）があれば `console.error('[dojo] …')` で帯も画面も作らない。
 - コミットメッセージは日本語、末尾に `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` と `Claude-Session: https://claude.ai/code/session_0165YqqRbQ9cLHPBbRkUzhmj`。
 - 毎タスクの終わりに全テスト: `node --test 'tests/unit/*.test.mjs'`、`node --test --test-concurrency=1 'tests/e2e/*.test.mjs'`（tests/e2e で `npm ci` 済み）、`bash tests/sql/run.sh`。とくに `transfer-keys` `cache_bust` `events-doc` `theme` `pc_layout`（1366×657 の setup）。
@@ -86,8 +86,8 @@ test('top_pairs', () => { const m = { 'ro-td': 3, 'bh-qa': 5, 'ad-md': 3, 'a1': 
 ### Task 2: index.html の `kind:'dojo'` と引き継ぎのキー
 
 **Files:**
-- Modify: `index.html`（マージ後に再確認: `$('quit').onclick` 933、`startDaily` 966 の後ろに `startDojo`、`nextQuestion` 986、`updateProgress` 1034、`answer` 1048、`factsHTML` 1136 の後ろに `flagTrivia`・`compareHTML`、`endGame` 1169、`showResult` 1182、`<style>` に `.dj-compare`）
-- Modify: `profile.js:154`（`TRANSFER_KEYS` の末尾に `'dojo'`。マージ後に再確認）、`tests/unit/transfer-keys.test.mjs`（期待する一覧に `'dojo'`）、`index.html` の `profile.js?v=` +1。このタスクの `answer` が `store.get('dojo', …)` で読むので、`transfer_keys_cover_code` が同じタスクで `'dojo'` を求める（Task 3 に回すと Task 2 の全テストが落ちる）
+- Modify: `index.html`（main 9918467 の行: `$('quit').onclick` 1049、`startDaily` 1106 の後ろに `startDojo`、`nextQuestion` 1126、`updateProgress` 1176、`answer` 1190、`factsHTML` 1278／`triviaHTML` 1302 の後ろに `flagTrivia`・`compareHTML`、`endGame` 1311、`showResult` 1324、`<style>` に `.dj-compare`）
+- Modify: `profile.js:157`（`TRANSFER_KEYS` の末尾に `'dojo'`）、`tests/unit/transfer-keys.test.mjs`（期待する一覧に `'dojo'`）、`index.html` の `profile.js?v=5` → `?v=6`。このタスクの `answer` が `store.get('dojo', …)` で読むので、`transfer_keys_cover_code` が同じタスクで `'dojo'` を求める（Task 3 に回すと Task 2 の全テストが落ちる）
 - Test: `tests/e2e/dojo.test.mjs`（新規。daily.test.mjs と同じ `t` で、最後に `errors` 0件）、`tests/unit/transfer-keys.test.mjs`
 
 **Interfaces:**
@@ -150,7 +150,7 @@ t('no_name_hint', async page => { await go(page, SEQ, TD, 'n2f'); assert.equal(a
 **Files:**
 - Modify: `dojo.js`（後半: DOM の即時関数。`typeof document === 'undefined'` なら何もしない）
 - Create: `dojo.css`
-- Modify: `index.html`（`<link rel="stylesheet" href="dojo.css?v=1">` を最後の機能 css（streak.css）の後ろ、`<script src="dojo.js?v=1">` を最後の機能 script（streak.js）の後ろ。`profile.js?v=` と `TRANSFER_KEYS` は Task 2 で済んでいる）
+- Modify: `index.html`（`<link rel="stylesheet" href="dojo.css?v=1">` を最後の機能 css（streak.css、392行）の後ろ、`<script src="dojo.js?v=1">` を最後の機能 script（streak.js、1593行）の後ろ。`profile.js?v=` と `TRANSFER_KEYS` は Task 2 で済んでいる）
 - Test: `tests/e2e/dojo.test.mjs`
 
 **Interfaces:**
@@ -206,7 +206,7 @@ t('missing_daily_core', async (page, app) => { assert.equal(await page.locator('
 ### Task 4: れんぞく日数・events.md・README
 
 **Files:**
-- Modify: `streak.js`（`drill:dojo` のリスナー1つ）、`index.html`（`streak.js?v=` +1）
+- Modify: `streak.js`（`drill:dojo` のリスナー1つ）、`index.html`（`streak.js?v=1` → `?v=2`）
 - Modify: `docs/events.md`（§2 に `drill:dojo` の行、§9 に `dojo.js` `dojo.css`、§11 の表に `drill:dojo` の行）、`tests/unit/events-doc.test.mjs`、`README.md`（今日の難問の節の後ろに「似た国旗の道場」の節）
 - Test: `tests/unit/events-doc.test.mjs`、`tests/e2e/dojo.test.mjs`
 

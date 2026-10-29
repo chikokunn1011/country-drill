@@ -84,3 +84,11 @@ test('events_doc_streak', () => {
   const nine = d.split(/^## /m).find(s => s.startsWith('9.')) ?? '';
   assert.ok(nine.includes('`streak.js`'), '9章に `streak.js` がない');
 });
+
+test('events_doc_dojo', () => {
+  const d = doc();
+  const s2 = d.split('## 2.')[1].split('## 3.')[0]; assert.ok(s2.includes('`drill:dojo`'));
+  for (const k of ['phase', 'pick', 'firstTry', 'wrongs']) assert.ok(spans(s2).some(x => new RegExp('\\b' + k + '\\b').test(x)), k);
+  assert.ok(d.split('## 9.')[1].split('## 10.')[0].includes('`dojo.js`'));
+  assert.match(d.split('## 11.')[1], /\| `drill:dojo` \|/);
+});

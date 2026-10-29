@@ -1,0 +1,23 @@
+/* 似た国旗の道場（dojo.js の #scr-dojo とモード選択の帯 #to-dojo）。色は index.html の変数だけを使う */
+/* モード選択の見出しの行（h2 と帯）。帯は h2 より低いので行の高さは変わらない。せまい幅では折り返す */
+.dj-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 2px 12px; }
+.dj-band { margin: 0 0 0 auto; }
+.dj-band .linkbtn { padding: 2px 4px; }
+.dojo .seg { align-self: flex-start; }
+.dj-last { margin: 0; font-weight: 700; min-height: 0; }
+.dj-last:empty { display: none; }
+.dj-pairs h3 { margin: 0 0 6px; font: 700 .95rem var(--font-display); }
+.dj-pairs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dj-pairs li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; font-size: .92rem; }
+.dj-pf { display: inline-flex; gap: 4px; }
+.dj-pf img { height: 22px; width: 33px; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; }
+.dj-pn { min-width: 0; overflow-wrap: anywhere; }
+.dj-pairs b { color: var(--ng); }
+.dj-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.dj-card { position: relative; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; text-align: left; min-width: 0;
+  background: var(--surface); color: inherit; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; cursor: pointer; }
+.dj-card:hover, .dj-card:focus-visible { border-color: var(--accent); }
+.dj-flags { display: flex; flex-wrap: wrap; gap: 4px; padding-right: 1.2em; }
+.dj-flags img { height: 22px; width: auto; max-width: 40px; object-fit: contain; border: 1px solid var(--line); border-radius: 3px; }
+.dj-label { font-size: .85rem; color: var(--muted); overflow-wrap: anywhere; }
+.dj-ok { position: absolute; top: 6px; right: 10px; color: var(--ok); font-weight: 900; }
