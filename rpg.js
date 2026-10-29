@@ -12,7 +12,7 @@
     screenRender: typeof screenRender, emit: typeof emit, toast: typeof toast, makeQuestion: typeof makeQuestion,
     mapSvg: typeof mapSvg, zoomableMap: typeof zoomableMap, factsHTML: typeof factsHTML, shuffle: typeof shuffle,
     feats: typeof feats, featCountry: typeof featCountry, featOf: typeof featOf, boxProjection: typeof boxProjection,
-    WORLD_BOX: typeof WORLD_BOX, W: typeof W, H: typeof H, d3: typeof d3, misses: typeof misses, SCREENS: typeof SCREENS,
+    WORLD_BOX: typeof WORLD_BOX, W: typeof W, H: typeof H, misses: typeof misses, SCREENS: typeof SCREENS,
     RPG_CORE: typeof RPG_CORE,
   };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');

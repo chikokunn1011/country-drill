@@ -15,7 +15,7 @@ export const PC = { width: 1280, height: 800 };
 export const QUIET_BADGES = { v: 1, got: { 'first-clear@1': 1, 'ta-clear@1': 1, 'dopa-on@1': 1 }, eq: '', sn: { 'first-clear': 2, 'ta-clear': 2, 'dopa-on': 2 },
   sent: ['first-clear@1', 'ta-clear@1', 'dopa-on@1'], tip: 3 };
 
-// index.html が読む CDN のファイル → npm install した同じ版
+// 前の index.html（GEOM_BASE で比べる古いコミット）が読む CDN のファイル → npm install した同じ版。いまの index.html は vendor/ から読むので使わない
 const LIBS = {
   'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js': 'd3/dist/d3.min.js',
   'https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js': 'topojson-client/dist/topojson-client.min.js',
@@ -444,7 +444,9 @@ async function supabaseRoute(route, db) {
 // 戻り値の db は偽DB（down を書き換えれば途中でつながる/切れるにできる）、errors はページで起きた例外、warnings は console.warn の文字、
 // consoleErrors は console.error の文字（再読み込みをまたいで積む）
 // path: url からの相対で開くページ（'admin.html' など。省略時は url そのもの＝index.html）
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init } = {}) {
+// waitMap: 開いたあと、地図（world.js・d3・topojson をうしろで読む）が読み終わるまで待つ。mapReady が無いページ・古いコミットでは待たない
+// routes: 開く前に context.route に渡す [url のパターン, ハンドラ] の並び（国旗・world.js を遅らせる・止めるときなど）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [] } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
   const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
@@ -468,6 +470,7 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (new URL(target).hostname.endsWith('.supabase.co')) return supabaseRoute(route, db);
     return route.abort(); // フォントなどその他の外部通信はしない
   });
+  for (const [pattern, handler] of routes) await context.route(pattern, handler);
   const page = await context.newPage(), errors = [], warnings = [], consoleErrors = [];
   page.on('pageerror', e => errors.push(e));
   page.on('console', m => {
@@ -475,8 +478,13 @@ export async function openApp(browser, { viewport = PHONE, supabase = 'fake', ur
     if (m.type() === 'error') consoleErrors.push(m.text());
   });
   await page.goto(new URL(path, url).href);
+  if (waitMap) await mapLoaded(page);
   return { page, context, db, errors, warnings, consoleErrors, close: () => context.close() };
 }
+
+// 地図（index.html が load のあとにうしろで読む）が読み終わるまで待つ。再読み込みのあとで、地図を使う画面へ進んですぐ中身を見るときに使う
+// （mapReady が無いページ・古いコミットでは待たない）
+export const mapLoaded = page => page.waitForFunction(() => typeof mapReady === 'undefined' || mapReady);
 
 // console.warn はページから少し遅れて届くので、re に合うものが来るまで（最大2秒）待つ。来たら true
 export async function warned(warnings, re) {
@@ -497,8 +505,10 @@ export async function pickSetup(page, { mode, kind, region, count } = {}) {
 }
 
 // タイムアタック・今日の難問と、設定「正解したらすぐ次の問題へ」の練習・挑戦は、問題を出した直後（index.html の TA_GUARD_MS の間）のクリックを無視する。その間が過ぎるまで待つ
-// （quick・timed が無い変更前のコードではタイムアタックだけ）
-export const settle = page => page.waitForFunction(() => !(typeof quick === 'function' ? quick() : typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS);
+// （quick・timed が無い変更前のコードではタイムアタックだけ）。タイムアタック・今日の難問は1問目の前に国旗を読む「じゅんび中」があり、
+// そのあいだ G.cur は null なので、まず問題が出る（G.cur があって #qcard .choices がある）まで待つ
+export const settle = page => page.waitForFunction(() => G?.cur && document.querySelector('#qcard .choices')
+  && (!(typeof quick === 'function' ? quick() : typeof timed === 'function' ? timed() : G.kind === 'ta') || performance.now() - G.shownAt >= TA_GUARD_MS));
 // 結果画面も出した直後（TA_GUARD_MS の間）は結果のボタンを押せない。その間が過ぎるまで待つ
 // （resultAt が無い変更前のコードでは待たない。GEOM_BASE の比較で clearTimeAttack を古いコードにも使うため）
 export const settleResult = page => page.waitForFunction(() => typeof resultAt === 'undefined' || performance.now() - resultAt >= TA_GUARD_MS);
