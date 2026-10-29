@@ -19,16 +19,9 @@
 .dl-qs .dl-mode { font-size: .78rem; color: var(--muted); text-align: right; }
 .dl-qs .dl-no { color: var(--muted); text-align: right; }
 .dl-ok { color: var(--ok); font-weight: 900; } .dl-ng { color: var(--ng); font-weight: 900; } .dl-skip { color: var(--muted); }
-/* ホームの入口（プレイの上の細い帯） */
-.dl-homerow { width: 100%; display: flex; justify-content: center; }
-.dl-homebtn { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; border: 1.5px dashed var(--accent); background: var(--surface); color: var(--accent);
-  border-radius: 999px; padding: 5px 16px; font: 700 1rem/1.4 var(--font-display); cursor: pointer; }
-.dl-homebtn:hover { border-style: solid; }
+/* ホームの［今日の難問］のカードの右上（日付と「挑戦ずみ」）。カードの並べ方は index.html と pc.css */
 .dl-homeday { font-size: .8rem; color: var(--muted); font-weight: 500; }
 .dl-homedone { font-size: .75rem; color: var(--muted); }
-@media (min-width: 1280px) { body[data-screen] .dl-homerow { justify-content: flex-start; } }
-@media (min-width: 1280px) and (max-height: 1000px) { .home .menu > .dl-homerow { grid-column: 1 / -1; } }
-@media (min-width: 1280px) and (max-height: 760px) { .dl-homebtn { padding-block: 2px; } }
 .dl-new { padding: 1px 7px; border-radius: 999px; background: var(--ng); color: #fff; font: 700 .7rem var(--font-mono); vertical-align: middle; letter-spacing: .05em; }
 @media (min-width: 900px) {
   .daily .col + .col { margin-top: 0; }

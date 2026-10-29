@@ -39,9 +39,12 @@ body[data-screen="home"] #scr-home { flex: 1 0 auto; justify-content: center; }
 .home h1 { font-size: clamp(4.4rem, calc(2rem + 3.4vw), 6rem); }
 .home .flags { max-width: 820px; gap: 8px; }
 .home .flags img { width: 44px; }
-.home .flags img:nth-child(n+15) { display: block; }
-.home .menu { flex-direction: row; width: auto; }
-.home .menu .btn { min-width: 200px; }
+.home .flags img:nth-child(n+8) { display: block; }
+/* 900〜1279: カード3枚を横3列。アイコンの列はその下 */
+.home-big { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 960px); }
+/* PC は字が大きくなる（≥1280 で rem が 18px まで）ので、アイコンを少し広げて「プロフィール」を1行に */
+.home-icons { width: min(100%, 520px); }
+.hicon { max-width: 100px; }
 
 /* ---------- panels / setup / settings ---------- */
 .panel { padding: var(--card-pad); gap: 18px; }
@@ -172,16 +175,18 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   body[data-screen="home"] #scr-home {
     display: grid; justify-content: stretch; text-align: left;
     grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
-    grid-template-rows: 1fr auto auto auto auto 1fr;
-    grid-template-areas: ". flags" "eyebrow flags" "title flags" "menu flags" "book flags" ". flags";
+    grid-template-rows: 1fr auto auto auto auto auto 1fr;
+    grid-template-areas: ". flags" "eyebrow flags" "title flags" "status flags" "big flags" "icons flags" ". flags";
     column-gap: clamp(40px, 5vw, 120px); row-gap: clamp(14px, 2.4vh, 26px);
     padding-inline: clamp(0px, 3vw, 64px);
   }
   .home .eyebrow { grid-area: eyebrow; }
   .home h1 { grid-area: title; }
-  .home .menu { grid-area: menu; flex-direction: column; width: min(340px, 100%); }
-  .home .menu .btn { min-width: 0; }
-  #home-book { grid-area: book; justify-self: start; padding-inline: 0; }
+  /* 左の列: 札・カード（縦1列）・アイコン。どれも左寄せ */
+  #home-status { grid-area: status; align-items: flex-start; }
+  #home-big { grid-area: big; display: flex; flex-direction: column; width: min(480px, 100%); }
+  #home-icons { grid-area: icons; justify-content: flex-start; width: min(480px, 100%); }
+  #home-status .bdg-titlerow { justify-content: flex-start; }
   .home .flags {
     grid-area: flags; align-self: center; justify-self: center;
     display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(8px, .8vw, 14px);
@@ -274,6 +279,14 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   .choice kbd, .rslot kbd { font-size: .8rem; }
 }
 
+/* ホームの2列（≥1280）で高さ 1000 まで: 大きいタイトル・札・カード3枚（説明つき）・アイコンを左の列に積むと 1366×768・1920×800 で
+   少しはみ出すので、上下の余白・行のすき間・カードの padding を少し詰める（もっと低い 760 以下は下でさらに詰めて、説明を隠す） */
+@media (min-width: 1280px) and (max-height: 1000px) {
+  .home { padding-block: clamp(12px, 3vh, 64px); }
+  body[data-screen="home"] #scr-home { row-gap: 12px; }
+  .hbig { padding-block: 8px; }
+}
+
 /* short windows (laptops at 125–150% zoom, 1366x768 with browser chrome) */
 @media (max-height: 760px) {
   :root { --vgap: 10px; --pad-y: 12px; --card-pad: clamp(16px, 1.4vw, 24px); }
@@ -281,10 +294,15 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #modes .modecard { min-height: 0; padding: 14px 18px; }
   #nameopt-field[hidden] { display: none !important; }
   .panel { gap: 14px; }
-  .home .menu .btn { padding-block: 11px; }
+  .hb-desc { display: none; }   /* 背の低い PC: カードの説明の文を隠す */
 }
 
 /* 背の低い PC: 答えの地図を小さくしても高さが足りない（1280×577 では地図は幅 0）ので、豆知識を3行で切る（全文は title と図鑑で読める） */
 @media (min-width: 1280px) and (max-height: 760px) {
+  /* ホーム（左の列に 札・カード3枚・アイコン）: 1280×577 でも縦にスクロールしないよう、上の ≤1000 よりさらに行のすき間・カードの padding を詰める */
+  body[data-screen="home"] #scr-home { row-gap: 8px; }
+  #home-big { gap: 6px; }
+  .hbig { padding-block: 6px; }
+  .hicon { padding-block: 4px; }
   #qcard > .reveal > .trivia .tv { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 }
