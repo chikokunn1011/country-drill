@@ -8,6 +8,8 @@
    - **文字の大きさ**: チップ3つ［ふつう］［大きめ］［とても大きい］。`settings.fs` = `'m'`（既定）/`'l'`/`'xl'`。
      `<html data-fs="l|xl">` を付け、`html[data-fs="l"] { font-size: 112.5% }`、`html[data-fs="xl"] { font-size: 125% }`。`'m'` は属性なし（今と1pxも変わらない）。
      テーマと同じく head の先読みスクリプトで最初から付ける（ちらつき防止）。
+     （main との突き合わせで分かったこと）`body` の文字は `15px` 固定なので、`html[data-fs] body { font-size: .9375rem }` を足して本文も大きくする（`'m'` は属性なしなので今のまま）。
+     PC は pc.css が `html { font-size: clamp(100%, calc(80% + .25vw), 112.5%) }` を持つので、pc.css にも `html[data-fs="l"|"xl"]` を足して、その clamp に ×1.125 / ×1.25 する（pc.css の ?v=3 → 4）。
    - **色の見分けやすさ**: チェックボックス（既定 OFF）。`settings.cvd = true` で `<html data-cvd>`。
      ON のとき正解/不正解の色を青/オレンジ系に置きかえる（Okabe–Ito: 正解 `#0072B2`、不正解 `#D55E00`、ダークは 正解 `#56B4E9`・不正解 `#E69F00`。soft 色もそれに合わせて作る）。ドパガキ ON でも cvd を優先（`body.dopa` の --ok/--ng より強く）。
      色の変数は「:root」「prefers-color-scheme dark（:root:not([data-theme=light])）」「[data-theme=dark]」の3か所の決まりに合わせて、cvd 版も3か所に書く。
@@ -15,7 +17,8 @@
 3. 国旗の絵そのものは変えない（本物の色が答えなので）。
 4. 文字が大きいときは PC でも縦スクロールが出てよい（ふつうのときの「縦スクロールなし」のテストはそのまま守る）。横スクロールはどの大きさでも出さない（スマホ 360/390px、PC 1366）。
 5. 引き継ぎ（プロフィール移行）は settings ごと移っているならそのまま。管理用サイトのセーブ検査（admin-save.js の settings の形）が新しいキーを拒まないか確かめ、拒むなら足す。
-6. ?v= を上げるファイルは今の main の値+1。
+   （確認済み）profile.js の TRANSFER_KEYS に 'settings' があり settings ごと移る。admin-save.js の GAME_SHAPE.settings は isObj だけで、settingsSet は今の settings に足し合わせるので fs・cvd は消えない。どちらも変更なし。
+6. ?v= を上げるファイルは今の main の値+1（変えるのは index.html 内の CSS/JS と pc.css。pc.css は ?v=3 → ?v=4）。
 
 ## タスク
 
