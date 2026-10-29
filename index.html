@@ -202,6 +202,11 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .map.zoomable { cursor: grab; }
 .map.tapmap { cursor: crosshair; }
 .tapmap .dot { fill: var(--land); stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.tapmap .dot.on { fill: var(--hl); }
+.tapmap path.ngc, .tapmap .dot.ngc { fill: var(--ng); }
+.tapmap .tapx { fill: none; stroke: var(--ng); stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.tapmap .tapline { stroke: var(--ng); stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+.tapkm { margin: 0; font-weight: 700; }
 .zoomctl { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
 .zoomctl button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1rem var(--font-mono); cursor: pointer; }
 .zoomctl button.reset { width: auto; padding: 0 10px; font-size: .75rem; }
@@ -395,7 +400,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-<link rel="stylesheet" href="pc.css?v=2" media="(min-width: 900px)">
+<link rel="stylesheet" href="pc.css?v=3" media="(min-width: 900px)">
 <link rel="stylesheet" href="rpg.css?v=22">
 <link rel="stylesheet" href="badges.css?v=2">
 <link rel="stylesheet" href="daily.css?v=2">
@@ -628,7 +633,7 @@ const MODES = [
   { k: 'm2f', label: '場所 → 国旗', desc: '地図の場所から国旗を選ぶ', q: 'map', a: 'flag', nameOpt: true },
   { k: 'f2m', label: '国旗 → 場所', desc: '国旗を見て地図の場所を選ぶ', q: 'flag', a: 'map', nameOpt: true },
   // 白地図タップ: 選択肢なしで白地図をタップして答える。練習と挑戦だけ（noTa: タイムアタック・ランキングには出さない）
-  { k: 'tap', label: '白地図タップ', desc: '国旗を見て白地図の場所をタップ', q: 'flag', a: 'tap', nameOpt: true, noTa: true },
+  { k: 'tap', label: '白地図タップ', desc: '国旗を見て白地図をタップ', q: 'flag', a: 'tap', nameOpt: true, noTa: true },
 ];
 const KINDS = [
   { k: 'practice', label: '練習', desc: 'まちがえた問題は後半にもう一度出る。全部正解したら終了' },
@@ -872,8 +877,28 @@ function tapJudge(c, p, r) {
   }
   return false;
 }
-// 外れたときの地図の表示（正解の国・押した国・距離）
-function tapMiss(c, p, at) {}
+// 外れたときの地図の表示。正解の国を光らせ（.on）、押した国を塗る（.ngc。海なら × 印 .tapx）。押した点が地球の上なら
+// 正解の国まで点線（.tapline）を引き、距離を G.cur.km に入れる（answer が「タップした所から約○ km」と出す）。
+// 正解の国が今の表示に1つも映っていないときだけ、地図の範囲を最初に戻す
+function tapMiss(c, p, at) {
+  const box = $('qcard').querySelector('.tapbox'), s = box?.querySelector('svg'), layer = s?.querySelector('.layer');
+  if (!layer) return;
+  const proj = G.cur.proj, k = d3.zoomTransform(s).k, u = W / (s.getBoundingClientRect().width || W) / k;   // u: 画面の 1px は地図の上でいくつか
+  const NS = 'http://www.w3.org/2000/svg', add = (tag, attrs) => { const el = document.createElementNS(NS, tag); for (const [n, v] of Object.entries(attrs)) el.setAttribute(n, v); layer.append(el); return el; };
+  for (const el of layer.querySelectorAll(`[data-a="${c.a}"]`)) el.classList.add('on');
+  if (at) for (const el of layer.querySelectorAll(`[data-a="${at}"]`)) el.classList.add('ngc');
+  else { const d = 7 * u; add('path', { class: 'tapx', d: `M${p[0] - d},${p[1] - d}L${p[0] + d},${p[1] + d}M${p[0] - d},${p[1] + d}L${p[0] + d},${p[1] - d}` }); }
+  const to = proj([c.ll[1], c.ll[0]]), ll = tapLonLat(p);
+  if (ll && to) {
+    add('line', { class: 'tapline', x1: p[0], y1: p[1], x2: to[0], y2: to[1] });
+    G.cur.km = Math.round(d3.geoDistance(ll, [c.ll[1], c.ll[0]]) * 6371 / 10) * 10;
+  }
+  // 光らせた国（丸印）は印の線より上に
+  for (const el of layer.querySelectorAll(`circle[data-a="${c.a}"]`)) layer.append(el);
+  const f = featOf(c), [[x0, y0], [x1, y1]] = f ? d3.geoPath(proj).bounds(f) : [to || p, to || p];
+  const t = d3.zoomTransform(s), seen = t.applyX(x1) >= 0 && t.applyX(x0) <= W && t.applyY(y1) >= 0 && t.applyY(y0) <= H;
+  if (!seen) box.zoomReset();
+}
 
 /* ---------- ドパガキ向けの演出（紙吹雪・ド派手な効果音・ポップ文字）。ふだんの効果音は sound.js の SND ---------- */
 const FX = {
@@ -1357,7 +1382,8 @@ function answer(a, isRight) {
     const other = byA.get(right ? dojoRival(c.a) : a);
     r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${compareHTML(c, other, right)}${triviaHTML([flagTrivia(c.a)].filter(Boolean))}`;
   } else {
-    r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
+    const km = !right && G.mode.a === 'tap' && G.cur.km != null ? `<p class="tapkm">タップした所から約${fmt(G.cur.km)} km</p>` : '';
+    r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${km}${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
     if (G.mode.q !== 'map' && G.mode.a !== 'map' && G.mode.a !== 'tap') r.append(mapSvg(c, `${c.n}の位置`, { region: G.region }));
   }
   const nx = document.createElement('button');

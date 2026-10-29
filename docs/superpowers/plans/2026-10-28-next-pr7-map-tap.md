@@ -69,11 +69,11 @@ test('tap_coins', () => {
 ### Task 2: MODES の tap と noTa（モード選択・ランキング）
 
 **Files:**
-- Modify: `index.html:621-626`（`MODES`）、`index.html:1024-1043`（`renderSetup`・`$('modes').onclick`・`$('kinds').onclick`）、`index.html:1095-1102`（`startGame` の kind）、`index.html:1488-1505`（`boardConds`・`openRanking`・`renderRanking`）、`index.html` の CSS（`.modegrid > .modecard[data-k="tap"] { grid-column: 1 / -1 }`、スマホの2列でも穴をあけない）、`pc.css`（PC の `#modes` は4列1行なので、5枚目は2行目で横いっぱい。`index.html:394` の `pc.css?v=2` → `3`）
+- Modify: `index.html:621-626`（`MODES`）、`index.html:1024-1043`（`renderSetup`・`$('modes').onclick`・`$('kinds').onclick`）、`index.html:1095-1102`（`startGame` の kind）、`index.html:1488-1505`（`boardConds`・`openRanking`・`renderRanking`）、`index.html` の CSS（`.modegrid > .modecard[data-k="tap"] { grid-column: 1 / -1 }`、スマホの2列でも穴をあけない）、`pc.css`（Task 4 で高さを確かめて決める。`index.html:394` の `pc.css?v=2` → `3`）
 - Test: `tests/e2e/tap_map.test.mjs`（新規。`map_zoom.test.mjs` と同じ `t(name, fn)` の形で、最後に `app.errors` が空）
 
 **Interfaces:**
-- Produces: `MODES` の5つ目 `{ k: 'tap', label: '白地図タップ', desc: '国旗を見て白地図の場所をタップ', q: 'flag', a: 'tap', nameOpt: true, noTa: true }`。`q:'flag'` なので答えのあとの小さい地図は今の条件（`q !== 'map' && a !== 'map'`）に `a !== 'tap'` を足して出さない。
+- Produces: `MODES` の5つ目 `{ k: 'tap', label: '白地図タップ', desc: '国旗を見て白地図をタップ', q: 'flag', a: 'tap', nameOpt: true, noTa: true }`。`q:'flag'` なので答えのあとの小さい地図は今の条件（`q !== 'map' && a !== 'map'`）に `a !== 'tap'` を足して出さない。
 - `renderSetup()`: `modeOf(P.mode).noTa && P.kind === 'ta'` なら `P.kind = 'practice'` を保存してから描く。kinds の TA カードは noTa のとき `disabled`（`aria-disabled`、説明は「白地図タップでは遊べない」）。
 - `startGame()`: kind は `modeOf(P.mode)?.noTa && P.kind === 'ta' ? 'practice' : P.kind`。
 - noTa を外す所: `renderRanking` のチップ（`MODES.filter(m => !m.noTa)`）、`boardConds`（`modeOf(mode) && !modeOf(mode).noTa`）、`openRanking` の既定値（`P.mode` が noTa なら `'f2n'`）。
@@ -141,7 +141,7 @@ t('quiz_only_flag_name_place', ...) // tap の問題の #qcard .qmain に img.qf
 **Interfaces:**
 - Consumes: Task 3 の `tapMap`・`G.cur.proj`・click の処理。
 - Produces: `tapMiss(c, p, at) -> void` — 正解の国の path（無ければ丸印）に `.on`（今の `.map path.on`＝`--hl`）、`at` があればその path に `.ngc`（`fill: var(--ng)`）、海なら p に × 印 `<path class="tapx">`（`stroke: var(--ng)`）。`ll = proj.invert(p)` が有効なときだけ、p から `proj([c.ll[1], c.ll[0]])` へ点線 `<line class="tapline">`（`stroke: var(--ng); stroke-dasharray: 5 4; vector-effect: non-scaling-stroke`）と `G.cur.km = Math.round(d3.geoDistance(ll, [c.ll[1], c.ll[0]]) * 6371 / 10) * 10`。正解の国の画面の上の範囲が今の表示（0〜W×0〜H）と重ならないときだけ `zoom.transform` を `d3.zoomIdentity` に（300ms）。`answer` は tap の外れで `G.cur.km != null` なら verdict の下に `<p class="tapkm">タップした所から約${fmt(km)} km</p>`。
-- pc.css: `#qcard.q-flag.a-tap { --qcols: minmax(0, .75fr) minmax(0, 1.5fr); }`、`#qcard > .tapbox { grid-column: 2; grid-row: 1; width: min(100%, calc((var(--mh) - 48px) * 16 / 9)); }`。5枚目のカードの横いっぱいは Task 2 のまま。
+- pc.css: `#qcard.q-flag.a-tap { --qcols: minmax(0, .75fr) minmax(0, 1.5fr); }`、`#qcard > .tapbox { grid-column: 2; grid-row: 1; width: min(100%, calc((var(--mh) - 48px) * 16 / 9)); }`。モードのカード: 5枚目を横いっぱいの3行目にすると 1366×657・1024×768 で縦にスクロールしたので、PC は行を増やさない並べ方にする（900〜1279 は3列×2行で5枚目は2列ぶん、≥1280 は5列×1行）。≥1280 の5列で説明が2行になると 1366×768 であふれるので、説明は「国旗を見て白地図をタップ」と短くする。スマホ（2列・1列）は Task 2 の横いっぱいのまま。
 - 場面: `quiz_tap`（練習・全世界・5問）、`wrong_tap`（`answerTap({ right: false })` → `#next`）、`named_tap`（`#nameopt` を入れて開始）。
 
 - [ ] **Step 1: 失敗するテストを書く**

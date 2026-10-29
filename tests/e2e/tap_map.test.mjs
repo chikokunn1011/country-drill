@@ -2,7 +2,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint } from './helpers.mjs';
+import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint, answerCorrect } from './helpers.mjs';
+import { openRpg, writeSave, saveWith, startBattle, battleAnswer } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -210,4 +211,94 @@ t('quiz_only_flag_name_place', async page => {
   await startTap(page, { named: true });
   v = await q();
   assert.ok(v.flag); assert.ok(!v.text.includes('首都'), v.text); assert.ok(v.text.includes(v.n), '国名表示ありでは国名も出す');
+});
+
+/* ---------- 外れたときの表示・冒険から・道場（Task 4） ---------- */
+const kOf = page => page.evaluate(() => d3.zoomTransform(document.querySelector('#qcard .tapmap')).k);
+// 今の問題の国 c の中心（国の ll）から画面で dx, dy ずらした点
+const nearC = (page, dx, dy) => page.evaluate(([dx, dy]) => {
+  const c = G.cur.c, [x, y] = G.cur.proj([c.ll[1], c.ll[0]]), m = document.querySelector('#qcard .tapmap .layer').getScreenCTM();
+  return { x: m.a * x + m.c * y + m.e + dx, y: m.b * x + m.d * y + m.f + dy };
+}, [dx, dy]);
+
+t('wrong_shows_km', async page => {
+  await startTap(page);
+  await force(page, 'br');
+  await answerTap(page, { right: false });
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.match(await page.innerText('#qcard .tapkm'), /^タップした所から約[\d,]+ km$/);
+  assert.equal(await page.locator('#qcard .tapline').count(), 1);
+  assert.equal(await page.locator('#qcard .tapmap path.on').count(), 1);
+  assert.ok(await page.evaluate(() => G.cur.km > 5000), '一番遠い国をタップしたので 5,000 km より遠い');
+  const ngc = await page.locator('#qcard .tapmap .ngc').count(), x = await page.locator('#qcard .tapmap .tapx').count();
+  assert.equal(ngc > 0 ? x : x - 1, 0, `国を押したら .ngc、海なら × 印（ngc ${ngc}・tapx ${x}）`);
+  // 正解の国の形の上にある画面の点は、印を足したあとも変わらない（地図の範囲を動かしていない）
+  assert.equal(await kOf(page), 1);
+});
+
+t('reset_when_out_of_view', async page => {
+  await startTap(page);
+  await force(page, 'jp');
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  // 南アメリカのあたりで拡大して日本を画面の外に出し、そこで外す → 地図の範囲が最初に戻る
+  const far = await page.evaluate(() => { const m = document.querySelector('#qcard .tapmap .layer').getScreenCTM(), [x, y] = G.cur.proj([-60, -15]); return { x: m.a * x + m.e, y: m.d * y + m.f }; });
+  await wheelZoom(page, far, 6.5);
+  await page.mouse.click(far.x, far.y);
+  await page.locator('#qcard .verdict.ng').waitFor();
+  await page.waitForTimeout(400);
+  assert.equal(await kOf(page), 1);
+  // 日本が見えたままの外れでは、拡大はそのまま
+  await force(page, 'jp');
+  const at = await nearC(page, 0, 0);
+  await wheelZoom(page, at, 2);
+  const p = await nearC(page, -40, 0);
+  await page.mouse.click(p.x, p.y);
+  await page.locator('#qcard .verdict.ng').waitFor();
+  await page.waitForTimeout(400);
+  assert.ok(Math.abs(await kOf(page) - 2) < 0.01);
+});
+
+t('dark_colors', async page => {
+  await startTap(page);
+  await force(page, 'br');
+  await answerTap(page, { right: false });
+  await page.locator('#qcard .verdict.ng').waitFor();
+  const v = await page.evaluate(() => {
+    const color = name => { const el = document.createElement('i'); el.style.color = `var(${name})`; document.body.append(el); const c = getComputedStyle(el).color; el.remove(); return c; };
+    const ngc = document.querySelector('#qcard .tapmap .ngc'), on = document.querySelector('#qcard .tapmap path.on'), line = document.querySelector('#qcard .tapline');
+    return { ng: color('--ng'), hl: color('--hl'), ngc: ngc && getComputedStyle(ngc).fill, on: getComputedStyle(on).fill, line: getComputedStyle(line).stroke };
+  });
+  assert.equal(v.ng, 'rgb(236, 122, 122)', 'ダークの --ng');
+  if (v.ngc) assert.equal(v.ngc, v.ng);
+  assert.equal(v.on, v.hl); assert.equal(v.line, v.ng);
+}, { colorScheme: 'dark', storage: { settings: { theme: 'auto' } } });
+
+test('rpg_practice_to_tap', { timeout: 60_000 }, async () => {
+  const app = await openRpg(browser, { storage: { setup: { mode: 'tap', kind: 'practice', count: 5 } } });
+  try {
+    const { page } = app;
+    await writeSave(page, saveWith({}));
+    await startBattle(page, 'samerica', 1);
+    for (let i = 0; i < 4; i++) await battleAnswer(page, false);
+    await page.click('#bt-practice');
+    assert.equal(await page.isVisible('#scr-setup'), true);
+    assert.deepEqual(await page.evaluate(() => [P.kind, P.mode]), ['practice', 'tap']);
+    await page.click('#start');
+    await page.locator('#qcard .tapbox').waitFor();
+    await answerTap(page);
+    await page.locator('#qcard .verdict.ok').waitFor();
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});
+
+t('dojo_round_still_works', async page => {
+  await page.evaluate(() => { window.__dj = []; document.addEventListener('drill:dojo', e => __dj.push(e.detail)); });
+  await page.evaluate(() => startDojo({ seq: ['td', 'ro', 'ad', 'md', 'td', 'ro', 'ad', 'md', 'td', 'ro'], group: ['td', 'ro', 'ad', 'md'], mode: 'f2n', sid: 'dj-t' }));
+  for (let i = 0; i < 10; i++) { await answerCorrect(page); await page.click('#next'); }
+  const dj = await page.evaluate(() => __dj);
+  const end = dj.find(e => e.phase === 'end');
+  assert.deepEqual({ outcome: end.outcome, n: end.n, wrongs: end.wrongs }, { outcome: 'clear', n: 10, wrongs: 0 });
+  const ans = dj.filter(e => e.phase === 'answer');
+  assert.equal(ans.length, 10); assert.ok(ans.every(e => e.right));
+  assert.equal(await page.isVisible('#scr-dojo'), true);
 });

@@ -176,3 +176,11 @@ test('howto_start_names', () => {
   for (const w of ['クイズで遊ぶ', '今日の難問', '冒険']) assert.ok(s.includes(w), w);
   assert.ok(!/［プレイ］|「プレイ」/.test(s));
 });
+
+// 遊び方ページ: 白地図タップ（A7）を5つ目の出し方として書き、練習と挑戦だけで遊べると書く
+test('howto_tap', () => {
+  const s = read('howto.html').split('<h2 id="modes"')[1].split('<h2 ')[0];
+  assert.ok(s.includes('白地図タップ'));
+  assert.match(s, /練習と挑戦/);
+  assert.ok(!/4つの出し方/.test(read('howto.html')));
+});

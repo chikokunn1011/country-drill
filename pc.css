@@ -53,6 +53,9 @@ body[data-screen="home"] #scr-home { flex: 1 0 auto; justify-content: center; }
 .cols > .col + .col { border-left: 1px dashed var(--line); padding-left: var(--col-gap); }
 .modecard { padding: 16px 18px; }
 .modecard b { font-size: 1.08rem; }
+/* モードは5枚（5枚目は白地図タップ）。900–1279 は3列×2行で5枚目は2列ぶん（4枚のときと同じ2行の高さ）、≥1280 は5列×1行 */
+#modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#modes > .modecard[data-k="tap"] { grid-column: span 2; }
 #start { min-width: 200px; padding-block: 14px; }
 #scr-settings.narrow { max-width: 720px; }
 /* settings: fields side by side (2 columns at 900–1279, 3 at 1280+) */
@@ -81,6 +84,8 @@ body[data-screen="quiz"] #scr-quiz { flex: 1 0 auto; }
 #qcard.q-name.a-flag { --qcols: minmax(0, .85fr) minmax(0, 1.2fr); }
 #qcard.q-map.a-flag  { --qcols: minmax(0, 1.5fr) minmax(0, 1fr); }
 #qcard.q-flag.a-map  { --qcols: minmax(0, .8fr) minmax(0, 1.4fr); }
+#qcard.q-flag.a-tap  { --qcols: minmax(0, .75fr) minmax(0, 1.5fr); }   /* 白地図タップ: 国旗 | 白地図（≥1280 も同じ） */
+#qcard > .tapbox { grid-column: 2; grid-row: 1; justify-self: center; width: min(100%, calc((var(--mh) - 48px) * 16 / 9)); }
 #qcard > .qmain { grid-column: 1; grid-row: 1; gap: clamp(10px, 2.2cqh, 22px); }
 #qcard > .choices { grid-column: 2; grid-row: 1; justify-self: center; }
 #qcard .qlabel { font-size: clamp(1.2rem, calc(.9rem + .45vw), 1.55rem); }
@@ -194,7 +199,7 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   }
   .home .flags img { width: 100%; border-radius: 4px; }
 
-  /* setup: modes in one row of 4, then あそび方 | 地域・問題数 */
+  /* setup: modes in one row of 5, then あそび方 | 地域・問題数 */
   #scr-setup .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "modes modes" "nameopt nameopt" "kinds opts" "rmap opts"; grid-template-rows: auto auto auto 1fr; row-gap: 18px; }
   #scr-setup .col:first-child { display: contents; }
   /* 地域の世界地図は あそび方 の下。高さは画面の高さに合わせる（背の低い PC でもスクロールしない） */
@@ -202,7 +207,8 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #rmap { grid-area: rmap; margin: 0; align-self: start; }
   #rmap .map { width: auto; height: clamp(110px, calc(100dvh - 590px), 300px); max-width: 100%; }
   #scr-setup .opts { grid-area: opts; display: flex; flex-direction: column; gap: 14px; border-left: 1px dashed var(--line); padding-left: var(--col-gap); align-self: stretch; }
-  #modes { grid-area: modes; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #modes { grid-area: modes; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  #modes > .modecard[data-k="tap"] { grid-column: auto; }
   #nameopt-field { grid-area: nameopt; }
   #kinds-field { grid-area: kinds; }
   #kinds { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
