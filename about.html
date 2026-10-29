@@ -35,15 +35,13 @@ try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'l
   <p>出題は国旗・国名・場所だけ。首都は答えのあとの説明と図鑑で見られる（首都を当てる問題はない）。</p>
 
   <h2 id="country-names">国名の書き方</h2>
-  <p>国名は、外務省の書き方を元にしています。外務省とちがう書き方にしている国は、次の表のとおりです。</p>
+  <p>国名は、外務省の「国・地域」の一覧（<a href="https://www.mofa.go.jp/mofaj/area/index.html">外務省のページ</a>）にある名前を元にして、後ろの「共和国」「王国」「連邦」などを省いた書き方にしています（例: イタリア共和国 → イタリア。アメリカ合衆国・ミクロネシア連邦などは、そのまま）。省くだけでは同じにならない国は、次の表のとおりです。</p>
   <table id="names">
     <thead><tr><th>このサイト</th><th>外務省</th></tr></thead>
     <tbody>
-      <tr><td>アメリカ合衆国</td><td>米国</td></tr>
-      <tr><td>イギリス</td><td>英国</td></tr>
-      <tr><td>セントビンセント及びグレナディーン諸島</td><td>セントビンセント</td></tr>
-      <tr><td>マーシャル諸島</td><td>マーシャル</td></tr>
-      <tr><td>ミクロネシア連邦</td><td>ミクロネシア</td></tr>
+      <tr><td>イギリス</td><td>英国（グレートブリテン及び北アイルランド連合王国）</td></tr>
+      <tr><td>韓国</td><td>大韓民国</td></tr>
+      <tr><td>中国</td><td>中華人民共和国</td></tr>
     </tbody>
   </table>
 

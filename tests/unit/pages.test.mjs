@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import vm from 'node:vm';
+import { MOFA_NAMES, MOFA_OTHER } from './mofa-names.mjs';
 
 const root = new URL('../../', import.meta.url);
 const read = p => readFileSync(new URL(p, root), 'utf8');
@@ -25,6 +26,13 @@ export const namesTableSiteColumn = html => {
   if (!m) return [];
   const body = /<tbody>([\s\S]*?)<\/tbody>/.exec(m[1]);
   return [...(body ? body[1] : '').matchAll(/<tr>\s*<td>([^<]*)<\/td>/g)].map(x => x[1].trim());
+};
+// 同じ表の各行の [このサイト, 外務省]
+export const namesTableRows = html => {
+  const m = /<table id="names">([\s\S]*?)<\/table>/.exec(html);
+  if (!m) return [];
+  const body = /<tbody>([\s\S]*?)<\/tbody>/.exec(m[1]);
+  return [...(body ? body[1] : '').matchAll(/<tr>\s*<td>([^<]*)<\/td>\s*<td>([^<]*)<\/td>/g)].map(x => [x[1].trim(), x[2].trim()]);
 };
 
 // 色の変数のかたまり。順は :root・端末がダークのとき・設定がダークのとき
@@ -122,6 +130,22 @@ test('about_name_table', () => {   // 例外の表（<table id="names">）の「
   const names = namesTableSiteColumn(read('about.html'));
   assert.ok(names.length > 0, '<table id="names"> に行が無い');
   for (const n of names) assert.ok(COUNTRY_NAMES.has(n), n);
+});
+
+// 国名の書き方のきまり: 外務省の一覧の名前の後ろ（「共和国」「王国」など）を省いた形（外務省の名前が n で始まる）。
+// そうならない国だけが表に載る。表の外務省の列は、写した一覧（tests/unit/mofa-names.mjs）にあるとおり
+test('about_name_table_mofa', () => {
+  const rows = namesTableRows(read('about.html'));
+  const official = [...MOFA_NAMES, ...MOFA_OTHER];
+  for (const [site, mofa] of rows) {
+    assert.ok(official.includes(mofa), `外務省の一覧に無い: ${mofa}`);
+    assert.ok(!mofa.startsWith(site), `後ろを省いただけなので表に要らない: ${site}｜${mofa}`);
+  }
+  const inTable = new Set(rows.map(r => r[0]));
+  for (const n of COUNTRY_NAMES) {
+    if (n === '日本') continue;   // 外務省の一覧に日本は載っていない
+    assert.ok(inTable.has(n) || official.some(o => o.startsWith(n)), `外務省の一覧の名前から作れないのに表に無い: ${n}`);
+  }
 });
 
 test('contact_form_url', () => {   // URL が入っていれば本物の Google フォーム。まだ無いときはリンクを出さず「準備中」の文だけ
