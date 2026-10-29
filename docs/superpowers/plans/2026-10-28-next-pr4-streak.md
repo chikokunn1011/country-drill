@@ -95,7 +95,7 @@ test('view_week', () => assert.deepEqual(K.view(S({ last: '2026-10-26', played: 
 - [ ] **Step 2: 落ちるのを確かめる** — Run: `node --test tests/unit/streak.test.mjs` → FAIL（`streak.js` が無い）
 
 - [ ] **Step 3: `streak.js` の前半に `STREAK_CORE` を作る**
-  - `record`: 空いた日（last の翌日〜day の前日）が7日以上（day − last ≥ 8）なら `cur=1`・`rest` は増やさない。そうでなければ古い順に見て、その日の `weekOf` の週に `rest` がまだ無ければ `rest` に足し、無い日が1日でもあれば `cur=1`（それまでに足した `rest` は残す）、全部埋まれば `cur+1`。last が null なら `cur=1`。最後に `best=max`・`last=day`・`played` に day を足し、`played` `rest` を `addDays(day,-13)` 以上だけに切る。
+  - `record`: 空いた日（last の翌日〜day の前日）が7日以上（day − last ≥ 8）なら `cur=1`・`rest` は増やさない。そうでなければ古い順に見て、その日の `weekOf` の週に `rest` がまだ無ければ `rest` に足し、無い日が1日でもあれば `cur=1`（この空きのために足した `rest` は戻す。修正ラウンド1で変更）、全部埋まれば `cur+1`。last が null なら `cur=1`。最後に `best=max`・`last=day`・`played` に day を足し、`played` `rest` を `addDays(day,-13)` 以上だけに切る。
   - `view`: `today <= last` は `'today'`（`cur` はそのまま・`next:null`）。そうでなければ `sim = record(st, today)` を作り、`st.cur > 0 && sim.cur === st.cur + 1` なら空いた日があれば `'rest'`、無ければ `'keep'`（`cur: st.cur`, `next: sim.cur`）。それ以外は `'start'`（`cur: 0`, `next: 1`、`sim` は使わない）。`tickets` と `week` の `'rest'` は、keep/rest のときは `sim.rest`、ほかは `st.rest` で、今日の週に `rest` があれば `tickets:0`。`week` の `'play'` は `st.played`。
   - `weekOf`: `Date.parse(day+'T00:00:00Z')/864e5` の通算日（1970-01-01 は木曜）から月曜まで戻す。
 

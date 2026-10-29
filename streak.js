@@ -32,12 +32,14 @@
     else {
       const gap = dayNo(day) - dayNo(st.last) - 1;   // あいだの遊ばなかった日の数
       let ok = gap < 7;
-      // 古い順に、その日の週の券がまだ残っていれば使う。1日でも使えなければ切れる（それまでに使った券は残す）
+      // 古い順に、その日の週の券がまだ残っていれば使う。1日でも使えなければ切れる。切れたときは、この空きのために足した券を戻す
+      // （つながらない空きで券を使わない。8日以上あいたときと同じで、ホームの表示も遊ぶ前と後で同じになる）
       for (let i = 1; ok && i <= gap; i++) {
         const d = D.addDays(st.last, i), w = weekOf(d);
         if (out.rest.some(r => weekOf(r) === w)) ok = false;
         else out.rest.push(d);
       }
+      if (!ok) out.rest = st.rest.slice();
       out.cur = ok ? Math.min(st.cur + 1, MAX) : 1;
     }
     out.best = Math.max(st.best, out.cur);

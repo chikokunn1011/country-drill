@@ -33,6 +33,21 @@ test('record_two_rests_same_week_breaks', () => {
   assert.equal(K.record(S({ last: '2026-10-26' }), '2026-10-29').cur, 1);                                  // 10/27・10/28 が同じ週
   assert.equal(K.record(S({ last: '2026-10-28', rest: ['2026-10-27'] }), '2026-10-30').cur, 1);           // 券はもう使った
 });
+test('record_break_returns_tickets', () => {   // 切れた空きで足した券は戻す（土 10/24 → 水 10/28: 日は使えるが月・火が同じ週）
+  const r = K.record(S({ last: '2026-10-24', cur: 5 }), '2026-10-28');
+  assert.equal(r.cur, 1); assert.deepEqual(plain(r.rest), []);
+  const r2 = K.record(S({ last: '2026-10-28', rest: ['2026-10-27'] }), '2026-10-30');
+  assert.deepEqual(plain(r2.rest), ['2026-10-27']);                                                       // 前から持っていた券は消さない
+});
+test('view_same_before_and_after_break', () => {   // 遊ぶ前（start）と遊んだ後（today）で券の枚数・週のマスがそろう
+  const st = S({ last: '2026-10-24', cur: 5, played: ['2026-10-24'] });
+  const before = K.view(st, '2026-10-28'), after = K.view(K.record(st, '2026-10-28'), '2026-10-28');
+  assert.equal(before.state, 'start'); assert.equal(after.state, 'today');
+  assert.equal(before.tickets, 1); assert.equal(after.tickets, 1); assert.equal(after.cur, 1);
+  assert.ok(!after.week.some(w => w.mark === 'rest'));
+  assert.equal(after.week[0].mark, 'miss');   // 月 10/26 は券ではなくお休み
+  assert.equal(K.view(K.record(st, '2026-10-28'), '2026-10-30').state, 'rest');   // 木を休んでも今週の券でつながる
+});
 test('record_sun_and_mon_two_tickets', () => {   // 土→火
   const r = K.record(S({ last: '2026-10-24', cur: 3 }), '2026-10-27');
   assert.equal(r.cur, 4); assert.deepEqual(plain(r.rest), ['2026-10-25', '2026-10-26']);
