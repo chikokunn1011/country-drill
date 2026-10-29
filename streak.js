@@ -72,3 +72,65 @@
 
   globalThis.STREAK_CORE = { fresh, sanitize, record, view, weekOf };
 })();
+
+// ---------- 後半: ホームの行（#home-status の最後）。描き直すのは drill:screen {name:'home'} のときと読み込み時だけ ----------
+(() => {
+  'use strict';
+  const NEED = { store: typeof store, emit: typeof emit, $: typeof $, DAILY_CORE: typeof DAILY_CORE, STREAK_CORE: typeof globalThis.STREAK_CORE };
+  const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
+  if (missing.length) { console.error(`[streak] 必要なものが読み込めなかったので、れんぞく日数はお休み: ${missing.join(' ')}`); return; }
+  const status = $('home-status');
+  if (!status) { console.error('[streak] #home-status が無いので、れんぞく日数はお休み'); return; }
+
+  const K = globalThis.STREAK_CORE, KEY = 'streak';
+  const WD = ['月', '火', '水', '木', '金', '土', '日'];
+  const MARK = { play: 'あそんだ', rest: 'お休み券', miss: 'お休み', today: '今日', future: '' };
+  const load = () => K.sanitize(store.get(KEY, null));
+  const today = () => DAILY_CORE.jstDay();
+  const md = day => `${+day.slice(5, 7)}/${+day.slice(8, 10)}`;
+
+  let el = null;
+  function build() {
+    el = document.createElement('div');
+    el.id = 'streak'; el.className = 'home-streak';   // .streak はクイズの連続正解（#pstreak）が使っている
+    el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'れんぞく日数');
+    el.innerHTML = '<p class="sk-text"></p><div class="sk-sub">' +
+      '<button type="button" class="sk-open" aria-expanded="false" aria-controls="sk-week">今週</button>' +
+      '<span id="sk-week" class="sk-week" role="list" aria-label="今週（月〜日）"></span><span class="sk-hint"></span></div>';
+    el.querySelector('.sk-open').addEventListener('click', () => setOpen(!el.classList.contains('open')));
+  }
+  function setOpen(on) {
+    el.classList.toggle('open', on);
+    el.querySelector('.sk-open').setAttribute('aria-expanded', String(on));
+  }
+  // 幅は CSS で決めうちせず、実際にはみ出すかで決める: 横1行に収まれば .oneline、2行（本文／7マスと今日あそぶと…）なら何も付けず、
+  // それでも収まらなければ .narrow（7マスを隠して［今週］で小窓を開く）
+  function fit() {
+    if (!el) return;
+    const over = () => el.scrollWidth > el.clientWidth;
+    el.classList.remove('narrow');
+    el.classList.add('oneline');
+    if (!over()) return;
+    el.classList.remove('oneline');
+    if (over()) el.classList.add('narrow');
+  }
+  function render() {
+    const v = K.view(load(), today());
+    if (!el) build();
+    if (status.lastElementChild !== el) status.append(el);   // 称号の札（prepend）より後ろ
+    el.querySelector('.sk-text').innerHTML = `🔥 <b>${v.cur}</b>日れんぞく` + (v.best > v.cur ? `（さいこう<b>${v.best}</b>日）` : '') + `・お休み券<b>${v.tickets}</b>枚`;
+    el.querySelector('.sk-hint').textContent = { keep: `今日あそぶと${v.next}日に！`, rest: 'きのうはお休み券でつながるよ', start: '今日あそぶと1日目', today: '' }[v.state];
+    el.querySelector('.sk-week').innerHTML = v.week.map((w, i) => {
+      const label = `${md(w.day)}（${WD[i]}）${MARK[w.mark] ? ' ' + MARK[w.mark] : ''}`;
+      return `<i class="sk-day" role="listitem" data-mark="${w.mark}" data-day="${w.day}" title="${label}" aria-label="${label}"></i>`;
+    }).join('');
+    setOpen(false);
+    fit();
+  }
+  const safe = fn => (...a) => { try { fn(...a); } catch (e) { console.error('[streak]', e); } };
+
+  document.addEventListener('drill:screen', safe(e => { if (e.detail?.name === 'home') render(); }));
+  addEventListener('resize', safe(() => { if (document.body.dataset.screen === 'home') fit(); }));
+  // 最初の drill:screen（インライン script の show(start)）はこのファイルより前に出るので、今の画面を見て描く
+  if (document.body.dataset.screen === 'home') safe(render)();
+})();

@@ -1,0 +1,38 @@
+/* れんぞく日数（A5・streak.js）: ホームの #home-status の最後の行。1行目が本文、2行目が今週の7マスと「今日あそぶと…」。
+   色は今ある --accent --ok --muted --line --surface だけ（新しい色の変数は作らない） */
+.home-streak { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: .82rem; line-height: 1.35; }
+.sk-text { margin: 0; white-space: nowrap; }
+.sk-text b { color: var(--accent); font-variant-numeric: tabular-nums; }
+.sk-sub { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; white-space: nowrap; }
+.sk-hint:empty { display: none; }
+.sk-week { display: flex; gap: 3px; }
+.sk-day { display: block; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--line); background: var(--surface); }
+.sk-day[data-mark="play"] { background: var(--ok); border-color: var(--ok); }
+.sk-day[data-mark="rest"] { border-color: var(--accent); }
+.sk-day[data-mark="today"] { border: 2.5px solid var(--muted); }
+.sk-day[data-mark="future"] { border-style: dashed; }
+.sk-open { display: none; font: inherit; color: var(--accent); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 1px 10px; cursor: pointer; }
+/* 収まらない幅（streak.js が .narrow を付ける）: 本文は折り返し、7マスは［今週］で開く小窓 */
+.home-streak.narrow .sk-text { white-space: normal; text-align: center; }
+.home-streak.narrow .sk-open { display: inline-block; }
+.home-streak.narrow .sk-week { display: none; }
+.home-streak.narrow.open .sk-week { display: flex; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 5; margin-top: 4px; padding: 8px 10px; gap: 5px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.home-streak.narrow.open .sk-day { width: 16px; height: 16px; }
+/* 1行に収まる幅（streak.js が .oneline を付ける。広い PC）: 本文・7マス・今日あそぶと… を横1列に */
+.home-streak.oneline { flex-direction: row; justify-content: center; gap: 8px; }
+/* PC の2列（≥1280）: #home-status は左寄せ（pc.css）。左の列の幅まで使えるようにして、広い画面ではれんぞく日数を1行にする */
+@media (min-width: 1280px) {
+  #home-status { width: 100%; }
+  .home-streak { align-items: flex-start; font-size: .78rem; }
+  .home-streak.oneline { justify-content: flex-start; }
+  .home-streak.narrow .sk-text { text-align: left; }
+  .home-streak.narrow.open .sk-week { left: 0; transform: none; }
+}
+/* 背の低い PC: れんぞく日数の2行を詰める。1280×577 などではさらに飾りの「FLAGS · NAMES · MAP」を隠す（ホームを縦にスクロールさせない） */
+@media (min-width: 900px) and (max-height: 760px), (min-width: 1280px) and (max-height: 820px) {
+  .home-streak { gap: 1px; line-height: 1.2; }
+}
+@media (min-width: 1280px) and (max-height: 600px) {
+  body[data-screen="home"] #scr-home > .eyebrow { display: none; }
+}

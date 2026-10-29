@@ -115,7 +115,7 @@ test('view_week', () => assert.deepEqual(K.view(S({ last: '2026-10-26', played: 
 
 **Interfaces:**
 - Consumes: Task 1 の `STREAK_CORE`、index.html の `store.get(k, d)` `store.set(k, v)` `$` `emit`、`DAILY_CORE.jstDay()`、B6 の `#home-status`
-- Produces: `#home-status` の最後の子 `<div id="streak" class="streak" role="group" aria-label="れんぞく日数">`。中に `.sk-text`（本文）・`.sk-hint`（今日あそぶと…）・`<button class="sk-open" aria-expanded aria-controls="sk-week">`・`<span id="sk-week" class="sk-week">` と `.sk-day[data-mark][data-day]` ×7。内部関数 `load(): State`（`STREAK_CORE.sanitize(store.get(KEY, null))`）と `render()`
+- Produces: `#home-status` の最後の子 `<div id="streak" class="home-streak" role="group" aria-label="れんぞく日数">`（`.streak` はクイズの連続正解 `#pstreak` が使っているので、クラスは `home-streak`）。中に `.sk-text`（本文）・`.sk-hint`（今日あそぶと…）・`<button class="sk-open" aria-expanded aria-controls="sk-week">`・`<span id="sk-week" class="sk-week">` と `.sk-day[data-mark][data-day]` ×7。内部関数 `load(): State`（`STREAK_CORE.sanitize(store.get(KEY, null))`）と `render()`
 
 - [ ] **Step 1: 失敗するテストを書く**
 
@@ -140,8 +140,8 @@ e2e（`tests/e2e/streak.test.mjs`。時計は daily.test.mjs の `at(iso)` と�
 
 - [ ] **Step 3: 作る**
   - `streak.js` 後半: 即時関数。`NEED` を typeof で確かめ、`STREAK_CORE`・`$('home-status')` も確かめる（無ければ `console.error('[streak] …')` して return）。`const KEY = 'streak'`。`render()` は毎回 `load()` → `view(st, DAILY_CORE.jstDay())` → `#streak` を作るか中身を書きかえて `#home-status` に append（prepend しない）。本文は `🔥 ${cur}日れんぞく` ＋（`best > cur` のとき）`（さいこう${best}日）` ＋ `・お休み券${tickets}枚`。hint は keep `今日あそぶと${next}日に！`／rest `きのうはお休み券でつながるよ`／start `今日あそぶと1日目`／today なし。`drill:screen` で `name === 'home'` のときと、読み込み時に `document.body.dataset.screen === 'home'` のときに `render()`（try/catch）。`.sk-open` の click で `#streak` の `.open` と `aria-expanded` を切りかえる。
-  - 「収まらない幅」は CSS の幅の決めうちにしない（PR3 の `.home-status` は幅 `min(340px, 100%)` の縦の flex なので、画面の幅では決まらない）。`render()` の最後と `resize` で、`.narrow` を外してから `#streak.scrollWidth > #streak.clientWidth` なら `.narrow` を付ける。
-  - `streak.css`: `.streak` は1行の flex（`flex-wrap: nowrap`、文字は `--muted`、数は `--accent`、`position: relative`）。`.sk-day` は小さい四角（`--line` の枠・`--surface` の地）、`[data-mark=play]` は `--ok`、`[data-mark=rest]` は `--accent` の枠、`[data-mark=today]` は太い枠。`.sk-open` はふだん隠す。`.streak.narrow` では `.sk-week` を隠して `.sk-open` を出し、`.streak.narrow.open .sk-week` を `#streak` の下に絶対配置の小窓（`--surface` の地・`--line` の枠）で出す。色の変数は作らない。
+  - 「収まらない幅」は CSS の幅の決めうちにしない（PR3 の `.home-status` は幅 `min(340px, 100%)` の縦の flex なので、画面の幅では決まらない）。`render()` の最後と `resize` で、`.narrow` を外してから `#streak.scrollWidth > #streak.clientWidth` なら `.narrow` を付ける。（実装で決めたこと: かたまりは「本文」の行と「7マス＋今日あそぶと…」の行の2行。横1列に収まる広い PC では `.oneline` で1行にし、2行でも収まらなければ `.narrow`。≥1280 では `#home-status` を左の列の幅まで広げる。背の低い PC（≥900 かつ高さ ≤760、≥1280 かつ高さ ≤820）は行間を詰め、≥1280 かつ高さ ≤600（1280×577）は飾りの `.eyebrow` を隠して、home.test の `pc_fits`・pc_layout の `laptop_150pct_fits` を縦スクロールさせない）
+  - `streak.css`: `.home-streak` は1行の flex（`flex-wrap: nowrap`、文字は `--muted`、数は `--accent`、`position: relative`）。`.sk-day` は小さい四角（`--line` の枠・`--surface` の地）、`[data-mark=play]` は `--ok`、`[data-mark=rest]` は `--accent` の枠、`[data-mark=today]` は太い枠。`.sk-open` はふだん隠す。`.home-streak.narrow` では `.sk-week` を隠して `.sk-open` を出し、`.home-streak.narrow.open .sk-week` を `#streak` の下に絶対配置の小窓（`--surface` の地・`--line` の枠）で出す。色の変数は作らない。
   - `profile.js` の `TRANSFER_KEYS` に `'streak'`、index.html の2行と `profile.js?v=` +1。
 
 - [ ] **Step 4: 通るのを確かめる** — unit 全部と、e2e の `streak`・`home`・`cache_bust`・`theme`・`pc_layout`・`badges`（称号の札が先頭のまま）・`profile`（引き継ぎ）→ PASS。`phone_geometry_unchanged` は `#home-status` に行が増えるのでホームに差が出る（README のとおり扱う）。
