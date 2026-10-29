@@ -192,3 +192,91 @@ t('pc_result_fits', async page => {
   assert.ok(m.sh <= m.ih, JSON.stringify(m));
 }, { viewport: { width: 1366, height: 657 } });
 
+// ---- 今日の難問（daily.js の #dl-share）----
+// 時計を日本時間の決まった時刻にする（daily.test.mjs の at と同じ）
+const at = iso => `{ const off = Date.parse('${iso}') - Date.now(), D = Date;
+  globalThis.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + off])); } static now() { return D.now() + off; } }; }`;
+const NOON = at('2026-10-28T03:00:00Z');   // 日本時間 10/28 12:00
+const dailyRec = (o = {}) => ({ daily: { day: '2026-10-28', sid: 'x', status: 'done', outcome: 'fail', correct: 12, timeMs: 83400, sent: null, ...o } });
+// attach に渡した data を __data に、fetch した URL を __fetched に残す
+const spyAttach = `{
+  let v;
+  Object.defineProperty(window, 'SHARECARD', { configurable: true, get: () => v, set: x => {
+    const a = x.attach;
+    v = { ...x, attach: (btn, d) => { window.__data = JSON.parse(JSON.stringify(d)); return a(btn, d); } };
+  } });
+  const f = window.fetch;
+  window.fetch = (u, ...r) => { (window.__fetched ||= []).push(String(u)); return f(u, ...r); };
+}`;
+const openDaily = page => page.click('#home-daily');
+const dready = page => page.waitForSelector('#dl-share[data-card="ready"]');
+
+t('daily_png_and_text', async page => {
+  await openDaily(page);
+  await dready(page);
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await png(page);
+  assert.deepEqual([s.type, s.w, s.h], ['image/png', 1200, 675]);
+  assert.equal(s.text, '国旗マスター 今日の難問 10/28\n' + '🟩'.repeat(12) + '🟥' + '⬜'.repeat(7) + '\n12 / 20 問正解\n#国旗マスター\n' + URL_);
+}, { init: NOON, storage: dailyRec() });
+
+t('daily_data_no_flags', async page => {
+  await openDaily(page);
+  await dready(page);
+  const { d, names, fetched } = await page.evaluate(() => ({
+    d: window.__data, fetched: (window.__fetched ?? []).filter(u => /flags\/[\w-]+\.svg/.test(u)),
+    names: DAILY.questions('2026-10-28').flatMap(q => { const c = byA.get(q.a); return [c.n, c.c]; }),
+  }));
+  assert.equal(d.kind, 'daily');
+  assert.deepEqual(d.flags, []);
+  assert.equal(d.grid.length, 20);
+  assert.deepEqual(d.grid.slice(11, 14), ['ok', 'ng', 'skip']);
+  assert.deepEqual(Object.keys(d).sort(), ['big', 'flags', 'grid', 'kind', 'rank', 'sub', 'text', 'title']);
+  assert.equal(d.big, '12 / 20 問正解');
+  assert.equal(d.rank, null);
+  const json = JSON.stringify(d);
+  for (const x of names) assert.ok(!json.includes(x), `data に ${x} がある`);
+  assert.deepEqual(fetched, []);
+}, { init: NOON + spyAttach, storage: dailyRec() });
+
+t('daily_clear_big', async page => {
+  await openDaily(page);
+  await dready(page);
+  const d = await page.evaluate(() => window.__data);
+  assert.equal(d.big, '全問正解！ 1分23.40秒');
+  assert.ok(d.grid.every(g => g === 'ok'));
+  assert.equal(d.rank, '今日3位');
+}, { init: NOON + spyAttach, storage: dailyRec({ correct: 20, outcome: 'clear', sent: { name: 'チコ', rank: 3 } }) });
+
+// 日本時間 10/29 0:10 に 10/28 の記録（0時30分までは昨日の結果を出す）→ タイトルは記録の日付
+t('daily_yday_title', async page => {
+  await openDaily(page);
+  await dready(page);
+  const d = await page.evaluate(() => window.__data);
+  assert.equal(d.title, '今日の難問 10/28');
+  assert.equal(d.grid.filter(g => g === 'ok').length, 12);
+}, { init: at('2026-10-28T15:10:00Z') + spyAttach, storage: dailyRec() });
+
+// share-card.js が読めない → ボタンは今のまま（文だけ）
+t('daily_blocked_text_only', async page => {
+  await openDaily(page);
+  assert.equal(await page.getAttribute('#dl-share', 'data-card'), null);
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await page.evaluate(() => ({ keys: Object.keys(__shared).sort(), text: __shared.text }));
+  assert.deepEqual(s.keys, ['text', 'url']);
+  assert.equal([...s.text.matchAll(/🟩|🟥|⬜/gu)].length, 20);
+}, { init: NOON, storage: dailyRec(), blockScripts: ['share-card.js'] });
+
+// 画像を作り終わる前に押す → 文と、サイトの URL（テストのサーバーの URL ではない）
+t('daily_fallback_url', async page => {
+  await openDaily(page);
+  assert.equal(await page.getAttribute('#dl-share', 'data-card'), 'busy');
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await page.evaluate(() => ({ keys: Object.keys(__shared).sort(), url: __shared.url, text: __shared.text }));
+  assert.deepEqual(s.keys, ['text', 'url']);
+  assert.equal(s.url, URL_);
+  assert.match(s.text, /^国旗マスター 今日の難問 10\/28\n/);
+}, { init: NOON + holdBlob, storage: dailyRec() });

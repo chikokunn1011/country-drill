@@ -113,7 +113,7 @@
     // 今日の難問の帯（国旗は出さない）
     if (d.kind === 'daily' && d.grid.length) {
       const n = d.grid.length, left = cx - (n * BAR + (n - 1) * BAR_GAP) / 2;
-      d.grid.forEach((g, i) => box(col[g === 'ok' ? 'ok' : g === 'ng' ? 'ng' : 'line'], c, left + i * (BAR + BAR_GAP), 360, BAR, BAR, 8));
+      d.grid.forEach((g, i) => box(col[g === 'ok' ? 'ok' : g === 'ng' ? 'ng' : 'line'], c, left + i * (BAR + BAR_GAP), 392, BAR, BAR, 8));
     }
     // 下: サイトとタグ
     text(SHARE.url.replace(/^https:\/\//, '').replace(/\/$/, ''), 80, H - 64, 26, col.muted);
