@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import vm from 'node:vm';
 
 const root = new URL('../../', import.meta.url);
 const read = p => readFileSync(new URL(p, root), 'utf8');
@@ -14,6 +15,16 @@ export const footerHrefs = html => {
   const m = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/.exec(html);
   if (!m) return [];
   return [...m[1].matchAll(/href="([^"]*)"/g)].map(x => x[1].replace(/^(\.\.\/)+/, ''));
+};
+
+// countries.js の 195 の国名（n）
+const COUNTRY_NAMES = (() => { const ctx = { window: {} }; vm.runInNewContext(read('countries.js'), ctx); return new Set(ctx.window.COUNTRIES.map(c => c.n)); })();
+// about.html の <table id="names"> の、本文の各行の1列め（このサイトの書き方）
+export const namesTableSiteColumn = html => {
+  const m = /<table id="names">([\s\S]*?)<\/table>/.exec(html);
+  if (!m) return [];
+  const body = /<tbody>([\s\S]*?)<\/tbody>/.exec(m[1]);
+  return [...(body ? body[1] : '').matchAll(/<tr>\s*<td>([^<]*)<\/td>/g)].map(x => x[1].trim());
 };
 
 // 色の変数のかたまり。順は :root・端末がダークのとき・設定がダークのとき
@@ -99,4 +110,23 @@ test('privacy_text', () => {
   const upper = keysWithUpper(read('profile.js'));
   assert.ok(upper.includes('rpgRank') && upper.includes('adminErrors'), upper.join(','));
   for (const k of upper) assert.ok(!h.includes(k), k);
+});
+
+test('about_text', () => {
+  const h = read('about.html');
+  assert.ok(h.includes('出題は国旗・国名・場所だけ。首都は答えのあとの説明と図鑑で見られる（首都を当てる問題はない）'));
+  for (const s of ['大学生の個人運営', '外務省', 'Natural Earth', '日本政府の立場を表すものではありません', 'flag-icons', 'world-atlas', 'world-countries', 'ODbL', 'd3', 'topojson-client']) assert.ok(h.includes(s), s);
+});
+
+test('about_name_table', () => {   // 例外の表（<table id="names">）の「このサイト」の列は、どれも countries.js の n にある
+  const names = namesTableSiteColumn(read('about.html'));
+  assert.ok(names.length > 0, '<table id="names"> に行が無い');
+  for (const n of names) assert.ok(COUNTRY_NAMES.has(n), n);
+});
+
+test('contact_form_url', () => {   // URL が入っていれば本物の Google フォーム。まだ無いときはリンクを出さず「準備中」の文だけ
+  const h = read('about.html');
+  const m = h.match(/<a id="contact-form" href="([^"]+)"/);
+  if (m) assert.match(m[1], /^https:\/\/(docs\.google\.com\/forms\/d\/e\/[\w-]{20,}\/viewform|forms\.gle\/\w{10,})$/);
+  else assert.ok(h.includes('id="contact-pending"'), 'フォームが無いときは #contact-pending');
 });
