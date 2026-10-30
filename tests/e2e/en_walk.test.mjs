@@ -2,6 +2,8 @@
 // PR6: プロフィール Chiko で、タイムアタック・結果のシェア・ランキング・プロフィールの窓・プロフィール画面と引き継ぎ・今日の難問・れんぞく日数も。
 // 偽DB にはほかの人（日本語の名前 チコ）の記録を入れておき、表と窓に日本語の名前が出ても名前のほかに日本語が無いこと
 // PR7: バッジ1つ取れるセーブで、答えの豆知識・結果のバッジのパネル・ホームの称号の札・バッジ画面（分類・詳細・ひみつ・称号えらび）・図鑑の豆知識・チコの英語の称号・英語の国のページの Fun facts も。
+// PR8: 冒険も（ホームのコインのチップと入口 → はじめての画面 → 冒険ホーム → ガチャ10回 → 仲間・カードの詳細 → 編成 → バトル1回 → 章の終わりの窓 →
+// 英雄の塔の1階 → 冒険ランキング → データの欄・コインのかせぎ方・かざりの窓 → 設定の冒険のスイッチ・練習の結果のコインの欄）。トーストの文にも日本語が無いこと。
 // 英語のページのリンクが /en/ の外へ出ないこと。日本語版のホームの見える文が origin/main と同じこと
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer, openApp, jaLeft, warned, QUIET_BADGES, PHONE, PC, pickSetup, settle, settleResult, answerCorrect, answerWrong, answerTap, clearTimeAttack } from './helpers.mjs';
+import { winBattle, winTowerFloor, saveWith, writeSave, startBattle, battleGuard } from './rpg_helpers.mjs';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -20,18 +23,15 @@ let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 未訳の機能の入口（英語版では見えてはいけない）。いまは無い（ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6、
-// 豆知識・バッジは PR7、冒険の入口・トップバーのチップ・#pcoin・設定のスイッチは PR8 で英語に）。しくみは残す（これから未訳の機能を足すとき用）
-const UNTRANSLATED = [];
-const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
-
 // 英語の静的なページ（本編 en/ のあとにまわる順）
 const STATIC = ['en/embed.html', 'en/country/', 'en/country/fr.html', 'en/country/jp.html', 'en/themes/', 'en/themes/stars.html',
   'en/themes/similar.html', 'en/themes/bigarea.html', 'en/howto.html', 'en/about.html', 'en/privacy.html'];
 
 // navigator.share は渡したものを __shared に入れるだけ（端末のシェアの窓を出さない）。画像も渡せることにする
 const STUB_SHARE = `{ Object.defineProperty(navigator, 'share', { configurable: true, value: o => { window.__shared = o; return Promise.resolve(); } });
-  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true }); window.open = () => null; }`;
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true }); window.open = () => null; }
+{ window.__toasts = []; new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains('toast')) window.__toasts.push(n.textContent); })
+  .observe(document, { childList: true, subtree: true }); }`;
 // バッジのセーブ: 練習のクリアで first-clear が1つ取れる（QUIET_BADGES から first-clear を抜いた形）。称号は取り済みのタイムアタッカー
 const ONE_TO_GET = { v: 1, got: { 'ta-clear@1': 1, 'dopa-on@1': 1 }, eq: 'ta-clear@1', sn: { 'ta-clear': 2, 'dopa-on': 2 }, sent: ['ta-clear@1', 'dopa-on@1'], tip: 3 };
 const openEn = (viewport, path = 'en/', badges = ONE_TO_GET) => openApp(browser, { viewport, path, locale: 'en-US', seed: 1, init: STUB_SHARE, storage: { badges } });
@@ -55,11 +55,11 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
   const app = await openEn(viewport);
   const { page, errors } = app;
   const problems = [];
-  // いまの画面を見る: 見えている日本語・未訳の入口・ここまでのページの例外
+  // いまの画面を見る: 見えている日本語・ここまでに出たトーストの日本語・ここまでのページの例外
   let seenErrors = 0;
   const check = async label => {
     for (const s of await jaLeft(page)) problems.push(`${label}: 日本語「${s}」`);
-    for (const s of await shownEntries(page)) problems.push(`${label}: 未訳の入口 ${s} が見える`);
+    for (const s of await page.evaluate(() => window.__toasts?.splice(0) ?? [])) if (JA_RE.test(s)) problems.push(`${label}: トーストに日本語「${s}」`);
     for (const e of errors.slice(seenErrors)) problems.push(`${label}: ページの例外 ${e}`);
     seenErrors = errors.length;
   };
@@ -77,6 +77,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     // 設定
     await page.click('#home-settings');
     await screen('settings');
+    assert.equal(await page.isVisible('#set-rpg'), true, '設定の冒険のスイッチ');
     await check('settings');
     // モード選択
     await home();
@@ -107,6 +108,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     for (let i = 0; i < 10 && await page.isHidden('#scr-result'); i++) { await answerCorrect(page); await page.click('#next'); }
     await screen('result');
     await settleResult(page);
+    await page.waitForSelector('#rpg-res', { state: 'visible' });   // 練習の結果のコインの欄
     await check('result');
     // 結果のバッジのパネル（first-clear が1つ取れる）。ボタンの［Practice →］は無い（詳細にだけある）
     await page.waitForSelector('#r-badges .bdg-row');
@@ -239,6 +241,110 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     if (await page.isVisible('#streak .sk-open')) await page.click('#streak .sk-open');
     await page.waitForSelector('#streak .sk-week', { state: 'visible' });
     await check('home streak');
+    // 冒険: トップバーのコインのチップ・ホームの入口 → はじめての画面（ストーリー）→ 旅に出る → 冒険ホーム
+    // トップバーのコインのチップ（トップバーはホームでは出ない。モード選択で見る）
+    await page.evaluate(() => show('setup'));
+    await screen('setup');
+    await page.waitForSelector('#rpg-chip', { state: 'visible' });
+    await check('topbar coin chip');
+    await home();
+    await page.waitForSelector('#home-rpg', { state: 'visible' });
+    await check('home adventure entry');
+    await page.click('#home-rpg');
+    await page.waitForSelector('#rpg-intro .rpg-story');
+    await check('adventure intro');
+    await page.click('#rpg-go');
+    await page.waitForSelector('#rpg-hero');
+    await check('adventure home');
+    // ガチャ10回（●1,000 が要るのでコインを足す）
+    await page.evaluate(() => RPG.debug.give(5000));
+    await page.click('#rpg-to-gacha');
+    await screen('gacha');
+    await check('gacha');
+    await page.click('#ga-10');
+    await page.click('#ga-skip');
+    await page.waitForFunction(() => document.querySelector('#ga-res .rpg-card') && !document.querySelector('#ga-res .rpg-card.is-back'));
+    await check('gacha draw 10');
+    // 仲間の一覧・カードの詳細
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.click('#rpg-to-cards');
+    await screen('cards');
+    await page.waitForSelector('#cd-grid .rpg-card');
+    await check('cards');
+    await page.click('#cd-grid .rpg-card');
+    await page.waitForSelector('#detail[open]');
+    await check('card detail');
+    await page.click('#detail .close');
+    await page.waitForSelector('#detail:not([open])', { state: 'attached' });
+    // 編成
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.click('#rpg-to-team');
+    await screen('team');
+    await check('team');
+    // バトル1回（冒険ホームの札のつぎのフロア → 会う画面 → 問題 → 勝つ）
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.click('#rpg-dgs .rpg-plate:not([hidden]) .rpg-fl.is-next');
+    await page.waitForSelector('#bt-fight');
+    await check('battle meet');
+    await page.click('#bt-fight');
+    await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+    await check('battle question');
+    await winBattle(page);
+    await page.waitForSelector('#bt-end');
+    assert.match(await page.locator('#bt-end .rpg-bend-h').innerText(), /^Victory!/);
+    await check('battle end');
+    // 章の終わりの窓（地図喰いの巣をクリアしたセーブ。ch1 のストーリーをまだ読んでいない）
+    await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('rpg'));
+      s.floors = { ...s.floors, world: 5 };
+      s.story = [];
+      localStorage.setItem('rpg', JSON.stringify(s));
+    });
+    await page.reload();
+    await page.waitForFunction(() => window.RPG && document.readyState === 'complete' && (typeof mapReady === 'undefined' || mapReady));
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.waitForSelector('#rpg-story-dlg[open]');
+    await check('chapter end story');
+    await page.click('#rpg-story-ok');
+    await page.waitForSelector('#rpg-story-dlg:not([open])', { state: 'attached' });
+    // 英雄の塔の1階（クリア → やめる → 終わり）
+    await page.click('#rpg-tower-go');
+    await page.waitForSelector('#bt-fight');
+    await check('tower meet');
+    await page.click('#bt-fight');
+    await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+    await winTowerFloor(page);
+    await check('tower floor 1 cleared');
+    await page.click('#bt-tquit');
+    await page.waitForSelector('#bt-end');
+    await check('tower end');
+    // 冒険ランキング（ほかの人 チコ）
+    app.db.rpgRows.push({ token: 'other', profile_id: 1, nickname: 'チコ', lv: 20, dungeons: 3, floors: 16, tower: 9, tower_at: new Date().toISOString(),
+      created_at: new Date().toISOString(), at: new Date().toISOString() });
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.click('#rpg-to-rank');
+    await screen('rpgrank');
+    await page.waitForFunction(() => [...document.querySelectorAll('#rr-list li')].some(l => l.textContent.includes('チコ')) && $('rr-rank').textContent !== '');
+    await check('adventure leaderboard');
+    for (const s of ['dg', 'tower']) {
+      await page.click(`#rr-tabs button[data-s="${s}"]`);
+      await page.waitForFunction(() => [...document.querySelectorAll('#rr-list li')].some(l => l.textContent.includes('チコ')));
+      await check(`adventure leaderboard ${s}`);
+    }
+    // 冒険ホームのデータの欄・コインのかせぎ方・かざりの窓
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.waitForSelector('#rpg-hero');
+    await page.click('#rpg-data summary');
+    await page.waitForFunction(() => $('rpg-code-out').value.length > 10);
+    await check('adventure data');
+    await page.click('#rpg-earn summary');
+    await page.waitForFunction(() => $('rpg-earn').open);
+    await check('adventure earn coins');
+    await page.click('#rpg-deco');
+    await page.waitForSelector('#rpg-deco-dlg[open]');
+    await check('decorations picker');
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('#rpg-deco-dlg:not([open])', { state: 'attached' });
     // 静的なページ
     for (const path of STATIC) {
       await page.goto(new URL(path, server.url).href);
@@ -299,6 +405,30 @@ test('en_links_stay_english', { timeout: 120_000 }, async () => {
     await page.evaluate(() => show('daily'));
     await page.waitForSelector('#dl-start');
     await links('en/ daily');
+    // 冒険: バトルに負けて［Practice this region］・冒険ホームの［Earn coins in quizzes］→ モード選択へ行っても /en/ のまま
+    await writeSave(page, saveWith({}));
+    await startBattle(page, 'samerica', 1);
+    while (await page.evaluate(() => RPG_BATTLE.state().phase) !== 'end') {
+      await battleGuard(page);
+      const a = await page.evaluate(() => RPG_BATTLE.cur());
+      await page.locator(`#scr-battle .choice:not([data-a="${a}"])`).first().click();
+      await page.click('#bt-next');
+      await page.waitForFunction(() => ['question', 'end'].includes(RPG_BATTLE.state().phase));
+    }
+    await links('en/ battle lost');
+    assert.equal((await page.locator('#bt-practice').innerText()).trim(), 'Practice this region');
+    await page.click('#bt-practice');
+    await page.waitForSelector('#scr-setup:not([hidden])');
+    if (new URL(page.url()).pathname !== '/en/') out.push(`battle practice: ${page.url()}`);
+    await links('en/ setup (battle practice)');
+    await page.evaluate(() => RPG.open('rpg'));
+    await page.waitForSelector('#rpg-hero');
+    await links('en/ adventure home');
+    await page.click('#rpg-earn summary');
+    assert.equal((await page.locator('#rpg-earn-go').innerText()).trim(), 'Earn coins in quizzes');
+    await page.click('#rpg-earn-go');
+    await page.waitForSelector('#scr-setup:not([hidden])');
+    if (new URL(page.url()).pathname !== '/en/') out.push(`adventure earn: ${page.url()}`);
     for (const path of STATIC) {
       await page.goto(new URL(path, server.url).href);
       await links(path);
