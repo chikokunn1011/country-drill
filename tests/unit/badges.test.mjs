@@ -829,7 +829,7 @@ test('broken_json_backup', () => {
 test('newer_save_readonly', () => {
   const { K, X, cat } = stores();
   const raw = JSON.stringify({ v: 2, s: { right: 500 } }), m = mem({ badges: raw }), warns = [];
-  const s = K.createStore({ storage: m, X, cat, ctx: () => K.makeCtx(X, null), warn: w => warns.push(w) });
+  const s = K.createStore({ storage: m, X, cat, ctx: () => K.makeCtx(X, null), warn: (...a) => warns.push(a) });
   pushAll(s, rights(1));
   assert.deepEqual(plain(s.commit()), []);   // 501 問でも取らない
   assert.deepEqual(plain(s.commit()), []);
@@ -840,7 +840,7 @@ test('newer_save_readonly', () => {
   assert.equal(s.lastAuto, null);
   s.reload();
   assert.equal(s.st.s.right, 501);
-  assert.deepEqual(warns, ['[badges] 新しい版のセーブなので読むだけにする']);
+  assert.equal(warns.length, 1);   // 知らせる文はブラウザの側（console.warn）
 });
 
 test('write_failure_no_double', () => {

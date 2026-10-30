@@ -49,12 +49,14 @@ async function openWithProfile(page, db, { name = 'Chiko', token = 'tok-en', sen
 }
 const noHScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 
-// ホームの入口: ランキング・プロフィール・今日の難問は出る。冒険・バッジ（PR7・PR8）はまだ
+// ホームの入口: ランキング・プロフィール・今日の難問・バッジ（PR7）は出る。冒険（PR8）はまだ
 for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) t(`en_home_entries_${vname}`, async page => {
   await page.waitForFunction(() => window.PROFILE);
   for (const id of ['home-rank', 'home-profile', 'home-daily']) assert.equal(await page.isVisible('#' + id), true, id);
   assert.match(await text(page, '#home-daily'), /^Daily Puzzle\s+A new puzzle every day\. Compete with other players\.\s+\d{1,2}\/\d{1,2}\s*NEW$/);
-  for (const id of ['home-rpg', 'home-badges']) assert.equal(await page.isVisible('#' + id), false, id);
+  assert.equal(await page.isVisible('#home-badges'), true);
+  assert.equal(await page.isVisible('#home-rpg'), false);
+  assert.equal((await text(page, '#home-badges .hi-label')).trim(), 'Badges');
   assert.equal((await text(page, '#home-rank .hi-label')).trim(), 'Leaderboard');
   assert.equal((await text(page, '#home-profile .hi-label')).trim(), 'Profile');
   assert.deepEqual(await jaLeft(page), []);
@@ -209,7 +211,8 @@ t('en_post_ja_name', async (page, { db }) => {
   assert.deepEqual(await jaLeft(page), []);
 });
 
-// 日本語版でつけた称号・バッジの数を、英語版の同期が消さない（英語版は badges.js を読まない）
+// 日本語版でつけた称号・バッジの数を、badges.js の無い英語版の同期が消さない。PR7 で英語版も badges.js を読むので、
+// ここでは badges.js を止めて「BADGES が無いとき」を見る（英語版で称号を送るのは Task 15 の en_sync_sends_ja_title）
 t('en_sync_keeps_title', async (page, { db }) => {
   // 日本語版で称号とバッジの数を送ったあとの状態
   await openWithProfile(page, db, { sent: { isPublic: true, title: '旅人', badges: 12, badgesTotal: 80 }, extra: { title: '旅人', badges: 12, badges_total: 80 } });
@@ -231,7 +234,7 @@ t('en_sync_keeps_title', async (page, { db }) => {
   assert.equal(db.profiles[0].badges_total, 80);
   // 自分のカードにも称号は出さない（英語版）
   assert.doesNotMatch(await text(page, '#pf-me'), /旅人/);
-});
+}, { blockScripts: ['badges.js'] });
 
 /* ---------- タイムアタックとランキング（Task 5） ---------- */
 const picked = (page, id) => page.$$eval(`#${id} [aria-pressed="true"]`, bs => bs.map(b => Object.values(b.dataset)[0]));

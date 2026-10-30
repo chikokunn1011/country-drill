@@ -19,9 +19,9 @@ let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 未訳の機能の入口（英語版では見えてはいけない）: 冒険・バッジ・クイズのコイン
-// （ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6、豆知識は PR7 で英語に）
-const UNTRANSLATED = ['#home-rpg', '#home-badges', '#pcoin'];
+// 未訳の機能の入口（英語版では見えてはいけない）: 冒険・クイズのコイン
+// （ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6、豆知識・バッジは PR7 で英語に）
+const UNTRANSLATED = ['#home-rpg', '#pcoin'];
 const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
 
 // 英語の静的なページ（本編 en/ のあとにまわる順）

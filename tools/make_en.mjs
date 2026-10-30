@@ -12,11 +12,11 @@ import { JA_RE } from './i18n_scan.mjs';
 import { SITE } from './make_country_pages.mjs';
 
 // 英語のページで読まない script（未訳の機能）
-export const EN_SKIP = ['rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js'];
+export const EN_SKIP = ['rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // 英語のページで差しかえる script（日本語のデータ → 英訳。?v= はそのまま）。trivia-en.js は tools/trivia_en.mjs build が作る
 export const EN_SWAP = { 'trivia.js': 'trivia-en.js' };
 // ページごとの辞書（i18n/<名前>.js。まだ無いファイルは入れない）
-export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily'], 'embed.html': ['en-embed'] };
+export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily', 'en-badges'], 'embed.html': ['en-embed'] };
 // 英語版があるページ（<a href> の # の前がこれなら頭に en/）
 export const EN_PAGES = ['./', 'index.html', 'howto.html', 'about.html', 'privacy.html', 'country/', 'themes/', 'embed.html'];
 

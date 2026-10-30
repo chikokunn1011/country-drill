@@ -1,7 +1,7 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = '97662bf4031a';
+const VERSION = 'f07067602f83';
 const PRECACHE = [
   "./",
   "index.html",
@@ -46,6 +46,7 @@ const PRECACHE = [
   "i18n/en-dojo.js?v=1",
   "i18n/en-profile.js?v=1",
   "i18n/en-daily.js?v=1",
+  "i18n/en-badges.js?v=1",
   "trivia-en.js",
   "vendor/d3-7.9.0.min.js",
   "vendor/topojson-client-3.1.0.min.js",

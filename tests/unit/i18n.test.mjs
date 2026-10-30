@@ -25,10 +25,10 @@ const load = ({ lang, dict } = {}) => {
 
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
-const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all',
+const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all', 'badges.js': 'all',
   'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '図鑑', '起動'] };
-// まだ訳さないファイル（PR7: badges、PR8: rpg-*）
-const NOT_YET = ['badges.js',
+// まだ訳さないファイル（PR8: rpg-*）
+const NOT_YET = [
   'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // 見ないファイル（データ・管理画面・生成物の sw.js）。trivia.js は日本語のデータで、英語のページは trivia-en.js（英訳のデータ。tests/unit/en-trivia.test.mjs が見る）に差しかえる
 const SKIP = ['countries.js', 'themes.js', 'world.js', 'admin.js', 'admin-api.js', 'admin-save.js', 'sw.js', 'trivia.js', 'trivia-en.js'];

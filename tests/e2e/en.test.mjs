@@ -23,10 +23,10 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => 
 t('en_home', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.deepEqual(await jaLeft(page), []);
-  // 未訳の機能の入口は出さない（冒険・バッジは PR7・PR8）。今日の難問は出る（PR6）
+  // 未訳の機能の入口は出さない（冒険は PR8）。今日の難問（PR6）とバッジ（PR7）は出る
   assert.equal(await page.isVisible('#home-daily'), true);
-  for (const id of ['home-rpg', 'home-badges'])
-    assert.equal(await page.isVisible('#' + id), false, id);
+  assert.equal(await page.isVisible('#home-badges'), true);
+  assert.equal(await page.isVisible('#home-rpg'), false);
   assert.match(await page.title(), /Flag Master/);
   assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
 });
