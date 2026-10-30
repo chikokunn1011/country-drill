@@ -26,7 +26,7 @@ test('pages_render', { timeout: 120_000 }, async () => {
     const where = `${path} ${viewport.width}x${viewport.height}`;
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${where} 横スクロール`);
     assert.equal(await bg(page), LIGHT, where);
-    assert.equal(await page.locator('.foot-links a').count(), 5, where);
+    assert.equal(await page.locator('.foot-links a').count(), 6, where);
   });
 });
 
