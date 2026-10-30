@@ -82,6 +82,7 @@ test('hide_rpg', () => {
   const en = load({ lang: 'en' }).ctx;
   assert.equal(en.I18N.hide.has('ta'), false);
   assert.equal(en.I18N.hide.has('rpg'), true);
+  assert.equal(en.I18N.hide.has('title'), true);   // 他人の称号は Task 15 まで隠したまま
   assert.equal(load().ctx.I18N.hide.size, 0);
   assert.equal(load().ctx.I18N.hide.has('rpg'), false);
 });

@@ -821,3 +821,45 @@ t('en_deco_hidden_with_rpg', async (page, { db }) => {
   assert.deepEqual(await page.locator('#pf-main .field > .lbl').allInnerTexts(), ['名前を変える', 'かざり', '設定']);
   assert.equal(await page.locator('#pf-deco').count(), 1);
 });
+
+// 画面なしのモードでは、消されにくい保存（navigator.storage.persist）を頼まない（Firefox は理由の見えない確認を出すので。冒険の表示が OFF と同じ）
+t('en_no_persist_headless', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await clearByAnswering(page);
+  await page.locator('#scr-result:not([hidden])').waitFor();
+  await frames2(page);
+  assert.ok((await stored(page, 'rpg')).earned > 0);
+  assert.equal(await page.evaluate(() => window.__persist || 0), 0);
+}, { init: () => { StorageManager.prototype.persist = function () { window.__persist = (window.__persist || 0) + 1; return Promise.resolve(false); }; } });
+
+// rpg.js を読んだまま英語版どうしで引き継ぐ: 受け取った端末のセーブは今の形に書き直されるが、コインはそのまま
+t('en_transfer_with_rpg', async (page, app) => {
+  const { db } = app;
+  acceptDialogs(page);
+  await openWithProfile(page, db, { name: 'Chiko' });
+  await page.evaluate(() => localStorage.setItem('rpg', '{"v":1,"coins":5}'));
+  await openProfile(page);
+  await page.click('#pf-tr-start');
+  await page.locator('#pf-tr-code').waitFor();
+  const code = db.transfers[0].code;
+  assert.equal(db.transfers[0].data.keys.rpg, '{"v":1,"coins":5}');
+  const b = await openApp(browser, { ...EN });
+  Object.assign(b.db.rpc, db.rpc);
+  try {
+    acceptDialogs(b.page);
+    await b.page.waitForFunction(() => window.PROFILE && window.RPG);
+    assert.equal((await stored(b.page, 'rpg')).coins, 0);
+    await openProfile(b.page);
+    await b.page.fill('#pf-tr-in', code);
+    await Promise.all([b.page.waitForEvent('load'), b.page.click('#pf-tr-claim')]);
+    await b.page.waitForFunction(() => window.PROFILE && window.RPG);
+    await b.page.evaluate(() => PROFILE.ready);
+    const s = await stored(b.page, 'rpg');
+    assert.equal(s.v, 1);
+    assert.equal(s.coins, 5);
+    assert.equal(await b.page.evaluate(() => RPG.get().coins), 5);
+    assert.deepEqual(await jaLeft(b.page), []);
+    assert.deepEqual(b.errors.map(String), []);
+  } finally { await b.close(); }
+});
