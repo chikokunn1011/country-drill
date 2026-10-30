@@ -2,13 +2,13 @@
 // 作ったページはコミットするので、作り直すと1文字もちがわないことを確かめる
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync, cpSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { readInputs, check, render } from '../../tools/make_country_pages.mjs';
+import { readInputs, check, render, neighborsOf, byJa } from '../../tools/make_country_pages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SITE = 'https://chikokunn1011.github.io/country-drill/';
@@ -52,8 +52,10 @@ function withTmp(fn) {
 }
 // 生成スクリプトが読むものを一時の root に写す
 const copyInputs = dir => {
-  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml']) cpSync(join(ROOT, f), join(dir, f));
-  cpSync(join(ROOT, 'flags'), join(dir, 'flags'), { recursive: true });
+  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
+  for (const d of ['flags', 'themes']) cpSync(join(ROOT, d), join(dir, d), { recursive: true });
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  for (const f of ['neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
 };
 const edit = (dir, f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
 const setTrivia = (dir, a, list) => edit(dir, 'trivia.js', () => `window.TRIVIA = ${JSON.stringify({ ...TRIVIA, [a]: list })};\n`);
@@ -61,6 +63,7 @@ const similarAdd = code => dir => edit(dir, 'daily-core.js', s => s.replace("'qa
 const triviaEmpty = a => dir => setTrivia(dir, a, []);
 const rmFlag = a => dir => rmSync(join(dir, 'flags', `${a}.svg`));
 const noFooterMarks = dir => edit(dir, 'index.html', s => s.replace('<!-- footer:start -->', ''));
+const noThemes = dir => rmSync(join(dir, 'themes'), { recursive: true, force: true });
 
 test('regenerate_same', () => {            // 作り直すと同じ（コミット済みと1文字もちがわない）
   const out = render(readInputs(ROOT));
@@ -102,7 +105,7 @@ test('head_items', () => {                  // 196枚
     assert.ok(!/<script[^>]* src=/.test(h), p);
     assert.ok(!h.includes('adminErrors'), p);
     assert.match(h, /<link rel="stylesheet" href="\.\.\/pages\.css\?v=\d+">/, p);
-    assert.ok(h.includes('<link rel="stylesheet" href="country.css?v=1">'), p);
+    assert.ok(h.includes('<link rel="stylesheet" href="country.css?v=2">'), p);
   }
   assert.equal(attr(read('country/fr.html'), /<title>([^<]*)<\/title>/), 'フランスの国旗と豆知識｜国旗マスター');
   assert.equal(attr(read('country/index.html'), /<title>([^<]*)<\/title>/), '国の一覧（195か国の国旗）｜国旗マスター');
@@ -170,7 +173,8 @@ test('sitemap_markers', () => {
 
 test('cli_stops_on_bad_input', () => {      // 一時の root に入力を写し、1つずつこわす。終了コード1・stderr・何も書かない
   for (const [break_, re] of [[similarAdd('zz'), /SIMILAR に知らないコード: zz/], [triviaEmpty('fr'), /豆知識が0件: fr/],
-                              [rmFlag('fr'), /flags\/fr\.svg が無い/], [noFooterMarks, /フッターの目印が無い/]])
+                              [rmFlag('fr'), /flags\/fr\.svg が無い/], [noFooterMarks, /フッターの目印が無い/],
+                              [noThemes, /themes\/index\.html が無い/]])
     withTmp(dir => {
       copyInputs(dir); break_(dir);
       const r = spawnSync('node', ['tools/make_country_pages.mjs', '--root', dir, '--out', dir], { cwd: ROOT, encoding: 'utf8' });
@@ -192,3 +196,145 @@ test('escapes_text', () => withTmp(dir => {   // 豆知識に `<b>&"` → ペー
   const h = render(readInputs(dir))['country/fr.html'];
   assert.ok(h.includes('&lt;b&gt;&amp;&quot;テスト')); assert.ok(!h.includes('<b>&'));
 }));
+
+// となりの国（world.js の地図から計算し、data/neighbors_fix.json で直す）
+const INP = readInputs(ROOT), NB = neighborsOf(INP);
+const FIX = JSON.parse(read('data/neighbors_fix.json'));
+const byA = new Map(C.map(c => [c.a, c]));
+
+test('neighbors_list', t => {             // 一覧を出す（確かめるため）。全部の国があり、自分はふくまず、五十音順
+  assert.deepEqual([...NB.keys()].sort(), [...C.map(c => c.a)].sort());
+  for (const c of [...C].sort(byJa)) {
+    const list = NB.get(c.a);
+    t.diagnostic(`${c.a} ${c.n}: ${list.map(b => byA.get(b).n).join('・') || '（なし）'}`);
+    assert.ok(!list.includes(c.a), c.a);
+    assert.equal(new Set(list).size, list.length, c.a);
+    assert.deepEqual(list, [...list].sort((x, y) => byJa(byA.get(x), byA.get(y))), c.a);
+  }
+});
+
+test('neighbors_known', () => {
+  const has = (a, list) => { for (const b of list) assert.ok(NB.get(a).includes(b), `${a} のとなりに ${b}`); };
+  has('fr', ['de', 'es', 'be', 'ch', 'it', 'lu', 'ad', 'mc']);
+  has('es', ['pt', 'fr', 'ad']);
+  has('cn', ['in', 'np', 'ru', 'kp', 'mn']);
+  assert.equal(NB.get('cn').length, 14);
+  assert.deepEqual(NB.get('kr'), ['kp']);
+  assert.deepEqual(NB.get('sm'), ['it']);
+  assert.deepEqual(NB.get('va'), ['it']);
+  // 小さい国
+  const eq = (a, list) => assert.deepEqual([...NB.get(a)].sort(), [...list].sort(), a);
+  eq('ad', ['es', 'fr']); eq('mc', ['fr']); eq('li', ['at', 'ch']); eq('lu', ['be', 'de', 'fr']);
+  eq('bn', ['my']); eq('tl', ['id']); eq('gm', ['sn']); eq('ls', ['za']); eq('sz', ['mz', 'za']);
+});
+
+test('neighbors_island', () => {           // 島国（rpg-core.js の THEMES.island）はとなりの国なし
+  const isl = /island: \{ n: '島国', a: '([^']*)'\.split\(' '\) \}/.exec(read('rpg-core.js'))[1].split(' ');
+  assert.ok(isl.length > 30);
+  for (const a of isl) assert.deepEqual(NB.get(a), [], a);
+});
+
+test('neighbors_symmetric', () => {
+  for (const [a, list] of NB) for (const b of list) assert.ok(NB.get(b).includes(a), `${a}-${b}`);
+});
+
+test('neighbors_fix_applied', () => {
+  assert.deepEqual(Object.keys(FIX).sort(), ['add', 'note', 'remove']);
+  const pairs = [...FIX.add, ...FIX.remove];
+  assert.ok(FIX.add.length > 0);
+  for (const [a, b] of FIX.add) { assert.ok(NB.get(a).includes(b) && NB.get(b).includes(a), `add ${a}-${b}`); }
+  for (const [a, b] of FIX.remove) { assert.ok(!NB.get(a).includes(b) && !NB.get(b).includes(a), `remove ${a}-${b}`); }
+  for (const [a, b] of pairs) assert.ok(typeof FIX.note[`${a}-${b}`] === 'string' && FIX.note[`${a}-${b}`].trim(), `note ${a}-${b}`);
+  assert.deepEqual(Object.keys(FIX.note).sort(), pairs.map(([a, b]) => `${a}-${b}`).sort());
+  // 直しが無いと地図だけの結果になる（add は地図に無い、remove は地図にある）
+  const raw = neighborsOf({ ...INP, NEIGHBORS_FIX: { add: [], remove: [], note: {} } });
+  for (const [a, b] of FIX.add) assert.ok(!raw.get(a).includes(b), `add ${a}-${b} は地図に無いはず`);
+  for (const [a, b] of FIX.remove) assert.ok(raw.get(a).includes(b), `remove ${a}-${b} は地図にあるはず`);
+});
+
+test('neighbors_fix_checked', () => {      // 直しに知らないコード・地図とかさなる直しがあれば check が言う
+  const bad = { add: [['fr', 'zz'], ['fr', 'de']], remove: [['jp', 'kr']], note: {} };
+  const p = check({ ...INP, NEIGHBORS_FIX: bad });
+  assert.ok(p.some(x => x.includes('zz')), p.join('\n'));
+  assert.ok(p.some(x => x.includes('fr-de')), p.join('\n'));
+  assert.ok(p.some(x => x.includes('jp-kr')), p.join('\n'));
+});
+
+// 国のページの読み物: 国旗の意味・となりの国・この国旗が出てくるまとめ・前の国・次の国
+const MEANING = new Map(JSON.parse(read('data/flag_meanings.json')).map(m => [m.a, m.t]));
+// まとめページ（入口の順）と、そこにリンクがある国
+const THEME_IDS_IN_INDEX = [...read('themes/index.html').matchAll(/<a class="ccard" href="([\w-]+)\.html">/g)].map(m => m[1]);
+const themeHas = (id, a) => read(`themes/${id}.html`).includes(`href="../country/${a}.html"`);
+const prevnext = h => { const m = /<nav class="prevnext"[^>]*>([\s\S]*?)<\/nav>/.exec(h); return m ? m[1] : null; };
+
+test('country_page_meaning', () => {
+  const h = read('country/jp.html');
+  assert.ok(h.includes('<h2>国旗の意味</h2>'));
+  assert.ok(h.includes(MEANING.get('jp').replace(/&/g, '&amp;')));
+  for (const c of C) assert.ok(read(`country/${c.a}.html`).includes('<h2>国旗の意味</h2>'), c.a);
+  // 並び: 国旗 → 地域など → 国旗の意味 → 豆知識 → となりの国 → 似ている国旗 → まとめ → 遊ぶ → 前後の国
+  const fr = read('country/fr.html'), at = s => { const i = fr.indexOf(s); assert.ok(i >= 0, s); return i; };
+  const order = ['class="cflag"', 'class="cfacts"', '<h2>国旗の意味</h2>', '<h2>豆知識</h2>', '<h2>となりの国</h2>', '<h2>似ている国旗</h2>',
+    '<h2>この国旗が出てくるまとめ</h2>', 'class="cplay"', 'class="prevnext"', '<footer>'].map(at);
+  assert.deepEqual(order, [...order].sort((x, y) => x - y));
+  // note（出典のメモ）は出さない
+  const frNote = JSON.parse(read('data/flag_meanings.json')).find(m => m.a === 'fr').note;
+  assert.ok(frNote.length > 0 && !fr.includes(frNote) && !fr.includes(frNote.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')));
+});
+
+test('country_page_neighbors', () => {
+  const fr = read('country/fr.html');
+  assert.ok(fr.includes('<h2>となりの国</h2>'));
+  const hrefs = hrefsIn(fr, 'ul.neighbors');
+  assert.ok(hrefs.includes('de.html'));
+  assert.ok(!fr.includes('../country/de.html'));
+  assert.ok(fr.includes('<span>ドイツ</span>'));
+  assert.deepEqual(hrefs, NB.get('fr').map(b => `${b}.html`));
+  assert.ok(fr.includes(`<img src="../flags/de.svg?v=${FLAG_V}" alt=""`));
+  const jp = read('country/jp.html');
+  assert.ok(jp.includes('陸で接している国はない（島国）'));
+  assert.deepEqual(hrefsIn(jp, 'ul.neighbors'), []);
+  // 島国でない国で、陸でとなる国が無い（オーストラリア）は「島国」と書かない
+  const au = read('country/au.html');
+  assert.ok(au.includes('陸で接している国はない') && !au.includes('（島国）'));
+});
+
+test('prevnext_edges', () => {           // 同じ6地域の中で五十音順。最初の国に「前」、最後に「次」は無い
+  const { REGIONS } = readInputs(ROOT);
+  for (const r of REGIONS) {
+    const list = C.filter(c => c.r === r).sort(byJa);
+    list.forEach((c, i) => {
+      const nav = prevnext(read(`country/${c.a}.html`));
+      assert.ok(nav != null, c.a);
+      const prev = /<a class="prev" href="([a-z]{2})\.html">← ([^<]+)<\/a>/.exec(nav), next = /<a class="next" href="([a-z]{2})\.html">([^<]+) →<\/a>/.exec(nav);
+      if (i === 0) assert.equal(prev, null, `${c.a} は ${r} の最初`);
+      else assert.deepEqual([prev?.[1], prev?.[2]], [list[i - 1].a, list[i - 1].n], c.a);
+      if (i === list.length - 1) assert.equal(next, null, `${c.a} は ${r} の最後`);
+      else assert.deepEqual([next?.[1], next?.[2]], [list[i + 1].a, list[i + 1].n], c.a);
+    });
+  }
+});
+
+test('country_page_themes', () => {
+  const tr = read('country/tr.html');
+  assert.ok(tr.includes('<h2>この国旗が出てくるまとめ</h2>'));
+  assert.ok(tr.includes('href="../themes/crescent.html"'));
+  assert.ok(tr.includes('href="../themes/stars.html"'));
+  // 10か国未満でクイズの無いまとめ（ユニオンジャック）にもリンクする
+  for (const a of ['gb', 'au', 'nz', 'fj', 'tv']) assert.ok(hrefsIn(read(`country/${a}.html`), 'ul.cthemes').includes('../themes/unionjack.html'), a);
+  assert.ok(read('country/gb.html').includes('<a href="../themes/unionjack.html">ユニオンジャックが入った国旗</a>'));
+  assert.equal(THEME_IDS_IN_INDEX.length, 14);
+  for (const c of C) {
+    const h = read(`country/${c.a}.html`), want = THEME_IDS_IN_INDEX.filter(id => themeHas(id, c.a)).map(id => `../themes/${id}.html`);
+    assert.deepEqual(hrefsIn(h, 'ul.cthemes'), want, c.a);
+    assert.equal(h.includes('この国旗が出てくるまとめ'), want.length > 0, c.a);
+  }
+});
+
+test('country_desc_starts_with_meaning', () => {
+  for (const c of C) {
+    const d = desc(read(`country/${c.a}.html`)), first = MEANING.get(c.a).split('。')[0] + '。';
+    assert.ok(d.startsWith(`${c.n}の国旗の意味: ${first}`), c.a);
+    assert.ok(d.length <= 120, `${c.a} ${d.length}`);
+  }
+});

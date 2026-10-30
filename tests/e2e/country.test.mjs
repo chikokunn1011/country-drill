@@ -89,6 +89,31 @@ test('country_page_renders', { timeout: 120_000 }, async () => {
   }
 });
 
+// 国旗の意味・となりの国・まとめ・前後の国の節も、スマホで横にはみ出さない（となりが多い中国、島国の日本も見る）
+test('country_page_sections_fit', { timeout: 120_000 }, async () => {
+  for (const viewport of [PHONE, { width: 360, height: 740 }]) for (const a of ['fr', 'cn', 'jp']) {
+    const where = `${a} ${viewport.width}x${viewport.height}`;
+    await open({ path: `country/${a}.html`, viewport }, async page => {
+      for (const sel of ['.meaning', '.neighbors, .noneighbor', '.prevnext']) assert.ok(await page.locator(sel).first().isVisible(), `${where} ${sel}`);
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${where} 横スクロール`);
+      // 節の中身が本文の幅に収まる
+      const over = await page.evaluate(() => [...document.querySelectorAll('.meaning, .neighbors li, .cthemes li, .prevnext a')]
+        .filter(e => e.getBoundingClientRect().right > document.querySelector('main').getBoundingClientRect().right + 0.5).map(e => e.className || e.textContent));
+      assert.deepEqual(over, [], where);
+      // となりの国・まとめ・前後の国のリンクは押しやすい高さ（44px 以上）
+      const low = await page.evaluate(() => [...document.querySelectorAll('.neighbors a, .cthemes a, .prevnext a')].filter(e => e.getBoundingClientRect().height < 44).map(e => e.textContent));
+      assert.deepEqual(low, [], `${where} リンクの高さ`);
+    });
+  }
+});
+
+test('country_prevnext_click', { timeout: 60_000 }, () => open({ path: 'country/fr.html' }, async page => {
+  const name = (await page.textContent('.prevnext .next')).replace(' →', '');
+  await page.click('.prevnext .next');
+  await page.waitForURL(/\/country\/[a-z]{2}\.html$/);
+  assert.equal(await page.textContent('h1'), name);
+}));
+
 test('country_page_dark', { timeout: 60_000 }, async () => {
   await open({ path: 'country/fr.html', storage: { settings: { theme: 'dark' } } }, async page => assert.equal(await bg(page), DARK, '設定がダーク'));
   await open({ path: 'country/fr.html', colorScheme: 'dark' }, async page => assert.equal(await bg(page), LIGHT, '設定なし・端末がダーク'));
