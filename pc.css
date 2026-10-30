@@ -198,6 +198,13 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #home-icons { grid-area: icons; justify-content: flex-start; width: min(480px, 100%); }
   /* 「アプリとして追加」の帯（pwa.js）は下の空きの行の上に置く（隠れているときは行も間もできない） */
   #home-pwa { grid-column: 1; grid-row: 7; align-self: start; width: min(480px, 100%); }
+  /* 英語の端末への案内（#home-en）が出ているときだけ、アイコンの下に1行足す（帯はその下へ） */
+  body[data-screen="home"] #scr-home:has(> #home-en:not([hidden])) {
+    grid-template-rows: 1fr auto auto auto auto auto auto 1fr;
+    grid-template-areas: ". flags" "eyebrow flags" "title flags" "status flags" "big flags" "icons flags" "en flags" ". flags";
+  }
+  #home-en { grid-area: en; }
+  #scr-home:has(> #home-en:not([hidden])) #home-pwa { grid-row: 8; }
   #home-status .bdg-titlerow { justify-content: flex-start; }
   .home .flags {
     grid-area: flags; align-self: center; justify-self: center;

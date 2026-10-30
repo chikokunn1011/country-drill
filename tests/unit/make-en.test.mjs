@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
 import { SITE } from '../../tools/make_country_pages.mjs';
-import { EN_SKIP, EN_DICTS, readEnInputs, translateHtml, renderEn } from '../../tools/make_en.mjs';
+import { EN_SKIP, EN_DICTS, LANGSW_EN, readEnInputs, translateHtml, renderEn } from '../../tools/make_en.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = p => readFileSync(join(ROOT, p), 'utf8');
@@ -132,4 +132,16 @@ test('en_manifest', () => {
     assert.equal(ic.src, '../' + ja.icons[i].src);
     assert.ok(existsSync(join(ROOT, 'en', ic.src)), ic.src);
   });
+});
+
+// 言語の切りかえ: 日本語版は「日本語 / English（en/ へのリンク）」、英語版は「日本語（./ へのリンク）/ English」。どちらも2か所。
+// 英語の端末への案内（#home-en）は日本語版だけ
+test('langsw', () => {
+  const ja = read('index.html'), en = enIndex();
+  const blocks = html => [...html.matchAll(/<!-- langsw:start -->([\s\S]*?)<!-- langsw:end -->/g)].map(m => m[1]);
+  assert.deepEqual(blocks(ja), Array(2).fill('<span class="langsw"><b>日本語</b> / <a href="en/" hreflang="en" lang="en">English</a></span>'));
+  assert.deepEqual(blocks(en), Array(2).fill(LANGSW_EN));
+  assert.equal(LANGSW_EN, '<span class="langsw"><a href="./" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>');
+  assert.match(ja, /<p class="home-en" id="home-en" hidden><a href="en\/" hreflang="en" lang="en">English version →<\/a><\/p>/);
+  assert.doesNotMatch(en, /id="home-en"/);
 });

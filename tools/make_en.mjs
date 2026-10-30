@@ -2,6 +2,7 @@
 //   ・<html lang="en">・<base href="../">（ファイルはルートのものをそのまま読む）・canonical / og / manifest を英語版に
 //   ・未訳の機能の script（EN_SKIP）を外し、i18n.js のすぐ後に英語の辞書 i18n/en-*.js を入れる
 //   ・HTML の文字を辞書（i18n/en-*.js と、HTML だけの i18n/en-html.js）で置きかえる。訳の無い日本語が残れば止まる
+//   ・言語の切りかえ（langsw の目印のあいだ）を英語版のものに、英語の端末への案内（#home-en）を外す
 // 使い方: node tools/make_en.mjs
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -130,6 +131,10 @@ const once = (html, from, to) => {
   return html.replace(from, to);
 };
 
+// 言語の切りかえ（index.html の <!-- langsw:start --> と <!-- langsw:end --> のあいだ）の英語版。「日本語」が日本語版へのリンク
+export const LANGSW_EN = '<span class="langsw"><a href="./" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>';
+const LANGSW = /(<!-- langsw:start -->)[\s\S]*?(<!-- langsw:end -->)/g;
+
 function renderPage(html, page, inp, used) {
   html = once(html, '<html lang="ja">', '<html lang="en">');
   html = once(html, '<meta charset="utf-8">\n', '<meta charset="utf-8">\n<base href="../">\n');
@@ -139,8 +144,12 @@ function renderPage(html, page, inp, used) {
   // i18n.js のすぐ後に辞書
   const dicts = (EN_DICTS[page] ?? []).filter(n => n in inp.vers).map(n => `\n<script src="i18n/${n}.js?v=${inp.vers[n]}"></script>`).join('');
   html = html.replace(/<script src="i18n\.js\?v=\d+"><\/script>/, m => m + dicts);
-  html = enLinks(html);
-  return translateHtml(html, inp.dict, used);
+  // 英語の端末への英語版の案内（#home-en）は日本語版だけ
+  html = html.replace(/^[ \t]*<p class="home-en" id="home-en"[^\n]*\n/m, '');
+  // 言語の切りかえは中を空けておき、リンクの書きかえ・翻訳・残りのチェックのあとで英語版のものを入れる
+  html = html.replace(LANGSW, '$1$2');
+  html = translateHtml(enLinks(html), inp.dict, used);
+  return html.replace(LANGSW, '$1' + LANGSW_EN + '$2');
 }
 
 export function renderEn(inp, used = new Set()) {
