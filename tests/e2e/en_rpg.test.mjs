@@ -541,9 +541,9 @@ te('en_gacha', async page => {
   assert.equal((await txt(page, '#ga-1')).trim(), 'Draw 1 100');
   assert.equal((await txt(page, '#ga-10')).trim(), 'Draw 10 1,000');
   assert.equal((await txt(page, '#ga-free')).trim(), 'Free draw');
-  assert.equal((await txt(page, '#ga-pity')).trim(), 'guaranteed ★3 in 50 draws');
+  assert.equal((await txt(page, '#ga-pity')).trim(), 'Guaranteed ★3 in 50 draws');
   const rates = await txt(page, '#ga-rates');
-  for (const x of ['Odds', '★3 Gold 3% / ★2 Silver 17%', '★1 Bronze 80%', 'No ★3 by draw 50 → guaranteed ★3', 'World: 1/195 = 0.5% each'])
+  for (const x of ['Odds', '★3 Gold 3% / ★2 Silver 17%', '★1 Bronze 80%', 'If no ★3 comes, draw 50 is a guaranteed ★3', 'World: 1/195 = 0.5% each'])
     assert.ok(rates.includes(x), `${x}: ${rates}`);
   assert.match(await txt(page, '#ga-pack .rpg-pack-sub'), /^Not met yet 195\/195$/);
   assert.equal(await page.getAttribute('#ga-pack .rpg-pack', 'aria-label'), 'World Flag Pack');
@@ -568,7 +568,7 @@ te('en_gacha', async page => {
   // 地域の国を全部仲間にしたパック
   const oc = await page.evaluate(() => C.filter(c => c.r === 'オセアニア').map(c => c.a));
   await openGacha(page, saveWith({ coins: 0, cards: Object.fromEntries(oc.map(a => [a, [1, 0]])) }), { region: 'オセアニア' });
-  assert.equal((await txt(page, '#ga-pack .rpg-pack-sub')).trim(), `${oc.length} countries complete!`);
+  assert.equal((await txt(page, '#ga-pack .rpg-pack-sub')).trim(), `All ${oc.length} countries met!`);
   assert.equal(await page.getAttribute('#ga-pack .rpg-pack', 'aria-label'), 'Oceania Flag Pack');
   assert.match(await txt(page, '#ga-need'), /^Need \d[\d,]* more$/);
   assert.deepEqual(await jaLeft(page), []);
@@ -598,7 +598,7 @@ te('en_gacha_errors', async page => {
   await openGacha(page, saveWith({ coins: 0, day: { ...FREE_TODAY, first: false } }));
   assert.equal((await txt(page, '#ga-free')).trim(), 'Clear a quiz today for a free draw');
   await page.evaluate(() => { $('ga-free').disabled = false; $('ga-free').click(); });
-  assert.equal((await txt(page, '#ga-msg')).trim(), 'Today’s free draw is already used, or you haven’t cleared a quiz today yet');
+  assert.equal((await txt(page, '#ga-msg')).trim(), 'You’ve already used today’s free draw, or you haven’t cleared a quiz today yet');
   await openGacha(page, saveWith({ coins: 0, day: FREE_TODAY }));
   await page.click('#ga-free');
   await page.evaluate(() => $('ga-flipall').click());
@@ -638,7 +638,7 @@ te('en_cards', async page => {
   assert.deepEqual(none, [...none].sort((x, y) => x.localeCompare(y, 'en')));
   assert.equal(none[0], 'Afghanistan');
   // まだ仲間でない国のカード
-  assert.match(await txt(page, '#cd-grid .rpg-card[data-a="de"] .rpg-card-hint'), /^2 more right answers to make it an ally/);
+  assert.match(await txt(page, '#cd-grid .rpg-card[data-a="de"] .rpg-card-hint'), /^2 more correct answers to make it your ally \(counts once per game\)$/);
   assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-fr', 'title'), 'Friendship');
   assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-stack', 'title'), 'Stack 1/4');
   // 仲間の世界地図
@@ -649,13 +649,13 @@ te('en_cards', async page => {
   await page.click('#cd-grid .rpg-card[data-a="jp"]');
   await shown(page, '#detail[open]');
   const info = (await txt(page, '#detail .rpg-cd-info')).replace(/\s+/g, ' ');
-  assert.match(info, /^★2 Silver · Stack ●○○○ · Friendship ♥0\/10 Attack \d+\.\d \(Region bonus: no\) · HP \d+\.\d Region bonus ×1\.5 in Asia dungeons and the Map Eater’s Lair$/);
+  assert.match(info, /^★2 Silver · Stack ●○○○ · Friendship ♥0\/10 Attack \d+\.\d \(no Region bonus\) · HP \d+\.\d Region bonus ×1\.5 in Asia dungeons and the Map Eater’s Lair$/);
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#detail .close');
   // まだ仲間でない国の詳細
   await page.click('#cd-grid .rpg-card[data-a="de"]');
   await shown(page, '#detail[open]');
-  assert.match((await txt(page, '#detail .rpg-cd-info')).replace(/\s+/g, ' '), /^Not an ally yet \(Friendship ♥3\/10\) 2 more right answers to make it an ally/);
+  assert.match((await txt(page, '#detail .rpg-cd-info')).replace(/\s+/g, ' '), /^Not an ally yet \(Friendship ♥3\/10\) 2 more correct answers to make it your ally/);
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#detail .close');
   // 地域でしぼる
@@ -666,9 +666,12 @@ te('en_cards', async page => {
 
 // 50か国目の仲間 → ［Share］の文は Flag Quest をふくみ #FlagMaster で終わる。URL は英語版
 te('en_cards_share', async page => {
-  const codes = await page.evaluate(() => C.slice(0, 49).map(c => c.a));
+  // 49か国を持ち、持っていない10か国だけから引く（1枚目はかならず NEW なので、乱数に依らず50か国をこえる。同じ国が2回出ると かさね）
+  const codes = await page.evaluate(() => C.slice(0, 49).map(c => c.a)), fresh = await page.evaluate(() => C.slice(49, 59).map(c => c.a));
   await openGacha(page, saveWith({ coins: 1000, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  await onlyDraw(page, fresh);
   await drawTen(page);
+  assert.ok(Object.keys((await saved(page)).cards).length >= 50);
   await shown(page, '#ga-share .rpg-share-row');
   assert.equal((await txt(page, '#ga-share .rpg-share-row span')).trim(), '🎉 You now have 50 allies!');
   assert.equal((await txt(page, '#ga-share .rpg-share')).trim(), 'Share');
@@ -705,7 +708,8 @@ const nameOver = (page, sel) => page.evaluate(sel => {
   }
   return { out, n: document.querySelectorAll(sel).length, sw: document.documentElement.scrollWidth, iw: document.documentElement.clientWidth };
 }, sel);
-for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) te(`en_cards_fit_${vname}`, async page => {
+// 1280px（PC）の結果は5列（900px から）、1440px は10列（rpg.css の 1400px から。いちばん細いカード）
+for (const [vname, viewport] of [['phone', PHONE], ['pc', PC], ['wide', { width: 1440, height: 900 }]]) te(`en_cards_fit_${vname}`, async page => {
   await openGacha(page, saveWith({ coins: 1100 }));
   await onlyDraw(page, LONG);
   await drawTen(page);
@@ -719,6 +723,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) te(`en_cards_fit
   r = await nameOver(page, '#ga-stage-in .rpg-card-name');
   assert.equal(r.n, 1);
   assert.deepEqual(r.out, []);
+  assert.ok(r.sw <= r.iw, `${r.sw} > ${r.iw}`);
   await page.click('#ga-skip');
   // 仲間の一覧（長い名前の国だけ）
   await writeSave(page, saveWith({ cards: Object.fromEntries(LONG.map(a => [a, [3, 4]])) }));

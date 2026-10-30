@@ -618,3 +618,31 @@ t('read_only_cannot_pull', async page => {
   await gacha(page, saveWith({ coins: 100 }));
   assert.equal(await page.isVisible('#ga-warn'), false);
 });
+
+// 英語版（PR8）で T() に通した文のうち、ja_rpg_unchanged（見える文とトースト）に写らないもの: シェアの文と URL・title・aria-label。
+// 日本語のページでは前と1文字も変わらないこと
+t('ja_share_and_attrs_unchanged', async page => {
+  const codes = await page.evaluate(() => C.slice(0, 49).map(c => c.a)), fresh = await page.evaluate(() => C.slice(49, 59).map(c => c.a));
+  await gacha(page, saveWith({ coins: 1000, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  assert.equal(await page.getAttribute('#ga-pack .rpg-pack', 'aria-label'), '全世界の国旗パック');
+  // 持っていない10か国だけから引く（1枚目はかならず NEW なので、乱数に依らず50か国をこえる）
+  await page.evaluate(fresh => { const pull = RPG_CORE.pull; RPG_CORE.pull = (x, r, n, rnd, cs) => pull(x, r, n, rnd, cs.filter(c => fresh.includes(c.a))); }, fresh);
+  await page.click('#ga-10');
+  await flipAll(page);
+  assert.equal(await text(page, '#ga-share .rpg-share-row span'), '🎉 仲間が50か国になった！');
+  assert.equal(await text(page, '#ga-share .rpg-share'), 'シェア');
+  await page.click('#ga-share .rpg-share');
+  assert.deepEqual(await page.evaluate(() => window.__shared), { text: '国旗クエストで仲間が50か国になった！ #国旗マスター', url: 'https://chikokunn1011.github.io/country-drill/' });
+  const oc = await page.evaluate(() => C.filter(c => c.r === 'オセアニア').map(c => c.a));
+  assert.deepEqual(await page.evaluate(oc => RPG.milestones([], oc).find(x => x.kind.startsWith('region-')), oc), {
+    kind: 'region-oceania', msg: 'オセアニアの国を全部仲間にした！', text: `国旗クエストでオセアニアの国を全部仲間にした！ 仲間 ${oc.length}/195か国 #国旗マスター` });
+  // 仲間のカードの title・aria-label、仲間の一覧と世界地図の aria-label
+  await writeSave(page, saveWith({ cards: { jp: [2, 1] }, fr: { de: 3 } }));
+  await page.evaluate(() => RPG.open('cards'));
+  assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-stack', 'title'), 'かさね 1/4');
+  assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-fr', 'title'), 'なかよし度');
+  assert.equal(await text(page, '#cd-grid .rpg-card[data-a="de"] .rpg-card-hint'), 'あと2回正解で仲間に（1回のゲームで1回ぶん）');
+  assert.equal(await page.getAttribute('#cd-regions', 'aria-label'), '地域でしぼりこむ');
+  assert.equal(await page.getAttribute('#cd-map svg', 'aria-label'), '仲間にした国の世界地図（仲間 1/195）');
+  assert.equal(await page.evaluate(() => RPG.cardHTML('jp', { cards: { jp: [2, 1] }, fr: {} }, { face: 'back' }).match(/aria-label="([^"]*)"/)[1]), '裏向きのカード');
+}, { init: () => { navigator.share = o => { window.__shared = o; return Promise.resolve(); }; } });

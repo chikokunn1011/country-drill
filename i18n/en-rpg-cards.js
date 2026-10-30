@@ -9,8 +9,8 @@
 Object.assign(window.I18N_EN ??= {}, {
   // ---- 仲間のカード ----
   'あと{n}回正解で仲間に（1回のゲームで1回ぶん）': {
-    one: '{n} more right answer to make it an ally (one per game)',
-    other: '{n} more right answers to make it an ally (one per game)',
+    one: '{n} more correct answer to make it your ally (counts once per game)',
+    other: '{n} more correct answers to make it your ally (counts once per game)',
   },
   'ブロンズ': 'Bronze',
   'シルバー': 'Silver',
@@ -22,8 +22,8 @@ Object.assign(window.I18N_EN ??= {}, {
   'かさね {dots}': 'Stack {dots}',
   'なかよし度 ♥{fr}/{max}': 'Friendship ♥{fr}/{max}',
   'こうげき {atk}': 'Attack {atk}',
-  '（地域ボーナス あり）': '(Region bonus: yes)',
-  '（地域ボーナス なし）': '(Region bonus: no)',
+  '（地域ボーナス あり）': '(with Region bonus)',
+  '（地域ボーナス なし）': '(no Region bonus)',
   '{region}のダンジョンと地図喰いの巣では、地域ボーナスで ×{mul}': 'Region bonus ×{mul} in {region} dungeons and the Map Eater’s Lair',
   'まだ仲間じゃない（なかよし度 ♥{fr}/{max}）': 'Not an ally yet (Friendship ♥{fr}/{max})',
 
@@ -35,7 +35,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'おかえし {coins}': 'Coins back {coins}',
   'どこの国と出会う？': 'Which countries will you meet?',
   '地域をしぼると値段が ×{price}。そのかわり、その地域のダンジョンでは仲間が ×{power} で強い':
-    'Choosing a region makes the price ×{price}. In return, those allies are ×{power} stronger in that region’s dungeons.',
+    'Choosing a region makes the price ×{price}. In return, allies from that region are ×{power} as strong in its dungeons.',
   '結果': 'Results',
   '引いたカードがここに並ぶよ': 'Cards you draw will appear here',
   'ぜんぶめくる': 'Flip all',
@@ -45,14 +45,14 @@ Object.assign(window.I18N_EN ??= {}, {
   '★3 ゴールド {p3}% / ★2 シルバー {p2}%': '★3 Gold {p3}% / ★2 Silver {p2}%',
   '★1 ブロンズ {p1}%': '★1 Bronze {p1}%',
   '10回引くと10枚目は★2以上（★3 {p3}% / ★2 {p2}%）': 'In Draw 10, the 10th card is ★2 or better (★3 {p3}% / ★2 {p2}%)',
-  '★3が出ないまま{n}回目 → ★3確定': 'No ★3 by draw {n} → guaranteed ★3',
+  '★3が出ないまま{n}回目 → ★3確定': 'If no ★3 comes, draw {n} is a guaranteed ★3',
   '国は選んだ地域から同じ確率（{area}なら 各 1/{n} = {p}%）': 'Every country in the chosen region has the same chance ({area}: 1/{n} = {p}% each)',
   '天井込みの★3の目安: 約{p}%': 'Overall ★3 chance with the guarantee: about {p}%',
   // 国旗パック
   '{name}の国旗パック': '{name} Flag Pack',
   'FLAG QUEST · 国旗パック': 'FLAG QUEST · FLAG PACK',
   'まだ会っていない国 {rest}/{n}': 'Not met yet {rest}/{n}',
-  '{n}か国コンプリート！': { one: '{n} country complete!', other: '{n} countries complete!' },
+  '{n}か国コンプリート！': { one: 'All {n} country met!', other: 'All {n} countries met!' },
   '地域しぼり ×{mul}': 'One region ×{mul}',
   // ボタン・天井
   'また明日': 'Come back tomorrow',
@@ -60,14 +60,14 @@ Object.assign(window.I18N_EN ??= {}, {
   '今日クイズを1回クリアすると無料1回': 'Clear a quiz today for a free draw',
   '1回': 'Draw 1',
   '10回': 'Draw 10',
-  '★3確定まで あと{n}回': { one: 'guaranteed ★3 in {n} draw', other: 'guaranteed ★3 in {n} draws' },
+  '★3確定まで あと{n}回': { one: 'Guaranteed ★3 in {n} draw', other: 'Guaranteed ★3 in {n} draws' },
   // 引く演出
   '…金色に光った！': '…It glowed gold!',
   'きらっ！': 'Sparkle!',
   'どの国かな？': 'Which country will it be?',
   // 引けなかったときの1行（#ga-msg）
   'コインが足りないので引けなかったよ（ほかのタブで使ったかも）': 'Not enough coins, so nothing was drawn (maybe you used them in another tab)',
-  '今日の無料1回はもう使っているか、まだ今日クイズをクリアしていないよ': 'Today’s free draw is already used, or you haven’t cleared a quiz today yet',
+  '今日の無料1回はもう使っているか、まだ今日クイズをクリアしていないよ': 'You’ve already used today’s free draw, or you haven’t cleared a quiz today yet',
   '保存できなかったので、引いていないよ': 'Couldn’t save, so nothing was drawn',
 
   // ---- 仲間の一覧（#scr-cards）・仲間の世界地図 ----
