@@ -210,6 +210,8 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .zoomctl { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
 .zoomctl button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1rem var(--font-mono); cursor: pointer; }
 .zoomctl button.reset { width: auto; padding: 0 10px; font-size: .75rem; }
+/* スマホの白地図タップ: ボタンが地図の端を隠さないよう地図の下に出す */
+@media (max-width: 599.98px) { .tapbox > .zoomctl { position: static; justify-content: flex-end; margin-top: 6px; } }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
 .choice { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 12px; padding: 12px 14px; font-size: 1rem; font-weight: 500; cursor: pointer; min-height: 56px; min-width: 0; transition: border-color .15s, transform .1s; }
 .choice:hover:not(:disabled) { border-color: var(--accent); }

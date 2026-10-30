@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint, answerCorrect } from './helpers.mjs';
+import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint, answerCorrect, PHONE, PC } from './helpers.mjs';
 import { openRpg, writeSave, saveWith, startBattle, battleAnswer } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -212,6 +212,23 @@ t('quiz_only_flag_name_place', async page => {
   v = await q();
   assert.ok(v.flag); assert.ok(!v.text.includes('首都'), v.text); assert.ok(v.text.includes(v.n), '国名表示ありでは国名も出す');
 });
+
+/* ---------- ズームボタンの置き場所 ---------- */
+const ctlAndMap = async page => ({ ctl: await page.locator('#qcard .tapbox .zoomctl').boundingBox(), map: await page.locator('#qcard .tapmap').boundingBox() });
+
+// スマホでは地図の下（地図の端を押すのにボタンがじゃまにならない）
+t('tap_zoom_buttons_outside_on_phone', async page => {
+  await startTap(page);
+  const { ctl, map } = await ctlAndMap(page);
+  assert.ok(ctl.y >= map.y + map.height - 0.5, `ctl ${JSON.stringify(ctl)} map ${JSON.stringify(map)}`);
+  assert.ok(ctl.x + ctl.width <= map.x + map.width + 0.5, '右寄せで地図の幅に収まる');
+}, { viewport: PHONE });
+
+t('tap_zoom_buttons_on_map_on_pc', async page => {
+  await startTap(page);
+  const { ctl, map } = await ctlAndMap(page);
+  assert.ok(ctl.y >= map.y && ctl.y + ctl.height <= map.y + map.height, `ctl ${JSON.stringify(ctl)} map ${JSON.stringify(map)}`);
+}, { viewport: PC });
 
 /* ---------- 外れたときの表示・冒険から・道場（Task 4） ---------- */
 const kOf = page => page.evaluate(() => d3.zoomTransform(document.querySelector('#qcard .tapmap')).k);
