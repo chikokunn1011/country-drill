@@ -25,7 +25,7 @@ const load = ({ lang, dict } = {}) => {
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
 const COVER = { 'i18n.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all',
-  'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '起動'] };
+  'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '図鑑', '起動'] };
 // まだ訳さないファイル（PR6: ranking・daily・profile・streak・share-card、PR7: badges・trivia、PR8: rpg-*）
 // dojo・embed は PR5 のあとのタスクで COVER へ移す
 const NOT_YET = ['ranking.js', 'daily.js', 'profile.js', 'streak.js', 'share-card.js', 'badges.js', 'trivia.js',
@@ -140,6 +140,12 @@ test('no_ja_outside_T', () => {
     else check(f, read(f));
   }
   assert.deepEqual(bad, []);
+});
+
+// index.html のインラインの節は全部 COVER で見る
+test('index_all_sections_covered', () => {
+  const missing = Object.keys(inlineSections(read('index.html'))).filter(k => !COVER['index.html'].includes(k));
+  assert.deepEqual(missing, []);
 });
 
 test('every_root_js_listed', () => {

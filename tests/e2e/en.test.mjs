@@ -346,3 +346,88 @@ t('en_no_ranking', async page => {
   assert.equal(await page.isHidden('#scr-ranking'), true);
   assert.deepEqual(await jaLeft(page), []);
 }, { path: 'en/#ranking' });
+
+// ---- 図鑑（Task 8） ----
+const openBook = async (page, view = 'list') => {
+  await page.click('#home-book');
+  await page.waitForSelector('#scr-book:not([hidden])');
+  await page.click(`#bview button[data-v="${view}"]`);
+};
+const cardNames = page => page.$$eval('#grid .card b', bs => bs.map(b => b.textContent));
+
+t('en_book_list', async page => {
+  await openBook(page);
+  assert.deepEqual(await jaLeft(page), []);
+  const names = await cardNames(page);
+  assert.equal(names.length, 195);
+  assert.equal(names[0], 'Afghanistan');
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'en')));
+  const i = names.indexOf('Ivory Coast');
+  assert.deepEqual([names[i - 1], names[i + 1]], ['Italy', 'Jamaica']);
+  assert.equal((await page.textContent('#bcount')).trim(), '195 countries');
+  assert.equal((await page.textContent('#grid .card[data-a="jp"] span')).trim(), 'Capital: Tokyo');
+  assert.equal((await page.innerText('#hidecap-row')).trim(), 'Hide capitals');
+  assert.equal(await page.isVisible('#grid .card[data-a="jp"] span'), true);
+  await page.click('#hidecap');
+  assert.equal(await page.isVisible('#grid .card[data-a="jp"] span'), false);
+  // 地域の選択: 表示は英語、value は日本語のまま
+  const opts = await page.$$eval('#bregion option', os => os.map(o => [o.value, o.textContent]));
+  assert.deepEqual(opts[0], ['all', 'All regions']);
+  assert.deepEqual(opts[1], ['アジア', 'Asia']);
+  await page.selectOption('#bregion', 'オセアニア');
+  assert.equal((await page.textContent('#bcount')).trim(), '14 countries');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+t('en_book_search_fold', async page => {
+  await openBook(page);
+  const search = async q => { await page.fill('#q', q); return cardNames(page); };
+  assert.deepEqual(await search('sao tome'), ['São Tomé and Príncipe']);
+  assert.equal((await page.textContent('#bcount')).trim(), '1 country');
+  assert.deepEqual(await search('IVORY'), ['Ivory Coast']);
+  assert.deepEqual(await search('tokyo'), ['Japan']);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+t('en_book_detail', async page => {
+  await openBook(page);
+  await page.click('#grid .card[data-a="fr"]');
+  await page.waitForSelector('#detail[open]');
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal(await page.locator('#detail .trivia').count(), 0);
+  assert.equal(await page.getAttribute('#detail .cpage a', 'href'), 'en/country/fr.html');
+  assert.equal(await page.evaluate(() => new URL(document.querySelector('#detail .cpage a').href).pathname), '/en/country/fr.html');
+  assert.equal((await page.textContent('#detail .cpage a')).trim(), 'Country page ›');
+  assert.equal(await page.getAttribute('#detail svg.map', 'aria-label'), 'Location of France');
+  assert.equal((await page.textContent('#dclose')).trim(), 'Close');
+});
+
+t('en_book_map', async page => {
+  await openBook(page, 'map');
+  await page.waitForSelector('#bmapbox svg path[data-a]');
+  assert.deepEqual(await jaLeft(page), []);
+  assert.match(await page.getAttribute('#bmapbox svg', 'aria-label'), /^Map: Whole world\./);
+  await page.click('#bmapbox path[data-a="br"]');
+  await page.waitForSelector('#binfo .facts');
+  assert.equal((await page.textContent('#binfo .facts .name')).trim(), 'Brazil');
+  assert.equal(await page.locator('#binfo .trivia').count(), 0);
+  assert.equal(await page.getAttribute('#binfo .cpage a', 'href'), 'en/country/br.html');
+  assert.deepEqual(await jaLeft(page), []);
+  // 検索で1件なら選ばれる
+  await page.fill('#q', 'ivory');
+  assert.equal((await page.textContent('#binfo .facts .name')).trim(), 'Ivory Coast');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+t('en_book_long_names_fit', async page => {
+  await openBook(page);
+  const r = await page.$eval('#grid .card[data-a="vc"]', el => {
+    const b = el.getBoundingClientRect(), g = el.parentElement.getBoundingClientRect();
+    return { sw: el.scrollWidth, cw: el.clientWidth, right: b.right, gright: g.right, doc: document.documentElement.scrollWidth, vw: innerWidth,
+      name: [...el.children].map(c => c.scrollWidth <= c.clientWidth + 1) };
+  });
+  assert.ok(r.sw <= r.cw, JSON.stringify(r));
+  assert.ok(r.right <= r.gright + 0.5, JSON.stringify(r));
+  assert.ok(r.name.every(Boolean), JSON.stringify(r));
+  assert.ok(r.doc <= r.vw, JSON.stringify(r));
+});

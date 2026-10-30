@@ -623,7 +623,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
   <section id="scr-book" class="wrap" hidden>
     <div class="row">
       <div class="seg" id="bview" role="group" aria-label="View"><button type="button" data-v="list">List</button><button type="button" data-v="map">Map</button></div>
-      <input type="search" id="q" placeholder="Search by country or capital" aria-label="Search">
+      <input type="search" id="q" placeholder="Search country or capital" aria-label="Search">
       <select id="bregion" aria-label="Region"></select>
       <label class="switch" id="hidecap-row"><input type="checkbox" id="hidecap"> Hide capitals</label>
       <span class="count" id="bcount"></span>
@@ -649,6 +649,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="i18n/en-core.js?v=1"></script>
 <script src="i18n/en-quiz.js?v=1"></script>
 <script src="i18n/en-rank.js?v=1"></script>
+<script src="i18n/en-book.js?v=1"></script>
 <script src="countries.js"></script>
 <script src="themes.js?v=1"></script>
 <script src="daily-core.js?v=2"></script>
@@ -1821,19 +1822,24 @@ $('rk-play').onclick = () => {
 
 /* ---------- 図鑑 ---------- */
 let bregion = 'all', bview = store.get('bview', 'list'), bsel = null, bmapKey = '';
-$('bregion').innerHTML = [['all', 'すべての地域'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+// 表示は T() で訳し、value は日本語のまま（データのキー）
+$('bregion').innerHTML = [['all', T('すべての地域')], ...REGIONS.map(r => [r, T(r)])].map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+// 検索: 日本語は今までどおり includes。英語はアクセントと大文字小文字を無視（I18N.fold）
+const bookHit = I18N.lang === 'en'
+  ? (c, q) => { const f = I18N.fold(q); return I18N.fold(cName(c)).includes(f) || I18N.fold(cCap(c)).includes(f); }
+  : (c, q) => c.n.includes(q) || c.c.includes(q);
 function renderBook() {
   const q = $('q').value.trim();
-  const list = C.filter(c => (bregion === 'all' || c.r === bregion) && (!q || c.n.includes(q) || c.c.includes(q)))
-    .sort((a, b) => a.n.localeCompare(b.n, 'ja'));
-  $('bcount').textContent = `${list.length}か国`;
+  const list = C.filter(c => (bregion === 'all' || c.r === bregion) && (!q || bookHit(c, q)))
+    .sort(I18N.byName);
+  $('bcount').textContent = T('{n}か国', { n: list.length });
   for (const b of $('bview').children) b.setAttribute('aria-pressed', b.dataset.v === bview);
   $('grid').hidden = bview !== 'list';
   $('bmap').hidden = bview !== 'map';
   $('hidecap-row').hidden = bview !== 'list';
   if (bview === 'map') return renderBookMap(q ? list : []);
   $('grid').className = 'grid' + ($('hidecap').checked ? ' hide-cap' : '');
-  $('grid').innerHTML = list.map(c => `<button class="card" data-a="${c.a}"><img loading="lazy" src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>首都 ${esc(c.c)}</span></button>`).join('');
+  $('grid').innerHTML = list.map(c => `<button class="card" data-a="${c.a}"><img loading="lazy" src="${flag(c.a)}" alt=""><b>${esc(cName(c))}</b><span>${esc(T('首都 {c}', { c: cCap(c) }))}</span></button>`).join('');
 }
 $('q').oninput = renderBook;
 $('bregion').onchange = e => { bregion = e.target.value; renderBook(); };
@@ -1858,11 +1864,11 @@ function renderBookMap(matches) {
     for (const c of poolFor(bregion).filter(isSmall)) {
       const q = proj([c.ll[1], c.ll[0]]); if (!q) continue;
       dots += `<circle class="dot" data-a="${c.a}" cx="${q[0]}" cy="${q[1]}" r="4"></circle>`;
-      hits += `<circle class="hit" data-a="${c.a}" cx="${q[0]}" cy="${q[1]}" r="8"><title>${esc(c.n)}</title></circle>`;
+      hits += `<circle class="hit" data-a="${c.a}" cx="${q[0]}" cy="${q[1]}" r="8"><title>${esc(cName(c))}</title></circle>`;
     }
     const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     s.classList.add('map', 'zoomable'); s.setAttribute('viewBox', `0 0 ${w} ${h}`);
-    s.setAttribute('role', 'img'); s.setAttribute('aria-label', `${regionLabel(bregion)}の地図。国をタップすると情報が出る`);
+    s.setAttribute('role', 'img'); s.setAttribute('aria-label', T('{r}の地図。国をタップすると情報が出る', { r: regionLabel(bregion) }));
     s.innerHTML = `<g class="layer">${out}${dots}${hits}</g>`;
     box.innerHTML = ''; box.append(s);
     const g = s.querySelector('.layer');
@@ -1877,7 +1883,7 @@ function renderBookMap(matches) {
     const sel = d3.select(s).call(zoom);
     requestAnimationFrame(() => sizeDots(1));
     const ctl = document.createElement('div'); ctl.className = 'zoomctl';
-    ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset">戻す</button>';
+    ctl.innerHTML = `<button type="button" aria-label="${T('縮小')}">−</button><button type="button" aria-label="${T('拡大')}">${T('＋')}</button><button type="button" class="reset">${T('戻す')}</button>`;
     const [minus, plus, reset] = ctl.children;
     minus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1 / 1.6);
     plus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1.6);
@@ -1890,13 +1896,13 @@ function renderBookMap(matches) {
   if (matches.length === 1) bsel = matches[0].a;
   selectBook(bsel, false);
 }
-// 図鑑の情報欄から国のページ（country/<a>.html）へ。クイズの答えの欄には出さない
-const countryLink = c => `<p class="cpage"><a href="country/${c.a}.html">この国のページ ›</a></p>`;
+// 図鑑の情報欄から国のページ（country/<a>.html。英語版は en/country/<a>.html）へ。クイズの答えの欄には出さない
+const countryLink = c => `<p class="cpage"><a href="${I18N.page('country/')}${c.a}.html">${T('この国のページ ›')}</a></p>`;
 function selectBook(a, tapped) {
   bsel = a;
   $('bmapbox').querySelectorAll('[data-a]').forEach(el => el.classList.toggle('on', el.dataset.a === a));
   const c = a && byA.get(a);
-  $('binfo').innerHTML = c ? factsHTML(c) + countryLink(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">地図の国をタップすると、国旗・首都などが出るよ。<br>小さい国は丸印をタップ。ピンチやホイールで拡大できる。</p>`;
+  $('binfo').innerHTML = c ? factsHTML(c) + countryLink(c) + triviaHTML(window.TRIVIA?.[c.a]) : `<p class="hint">${T('地図の国をタップすると、国旗・首都などが出るよ。')}<br>${T('小さい国は丸印をタップ。ピンチやホイールで拡大できる。')}</p>`;
   $('binfo').scrollTop = 0; // PC では情報欄が中でスクロールする。前の国の位置のままだと国旗が上で隠れる
   if (c && tapped && innerWidth < 900) $('binfo').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   if (c && tapped) emit('drill:book-open', { a });
@@ -1905,8 +1911,8 @@ $('hidecap').onchange = renderBook;
 $('grid').onclick = e => {
   const b = e.target.closest('.card'); if (!b) return;
   const c = byA.get(b.dataset.a), inner = $('detail-inner');
-  inner.innerHTML = `<button class="close" id="dclose">閉じる</button>${factsHTML(c)}${countryLink(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
-  inner.append(mapSvg(c, `${c.n}の位置`));
+  inner.innerHTML = `<button class="close" id="dclose">${T('閉じる')}</button>${factsHTML(c)}${countryLink(c)}${triviaHTML(window.TRIVIA?.[c.a])}`;
+  inner.append(mapSvg(c, T('{n}の位置', { n: cName(c) })));
   $('dclose').onclick = () => $('detail').close();
   $('detail').showModal();
   emit('drill:book-open', { a: c.a });

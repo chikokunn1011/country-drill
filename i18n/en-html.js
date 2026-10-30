@@ -89,7 +89,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '表示': 'View',
   '一覧': 'List',
   '地図': 'Map',
-  '国名・首都で検索': 'Search by country or capital',
+  '国名・首都で検索': 'Search country or capital',   // 390px の検索の欄に収まる長さ
   '検索': 'Search',
   '首都をかくす': 'Hide capitals',
 
