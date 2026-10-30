@@ -1,4 +1,4 @@
-// v=1
+// v=2
 // 英語版（PR6）: profile.js の文（プロフィール画面・結果画面の「載せる」箱・プロフィールの窓・引き継ぎ）。
 // en-html.js と同じキー（プロフィール・ホームへ・設定・再読み込み・プライバシーポリシー）は同じ訳（en-html.js はブラウザが読まない）
 Object.assign(window.I18N_EN ??= {}, {
@@ -28,7 +28,7 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // プロフィール画面
   'プロフィールを作ると、タイムアタック・今日の難問・冒険のランキングにこの名前で載るよ。':
-    'With a profile, your name appears on the Time Attack and Daily Puzzle leaderboards.',
+    'With a profile, your name appears on the Time Attack, Daily Puzzle, and Adventure leaderboards.',
   'プロフィールを作る': 'Create a profile',
   '作る': 'Create',
   'ほかの人と同じニックネームは使えないよ。名前はあとから変えられる': 'You can’t use a nickname someone else has. You can change it later.',
@@ -37,7 +37,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'ランキングの名前は、前の記録もふくめて新しい名前になるよ': 'Your new nickname will also show on your past records on the leaderboard.',
   '名前を変えたよ': 'Nickname changed',
   'かざり': 'Decorations',
-  '冒険の仲間の国旗を3つまで、名前の横にかざれるよ': 'Show up to 3 flags of your Adventure companions next to your nickname.',
+  '冒険の仲間の国旗を3つまで、名前の横にかざれるよ': 'Show up to 3 flags of your Adventure allies next to your nickname.',
   '冒険でかざりを選ぶ': 'Choose decorations in Adventure',
   '設定': 'Settings',
   'プロフィールを公開する': 'Make my profile public',

@@ -233,8 +233,7 @@ t('en_card_title_unknown', async (page, { db }) => {
 // 冒険（PR8）が無いあいだ、英語版のプロフィール画面にかざりの欄は出さない。はじめの文も冒険のランキングを約束しない
 t('en_profile_no_decorations', async (page, { db }) => {
   await openProfile(page);
-  assert.equal(await text(page, '#pf-main .pf-lead'), 'With a profile, your name appears on the Time Attack and Daily Puzzle leaderboards.');
-  assert.doesNotMatch(await text(page, '#pf-main'), /Adventure/);
+  assert.equal(await text(page, '#pf-main .pf-lead'), 'With a profile, your name appears on the Time Attack, Daily Puzzle, and Adventure leaderboards.');
   await openWithProfile(page, db);
   await openProfile(page);
   await page.locator('#pf-me').waitFor();

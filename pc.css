@@ -291,7 +291,7 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   /* 豆知識があれば国の情報の下に置き、地図は右で2行ぶん */
   #detail .inner > .trivia { grid-column: 1; }
   #detail .inner:has(> .trivia) > .map { grid-column: 2; grid-row: 2 / span 2; }
-  /* 豆知識が無いとき（英語版）も同じ形: 国の情報と［国のページ］は左の列に重ね、地図は右で2行ぶん（右の列が空かないように） */
+  /* 豆知識が無い国のときも同じ形: 国の情報と［国のページ］は左の列に重ね、地図は右で2行ぶん（右の列が空かないように） */
   #detail .inner:not(:has(> .trivia)) > .cpage { grid-column: 1; }
   #detail .inner:not(:has(> .trivia)) > .map { grid-column: 2; grid-row: 2 / span 2; }
 }
