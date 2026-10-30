@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { swList, render } from '../../tools/make_sw.mjs';
@@ -83,5 +83,16 @@ test('sw_list_en', () => {
   // ブラウザが読まない辞書（make_en が使う en-html.js）は入れない
   assert.ok(!list.some(u => u.startsWith('i18n/en-html.js')));
   for (const u of list) assert.ok(!u.startsWith('en/country/') && !u.startsWith('en/themes/') && !u.startsWith('../'), u);
+  // en/ の manifest のアイコンは manifest のある場所（en/）からの相対（../icons/…）。根からの path（icons/…）にして入れる
+  const icons = JSON.parse(read('en/manifest.webmanifest')).icons;
+  assert.ok(icons.length >= 4);
+  for (const { src } of icons) {
+    assert.match(src, /^\.\.\/icons\//, src);
+    const u = posix.normalize(posix.join('en', src));
+    assert.equal(u, src.slice(3));
+    has(u);
+    assert.ok(!list.some(x => x.includes(src)), src);
+  }
+  assert.ok(!list.some(u => u.split('/').includes('..')));
   assert.equal(new Set(list).size, list.length);
 });

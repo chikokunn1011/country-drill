@@ -93,6 +93,11 @@ t('sw_en_shell', async (page, { context }) => {
   await page.goto(en('index.html'));
   await page.locator('#scr-home').waitFor();
   await isEn();
+  // キャッシュに無い en/ の URL（? 付き）は、ネットが落ちたら en/index.html を出す（日本語の index.html ではない）
+  await page.goto(en('?from=pwa'));
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play quiz');
   await page.goto(en());
   await page.locator('#scr-home').waitFor();
   await isEn();
@@ -111,6 +116,7 @@ t('sw_en_shell', async (page, { context }) => {
   for (const path of ['country/jp.html', 'howto.html']) {
     await page.goto(en(path)).catch(() => {});
     assert.equal(await page.locator('#scr-home').count(), 0, path);
+    assert.equal(await page.evaluate(() => typeof G), 'undefined', path);
   }
 }, { path: 'en/', locale: 'en-US', seed: 1 });
 
