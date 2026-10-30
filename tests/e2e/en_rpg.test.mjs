@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer, QUIET_BADGES, PHONE, PC, jaLeft, warned, pickSetup, answerCorrect, clearByAnswering, settleResult } from './helpers.mjs';
-import { openRpg, writeSave, saveWith, toastTexts, playPractice, winBattle, startTower, winTowerFloor } from './rpg_helpers.mjs';
+import { openRpg, writeSave, saveWith, toastTexts, playPractice, winBattle, startTower, winTowerFloor, localToday, flipAll } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -150,8 +150,8 @@ test('ja_rpg_unchanged', { timeout: 300_000 }, async t => {
 });
 
 /* ---------- 英語の冒険（Task 5: 冒険ホーム・入口・コインの表示。I18N.hide から 'rpg' を外す） ---------- */
-// Task 5 の時点では rpg-cards・rpg-battle・rpg-team・rpg-rank は英語のページで読まない（EN_SKIP。Task 6〜9）。
-// なので塔の札（バトルの画面が要る）とかざりの窓（RPG.cardHTML が要る）は Task 8・6 で見る（preflight C2）
+// rpg-battle・rpg-team・rpg-rank は Task 7〜9 まで英語のページで読まない（EN_SKIP）。
+// なので塔の札（バトルの画面が要る）は Task 8 で見る。かざりの窓（RPG.cardHTML が要る）は Task 6 から en_profile_decorations で見る（preflight C2）
 const EN_OPTS = { path: 'en/', locale: 'en-US', seed: 1, storage: { badges: QUIET_BADGES } };
 // 英語版を開いて fn(page, app) を呼び、最後にページの例外・[i18n] の warn（辞書に無いキー）・[rpg] の console.error が無いかも見る
 const te = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => {
@@ -186,7 +186,8 @@ te('en_rpg_intro', async page => {
 });
 
 te('en_rpg_home', async page => {
-  await openHome(page, { ...JA_SAVE, bounty: { d: '2000-01-01', a: [], done: [] } });   // 今日の手配書を引き直す
+  // 今日の手配書を引き直す。pulls: 1 は「まずはガチャ10連」をすすめないため（つぎにやることをダンジョンにする）
+  await openHome(page, { ...JA_SAVE, pulls: 1, bounty: { d: '2000-01-01', a: [], done: [] } });
   assert.deepEqual(await jaLeft(page), []);
   // ダンジョンの札（いま見せている1つ）: 英語の名前・推奨 Lv の目安
   const plate = page.locator('#rpg-dgs .rpg-plate:not([hidden])');
@@ -210,7 +211,12 @@ te('en_rpg_home', async page => {
   // 旅人カード
   assert.match(await txt(page, '#rpg-stats'), /Lv 12.*Allies 4\/195/s);
   assert.match(await txt(page, '#rpg-next > span:last-child'), /^Take on Coral Reef F3! \(recommended Lv \d+\)/);
-  // つぎにやることの札を押してもバトルの画面が無いので冒険ホームのまま（Task 8 まで）
+  assert.deepEqual(await jaLeft(page), []);
+  // まだ引いたことがなく ●1,000 以上: ガチャの画面がある（Task 6 から）ので、つぎにやることは Draw 10。押すと Flag Draw
+  await openHome(page, JA_SAVE);
+  assert.equal((await txt(page, '#rpg-next > span:last-child')).trim(), 'Start by finding allies with Draw 10 in the Flag Draw (●1,000 for World)');
+  await page.click('#rpg-next');
+  await shown(page, '#scr-gacha');
   assert.deepEqual(await jaLeft(page), []);
 });
 
@@ -404,7 +410,7 @@ te('en_rpg_save_roundtrip', async page => {
   assert.equal(await raw(), r0);
 });
 
-// PR7 の en_profile_no_decorations・en_deco_hidden_with_rpg の書きかえ: 英語でもかざりの欄は日本語と同じく出す（窓の中は Task 6）
+// PR7 の en_profile_no_decorations・en_deco_hidden_with_rpg の書きかえ: 英語でもかざりの欄は日本語と同じく出す。窓の中（仲間のカード）も英語（Task 6）
 te('en_profile_decorations', async (page, { db }) => {
   db.profiles.push({ id: 1, pid: 'rpgpid000002', token: 'tok-rpg2', nickname: 'Chiko' });
   await page.evaluate(() => localStorage.setItem('profile', JSON.stringify({ token: 'tok-rpg2', pid: 'rpgpid000002', name: 'Chiko', auto: true, isPublic: true, sent: { isPublic: true } })));
@@ -426,6 +432,13 @@ te('en_profile_decorations', async (page, { db }) => {
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#pf-deco');
   await shown(page, '#rpg-hero');
+  // かざりを選ぶ窓: 見出し・仲間のカード（英語の国名）・［OK］
+  await page.click('#rpg-deco');
+  await shown(page, '#rpg-deco-dlg[open]');
+  assert.match(await txt(page, '#rpg-deco-h'), /^Choose decorations/);
+  assert.deepEqual(await page.locator('#rpg-deco-grid .rpg-card-name').allInnerTexts(), ['Brazil', 'Japan', 'France', 'Saint Kitts and Nevis']);
+  assert.equal((await txt(page, '#rpg-deco-ok')).trim(), 'OK');
+  assert.deepEqual(await jaLeft(page), []);
 });
 
 // PR7 の en_no_persist_headless の書きかえ: 英語でもコインを書けたら消されにくい保存を1回頼む（日本語と同じ）
@@ -470,5 +483,226 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) te(`en_rpg_home_
       assert.deepEqual(svgOver, [], id);
     }
   }
+  assert.deepEqual(await jaLeft(page), []);
+}, { viewport });
+
+/* ---------- Task 6: 仲間のカード・国旗ガチャ（rpg-cards.js）を英語に ---------- */
+const openGacha = async (page, save, opts = {}) => {
+  await writeSave(page, save);
+  await page.evaluate(o => RPG.open('gacha', o), opts);
+  await shown(page, '#ga-10');
+};
+const FREE_TODAY = { d: localToday(), n: {}, first: true, free: false };
+// 10回引いて［Skip］で演出をとばし、結果が全部表になるまで
+const drawTen = async page => {
+  await page.click('#ga-10');
+  await shown(page, '#ga-skip');
+  assert.equal((await txt(page, '#ga-skip')).trim(), 'Skip');
+  await page.click('#ga-skip');
+  await page.waitForFunction(() => document.querySelectorAll('#ga-res .rpg-card').length === 10 && !document.querySelector('#ga-res .rpg-card.is-back'));
+};
+// 引く国を codes だけにする（RPG_CORE.pull に渡す国の並びをしぼる。コイン・天井・カードは本物の処理）
+const onlyDraw = (page, codes) => page.evaluate(codes => {
+  const pull = RPG_CORE.pull;
+  RPG_CORE.pull = (x, r, n, rnd, cs) => pull(x, r, n, rnd, cs.filter(c => codes.includes(c.a)));
+}, codes);
+const LONG = ['vc', 'cd', 'fm', 'cf', 'ba', 'li', 'gw'];
+
+te('en_gacha', async page => {
+  await openGacha(page, saveWith({ coins: 1200, day: FREE_TODAY }));
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal((await txt(page, '#scr-gacha .rpg-h2')).trim(), 'Flag Draw');
+  assert.equal((await txt(page, '#scr-gacha .rpg-back')).trim(), '← Adventure');
+  assert.equal((await txt(page, '#ga-q')).trim(), 'Which countries will you meet?');
+  assert.equal((await txt(page, '#ga-1')).trim(), 'Draw 1 100');
+  assert.equal((await txt(page, '#ga-10')).trim(), 'Draw 10 1,000');
+  assert.equal((await txt(page, '#ga-free')).trim(), 'Free draw');
+  assert.equal((await txt(page, '#ga-pity')).trim(), 'guaranteed ★3 in 50 draws');
+  const rates = await txt(page, '#ga-rates');
+  for (const x of ['Odds', '★3 Gold 3% / ★2 Silver 17%', '★1 Bronze 80%', 'No ★3 by draw 50 → guaranteed ★3', 'World: 1/195 = 0.5% each'])
+    assert.ok(rates.includes(x), `${x}: ${rates}`);
+  assert.match(await txt(page, '#ga-pack .rpg-pack-sub'), /^Not met yet 195\/195$/);
+  assert.equal(await page.getAttribute('#ga-pack .rpg-pack', 'aria-label'), 'World Flag Pack');
+  assert.equal((await txt(page, '#ga-empty')).trim(), 'Cards you draw will appear here');
+  // 地域のチップは英語の地域名（値は日本語のまま）
+  const chips = (await page.locator('#ga-regions .chip').allInnerTexts()).map(s => s.replace(/\s*\d+\/\d+$/, '').trim());
+  assert.equal(chips[0], 'World');
+  for (const c of chips) assert.doesNotMatch(c, JA_TEXT);
+  await page.click('#ga-regions .chip[data-r="南アメリカ"]');
+  assert.match(await txt(page, '#ga-rates'), /South America: 1\/12 = 8\.3% each/);
+  assert.match(await txt(page, '#ga-pack .rpg-pack-tag.is-mul'), /×1\.5/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#ga-regions .chip[data-r="all"]');
+  // 10回引く → 国名は英語・ラベルは英語
+  await drawTen(page);
+  const shownNames = await page.locator('#ga-res .rpg-card-name').allInnerTexts();
+  const want = await page.evaluate(() => [...document.querySelectorAll('#ga-res .rpg-card')].map(b => cName(byA.get(b.dataset.a))));
+  assert.deepEqual(shownNames.map(s => s.replace(/\s+/g, ' ').trim()), want);
+  for (const l of await page.locator('#ga-res .rpg-lab').allInnerTexts()) assert.match(l.trim(), /^(NEW|Rank up|Stack \+1|Coins back \d+)$/);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.deepEqual((await toastTexts(page)).filter(s => JA_TEXT.test(s)), []);
+  // 地域の国を全部仲間にしたパック
+  const oc = await page.evaluate(() => C.filter(c => c.r === 'オセアニア').map(c => c.a));
+  await openGacha(page, saveWith({ coins: 0, cards: Object.fromEntries(oc.map(a => [a, [1, 0]])) }), { region: 'オセアニア' });
+  assert.equal((await txt(page, '#ga-pack .rpg-pack-sub')).trim(), `${oc.length} countries complete!`);
+  assert.equal(await page.getAttribute('#ga-pack .rpg-pack', 'aria-label'), 'Oceania Flag Pack');
+  assert.match(await txt(page, '#ga-need'), /^need \d[\d,]* more$/);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 1回の演出（パック → カード1枚）も英語
+te('en_gacha_stage', async page => {
+  await openGacha(page, saveWith({ coins: 100 }));
+  await onlyDraw(page, ['vc']);
+  await page.click('#ga-1');
+  await shown(page, '#ga-stage-in .rpg-gstage-say');
+  assert.match((await txt(page, '#ga-stage-in .rpg-gstage-say')).trim(), /^(…It glowed gold!|Sparkle!|Which country will it be\?)$/);
+  assert.deepEqual(await jaLeft(page), []);
+  await shown(page, '#ga-stage-in .rpg-gst-say');
+  assert.match((await txt(page, '#ga-stage-in .rpg-gst-say')).trim(), /^Saint Vincent and the Grenadines ★+$/);
+  assert.deepEqual(await jaLeft(page), []);
+}, { reducedMotion: 'reduce' });
+
+te('en_gacha_errors', async page => {
+  // ほかのタブでコインを使った
+  await openGacha(page, saveWith({ coins: 100 }));
+  await page.evaluate(() => { const d = JSON.parse(localStorage.getItem('rpg')); d.coins = 0; localStorage.setItem('rpg', JSON.stringify(d)); });
+  await page.click('#ga-1');
+  assert.equal((await txt(page, '#ga-msg')).trim(), 'Not enough coins, so nothing was drawn (maybe you used them in another tab)');
+  assert.deepEqual(await jaLeft(page), []);
+  // 今日の無料1回がない（まだクイズをクリアしていない・もう使った）
+  await openGacha(page, saveWith({ coins: 0, day: { ...FREE_TODAY, first: false } }));
+  assert.equal((await txt(page, '#ga-free')).trim(), 'Clear a quiz today for a free draw');
+  await page.evaluate(() => { $('ga-free').disabled = false; $('ga-free').click(); });
+  assert.equal((await txt(page, '#ga-msg')).trim(), 'Today’s free draw is already used, or you haven’t cleared a quiz today yet');
+  await openGacha(page, saveWith({ coins: 0, day: FREE_TODAY }));
+  await page.click('#ga-free');
+  await page.evaluate(() => $('ga-flipall').click());
+  assert.equal((await txt(page, '#ga-free')).trim(), 'Come back tomorrow');
+  assert.deepEqual(await jaLeft(page), []);
+  // 保存できない
+  await openGacha(page, saveWith({ coins: 100 }));
+  await page.evaluate(() => { window.__fail = true; });
+  await page.click('#ga-1');
+  assert.equal((await txt(page, '#ga-msg')).trim(), 'Couldn’t save, so nothing was drawn');
+  await page.evaluate(() => { window.__fail = false; });
+  assert.deepEqual(await jaLeft(page), []);
+  // 新しい版のデータ（引けない）
+  await openGacha(page, { v: 99, intro: true, coins: 5000 });
+  assert.match(await txt(page, '#ga-warn'), /^Found data from a newer version/);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.deepEqual((await toastTexts(page)).filter(s => JA_TEXT.test(s)), []);
+}, { init: () => {
+  const { setItem } = Storage.prototype;
+  Storage.prototype.setItem = function (k, v) { if (k === 'rpg' && window.__fail) throw new DOMException('full', 'QuotaExceededError'); return setItem.call(this, k, v); };
+} });
+
+te('en_cards', async page => {
+  await writeSave(page, JA_SAVE);
+  await page.evaluate(() => RPG.open('cards'));
+  await shown(page, '#scr-cards');
+  assert.equal((await txt(page, '#cd-count')).trim(), 'Allies 4 / 195');
+  assert.equal((await txt(page, '#scr-cards .rpg-back')).trim(), '← Adventure');
+  const chips = (await page.locator('#cd-regions .chip').allInnerTexts()).map(s => s.replace(/\s*\d+\/\d+$/, '').trim());
+  assert.equal(chips[0], 'All');
+  assert.ok(chips.includes('South America') && chips.includes('Oceania'), chips.join());
+  assert.equal(await page.getAttribute('#cd-regions', 'aria-label'), 'Filter by region');
+  // 並び: ★の多い順、同じ★の中は英語の ABC 順
+  const order = await page.evaluate(() => [...document.querySelectorAll('#cd-grid .rpg-card')].map(b => [+b.dataset.star, cName(byA.get(b.dataset.a))]));
+  assert.deepEqual(order.slice(0, 4).map(x => x[1]), ['Brazil', 'Japan', 'France', 'Saint Kitts and Nevis']);
+  const none = order.filter(x => x[0] === 0).map(x => x[1]);
+  assert.deepEqual(none, [...none].sort((x, y) => x.localeCompare(y, 'en')));
+  assert.equal(none[0], 'Afghanistan');
+  // まだ仲間でない国のカード
+  assert.match(await txt(page, '#cd-grid .rpg-card[data-a="de"] .rpg-card-hint'), /^2 more right answers to make it an ally/);
+  assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-fr', 'title'), 'Friendship');
+  assert.equal(await page.getAttribute('#cd-grid .rpg-card[data-a="jp"] .rpg-card-stack', 'title'), 'Stack 1/4');
+  // 仲間の世界地図
+  assert.equal(await page.getAttribute('#cd-map svg', 'aria-label'), 'World map of your allies (Allies 4/195)');
+  assert.deepEqual((await page.locator('#cd-map .rpg-legend li').allInnerTexts()).map(s => s.trim()), ['★1 Bronze', '★2 Silver', '★3 Gold', 'Not yet']);
+  assert.deepEqual(await jaLeft(page), []);
+  // カードの詳細
+  await page.click('#cd-grid .rpg-card[data-a="jp"]');
+  await shown(page, '#detail[open]');
+  const info = (await txt(page, '#detail .rpg-cd-info')).replace(/\s+/g, ' ');
+  assert.match(info, /^★2 Silver · Stack ●○○○ · Friendship ♥0\/10 Attack \d+\.\d \(Region bonus: no\) · HP \d+\.\d Region bonus ×1\.5 in Asia dungeons and the Map Eater’s Lair$/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#detail .close');
+  // まだ仲間でない国の詳細
+  await page.click('#cd-grid .rpg-card[data-a="de"]');
+  await shown(page, '#detail[open]');
+  assert.match((await txt(page, '#detail .rpg-cd-info')).replace(/\s+/g, ' '), /^Not an ally yet \(Friendship ♥3\/10\) 2 more right answers to make it an ally/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#detail .close');
+  // 地域でしぼる
+  await page.click('#cd-regions .chip[data-r="南アメリカ"]');
+  assert.equal(await page.locator('#cd-grid .rpg-card').count(), 12);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 50か国目の仲間 → ［Share］の文は Flag Quest をふくみ #FlagMaster で終わる。URL は英語版
+te('en_cards_share', async page => {
+  const codes = await page.evaluate(() => C.slice(0, 49).map(c => c.a));
+  await openGacha(page, saveWith({ coins: 1000, cards: Object.fromEntries(codes.map(a => [a, [1, 0]])) }));
+  await drawTen(page);
+  await shown(page, '#ga-share .rpg-share-row');
+  assert.equal((await txt(page, '#ga-share .rpg-share-row span')).trim(), '🎉 You now have 50 allies!');
+  assert.equal((await txt(page, '#ga-share .rpg-share')).trim(), 'Share');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#ga-share .rpg-share');
+  const s = await page.evaluate(() => window.__shared);
+  assert.match(s.text, /Flag Quest/);
+  assert.match(s.text, /50 allies/);
+  assert.match(s.text, /#FlagMaster$/);
+  assert.doesNotMatch(s.text, JA_TEXT);
+  assert.match(s.url, /\/country-drill\/en\/$/);
+  // 地域の国を全部仲間にした
+  const m = await page.evaluate(() => RPG.milestones([], C.filter(c => c.r === 'オセアニア').map(c => c.a)).find(x => x.kind.startsWith('region-')));
+  assert.equal(m.msg, 'Every country in Oceania is now your ally!');
+  assert.match(m.text, /^Every country in Oceania is now my ally in Flag Quest! Allies: \d+\/195 countries #FlagMaster$/);
+}, { init: () => { navigator.share = o => { window.__shared = o; return Promise.resolve(); }; } });
+
+// 390px: いちばん長い英語の国名のカードが、ガチャの10枚の結果・1枚の演出・仲間の一覧で枠からはみ出さない
+const nameOver = (page, sel) => page.evaluate(sel => {
+  const out = [];
+  for (const el of document.querySelectorAll(sel)) {
+    if (!el.checkVisibility({ visibilityProperty: true })) continue;
+    const card = el.closest('.rpg-card').getBoundingClientRect(), r = el.getBoundingClientRect();
+    if (el.scrollWidth > el.clientWidth + 0.5 || r.left < card.left - 0.5 || r.right > card.right + 0.5) out.push(`${el.textContent} ${el.scrollWidth}/${el.clientWidth}`);
+    // overflow-wrap: break-word なので、入らない語ははみ出さずに語の途中で折れる。語ごとに1行に入っていること
+    const t = el.firstChild;
+    if (t?.nodeType !== 3) continue;
+    for (const m of t.data.matchAll(/\S+/g)) {
+      const rg = document.createRange();
+      rg.setStart(t, m.index);
+      rg.setEnd(t, m.index + m[0].length);
+      if (new Set([...rg.getClientRects()].map(x => Math.round(x.top))).size > 1) out.push(`${el.textContent}: ${m[0]} が途中で折れる`);
+    }
+  }
+  return { out, n: document.querySelectorAll(sel).length, sw: document.documentElement.scrollWidth, iw: document.documentElement.clientWidth };
+}, sel);
+for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) te(`en_cards_fit_${vname}`, async page => {
+  await openGacha(page, saveWith({ coins: 1100 }));
+  await onlyDraw(page, LONG);
+  await drawTen(page);
+  let r = await nameOver(page, '#ga-res .rpg-card-name');
+  assert.equal(r.n, 10);
+  assert.deepEqual(r.out, []);
+  assert.ok(r.sw <= r.iw, `${r.sw} > ${r.iw}`);
+  // 1枚の演出（めくれるまで待つ）
+  await page.click('#ga-1');
+  await page.waitForFunction(() => document.querySelector('#ga-stage-in .rpg-gst-card .rpg-card:not(.is-back)'));
+  r = await nameOver(page, '#ga-stage-in .rpg-card-name');
+  assert.equal(r.n, 1);
+  assert.deepEqual(r.out, []);
+  await page.click('#ga-skip');
+  // 仲間の一覧（長い名前の国だけ）
+  await writeSave(page, saveWith({ cards: Object.fromEntries(LONG.map(a => [a, [3, 4]])) }));
+  await page.evaluate(() => RPG.open('cards'));
+  await shown(page, '#scr-cards');
+  r = await nameOver(page, '#cd-grid .rpg-card-name');
+  assert.ok(r.n >= 195);
+  assert.deepEqual(r.out, []);
+  assert.ok(r.sw <= r.iw, `${r.sw} > ${r.iw}`);
   assert.deepEqual(await jaLeft(page), []);
 }, { viewport });
