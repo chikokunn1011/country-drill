@@ -446,9 +446,10 @@ async function supabaseRoute(route, db) {
 // path: url からの相対で開くページ（'admin.html' など。省略時は url そのもの＝index.html）
 // waitMap: 開いたあと、地図（world.js・d3・topojson をうしろで読む）が読み終わるまで待つ。mapReady が無いページ・古いコミットでは待たない
 // routes: 開く前に context.route に渡す [url のパターン, ハンドラ] の並び（国旗・world.js を遅らせる・止めるときなど）
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [] } = {}) {
+// serviceWorkers: newContext にそのまま渡す。既定は 'block'（sw.js が動くと、SW が取りに行く通信は context.route を通らない）。pwa.test.mjs だけ 'allow'
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [], serviceWorkers = 'block' } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
-  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch });
+  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch, serviceWorkers });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
   if (seed !== undefined) await context.addInitScript(seed => {
     let t = seed;
