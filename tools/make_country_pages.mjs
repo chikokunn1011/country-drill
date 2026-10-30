@@ -9,8 +9,8 @@ import { createRequire } from 'node:module';
 import vm from 'node:vm';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-// topojson-client は e2e の node_modules にあるものを使う（本編が CDN から読むのと同じライブラリ）
-const topojson = createRequire(import.meta.url)(join(REPO, 'tests/e2e/node_modules/topojson-client/dist/topojson-client.js'));
+// topojson-client はリポジトリの vendor/ のもの（本編が読むのと同じライブラリ）
+const topojson = createRequire(import.meta.url)(join(REPO, 'vendor/topojson-client-3.1.0.min.js'));
 export const SITE = 'https://chikokunn1011.github.io/country-drill/';
 const OGP = SITE + 'icons/ogp.png';
 const TRIVIA_LABEL = { flag: '国旗', geo: '地理', culture: '文化' };
