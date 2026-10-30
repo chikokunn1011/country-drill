@@ -231,7 +231,6 @@ t('en_card_title_unknown', async (page, { db }) => {
   } finally { await ja.close(); }
 });
 
-// 冒険（PR8）が無いあいだ、英語版のプロフィール画面にかざりの欄は出さない。はじめの文も冒険のランキングを約束しない
 // 日本語のニックネームで載せた知らせ（結果の「載せる」箱）: 名前は data-ugc の中、ほかは英語
 t('en_post_ja_name', async (page, { db }) => {
   await openWithProfile(page, db, { name: 'チコ' });

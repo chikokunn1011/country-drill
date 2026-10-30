@@ -379,7 +379,8 @@
   // 表示する称号: 英語のページはカタログの称号だけ英語（BADGES.titleLabel。無い称号は ''）。かっこはつけない・エスケープしない
   const titleShown = () => {
     const t = titleOf();
-    try { return t ? String(window.BADGES?.titleLabel?.(t) ?? t) : ''; } catch (e) { console.error('[rpg]', e); return ''; }
+    // 英語のページで titleLabel が無い（キャッシュに残った前の badges.js）ときは出さない（profile.js と同じ。日本語の称号を英語の画面に出さない）
+    try { return t ? String(EN ? window.BADGES?.titleLabel?.(t) ?? '' : t) : ''; } catch (e) { console.error('[rpg]', e); return ''; }
   };
   // 称号が変わったら（badge:title）旅人カードの称号だけその場で描き直す。冒険ホームを開いていなければ、次に開いたときに出る
   on('badge:title', () => {

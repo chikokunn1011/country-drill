@@ -102,7 +102,7 @@ t('en_topbar_chip_360', async page => {
   // badges.js のさかのぼりのごほうび（●+50 など）が足されることがあるので、額はセーブから読む
   const coins = await page.evaluate(() => RPG.get().coins);
   assert.ok(coins >= 123400 && coins < 123500, String(coins));
-  assert.equal(await page.getAttribute('#rpg-chip', 'aria-label'), `Coins ${coins.toLocaleString('en-US')} (go to Adventure)`);
+  assert.equal(await page.getAttribute('#rpg-chip', 'aria-label'), `Coins ${coins.toLocaleString('en-US')} (go to the Adventure)`);
   const r = await page.evaluate(() => {
     const els = [...['brand', 'rpg-chip', 'to-book', 'to-settings'].map(id => document.getElementById(id)), document.querySelector('#topbar .langsw a')];
     const rects = els.map(e => e.getBoundingClientRect());
@@ -340,7 +340,7 @@ t('en_result_practice', async page => {
   assert.equal(await page.locator('#r-share').count(), 0);
   assert.equal(await page.locator('.tabox').count(), 0);
   assert.equal(await page.locator('#r-ext > *').count(), 1);
-  assert.match((await page.textContent('#r-ext .rpg-res-head')).trim(), /^\+[\d,]+ coins Now [\d,]+$/);
+  assert.match((await page.textContent('#r-ext .rpg-res-head')).trim(), /^\+[\d,]+ coins You have [\d,]+$/);
   assert.equal((await page.textContent('#r-setup')).trim(), 'Change mode');
   assert.equal((await page.textContent('#r-again')).trim(), 'Play again');
   await page.waitForTimeout(400);   // TA_GUARD_MS

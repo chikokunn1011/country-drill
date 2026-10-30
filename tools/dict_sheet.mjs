@@ -76,7 +76,7 @@ const GLOSSARY_PR8 = [
   { ja: 'コイン', term: 'coins ({n}k on the chip)', en: /coin/i },
   { ja: '自己ベスト', term: 'Personal best', en: /personal best/i },
   { ja: '引き継ぎコード', term: 'Transfer code', en: /transfer code/i },
-  { ja: 'コードで復元', term: 'Restore from code', en: /restore from code/i },
+  { ja: 'コードで復元', term: 'Restore from code', en: /restor(e|ed|ing) from (your |the )?(transfer )?code/i },
   { ja: 'かざり', term: 'Decorations', en: /decoration/i },
 ];
 export const GLOSSARY = [...GLOSSARY_BASE, ...GLOSSARY_PR8];

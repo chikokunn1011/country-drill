@@ -121,6 +121,8 @@
   body:not(.rpg-off) #topbar:has(#rpg-chip) .rpg-chip:lang(en) { padding-inline: 4px; }
   body:not(.rpg-off) #topbar:has(#rpg-chip) #brand small:lang(en) { letter-spacing: .04em; }
 }
+/* 英語は Gallery・Settings が長いので、480px まではチップの coins の字を出さない（トップバーを1行に） */
+@media (max-width: 479.98px) { .rpg-chip-l:lang(en) { display: none; } }
 /* 設定の「冒険（コイン・RPG）を表示する」が OFF: ボタン・チップ・クイズ中のコインを出さない（コインは裏で貯まる） */
 body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !important; }
 
