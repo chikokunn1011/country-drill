@@ -26,10 +26,10 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // 問題文
   'この国旗はどこの国？': 'Which country has this flag?',
-  'この国の国旗は？': 'Which is this country’s flag?',
+  'この国の国旗は？': 'Which flag belongs to this country?',
   '色がついている場所の国旗は？': 'Which flag belongs to the highlighted country?',
-  'この国旗の国はどこ？': 'Where is this flag’s country?',
-  'この国旗の国はどこ？ 地図をタップ': 'Where is this flag’s country? Tap the map',
+  'この国旗の国はどこ？': 'Where is the country with this flag?',
+  'この国旗の国はどこ？ 地図をタップ': 'Where is the country with this flag? Tap the map.',
   '国旗': 'Flag',
   '出題中の国の位置': 'Location of the country in question',
   '選択肢{k}の国旗': 'Flag for choice {k}',
@@ -39,7 +39,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'まちがえたら、ここに正解が出るよ': 'If you miss, the answer will show up here',
   '答えたら、ここで国旗をくらべるよ': 'Once you answer, compare the flags here',
   '答えたら、ここに国のプロフィールが出るよ': 'Once you answer, the country’s profile will show up here',
-  '矢印キーで動かし {enter} で真ん中を答える・＋−で拡大': 'Move with the arrow keys, {enter} to answer with the center, +/− to zoom',
+  '矢印キーで動かし {enter} で真ん中を答える・＋−で拡大': 'Move with the arrow keys, {enter} to pick the center, +/− to zoom',
   '{k1}〜{k4} キーでも答えられる': 'You can also answer with keys {k1}–{k4}',
   '{keys} ・ {enter} で次へ': '{keys} · {enter} for next',
 
