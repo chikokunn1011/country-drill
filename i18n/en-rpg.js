@@ -1,6 +1,6 @@
 // v=1
 // 英語版（PR8）: 冒険（国旗クエスト → Flag Quest）の文。rpg-core.js のデータ（// i18n-data の名前: ダンジョン・land・章・モンスター・
-// 鏡の手下の型の文・宇宙のテーマ・塔の番人・既定の編成名の頭・コインの単位）。あとのタスクで rpg.js・ストーリー・2つ以上の rpg-*.js が使う文を足す。
+// 鏡の手下の型の文・宇宙のテーマ・塔の番人・既定の編成名の頭・コインの単位）。ストーリー（rpg-core の STORY・STORY_END）。あとのタスクで rpg.js・2つ以上の rpg-*.js が使う文を足す。
 // 名前は Title Case・28字まで。鏡の手下は 'Mirror {name}'・'Upside-Down {name}' に元の名前を入れる（Upside-Down に入る名前は16字まで）。
 // 月（天体）は曜日の '月'（en-daily.js の Mon）とぶつかるので、表示のキーは '天体の月'（DUNGEONS の key）。
 // 冒険の語（PR7）: Adventure・Tower of Heroes・Dungeon（文の中は dungeon）・Traveler（Traveler level）・battle・boss / region boss・
@@ -149,4 +149,48 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // ---- 英雄の塔（'英雄の塔' は en-badges.js） ----
   '塔の番人': 'Tower Guardian',
+
+  // ---- ストーリー（rpg-core の STORY・STORY_END。子ども向けのやさしい英語・2人称 you, the Traveler・出来事を足さない） ----
+  // 「地図喰い（ちずくい）」の（ちずくい）は読みがななので訳さない。「地球の国のなかまたち」は仲間（allies）ではなく friends
+  '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。':
+    'The Map Eater, a monster that chews on the world map, and its monster minions ran off with flags from all over the world.',
+  '旅人のきみは、クイズで集めたコインで力をつけ、国のカードの仲間といっしょに6つの地域を旅する。':
+    'You, the Traveler, grow stronger with the coins you collect in quizzes, and travel through six regions with your country card allies.',
+  '国を思い出すたびに、国旗がひとつ戻ってくる。地図喰いの巣で親玉をたおして、195の旗を取りもどそう！':
+    'Each time you remember a country, one flag comes back. Defeat the big boss in the Map Eater’s Lair and win back the 195 flags!',
+  '🌍 地球クリア！': '🌍 Earth cleared!',
+  '地図喰いをたおすと、195の旗が空に舞いもどった。':
+    'When you defeated the Map Eater, the 195 flags came fluttering back into the sky.',
+  'でも、地図喰いのいた場所に、鏡のような裂け目がひとつ残っている。':
+    'But where the Map Eater used to be, there is still one crack that looks like a mirror.',
+  'のぞきこむと、そこにはそっくりだけど少しちがう、もうひとつの地球があった…':
+    'When you peeked inside, you saw another Earth that looked just the same, but a little different…',
+  '🪞 第2章 鏡の地球': '🪞 Chapter 2: Mirror Earth',
+  '鏡の地球では、国旗がみんな似たものに化けている。':
+    'On Mirror Earth, all the flags are disguised as look-alikes.',
+  '本物の旗を見分けられるのは、旅人のきみだけ。':
+    'Only you, the Traveler, can tell which flags are real.',
+  '鏡の地図喰いをたおして、ふたつの地球をつなぐ裂け目を閉じよう！':
+    'Defeat the Mirror Map Eater and close the crack that connects the two Earths!',
+  '🪞 第2章クリア！': '🪞 Chapter 2 cleared!',
+  '裂け目が閉じる直前、鏡の地図喰いがさけんだ。「母さま、あとはたのむ…」':
+    'Just before the crack closed, the Mirror Map Eater shouted, “Mother, it’s up to you now…”',
+  '夜空を見上げると、星がひとつ、またひとつと消えていく。':
+    'When you looked up at the night sky, the stars were vanishing, one after another.',
+  '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。':
+    'The Star Eater, who gave birth to the Map Eater, had been targeting Earth from space.',
+  '🪐 第3章 宇宙': '🪐 Chapter 3: Space',
+  '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。':
+    'The Star Eater is swallowing the stars one by one as it comes closer to Earth.',
+  '星には、地球の国のなかまたちの記憶が眠っている。':
+    'Memories of your friends, the countries of Earth, are sleeping inside the stars.',
+  '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！':
+    'Look down on Earth from space, remember where the countries are, and stop the Star Eater!',
+  '🌟 エンディング': '🌟 Ending',
+  '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。':
+    'When the Star Eater disappeared, all the swallowed stars began to shine at once.',
+  '地球も、鏡の地球も、宇宙も、もう安心だ。':
+    'Earth, Mirror Earth, and Space are all safe now.',
+  'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――':
+    'But the journey doesn’t end. No one has ever seen the top of the Tower of Heroes yet—',
 });

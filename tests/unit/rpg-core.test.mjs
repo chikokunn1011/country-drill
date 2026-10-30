@@ -1685,3 +1685,57 @@ test('default_team_name', () => {
   assert.deepEqual(plain(K.fresh(T0).teams), [{ n: '編成1', c: null }]);
   assert.ok(K.sanitize({ ...K.fresh(T0), teams: [{ n: '', c: null }, 5] }, T0).teams.every((t, i) => K.isDefaultTeamName(t.n, i)));
 });
+
+// ストーリーは rpg-core のデータ（// i18n-data）。文と並びは rpg.js にあったものと1文字も同じ
+const STORY_JA = [
+  '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。',
+  '旅人のきみは、クイズで集めたコインで力をつけ、国のカードの仲間といっしょに6つの地域を旅する。',
+  '国を思い出すたびに、国旗がひとつ戻ってくる。地図喰いの巣で親玉をたおして、195の旗を取りもどそう！',
+];
+const STORY_END_JA = {
+  ch1: [
+    { h: '🌍 地球クリア！', p: [
+      '地図喰いをたおすと、195の旗が空に舞いもどった。',
+      'でも、地図喰いのいた場所に、鏡のような裂け目がひとつ残っている。',
+      'のぞきこむと、そこにはそっくりだけど少しちがう、もうひとつの地球があった…',
+    ] },
+    { h: '🪞 第2章 鏡の地球', p: [
+      '鏡の地球では、国旗がみんな似たものに化けている。',
+      '本物の旗を見分けられるのは、旅人のきみだけ。',
+      '鏡の地図喰いをたおして、ふたつの地球をつなぐ裂け目を閉じよう！',
+    ] },
+  ],
+  ch2: [
+    { h: '🪞 第2章クリア！', p: [
+      '裂け目が閉じる直前、鏡の地図喰いがさけんだ。「母さま、あとはたのむ…」',
+      '夜空を見上げると、星がひとつ、またひとつと消えていく。',
+      '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。',
+    ] },
+  ],
+  ch3start: [
+    { h: '🪐 第3章 宇宙', p: [
+      '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。',
+      '星には、地球の国のなかまたちの記憶が眠っている。',
+      '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！',
+    ] },
+  ],
+  ch3: [
+    { h: '🌟 エンディング', p: [
+      '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。',
+      '地球も、鏡の地球も、宇宙も、もう安心だ。',
+      'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――',
+    ] },
+  ],
+};
+
+test('story_same', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.STORY), STORY_JA);
+  assert.deepEqual(plain(K.STORY_END), STORY_END_JA);
+  assert.deepEqual(Object.keys(K.STORY_END), plain(K.STORY_IDS));
+  // rpg.js は文を持たない（rpg-core のデータを読む）
+  const src = read('rpg.js');
+  assert.match(src, /K\.STORY\b/);
+  assert.match(src, /K\.STORY_END\b/);
+  for (const s of [...STORY_JA, ...Object.values(STORY_END_JA).flat().flatMap(x => [x.h, ...x.p])]) assert.ok(!src.includes(s), s);
+});

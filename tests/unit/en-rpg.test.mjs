@@ -125,3 +125,49 @@ test('rpg_names_not_weekday', () => {
   assert.deepEqual(bad, []);
   assert.equal(T(K.dungeonOf('moon').key), 'Moon');
 });
+
+// ストーリー（rpg-core の STORY・STORY_END）の英語。見出し5（🪞 は2つ）・本文18（はじめの3をふくむ）
+const storyRows = K => ({
+  heads: Object.values(K.STORY_END).flat().map(x => x.h),
+  body: [...K.STORY, ...Object.values(K.STORY_END).flat().flatMap(x => x.p)],
+});
+
+test('story_en_complete', () => {
+  const K = loadCore();
+  const { dict, T } = enDict();
+  const { heads, body } = storyRows(K);
+  assert.equal(heads.length, 5);
+  assert.equal(body.length, 18);
+  const bad = [];
+  for (const ja of [...heads, ...body]) {
+    if (!Object.hasOwn(dict, ja)) { bad.push(`辞書に無い: ${ja}`); continue; }
+    const en = dict[ja];
+    if (typeof en !== 'string') { bad.push(`${ja}: { one, other } は使わない`); continue; }
+    if (JA_RE.test(en)) bad.push(`日本語が残る: ${en}`);
+    if ([...en].length > 160) bad.push(`160字より長い: ${en}`);
+    if (/['"]/.test(en)) bad.push(`まっすぐな ' " : ${en}`);
+  }
+  for (const ja of body) if (Object.hasOwn(dict, ja) && !/[.!…—][”’]?$/u.test(dict[ja])) bad.push(`終わりの記号が無い: ${dict[ja]}`);
+  const EMOJI = ['🌍', '🪞', '🪞', '🪐', '🌟'];
+  heads.forEach((ja, i) => {
+    assert.ok(ja.startsWith(EMOJI[i]), ja);
+    if (Object.hasOwn(dict, ja) && !T(ja).startsWith(EMOJI[i] + ' ')) bad.push(`見出しの絵文字: ${ja} → ${T(ja)}`);
+  });
+  assert.deepEqual(bad, []);
+});
+
+test('story_en_numbers', () => {
+  const K = loadCore();
+  const { dict } = enDict();
+  const { heads, body } = storyRows(K);
+  const bad = [];
+  for (const ja of [...heads, ...body]) {
+    const en = dict[ja];
+    if (typeof en !== 'string') { bad.push(`辞書に無い: ${ja}`); continue; }
+    if (ja.includes('195') && !en.includes('195')) bad.push(`195: ${en}`);
+    if (ja.includes('6つ') && !/\b(six|6)\b/i.test(en)) bad.push(`six: ${en}`);
+    if (ja.includes('第2章') && !en.includes('Chapter 2')) bad.push(`Chapter 2: ${en}`);
+    if (ja.includes('第3章') && !en.includes('Chapter 3')) bad.push(`Chapter 3: ${en}`);
+  }
+  assert.deepEqual(bad, []);
+});
