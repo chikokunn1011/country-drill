@@ -1653,6 +1653,14 @@ test('short_coins_en', () => {
   assert.equal(K.shortCoins(12345, true), '12.3k');
   assert.equal(K.shortCoins(19999, true), '19.9k');
   assert.equal(K.shortCoins(123456, true), '123.4k');
+  // 切り捨て（四捨五入しない）と 100万から
+  assert.equal(K.shortCoins(10099, true), '10k');
+  assert.equal(K.shortCoins(10100, true), '10.1k');
+  assert.equal(K.shortCoins(99999, true), '99.9k');
+  assert.equal(K.shortCoins(999999, true), '999.9k');
+  assert.equal(K.shortCoins(1e6, true), '1000k');
+  assert.equal(K.shortCoins(1234567, true), '1234.5k');
+  assert.equal(K.shortCoins(1e9, true), '1000000k');
   // 日本語は今のまま（en を渡さない・false）
   assert.equal(K.shortCoins(9999), '9,999');
   assert.equal(K.shortCoins(12345, false), '1.2万');
@@ -1666,6 +1674,13 @@ test('default_team_name', () => {
   assert.equal(K.isDefaultTeamName('編成2', 0), false);
   assert.equal(K.isDefaultTeamName('Team 2', 1), false);
   assert.equal(K.isDefaultTeamName('あか', 0), false);
+  // 文字でない名前は既定の名前ではない
+  for (const n of [undefined, null, 1, 2, ['編成1'], { n: '編成1' }]) assert.equal(K.isDefaultTeamName(n, 0), false, String(n));
+  // 既定の名前を作る（セーブに書く日本語）
+  assert.equal(K.TEAM_PREFIX, '編成');
+  assert.equal(K.defaultTeamName(0), '編成1');
+  assert.equal(K.defaultTeamName(4), '編成5');
+  for (let i = 0; i < 5; i++) assert.equal(K.isDefaultTeamName(K.defaultTeamName(i), i), true);
   // 既定の名前は同じ頭から作る
   assert.deepEqual(plain(K.fresh(T0).teams), [{ n: '編成1', c: null }]);
   assert.ok(K.sanitize({ ...K.fresh(T0), teams: [{ n: '', c: null }, 5] }, T0).teams.every((t, i) => K.isDefaultTeamName(t.n, i)));

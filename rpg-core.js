@@ -261,7 +261,7 @@
     const cost = slotCost(d);
     if (cost == null || !(d.coins >= cost)) return 0;
     d.coins -= cost;
-    d.teams.push({ n: TEAM_PREFIX + (d.teams.length + 1), c: null });
+    d.teams.push({ n: defaultTeamName(d.teams.length), c: null });
     d.tsel = d.teams.length - 1;
     return cost;
   };
@@ -315,7 +315,8 @@
     ? (n < 10000 ? n.toLocaleString('en-US') : Math.floor(n / 100) / 10 + 'k')
     : (n < 10000 ? n.toLocaleString('ja-JP') : Math.floor(n / 1000) / 10 + UNIT_MAN);
   // 既定の編成名（i 番目の枠の「編成{i+1}」）か。英語の表示は既定の名前だけ Team {n} にする（セーブは日本語のまま）
-  const isDefaultTeamName = (n, i) => n === TEAM_PREFIX + (i + 1);
+  const defaultTeamName = i => TEAM_PREFIX + (i + 1);
+  const isDefaultTeamName = (n, i) => n === defaultTeamName(i);
 
   // ---- セーブの形・移行・掃除（設計書 §9） ----
   const VERSION = 1;
@@ -335,7 +336,7 @@
     paid: [],
     st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
     badgesPaid: [], gr: '',
-    teams: [{ n: TEAM_PREFIX + 1, c: null }], tsel: 0, deco: [],
+    teams: [{ n: defaultTeamName(0), c: null }], tsel: 0, deco: [],
     tower: { best: 0 },   // best = これまでに勝ったいちばん上の階
   });
   const KNOWN = new Set(Object.keys(fresh('')));
@@ -363,12 +364,12 @@
   // 持っていない国は消さない（使うときに teamParty がしぼる）
   const sanitizeTeams = v => {
     const a = list(v).slice(0, TUNING.team.slots).map((t, i) => {
-      const def = TEAM_PREFIX + (i + 1);
+      const def = defaultTeamName(i);
       if (!isObj(t)) return { n: def, c: null };
       const n = typeof t.n === 'string' ? [...t.n.trim()].slice(0, TUNING.team.nameMax).join('') : '';   // 絵文字を半分に切らない
       return { n: n || def, c: Array.isArray(t.c) ? uniq(t.c.filter(isCode)).slice(0, 3) : null };
     });
-    return a.length ? a : [{ n: TEAM_PREFIX + 1, c: null }];
+    return a.length ? a : [{ n: defaultTeamName(0), c: null }];
   };
 
   // 入力が何でも例外を出さずに fresh の形にそろえる。知らない最上位の項目は残す（新しい版から戻ったときに消さない）
@@ -854,7 +855,7 @@
     cardAtk, inDungeon, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
     hitsNeeded, missesAllowed, judge,
     floorsOf, poolOf,
-    today, dayNum, shortCoins, fillJa, isDefaultTeamName,
+    today, dayNum, shortCoins, fillJa, TEAM_PREFIX, defaultTeamName, isDefaultTeamName,
     VERSION, MIGRATE, fresh, sanitize, migrate,
     encodeCode, decodeCode, sanitizeMisses,
     isWeak, answerCoins, clearBonus, addCard, settleDelta,

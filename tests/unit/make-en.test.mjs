@@ -1,7 +1,7 @@
 // 英語版（PR5）: tools/make_en.mjs が作る en/index.html・hreflang・英語の manifest
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
@@ -194,4 +194,11 @@ test('en_embed', () => {
   for (const s of scriptSrcs(read('embed.html'))) assert.ok(srcs.includes(s), s);
   const left = visible(html).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.trim());
   assert.deepEqual(left, []);
+});
+
+// i18n/en-*.js（ブラウザが読まない en-html.js を除く）は、どれもどこかのページの EN_DICTS に入っている（名前の書きまちがい・入れ忘れ）
+test('en_dicts_list_all_files', () => {
+  const listed = new Set(Object.values(EN_DICTS).flat());
+  const files = readdirSync(join(ROOT, 'i18n')).filter(f => /^en-[\w-]+\.js$/.test(f) && f !== 'en-html.js').map(f => f.slice(0, -3));
+  assert.deepEqual(files.filter(n => !listed.has(n)), []);
 });

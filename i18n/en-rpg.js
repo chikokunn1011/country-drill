@@ -25,7 +25,7 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // ---- ダンジョン（name）と land（地域名と同じ land は en-core.js） ----
   'アマゾンの密林': 'Amazon Jungle',
-  'サンゴ礁の海': 'Coral Reef Sea',
+  'サンゴ礁の海': 'Coral Reef',
   '大峡谷': 'Great Canyon',
   '古城の迷宮': 'Old Castle Labyrinth',
   '天空の山脈': 'Mountains of the Sky',
@@ -37,7 +37,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '鏡のサンゴ礁': 'Mirror Coral Reef',
   '鏡のオセアニア': 'Mirror Oceania',
   '鏡の大峡谷': 'Mirror Great Canyon',
-  '鏡の北・中央アメリカ': 'Mirror North & Central America',
+  '鏡の北・中央アメリカ': 'Mirror North/Central America',
   '鏡の古城': 'Mirror Old Castle',
   '鏡のヨーロッパ': 'Mirror Europe',
   '鏡の山脈': 'Mirror Mountains',
@@ -61,7 +61,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '大アナコンダ': 'Giant Anaconda',
   'ジャガー王': 'Jaguar King',
   'ヤシガニ': 'Coconut Crab',
-  'ボクサーカンガルー': 'Boxer Kangaroo',
+  'ボクサーカンガルー': 'Boxing Kangaroo',
   'イリエワニ': 'Saltwater Crocodile',
   'ホホジロザメ': 'White Shark',
   '怒れる火山': 'Angry Volcano',
@@ -139,13 +139,13 @@ Object.assign(window.I18N_EN ??= {}, {
   '星喰いの目': 'Eye of the Star Eater',
   '星喰い': 'Star Eater',
 
-  // ---- 宇宙のテーマ（答えのあとに出す名前） ----
-  '島国': 'Island countries',
-  '小さい国': 'Small countries',
-  '赤道の国': 'Equator countries',
-  '内陸国': 'Landlocked countries',
-  '大きい国': 'Large countries',
-  '南半球の国': 'Southern Hemisphere countries',
+  // ---- 宇宙のテーマ（答えのあとに出す名前。Title Case） ----
+  '島国': 'Island Countries',
+  '小さい国': 'Small Countries',
+  '赤道の国': 'Equatorial Countries',
+  '内陸国': 'Landlocked Countries',
+  '大きい国': 'Large Countries',
+  '南半球の国': 'Southern Hemisphere',
 
   // ---- 英雄の塔（'英雄の塔' は en-badges.js） ----
   '塔の番人': 'Tower Guardian',
