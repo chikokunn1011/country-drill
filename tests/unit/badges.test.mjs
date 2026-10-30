@@ -516,6 +516,62 @@ test('catalog_from_countries', () => {
   assert.equal(K.stepInfo(cat, 'answers@2').t.desc, '正解の合計が 1,000問');
 });
 
+// 条件の文は型の文 dk と数 dv（英語版で T(dk, dv) にする）。日本語の desc は fillJa(dk, dv) で今と同じ
+test('catalog_desc_same', () => {
+  const { K, cat } = cat0();
+  for (const b of cat) for (const t of b.tiers) {
+    assert.equal(typeof t.dk, 'string', b.id);
+    assert.equal(t.desc, K.fillJa(t.dk, t.dv), b.id);
+  }
+  const desc = key => K.stepInfo(cat, key).t.desc;
+  assert.equal(desc('mode-f2n@1'), '「国旗→国名」で 30か国にヒントなしで正解');
+  assert.equal(desc('answers@2'), '正解の合計が 1,000問');
+  assert.equal(desc('reg-samerica@1'), '南アメリカで10問以上のゲームをクリア');
+  assert.equal(desc('reg-world@3'), '全世界の国すべてを4モードで正解');
+  assert.equal(desc('ta-speed@3'), 'タイムアタック10問以上を1問 1.4秒以内でクリア');
+  assert.equal(desc('micro@1'), '面積 1,000km² 未満の国（25か国）すべてに、どれかのモードでヒントなしで正解');
+  // fillJa は {name} を1回だけ置きかえる（T と同じ。知らない名前はそのまま、入れた値の中の {…} は置きかえない）
+  assert.equal(K.fillJa('{a}と{b}と{a}', { a: '{b}', b: 'い' }), '{b}といと{b}');
+  assert.equal(K.fillJa('{x}だけ', {}), '{x}だけ');
+});
+
+test('catalog_titles_same', () => {
+  const { K, cat } = cat0();
+  assert.deepEqual(plain(K.titlesOf(cat)), ['ドリルの新人', 'こつこつ派', '努力の人', 'ドリルの鬼', '波に乗る人', '止まらない人', '百連の達人',
+    'リベンジャー', '苦手つぶし', 'にがて知らず', 'ミクロの探検家', 'ていねい派', 'ノーミス職人', '完璧主義者', '集中モード', '鉄の集中力',
+    'ミスを知らない人', '不屈の人', 'スピード見習い', 'タイムアタッカー', '秒速の旅人', 'せっかち名人', 'スピードスター', '光速の目',
+    '旗見習い', '旗ソムリエ', '国旗の達人', '旗さがし屋', '旗えらび名人', '旗の目きき', '地図好き', '地図よみ名人', '歩く地図帳',
+    '方向音痴卒業', 'ピンポイント職人', '人間GPS', '南米の旅人', '南米通', '南米博士', '南の島の旅人', 'オセアニア通', 'オセアニア博士',
+    '北中米の旅人', '北中米通', '北中米博士', 'ヨーロッパの旅人', 'ヨーロッパ通', 'ヨーロッパ博士', 'アジアの旅人', 'アジア通', 'アジア博士',
+    'アフリカの旅人', 'アフリカ通', 'アフリカ博士', '世界の旅人', '世界通', '世界博士', '図鑑好き', '図鑑マニア', '歩く図鑑',
+    '常連さん', 'おなじみさん', 'ドリルが日課', '帰ってきた旅人', 'お祭り好き', 'フィーバー王', '見習い旅人', 'かけだし勇者',
+    '一人前の旅人', 'ベテラン旅人', '伝説の旅人', '旗の守り手', '三地域の勇者', '六地域の勇者', '世界を取りもどした者', '無傷の旅人',
+    '知識の勇者', '国の友だち', '4モードの達人', '50か国の友', '100か国の友', '世界の友', '新米探偵', '敏腕探偵', '名探偵',
+    '塔の見習い', '塔の戦士', '塔の勇者', '英雄']);
+  assert.deepEqual(plain(K.titlesOf(cat)), plain(cat.flatMap(b => b.tiers.map(t => t.title))));
+});
+
+test('dv_keys', () => {
+  const { cat } = cat0();
+  const ALLOWED = ['g', 's', 'sub', 'region'];
+  for (const b of cat) for (const [i, t] of b.tiers.entries()) {
+    const at = `${b.id}@${i + 1}`;
+    assert.ok(t.dv && typeof t.dv === 'object' && !Array.isArray(t.dv), at);
+    const keys = Object.keys(t.dv).sort();
+    for (const k of keys) {
+      assert.ok(ALLOWED.includes(k), `${at}: ${k}`);
+      assert.equal(typeof t.dv[k], 'string', `${at}: ${k}`);
+    }
+    assert.deepEqual(keys, [...new Set([...t.dk.matchAll(/\{(\w+)\}/g)].map(m => m[1]))].sort(), at);
+  }
+  // 数の文字は今の desc の書き方（num() の桁区切り・toFixed(1)）
+  assert.deepEqual(plain(badge(cat, 'answers').tiers.map(t => t.dv)), [{ g: '100' }, { g: '1,000' }, { g: '5,000' }]);
+  assert.deepEqual(plain(badge(cat, 'ta-speed').tiers.map(t => t.dv)), [{ s: '3.0' }, { s: '2.0' }, { s: '1.4' }]);
+  assert.deepEqual(plain(badge(cat, 'mode-m2f').tiers[2].dv), { sub: '場所→国旗', g: '195' });
+  assert.deepEqual(plain(badge(cat, 'reg-world').tiers.map(t => t.dv)), [{ region: '全世界' }, { region: '全世界' }, { region: '全世界' }]);
+  assert.deepEqual(plain(badge(cat, 'first-clear').tiers[0].dv), {});
+});
+
 test('step_info_and_labels', () => {
   const { K, cat } = cat0();
   const si = K.stepInfo(cat, 'reg-world@3');
