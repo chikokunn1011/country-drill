@@ -77,12 +77,13 @@ test('t_page_and_fold', () => {
   assert.ok(ja.I18N.byName(a, b) > 0);
 });
 
-// PR7: 英語版は冒険（rpg）の画面・入口・コインの表示を隠す（rpg.js は画面なしで読む。PR8 で外す）。'title' は Task 15 で外す
+// PR7: 英語版は冒険（rpg）の画面・入口・コインの表示を隠す（rpg.js は画面なしで読む。PR8 で外す）。ほかの人の称号は英語で出す（'title' は無い）
 test('hide_rpg', () => {
   const en = load({ lang: 'en' }).ctx;
   assert.equal(en.I18N.hide.has('ta'), false);
   assert.equal(en.I18N.hide.has('rpg'), true);
-  assert.equal(en.I18N.hide.has('title'), true);   // 他人の称号は Task 15 まで隠したまま
+  assert.equal(en.I18N.hide.has('title'), false);   // 他人の称号は BADGES.titleLabel で英語にして出す
+  assert.deepEqual([...en.I18N.hide], ['rpg']);
   assert.equal(load().ctx.I18N.hide.size, 0);
   assert.equal(load().ctx.I18N.hide.has('rpg'), false);
 });

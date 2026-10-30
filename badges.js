@@ -550,7 +550,7 @@
   if (lacking.length === Object.keys(kinds).length) return;
   if (lacking.length) { console.error('[badges] 見つからない: ' + lacking.join(' ')); return; }
 
-  const X = makeX(C), CAT = makeCatalog(C);
+  const X = makeX(C), CAT = makeCatalog(C), catTitles = new Set(titlesOf(CAT));
   const ctx = () => makeCtx(X, window.RPG);
 
   // ---------- 表示の文。カタログの日本語（データ）は表示のときだけ T() に通す。英語版は辞書 i18n/en-badges.js ----------
@@ -1026,6 +1026,8 @@
   window.BADGES = {
     title: titleText,              // かっこなし
     titleKey: () => bs.st.eq || null,
+    // 日本語の称号（サーバーにあるほかの人の称号など）の表示用。英語のページではカタログの称号だけ英語にし、無い称号は ''
+    titleLabel: ja => I18N.lang !== 'en' ? ja : catTitles.has(ja) ? T(ja) : '',
     count: () => summarize(CAT, bs.st, ctx()),
     list: () => listView(CAT, bs.st, ctx()),
     open,

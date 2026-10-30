@@ -47,6 +47,27 @@ async function openWithProfile(page, db, { name = 'Chiko', token = 'tok-en', sen
   await page.waitForFunction(() => window.PROFILE);
   await page.evaluate(() => PROFILE.ready);
 }
+// 英語のバッジ画面の［Change title］から称号をえらぶ（key はステップのキー）
+async function equipEn(page, key) {
+  await page.evaluate(() => show('badges'));
+  await page.click('#bdg-change');
+  await page.waitForSelector('#detail[open] .bdg-picker');
+  await page.click(`#detail-inner [data-bdg-pick="${key}"]`);
+  await page.waitForFunction(k => JSON.parse(localStorage.getItem('badges')).eq === k, key);
+}
+// ほかの人（チコ）の称号を title にして、ランキングの名前から窓を開く。窓の locator を返す
+async function openOtherCard(page, db, title) {
+  await page.waitForFunction(() => window.PROFILE);
+  const board = await page.evaluate(() => RANKING.boardKey('f2n', 'all', 10));
+  db.profiles.push({ id: 1, pid: 'otherpid0001', token: 'other', nickname: 'チコ', title, deco: [], badges: 12, badges_total: 80, created_at: '2026-10-01T00:00:00Z' });
+  db.rows.push({ board, profile_id: 1, nickname: 'チコ', time_ms: 12340, questions: 10, created_at: new Date().toISOString() });
+  await page.evaluate(b => openRanking(b), board);
+  await page.locator('#rk-list .pf-name', { hasText: 'チコ' }).waitFor();
+  await page.click('#rk-list .pf-name');
+  const dlg = page.locator('#pf-card');
+  await dlg.locator('.pf-card-line').first().waitFor();
+  return dlg;
+}
 const noHScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 
 // ホームの入口: ランキング・プロフィール・今日の難問・バッジ（PR7）は出る。冒険（PR8）はまだ
@@ -133,7 +154,7 @@ t('en_profile_transfer', async (page, app) => {
   } finally { await b.close(); }
 }, { timezoneId: 'America/New_York', blockScripts: RPG_FILES });
 
-// ほかの人の日本語の名前・称号: 名前はそのまま（data-ugc）、称号は出さない
+// ほかの人の日本語の名前・称号: 名前はそのまま（data-ugc）、カタログに無い称号（旅人）は出さない
 t('en_card_other_ja', async (page, { db }) => {
   await page.waitForFunction(() => window.PROFILE);
   const board = await page.evaluate(() => RANKING.boardKey('f2n', 'all', 10));
@@ -176,6 +197,39 @@ t('en_card_other_ja', async (page, { db }) => {
   await dlg.locator('button', { hasText: 'Close' }).click();
 });
 
+// ほかの人のカタログにある称号（日本語でサーバーにある）は、英語の称号で出る
+t('en_card_title_known', async (page, { db }) => {
+  const dlg = await openOtherCard(page, db, 'ドリルの鬼');
+  assert.equal(await dlg.locator('.pf-card-title').innerText(), '“Drill Machine”');
+  assert.doesNotMatch(await dlg.innerText(), /ドリルの鬼/);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// カタログに無い称号（古い称号・手で入れた文字・タグ入り）は、英語版では称号の行が無い。日本語版は今のまま全部出す（エスケープして）
+t('en_card_title_unknown', async (page, { db }) => {
+  for (const title of ['旅人', '<b>x</b>']) {
+    db.profiles.length = 0; db.rows.length = 0;
+    const dlg = await openOtherCard(page, db, title);
+    assert.equal(await dlg.locator('.pf-card-title').count(), 0, title);
+    assert.doesNotMatch(await dlg.innerText(), /旅人|<b>/);
+    assert.equal(await dlg.locator('b', { hasText: /^x$/ }).count(), 0);
+    assert.deepEqual(await jaLeft(page), []);
+    await dlg.locator('[data-pfc="close"]').click();
+  }
+  const ja = await openApp(browser, { storage: { badges: QUIET_BADGES } });
+  try {
+    for (const [title, want] of [['旅人', '〈旅人〉'], ['<b>x</b>', '〈<b>x</b>〉']]) {
+      ja.db.profiles.length = 0; ja.db.rows.length = 0;
+      const dlg = await openOtherCard(ja.page, ja.db, title);
+      await dlg.locator('.pf-card-title', { hasText: want }).waitFor();
+      assert.equal(await dlg.locator('.pf-card-title').innerText(), want);
+      assert.equal(await dlg.locator('.pf-card-title b').count(), 0);
+      await dlg.locator('[data-pfc="close"]').click();
+    }
+    assert.deepEqual(ja.errors.map(String), []);
+  } finally { await ja.close(); }
+});
+
 // 冒険（PR8）が無いあいだ、英語版のプロフィール画面にかざりの欄は出さない。はじめの文も冒険のランキングを約束しない
 t('en_profile_no_decorations', async (page, { db }) => {
   await openProfile(page);
@@ -211,30 +265,56 @@ t('en_post_ja_name', async (page, { db }) => {
   assert.deepEqual(await jaLeft(page), []);
 });
 
-// 日本語版でつけた称号・バッジの数を、badges.js の無い英語版の同期が消さない。PR7 で英語版も badges.js を読むので、
-// ここでは badges.js を止めて「BADGES が無いとき」を見る（英語版で称号を送るのは Task 15 の en_sync_sends_ja_title）
-t('en_sync_keeps_title', async (page, { db }) => {
-  // 日本語版で称号とバッジの数を送ったあとの状態
-  await openWithProfile(page, db, { sent: { isPublic: true, title: '旅人', badges: 12, badgesTotal: 80 }, extra: { title: '旅人', badges: 12, badges_total: 80 } });
-  await openProfile(page);
+// 英語で称号をつけても、同期で送る称号は日本語（BADGES.title()）。バッジの数・全部の数は数で送る。DB の称号も日本語
+t('en_sync_sends_ja_title', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await equipEn(page, 'first-clear@1');
+  await until(() => db.calls.some(c => c.name === 'profile_set' && c.args.p_title != null), 'profile_set p_title');
+  const sets = db.calls.filter(c => c.name === 'profile_set' && c.args.p_title != null);
+  assert.equal(sets.at(-1).args.p_title, 'ドリルの新人');
+  assert.equal(typeof sets.at(-1).args.p_badges, 'number');
+  assert.equal(typeof sets.at(-1).args.p_badges_total, 'number');
+  assert.equal(db.profiles[0].title, 'ドリルの新人');
+  assert.equal(db.profiles[0].badges, await page.evaluate(() => BADGES.count().got));
+  assert.equal(db.profiles[0].badges_total, await page.evaluate(() => BADGES.count().total));
   assert.deepEqual(await jaLeft(page), []);
-  // 公開を切りかえて同期を走らせる
-  await page.click('#pf-public');
-  await until(() => db.profiles[0].is_public === false, 'is_public false');
-  await page.evaluate(() => new Promise(ok => setTimeout(ok, 1800)));   // scheduleSync の後
-  const sets = db.calls.filter(c => c.name === 'profile_set');
-  assert.ok(sets.length >= 1);
-  for (const c of sets) {
-    assert.equal(c.args.p_title, null);
-    assert.equal(c.args.p_badges, null);
-    assert.equal(c.args.p_badges_total, null);
+});
+
+// 自分のプロフィールのカード: 英語でつけた称号が英語で出る
+t('en_own_card_title', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await equipEn(page, 'first-clear@1');
+  await page.evaluate(() => show('home'));
+  await openProfile(page);
+  await page.locator('#pf-me .pf-card-title').waitFor();
+  assert.equal(await text(page, '#pf-me .pf-card-title'), '“Drill Rookie”');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 日本語版で同期が終わった状態で英語版を開いても、日本語版に戻っても、profile_set は飛ばない（バッジの数・称号が両方の言語で同じ）
+t('en_no_sync_flap', async (page, { db }) => {
+  const sets = () => db.calls.filter(c => c.name === 'profile_set').length;
+  const settle = () => page.evaluate(() => new Promise(ok => setTimeout(ok, 2500)));   // scheduleSync の待ちより長く
+  db.profiles.push({ token: 'tok-en', nickname: 'Chiko', pid: PID });
+  await page.evaluate(p => localStorage.setItem('profile', JSON.stringify(p)), { token: 'tok-en', pid: PID, name: 'Chiko', auto: true, isPublic: true, sent: { isPublic: true } });
+  await page.goto(server.url);
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+  await until(() => db.profiles[0].title === 'ドリルの新人', 'ja sync');
+  await settle();
+  const sent = (await stored(page, 'profile')).sent;
+  assert.equal(sent.title, 'ドリルの新人');
+  assert.equal(typeof sent.badges, 'number');
+  const n = sets();
+  for (const path of ['en/', '']) {
+    await page.goto(new URL(path, server.url).href);
+    await page.waitForFunction(() => window.PROFILE);
+    await page.evaluate(() => PROFILE.ready);
+    await settle();
+    assert.equal(sets(), n, path || 'ja');
   }
-  assert.equal(db.profiles[0].title, '旅人');
-  assert.equal(db.profiles[0].badges, 12);
-  assert.equal(db.profiles[0].badges_total, 80);
-  // 自分のカードにも称号は出さない（英語版）
-  assert.doesNotMatch(await text(page, '#pf-me'), /旅人/);
-}, { blockScripts: ['badges.js'] });
+  assert.deepEqual((await stored(page, 'profile')).sent, sent);
+}, { storage: { badges: { ...QUIET_BADGES, eq: 'first-clear@1' } } });
 
 /* ---------- タイムアタックとランキング（Task 5） ---------- */
 const picked = (page, id) => page.$$eval(`#${id} [aria-pressed="true"]`, bs => bs.map(b => Object.values(b.dataset)[0]));
