@@ -97,13 +97,29 @@ test('scan_fixtures', () => {
   assert.deepEqual(nest.map(e => [e.text, e.wrapped]), [['あ', true], ['い', false]]);
   // a / b は割り算（正規表現にしない）
   assert.equal(one("x = a / b; y = 'う' / 2;").text, 'う');
+  // キーワードや => のあとの / は正規表現（中の引用符で文字列を読みちがえない）
+  for (const pre of ['return', 'typeof', 'case', 'x =>', 'throw', 'else', 'void', 'await', 'yield'])
+    assert.equal(one(`${pre} /[",']/.test(s); y = 'え';`).text, 'え', pre);
+  assert.equal(one("x = a.return / 2; y = 'お' / 3;").text, 'お');   // プロパティ名の return は割り算
+  // T( の第1引数が文字列そのものでなければ wrapped にしない
+  assert.equal(one("x = T('あ' + y);").wrapped, false);
+  assert.equal(one("x = T('あ'.repeat(2));").wrapped, false);
+  assert.equal(one("x = T( 'あ' );").wrapped, true);
+  // エスケープを読む
+  assert.equal(one("x = T('あ\\'い\\n\\u3042\\\\');").text, "あ'い\nあ\\");
+  assert.equal(one('x = "あ\\"";').text, 'あ"');
+  // console・Error の中でも、関数の本体 {…} の中は exempt にしない
+  assert.equal(one("console.log(() => { el.textContent = 'あ'; });").exempt, false);
+  assert.equal(one("console.log(function () { return 'あ'; });").exempt, false);
+  assert.equal(one("console.log({ a: 'あ' });").exempt, true);
+  assert.equal(one("console.log(() => 'あ');").exempt, true);
   const d = scanJs("x = 'あ';\n// i18n-data:start\nconst D = { a: 'い' };\n// i18n-data:end\ny = 'う';");
   assert.deepEqual(d.map(e => [e.text, e.data]), [['あ', false], ['い', true], ['う', false]]);
 });
 
 test('scan_helpers', async () => {
   const { tKeys } = await import('../../tools/i18n_scan.mjs');
-  assert.deepEqual(tKeys("T('あ'); x.T('い'); T('{n}問', { n }); T(\"え\")"), ['あ', '{n}問']);
+  assert.deepEqual(tKeys("T('あ'); x.T('い'); T('{n}問', { n }); T(\"え\"); T('it\\'s'); T('お' + x)"), ['あ', '{n}問', "it's"]);
   assert.ok(JA_RE.test('あ') && JA_RE.test('漢') && JA_RE.test('・') && JA_RE.test('！') && !JA_RE.test('São Tomé'));
   const s = inlineSections(read('index.html'));
   assert.ok('先読み' in s && 'データ' in s && 'クイズ' in s && 'ドパガキ向けの演出' in s && '起動' in s, Object.keys(s).join(','));
@@ -131,9 +147,27 @@ test('every_root_js_listed', () => {
   }
 });
 
+// グローバルの名前を宣言しているところ（宣言の2つめ以降・関数の引数も見る）
+const GLOBALS = 'T|cName|cCap|LANG|I18N|I18N_EN';
+const globalDecls = src => {
+  const g = String.raw`(?:${GLOBALS})`;
+  const res = [
+    new RegExp(String.raw`\b(?:const|let|var|function)\s+${g}\b`, 'g'),                    // const T / function T
+    new RegExp(String.raw`\b(?:const|let|var)\s[^;\n]*?,\s*${g}\s*=(?![=>])`, 'g'),       // const K = …, T = …
+    new RegExp(String.raw`\bfunction\b[^(\n]*\([^)]*\b${g}\b[^)]*\)`, 'g'),              // function f(a, T)
+    new RegExp(String.raw`\([^()\n]*(?<![.\w$])${g}\b(?!\s*[.(\[])[^()\n]*\)\s*=>`, 'g'),  // (a, T) =>
+    new RegExp(String.raw`(?<![.\w$])${g}\s*=>`, 'g'),                                       // T =>
+  ];
+  return res.flatMap(re => [...src.matchAll(re)].map(m => m[0]));
+};
+
 test('i18n_globals_unique', () => {
+  // 見つけ方の確かめ
+  for (const s of ['const T = 1', 'let K = 1, T = 2', 'function T() {}', 'function f(a, T) {}', 'const f = (a, T) => 1', 'xs.map(T => T)', 'var a, I18N = 3'])
+    assert.ok(globalDecls(s).length, s);
+  for (const s of ["x = T('あ')", 'const a = T.x', "const a = b, c = T('あ')", 'f(x === T)', "xs.map(c => T('あ', c))", 'const a = b, c = x ? T : y'])
+    assert.deepEqual(globalDecls(s), [], s);
   const files = [...readdirSync(root).filter(f => f.endsWith('.js') && f !== 'i18n.js'), 'index.html'];
-  const re = /\b(?:const|let|var|function)\s+(T|cName|cCap|LANG|I18N|I18N_EN)\b/g;
-  const bad = files.flatMap(f => [...read(f).matchAll(re)].map(m => `${f}: ${m[0]}`));
+  const bad = files.flatMap(f => globalDecls(read(f)).map(m => `${f}: ${m}`));
   assert.deepEqual(bad, []);
 });

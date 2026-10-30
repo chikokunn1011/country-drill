@@ -1,18 +1,30 @@
 // 英語版（PR5）: js の中の日本語の文字列を見つける（tests/unit/i18n.test.mjs が使う）。
 // 本物の JS の構文解析はしない。コメント・文字列・テンプレート・正規表現を見分けるだけの字句の読み方:
 //   ・// と /* */ のコメントは飛ばす（// i18n-data:start 〜 // i18n-data:end の目印だけ見る）
-//   ・/ は、直前の意味のある文字が ( , = : [ ! & | ? { } ; + か行頭なら正規表現として読み飛ばす（ほかは割り算）
+//   ・/ は、直前の意味のある文字が ( , = : [ ! & | ? { } ; + > か行頭、または直前の語が return・typeof などの
+//     キーワードなら正規表現として読み飛ばす（ほかは割り算）
 //   ・テンプレートの ${…} は入れ子で読む（中の文字列も1つずつ拾う）
 
 // 日本語の文字（かな・漢字・和文の記号・全角の記号）。どこでもこれを使う
 export const JA_RE = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}　-〿・ー！-｠]/u;
 
-const REGEX_BEFORE = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+']);
+const REGEX_BEFORE = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '>']);
+// このキーワードのあとの / も正規表現（return /…/ など）
+const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'throw', 'new', 'else', 'do', 'yield', 'await']);
+// 文字列のエスケープを読む（\' \" \\ \n \t \uXXXX \u{…}。ほかは \ を外すだけ。行の続きの \改行 は消す）
+const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
+const unesc = s => s.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|\r\n|[\s\S])/g, (m, e) => {
+  if (e[0] === 'u' && e.length > 1) return String.fromCodePoint(parseInt(e[1] === '{' ? e.slice(2, -1) : e.slice(1), 16));
+  if (e[0] === 'x' && e.length > 1) return String.fromCharCode(parseInt(e.slice(1), 16));
+  if (e === '\n' || e === '\r\n' || e === '\r') return '';
+  return ESC[e] ?? e;
+});
 const ID_CHAR = /[\w$]/;
 
 // src の中の、日本語をふくむ文字列・テンプレート文字列ごとに { text, line, wrapped, exempt, data }。
-//   wrapped: T( の第1引数（シングルクォートの文字列だけ）
-//   exempt:  いちばん内側の呼び出しが console.<x>( か Error(
+//   wrapped: T( の第1引数（シングルクォートの文字列だけ。すぐあとが , か ) のとき。T('あ' + x) はちがう）
+//   exempt:  いちばん内側の呼び出しが console.<x>( か Error(（関数の本体 {…} の中からは外を見ない）
+// text はエスケープを読んだあとの文字（T('a\'b') のキーは a'b）
 //   data:    // i18n-data:start 〜 // i18n-data:end の中
 // テンプレートの text は、${…} を '${…}' に置きかえた文字の部分
 export function scanJs(src) {
@@ -29,7 +41,8 @@ function lex(src, keep) {
   const out = [];
   let i = 0, line = 1, data = false;
   let last = null, sigOnLine = false;   // 直前の意味のある文字、この行に意味のある文字があったか
-  // 開いているかっこ: { ch, callee, argStart }。callee は ( の前の名前（a.b.c）、無ければ null
+  // 開いているかっこ: { ch, callee, body }。callee は ( の前の名前（a.b.c）、無ければ null。
+  // body は ) か => のあとの {（関数などの本体）
   const stack = [];
   // 直前のトークン（文字列が T( の第1引数かを見るため）
   let prevTok = null, prevTok2 = null;
@@ -46,7 +59,10 @@ function lex(src, keep) {
     return name && /^[A-Za-z_$]/.test(name) ? name : null;
   };
   const innermostCall = () => {
-    for (let k = stack.length - 1; k >= 0; k--) if (stack[k].ch === '(' && stack[k].callee) return stack[k].callee;
+    for (let k = stack.length - 1; k >= 0; k--) {
+      if (stack[k].body) return null;
+      if (stack[k].ch === '(' && stack[k].callee) return stack[k].callee;
+    }
     return null;
   };
   const isExempt = () => {
@@ -67,7 +83,7 @@ function lex(src, keep) {
       s += src[i++];
     }
     i++;
-    return s;
+    return unesc(s);
   };
   // 正規表現を読み飛ばす（i は開きの /）
   const skipRegex = () => {
@@ -105,6 +121,7 @@ function lex(src, keep) {
       s += src[i++];
     }
     i++;
+    s = unesc(s);
     if (keep(s)) out.splice(at, 0, { text: s, line: startLine, wrapped: false, exempt, data: d });
   };
 
@@ -130,15 +147,18 @@ function lex(src, keep) {
       }
       if (c === '\'' || c === '"') {
         const startLine = line;
-        const wrapped = c === '\'' && prevTok === '(' && prevTok2 === 'T';
+        const first = c === '\'' && prevTok === '(' && prevTok2 === 'T';
         const s = readString(c);
+        let j = i;
+        while (j < src.length && /\s/.test(src[j])) j++;
+        const wrapped = first && (src[j] === ',' || src[j] === ')');
         record(s, startLine, wrapped);
         sig('x'); tok('str');
         continue;
       }
       if (c === '`') { readTemplate(); sig('x'); tok('tpl'); continue; }
       if (c === '/') {
-        if (!sigOnLine || REGEX_BEFORE.has(last)) { skipRegex(); sig('x'); tok('re'); continue; }
+        if (!sigOnLine || REGEX_BEFORE.has(last) || last === 'kw') { skipRegex(); sig('x'); tok('re'); continue; }
         i++; sig('/'); tok('/');
         continue;
       }
@@ -149,11 +169,11 @@ function lex(src, keep) {
         // T の前が . や名前の続きなら T( ではない（x.T( など）
         const p = src[i - 1];
         tok(w === 'T' && p !== '.' ? 'T' : 'id');
-        i = j; sig('x');
+        i = j; sig(p !== '.' && REGEX_AFTER_WORD.has(w) ? 'kw' : 'x');
         continue;
       }
       if (c === '(' || c === '[' || c === '{') {
-        stack.push({ ch: c, callee: c === '(' ? calleeBefore() : null });
+        stack.push({ ch: c, callee: c === '(' ? calleeBefore() : null, body: c === '{' && (last === ')' || last === '>') });
         i++; sig(c); tok(c);
         continue;
       }
