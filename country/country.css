@@ -26,3 +26,22 @@
 .cplay { display: flex; flex-wrap: wrap; gap: 10px; margin: 32px 0 0; }
 .cplay a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font: 700 .9rem var(--font-display); text-decoration: none; }
 .cplay a.play-region { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* 国旗の意味 */
+.meaning { margin: 0 0 8px; }
+
+/* となりの国（小さい国旗＋国名）。陸でとなる国が無ければ一文 */
+.page .neighbors { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.neighbors a { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--ink); text-decoration: none; }
+.neighbors img { display: block; width: 36px; height: auto; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--line); background: var(--surface); }
+.neighbors a:hover span { text-decoration: underline; }
+.noneighbor { color: var(--muted); }
+
+/* この国旗が出てくるまとめ */
+.page .cthemes { padding-left: 1.2em; }
+.cthemes li { margin: 0 0 6px; }
+
+/* 前の国・次の国（同じ地域の五十音順）。前が無ければ次を右に寄せる */
+.prevnext { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+.prevnext a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.prevnext .next { margin-left: auto; text-align: right; }

@@ -16,7 +16,7 @@ export const THEME_REP = { stars: 'us', cross: 'dk', crescent: 'tr', sun: 'jp', 
   redwhite: 'ca', similar: 'id', island: 'mg', landlocked: 'ch', bigarea: 'ru', smallarea: 'va' };
 const QUIZ_MIN = 10;   // これより少ないテーマはクイズのボタンを出さず、themes.js にも入れない
 const RANK_N = 20;
-const CSS = ['../country/country.css?v=1', 'themes.css?v=1'];
+const CSS = ['../country/country.css?v=2', 'themes.css?v=1'];
 
 // 題・説明（1〜2文）
 const THEMES = {

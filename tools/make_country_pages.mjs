@@ -1,7 +1,8 @@
 // 国ごとのページ（country/<a>.html ×195）と一覧（country/index.html）を作り、sitemap.xml の目印のあいだを書きかえる。
 // 使い方: node tools/make_country_pages.mjs [--root DIR] [--out DIR]（どちらも既定はリポジトリの根）
 // 読むもの: countries.js・trivia.js・daily-core.js の SIMILAR・index.html（REGIONS・SUBREGIONS・フッター・FLAG_V・テーマの先読み・フォント）・
-// privacy.html の pages.css?v=・flags/*.svg・sitemap.xml・world.js（となりの国）・data/neighbors_fix.json。日付と乱数は使わない（同じ入力からはいつも同じ出力）。作ったファイルはコミットする
+// privacy.html の pages.css?v=・flags/*.svg・sitemap.xml・world.js（となりの国）・data/neighbors_fix.json・
+// data/flag_meanings.json（国旗の意味）・themes.js（まとめの題と国。tools/make_theme_pages.mjs が作る）。日付と乱数は使わない（同じ入力からはいつも同じ出力）。作ったファイルはコミットする
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,7 +60,11 @@ export function readInputs(root) {
   const featCodes = geoms.map(g => (String(g.id) === 'XK' ? C.find(c => c.a === 'xk') : C.find(c => c.id === String(g.id)))?.a ?? null);
   const featNb = topojson.neighbors(geoms);
   const NEIGHBORS_FIX = JSON.parse(read('data/neighbors_fix.json'));
-  return { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles, featCodes, featNb, NEIGHBORS_FIX };
+  // 国旗の意味: コード → 文（note は出さない）
+  const MEANINGS = Object.fromEntries(JSON.parse(read('data/flag_meanings.json')).map(m => [m.a, m.t]));
+  // まとめ: themes.js のテーマ（10か国以上で、ページのあるもの）→ { n: 題, a: 国 }
+  const THEMES_DATA = JSON.parse(JSON.stringify(win('themes.js').THEMES_DATA));
+  return { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles, featCodes, featNb, NEIGHBORS_FIX, MEANINGS, THEMES_DATA };
 }
 
 // 地図の形がとなり合う国の組（a-b と b-a の両方）。国に当たらない形（西サハラ・パレスチナなど）は飛ばす
@@ -89,6 +94,10 @@ export function check(inp) {
     if (!Array.isArray(list) || !list.some(hasText)) out.push(`豆知識が0件: ${c.a}`);
   }
   for (const c of inp.C) if (!inp.flagFiles.has(c.a)) out.push(`flags/${c.a}.svg が無い`);
+  for (const c of inp.C) {
+    if (typeof inp.MEANINGS[c.a] !== 'string' || !inp.MEANINGS[c.a].trim()) out.push(`国旗の意味が無い: ${c.a}`);
+    else if (descHead(c, inp.MEANINGS[c.a]).length > DESC_MAX) out.push(`国旗の意味の最初の文が長すぎる: ${c.a}`);
+  }
   if (inp.footer == null) out.push('フッターの目印が無い');
   if (!inp.sitemap.includes(MARK_START) || !inp.sitemap.includes(MARK_END)) out.push('sitemap.xml の目印が無い');
   // となりの国の直し: 知らないコード・地図と同じになる直し（add が地図にある、remove が地図に無い）
@@ -115,7 +124,7 @@ export const footerHTML = inp => `<footer>
 </footer>`;
 
 // css: 国のページは country.css。まとめページ（tools/make_theme_pages.mjs）はほかの css も渡す
-export function head(inp, { title, description, url, crumbs, css = ['country.css?v=1'] }) {
+export function head(inp, { title, description, url, crumbs, css = ['country.css?v=2'] }) {
   const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: crumbs.map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })) };
   return `<!doctype html>
@@ -156,13 +165,24 @@ ${css.map(h => `<link rel="stylesheet" href="${h}">`).join('\n')}
 `;
 }
 
-function countryDescription(c, sims) {
-  const base = `${c.n}（${c.r}）の国旗と、首都・面積・豆知識。`, tail = '国旗マスターで国旗・国名・場所をクイズで覚えよう。';
-  const withSim = base + (sims.length ? `似ている国旗: ${sims.map(s => s.n).join('・')}。` : '') + tail;
-  return withSim.length <= DESC_MAX ? withSim : base + tail;
+// description の頭: 「<国名>の国旗の意味: <国旗の意味の最初の文>」
+const descHead = (c, meaning) => `${c.n}の国旗の意味: ${meaning.split('。')[0]}。`;
+// 頭のあとに、地域・似ている国旗・さそいの文を、120字に収まるところまで文ごとに付ける（文の途中では切らない）
+function countryDescription(inp, c, sims) {
+  const rest = [`${c.n}（${c.r}）の国旗と、首都・面積・豆知識。`, ...(sims.length ? [`似ている国旗: ${sims.map(s => s.n).join('・')}。`] : []),
+    '国旗マスターで国旗・国名・場所をクイズで覚えよう。'];
+  let d = descHead(c, inp.MEANINGS[c.a]);
+  for (const s of rest) { if ((d + s).length > DESC_MAX) break; d += s; }
+  return d;
 }
 
-function countryPage(inp, byA, c) {
+// 同じ6地域の中の、五十音順で前と次の国（端なら null）
+function prevNextOf(inp, c) {
+  const list = inp.C.filter(x => x.r === c.r).sort(byJa), i = list.indexOf(c);
+  return [list[i - 1] ?? null, list[i + 1] ?? null];
+}
+
+function countryPage(inp, byA, nbs, c) {
   const sims = similarOf(inp, byA, c.a), region = playRegion(inp, c), url = `${SITE}country/${c.a}.html`;
   const trivia = inp.TRIVIA[c.a].filter(hasText)
     .map(x => `    <li><span class="tv-k">${esc(TRIVIA_LABEL[x.k] ?? x.k)}</span>${esc(x.t)}</li>`).join('\n');
@@ -172,7 +192,21 @@ function countryPage(inp, byA, c) {
 ${sims.map(s => `    <li><a href="${s.a}.html">${flagImg(inp, s.a, '', true)}<span>${esc(s.n)}</span></a></li>`).join('\n')}
   </ul>
 ` : '';
-  return head(inp, { title: `${c.n}の国旗と豆知識｜国旗マスター`, description: countryDescription(c, sims), url,
+  // となりの国（同じフォルダのページへ）。無ければ一文。島国は themes.js の island で見る（オーストラリアは島国にしない）
+  const nb = nbs.get(c.a).map(b => byA.get(b));
+  const neighbors = nb.length ? `  <ul class="neighbors">
+${nb.map(b => `    <li><a href="${b.a}.html">${flagImg(inp, b.a, '', true)}<span>${esc(b.n)}</span></a></li>`).join('\n')}
+  </ul>` : `  <p class="noneighbor">陸で接している国はない${inp.THEMES_DATA.island?.a.includes(c.a) ? '（島国）' : ''}</p>`;
+  // この国旗が出てくるまとめ（themes.js の並び）。無ければ節ごと出さない
+  const themes = Object.entries(inp.THEMES_DATA).filter(([, t]) => t.a.includes(c.a));
+  const themeList = themes.length ? `
+  <h2>この国旗が出てくるまとめ</h2>
+  <ul class="cthemes">
+${themes.map(([id, t]) => `    <li><a href="../themes/${id}.html">${esc(t.n)}</a></li>`).join('\n')}
+  </ul>
+` : '';
+  const [prev, next] = prevNextOf(inp, c);
+  return head(inp, { title: `${c.n}の国旗と豆知識｜国旗マスター`, description: countryDescription(inp, c, sims), url,
     crumbs: [['国旗マスター', SITE], ['国の一覧', `${SITE}country/`], [c.n, url]] }) + `<body>
 <main class="page">
   <a class="back" href="../">← 国旗マスターで遊ぶ</a>
@@ -186,15 +220,25 @@ ${sims.map(s => `    <li><a href="${s.a}.html">${flagImg(inp, s.a, '', true)}<sp
     <dt>ISO</dt><dd>${c.a.toUpperCase()}</dd>
   </dl>
 
+  <h2>国旗の意味</h2>
+  <p class="meaning">${esc(inp.MEANINGS[c.a])}</p>
+
   <h2>豆知識</h2>
   <ul class="trivia">
 ${trivia}
   </ul>
-${similar}
+
+  <h2>となりの国</h2>
+${neighbors}
+${similar}${themeList}
   <nav class="cplay" aria-label="遊ぶ">
     <a class="play-region" href="${playHref(region)}">この地域で遊ぶ（${esc(region)}）</a>
     <a href="../">国旗マスターで遊ぶ</a>
     <a href="../index.html#book">図鑑で見る</a>
+  </nav>
+  <nav class="prevnext" aria-label="${esc(c.r)}の前の国・次の国">${prev ? `
+    <a class="prev" href="${prev.a}.html">← ${esc(prev.n)}</a>` : ''}${next ? `
+    <a class="next" href="${next.a}.html">${esc(next.n)} →</a>` : ''}
   </nav>
 </main>
 ${footerHTML(inp)}
@@ -237,7 +281,8 @@ function sitemapOf(inp) {
 // 出力の相対パス → 中身
 export function render(inp) {
   const byA = new Map(inp.C.map(c => [c.a, c])), out = { 'country/index.html': indexPage(inp) };
-  for (const c of [...inp.C].sort(byCode)) out[`country/${c.a}.html`] = countryPage(inp, byA, c);
+  const nbs = neighborsOf(inp);
+  for (const c of [...inp.C].sort(byCode)) out[`country/${c.a}.html`] = countryPage(inp, byA, nbs, c);
   out['sitemap.xml'] = sitemapOf(inp);
   return out;
 }
