@@ -196,6 +196,8 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
   #home-status { grid-area: status; align-items: flex-start; }
   #home-big { grid-area: big; display: flex; flex-direction: column; width: min(480px, 100%); }
   #home-icons { grid-area: icons; justify-content: flex-start; width: min(480px, 100%); }
+  /* 「アプリとして追加」の帯（pwa.js）は下の空きの行の上に置く（隠れているときは行も間もできない） */
+  #home-pwa { grid-column: 1; grid-row: 7; align-self: start; width: min(480px, 100%); }
   #home-status .bdg-titlerow { justify-content: flex-start; }
   .home .flags {
     grid-area: flags; align-self: center; justify-self: center;

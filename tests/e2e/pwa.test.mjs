@@ -72,3 +72,92 @@ t('sw_ignores_other_origins', async (page, { db }) => {
   for (let i = 0; i < 100 && db.calls.filter(c => c.name === 'top_scores2').length <= n; i++) await new Promise(ok => setTimeout(ok, 20));
   assert.ok(db.calls.filter(c => c.name === 'top_scores2').length > n);
 });
+
+// ---------- 「アプリとして追加」の帯（#home-pwa）と設定の欄（#set-pwa-field）。SW は要らないので既定の block ----------
+const b = (name, fn, opts = {}) => test(name, { timeout: 60_000 }, async () => {
+  const app = await openApp(browser, { waitMap: false, ...opts });
+  try {
+    await fn(app.page, app);
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});
+const DAY2 = { pwa: { v: 1, first: '2026-01-01', hideUntil: 0 } };
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+// ブラウザの「追加できる」の知らせ（beforeinstallprompt）のまね。prompt() が呼ばれた数は window.__prompted
+const fakePrompt = page => page.evaluate(() => {
+  window.__prompted = 0;
+  const e = new Event('beforeinstallprompt', { cancelable: true });
+  e.prompt = () => { window.__prompted++; return Promise.resolve(); };
+  e.userChoice = Promise.resolve({ outcome: 'dismissed', platform: 'web' });
+  dispatchEvent(e);
+});
+const pwaSave = page => page.evaluate(() => JSON.parse(localStorage.getItem('pwa')));
+
+b('install_banner_not_first_day', async page => {
+  await fakePrompt(page);
+  assert.equal(await page.isHidden('#home-pwa'), true);
+  assert.equal((await pwaSave(page)).first, await page.evaluate(() => DAILY_CORE.jstDay()));
+});
+
+b('install_banner_second_day', async page => {
+  await fakePrompt(page);
+  await page.locator('#home-pwa').waitFor();
+  assert.equal(await page.textContent('#home-pwa'), 'ホーム画面に追加すると、電波がなくても遊べる追加する×');
+  await page.click('#home-pwa-add');
+  await page.waitForFunction(() => window.__prompted === 1);
+}, { storage: DAY2 });
+
+// storage は読み込むたびに入れ直すので使わず、ここで1回だけ入れて読み直す
+b('install_banner_dismiss', async page => {
+  await page.evaluate(s => localStorage.setItem('pwa', JSON.stringify(s)), DAY2.pwa);
+  await page.reload();
+  await page.locator('#scr-home').waitFor();
+  await fakePrompt(page);
+  await page.locator('#home-pwa').waitFor();
+  await page.click('#home-pwa [aria-label="閉じる"]');
+  assert.equal(await page.isHidden('#home-pwa'), true);
+  const want = Date.now() + 30 * 864e5;
+  assert.ok(Math.abs((await pwaSave(page)).hideUntil - want) < 60_000);
+  await page.reload();
+  await page.locator('#scr-home').waitFor();
+  await fakePrompt(page);
+  assert.equal(await page.isHidden('#home-pwa'), true);
+});
+
+b('install_banner_standalone', async page => {
+  await fakePrompt(page);
+  assert.equal(await page.isHidden('#home-pwa'), true);
+  assert.equal(await page.isHidden('#set-pwa-field'), true);
+}, { storage: DAY2, init: () => {
+  const mm = window.matchMedia.bind(window);
+  window.matchMedia = q => /display-mode:\s*standalone/.test(q)
+    ? { matches: true, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false } : mm(q);
+} });
+
+b('install_banner_ios', async page => {
+  await page.locator('#home-pwa').waitFor();
+  await page.click('#home-pwa-add');
+  await page.locator('#pwa-ios').waitFor();
+  assert.equal(await page.evaluate(() => document.getElementById('pwa-ios').open), true);
+  assert.equal((await page.textContent('#pwa-ios p')).trim(), 'Safari の下の共有ボタン（□に↑）を押して、「ホーム画面に追加」を選んでね。');
+  await page.click('#pwa-ios button:has-text("OK")');
+  assert.equal(await page.evaluate(() => document.getElementById('pwa-ios').open), false);
+}, { storage: DAY2, init: `Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => ${JSON.stringify(IPHONE)} });` });
+
+b('install_setting_button', async page => {
+  await fakePrompt(page);
+  await page.click('#home-settings');
+  await page.locator('#set-pwa-field').waitFor();
+  assert.equal((await page.textContent('#set-pwa-field .lbl')).trim(), 'アプリ');
+  assert.equal((await page.textContent('#set-pwa-field .hint')).trim(), '追加すると、アプリのようにすぐ開けて、電波がなくても遊べるよ。');
+  await page.click('#set-pwa-field button:has-text("ホーム画面に追加する")');
+  await page.waitForFunction(() => window.__prompted === 1);
+}, { storage: DAY2 });
+
+// 知らせが来ず iPhone でもない（PC の Firefox など）ときは、設定の欄も出さない
+b('install_setting_hidden_without_prompt', async page => {
+  await page.click('#home-settings');
+  await page.locator('#scr-settings').waitFor();
+  assert.equal(await page.isHidden('#set-pwa-field'), true);
+  assert.equal(await page.isHidden('#home-pwa'), true);
+}, { storage: DAY2 });
