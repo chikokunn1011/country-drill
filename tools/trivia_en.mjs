@@ -8,6 +8,10 @@
 //   node tools/trivia_en.mjs sheet <1-8>          かたまり N を訳すシート（id | k | 日本語 | note）を標準出力に
 //   node tools/trivia_en.mjs sheet <1-8> faith    中身のずれを見るシート（id | 日本語 | English。note は出さない）
 //   node tools/trivia_en.mjs sheet <1-8> en       英語の自然さを見るシート（id | k | English。日本語は出さない）
+//   node tools/trivia_en.mjs merge <1-8> <file.json>
+//                                                 訳した {id: 英語} を、id・a・k・ja を日本語から埋めて英訳の末尾に足す
+//                                                 （かたまり N の id をちょうど全部。前のかたまりが入っていないと止まる）
+//   node tools/trivia_en.mjs patch <file.json>    確かめの直し {id: 英語} で、もう入っている行の t だけを置きかえる
 //   node tools/trivia_en.mjs build                trivia-en.js を書く（英訳が779件そろっていないと止まる）
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -101,6 +105,36 @@ export function sheet(ja, en, b, mode) {
   ].join('\n');
 }
 
+// {id: 英語} の形を確かめる
+function textMap(map) {
+  if (!map || typeof map !== 'object' || Array.isArray(map)) throw new Error('{id: 英語} のオブジェクトでない');
+  for (const [id, t] of Object.entries(map)) if (typeof t !== 'string' || !t.trim()) throw new Error(`${id} の英語が空か文字列でない`);
+  return map;
+}
+
+// かたまり n の訳 {id: 英語} を、日本語の並びで en の末尾に足した新しい配列。id の過不足・順番ちがいは止まる
+export function mergeBatch(ja, en, n, map) {
+  if (!Number.isInteger(n) || n < 1 || n > BATCHES.length) throw new Error(`かたまりは 1〜${BATCHES.length}: ${n}`);
+  textMap(map);
+  const [s, e] = BATCHES[n - 1];
+  if (en.length !== s) throw new Error(`英訳は ${en.length} 件。B${n} を足せるのは ${s} 件（B${n - 1} まで）のとき`);
+  const ids = triviaIds(ja);
+  const want = ids.slice(s, e), wantSet = new Set(want);
+  const missing = want.filter(id => !(id in map)), extra = Object.keys(map).filter(id => !wantSet.has(id));
+  if (missing.length || extra.length) throw new Error(`B${n} の id が合わない。足りない: ${missing.join(' ') || 'なし'}／余分: ${extra.join(' ') || 'なし'}`);
+  return [...en, ...want.map((id, x) => { const j = ja[s + x]; return { id, a: j.a, k: j.k, ja: j.t, t: map[id] }; })];
+}
+
+// 確かめの直し {id: 英語} で、もう入っている行の t だけを置きかえた新しい配列。無い id は止まる
+export function patchEn(en, map) {
+  textMap(map);
+  if (!Object.keys(map).length) throw new Error('直しが空');
+  const at = new Map(en.map((r, i) => [r.id, i]));
+  const unknown = Object.keys(map).filter(id => !at.has(id));
+  if (unknown.length) throw new Error(`英訳にまだ無い id: ${unknown.join(' ')}`);
+  return en.map(r => (r.id in map ? { ...r, t: map[r.id] } : r));
+}
+
 const readJson = p => JSON.parse(readFileSync(join(ROOT, p), 'utf8'));
 const HEAD = '// 豆知識の英訳。tools/trivia_en.mjs build が data/en/trivia_facts.json から作る。手で書きかえない';
 
@@ -128,12 +162,20 @@ if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   try {
     if (cmd === 'sheet') {
       process.stdout.write(sheet(readJson('data/trivia_facts.json'), readJson('data/en/trivia_facts.json'), Number(n), mode));
+    } else if (cmd === 'merge' || cmd === 'patch') {
+      const file = process.argv[cmd === 'merge' ? 4 : 3];
+      if (!file) throw new Error(`usage: node tools/trivia_en.mjs ${cmd === 'merge' ? 'merge <1-8>' : 'patch'} <file.json>`);
+      const map = JSON.parse(readFileSync(resolve(file), 'utf8'));
+      const en = readJson('data/en/trivia_facts.json');
+      const out = cmd === 'merge' ? mergeBatch(readJson('data/trivia_facts.json'), en, Number(n), map) : patchEn(en, map);
+      writeFileSync(join(ROOT, 'data/en/trivia_facts.json'), JSON.stringify(out, null, 2) + '\n');
+      console.log(`${cmd}: ${cmd === 'merge' ? out.length - en.length + ' rows added' : Object.keys(map).length + ' rows patched'}, ${out.length} in total`);
     } else if (cmd === 'build') {
       const en = readJson('data/en/trivia_facts.json');
       writeFileSync(join(ROOT, 'trivia-en.js'), buildTriviaEn(en));
       console.log(`wrote trivia-en.js: ${new Set(en.map(r => r.a)).size} countries, ${en.length} facts`);
     } else {
-      console.error('usage: node tools/trivia_en.mjs sheet <1-8> [faith|en] | build');
+      console.error('usage: node tools/trivia_en.mjs sheet <1-8> [faith|en] | merge <1-8> <file.json> | patch <file.json> | build');
       process.exit(2);
     }
   } catch (e) {

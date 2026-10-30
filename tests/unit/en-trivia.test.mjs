@@ -8,8 +8,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
+import { execFileSync } from 'node:child_process';
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
-import { BATCHES, triviaIds, sheet, buildTriviaEn, numbersOf } from '../../tools/trivia_en.mjs';
+import { BATCHES, triviaIds, sheet, buildTriviaEn, numbersOf, mergeBatch, patchEn } from '../../tools/trivia_en.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = p => readFileSync(join(ROOT, p), 'utf8');
@@ -22,6 +25,17 @@ const load = (src, name) => { const ctx = { window: {} }; vm.runInNewContext(src
 // 数の確かめ（trivia_en_numbers）の例外。id → 理由。
 // 入れるときは「確かめた AI の名前: 理由」を書く（例: 'xx-1': 'B1 確かめ1（<AI>）: 1億2000万 → 120 million と書くため'）
 const NUM_OK = {};
+
+// tools と data だけを写した一時のルートで fn を動かす（CLI が本物の英訳を書きかえないように）
+function withTmpRoot(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'trivia-en-'));
+  try {
+    for (const p of ['tools/trivia_en.mjs', 'data/trivia_facts.json']) cpSync(join(ROOT, p), join(dir, p));
+    mkdirSync(join(dir, 'data/en'), { recursive: true });
+    writeFileSync(join(dir, 'data/en/trivia_facts.json'), '[]\n');
+    return fn(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
 
 test('batches_cover', () => {
   assert.equal(JA.length, 779);
@@ -157,3 +171,62 @@ test('build_refuses_incomplete', () => {
   }
   assert.deepEqual(got.af[0], { k: 'flag', t: 'x0.' });
 });
+
+// かたまり N の {id: 英語} を作る（merge・patch のテスト用）
+const mapOf = (n, f = id => `English for ${id}.`) => Object.fromEntries(IDS.slice(...BATCHES[n - 1]).map(id => [id, f(id)]));
+
+test('merge_appends_batch', () => {
+  const b1 = mergeBatch(JA, [], 1, mapOf(1));
+  assert.equal(b1.length, 96);
+  assert.deepEqual(b1[0], { id: 'af-1', a: 'af', k: JA[0].k, ja: JA[0].t, t: 'English for af-1.' });
+  b1.forEach((r, i) => { assert.equal(r.id, IDS[i]); assert.equal(r.ja, JA[i].t); });
+  // キーの並びが逆でも日本語の並びで足す
+  const rev = Object.fromEntries(Object.entries(mapOf(2)).reverse());
+  const b2 = mergeBatch(JA, b1, 2, rev);
+  assert.equal(b2.length, 196);
+  assert.deepEqual(b2.slice(96).map(r => r.id), IDS.slice(96, 196));
+  assert.equal(b1.length, 96, 'もとの配列は変えない');
+});
+
+test('merge_refuses_bad_input', () => {
+  const m = mapOf(1);
+  const { 'af-1': _, ...missing } = m;
+  assert.throws(() => mergeBatch(JA, [], 1, missing), /af-1/, '足りない id');
+  assert.throws(() => mergeBatch(JA, [], 1, { ...m, 'my-1': 'Extra.' }), /my-1/, '余分な id');
+  assert.throws(() => mergeBatch(JA, [], 1, { ...m, 'af-2': 3 }), /af-2/, '文字列でない');
+  assert.throws(() => mergeBatch(JA, [], 2, mapOf(2)), /B1/, '前のかたまりがまだ');
+  const b1 = mergeBatch(JA, [], 1, m);
+  assert.throws(() => mergeBatch(JA, b1, 1, m), '同じかたまりを2度');
+  assert.throws(() => mergeBatch(JA, [], 9, {}));
+  assert.throws(() => mergeBatch(JA, [], 1, ['x']));
+});
+
+test('patch_replaces_text', () => {
+  const b1 = mergeBatch(JA, [], 1, mapOf(1));
+  const p = patchEn(b1, { 'af-2': 'Fixed text.', 'lb-4': 'Also fixed.' });
+  assert.equal(p[1].t, 'Fixed text.');
+  assert.equal(p[95].t, 'Also fixed.');
+  assert.deepEqual({ ...p[1], t: b1[1].t }, b1[1], 't のほかは変えない');
+  assert.equal(b1[1].t, 'English for af-2.', 'もとの配列は変えない');
+  assert.throws(() => patchEn(b1, { 'my-1': 'Not yet.' }), /my-1/, 'まだ無い id');
+  assert.throws(() => patchEn(b1, { 'zz-1': 'No.' }), /zz-1/);
+  assert.throws(() => patchEn(b1, { 'af-1': '' }), /af-1/, '空の文');
+  assert.throws(() => patchEn(b1, {}), '空の直し');
+});
+
+test('merge_patch_cli', () => withTmpRoot(dir => {
+  const run = (...args) => execFileSync('node', [join(dir, 'tools/trivia_en.mjs'), ...args], { cwd: dir, stdio: 'pipe', encoding: 'utf8' });
+  const f = join(dir, 'b1.json');
+  writeFileSync(f, JSON.stringify(mapOf(1)));
+  run('merge', '1', f);
+  const en = JSON.parse(readFileSync(join(dir, 'data/en/trivia_facts.json'), 'utf8'));
+  assert.equal(en.length, 96);
+  writeFileSync(f, JSON.stringify({ 'af-3': 'Patched.' }));
+  run('patch', f);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'data/en/trivia_facts.json'), 'utf8'))[2].t, 'Patched.');
+  writeFileSync(f, JSON.stringify({ 'my-1': 'Too early.' }));
+  const before = readFileSync(join(dir, 'data/en/trivia_facts.json'), 'utf8');
+  assert.throws(() => run('patch', f));
+  assert.throws(() => run('merge', '1', f));
+  assert.equal(readFileSync(join(dir, 'data/en/trivia_facts.json'), 'utf8'), before, '止まったときは書かない');
+}));
