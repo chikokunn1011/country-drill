@@ -647,6 +647,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 
 <script src="i18n.js?v=1"></script>
 <script src="i18n/en-core.js?v=1"></script>
+<script src="i18n/en-quiz.js?v=1"></script>
 <script src="countries.js"></script>
 <script src="themes.js?v=1"></script>
 <script src="daily-core.js?v=2"></script>
@@ -1217,18 +1218,18 @@ $('set-done').onclick = () => show('home');
 
 /* ---------- モード選択 ---------- */
 // 地域と問題数のボタン（モード選択とランキングで共通）。その地域の国の数より多い問題数は選べない
-const regionChips = sel => [['all', '全世界'], ...REGIONS.map(r => [r, r])].map(([v, l]) => `<button class="chip" aria-pressed="${v === sel}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
+const regionChips = sel => ['all', ...REGIONS].map(v => [v, regionLabel(v)]).map(([v, l]) => `<button class="chip" aria-pressed="${v === sel}" data-r="${v}">${l}<span class="mono"> ${poolFor(v).length}</span></button>`).join('');
 const fitCount = (count, region) => count !== 'all' && count > poolFor(region).length ? 'all' : count;
 function countChips(region, sel) {
   const n = poolFor(region).length;
-  return COUNTS.map(c => `<button class="chip" aria-pressed="${c === sel}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? `全部（${n}）` : c + '問'}</button>`).join('');
+  return COUNTS.map(c => `<button class="chip" aria-pressed="${c === sel}" data-c="${c}"${c !== 'all' && c > n ? ' disabled' : ''}>${c === 'all' ? T('全部（{n}）', { n }) : T('{n}問', { n: c })}</button>`).join('');
 }
 // モード選択の地域ボタン。6地域を選ぶと、その下に細かい地域が出る。タイムアタックはランキングの区分に合わせて6地域だけ
 function regionGroups(sel, ta) {
-  const chip = (r, cls = '') => `<button class="chip${cls}" aria-pressed="${r === sel}" data-r="${r}">${r === 'all' ? '全世界' : r}<span class="mono"> ${poolFor(r).length}</span></button>`;
+  const chip = (r, cls = '') => `<button class="chip${cls}" aria-pressed="${r === sel}" data-r="${r}">${regionLabel(r)}<span class="mono"> ${poolFor(r).length}</span></button>`;
   const p = parentRegion(sel), subs = ta ? [] : Object.keys(SUBREGIONS).filter(k => SUBREGIONS[k].p === p);
   return `<div class="chips">${['all', ...REGIONS].map(r => chip(r)).join('')}</div>`
-    + (subs.length ? `<div class="subs" role="group" aria-label="${p}を細かく"><span class="lbl2">細かく</span>${subs.map(k => chip(k, ' sub')).join('')}</div>` : '');
+    + (subs.length ? `<div class="subs" role="group" aria-label="${T('{r}を細かく', { r: T(p) })}"><span class="lbl2">${T('細かく')}</span>${subs.map(k => chip(k, ' sub')).join('')}</div>` : '');
 }
 // 世界地図は最初に1回だけ描いて、地域が変わったら色と点線の範囲だけ変える
 let rmap = null;
@@ -1262,38 +1263,40 @@ function renderRegionMap(region) {
     const lon = x => { x = Math.min(WORLD_BOX[2] - .01, Math.max(WORLD_BOX[0] + .01, x)); return x > 180 ? x - 360 : x; };
     frame.setAttribute('d', 'M' + pts.map(([x, y]) => rmap.proj([lon(x), y]).map(v => v.toFixed(1)).join(',')).join('L') + 'Z');
   } else frame.setAttribute('d', '');
-  rmap.s.setAttribute('aria-label', `世界地図。${regionLabel(region)}（${pool.size}か国）に色がついている`);
+  rmap.s.setAttribute('aria-label', T('世界地図。{r}（{n}か国）に色がついている', { r: regionLabel(region), n: pool.size }));
 }
-// いまのあそび方。テーマ中はタイムアタックを選べないので練習として扱う（P.kind は書きかえない。テーマをやめたら元に戻る）
-const kindNow = () => THEME && P.kind === 'ta' ? 'practice' : P.kind;
+// いまのあそび方。テーマ中と、英語版（I18N.hide に 'ta'。ランキングが未訳）はタイムアタックを選べないので練習として扱う
+// （P.kind は書きかえない。テーマをやめた・日本語版に戻ったら元に戻る）
+const kindNow = () => (THEME || I18N.hide.has('ta')) && P.kind === 'ta' ? 'practice' : P.kind;
 function renderSetup() {
   // タイムアタックで遊べないモード（白地図タップ）でタイムアタックを選んでいたら（引き継ぎ・古い端末の保存も）練習にする
-  const modeNoTa = !!modeOf(P.mode)?.noTa, noTa = modeNoTa || !!THEME;
+  const modeNoTa = !!modeOf(P.mode)?.noTa, hideTa = I18N.hide.has('ta'), noTa = modeNoTa || !!THEME || hideTa;
   if (modeNoTa && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
   const kind = kindNow(), region = themeKey();
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
   // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
   $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || kind === 'ta';
   $('nameopt').checked = P.name;
-  $('kinds').innerHTML = KINDS.map(k => noTa && k.k === 'ta'
-    ? `<button class="modecard" aria-pressed="false" data-k="ta" disabled aria-disabled="true"><b>${k.label}</b><span>${THEME ? 'テーマ' : esc(modeOf(P.mode).label)}では遊べない</span></button>`
+  // 英語版はタイムアタックのカードそのものを出さない（「〜では遊べない」の札も出さない）
+  $('kinds').innerHTML = KINDS.filter(k => !(hideTa && k.k === 'ta')).map(k => noTa && k.k === 'ta'
+    ? `<button class="modecard" aria-pressed="false" data-k="ta" disabled aria-disabled="true"><b>${k.label}</b><span>${THEME ? T('テーマでは遊べない') : T('{m}では遊べない', { m: esc(modeOf(P.mode).label) })}</span></button>`
     : `<button class="modecard" aria-pressed="${k.k === kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
   // テーマ中は地域の地図とボタンの代わりにテーマ名と［テーマをやめる］を出す（S.region はさわらない）
   $('theme-field').hidden = !THEME;
   $('regions-field').hidden = $('rmap').hidden = !!THEME;
   if (THEME) {
-    $('theme-name').textContent = `テーマ: ${THEME.n}（${THEME.a.size}か国）`;
+    $('theme-name').textContent = T('テーマ: {t}（{n}か国）', { t: themeTitle(window.THEMES_DATA?.[THEME.id]) || THEME.n, n: THEME.a.size });
     P.count = fitCount(P.want ?? P.count, region);
     $('counts').innerHTML = countChips(region, P.count);
     return;
   }
   // タイムアタック中は細かい地域を選べない（ランキングの区分は6地域）。選んでいたら親の地域にする
   // 練習・挑戦に戻ったら、親の地域のままなら前の細かい地域に戻す
-  if (P.kind === 'ta' && SUBREGIONS[S.region]) { S.sub = S.region; S.region = parentRegion(S.region); store.set('settings', S); }
-  else if (P.kind !== 'ta' && S.sub) { if (S.region === parentRegion(S.sub)) S.region = S.sub; delete S.sub; store.set('settings', S); }
-  $('regions').innerHTML = regionGroups(S.region, P.kind === 'ta');
-  $('regions-hint').textContent = P.kind === 'ta' ? 'タイムアタックはランキングの区分に合わせて、大きい地域だけ。'
-    : '大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。';
+  if (kind === 'ta' && SUBREGIONS[S.region]) { S.sub = S.region; S.region = parentRegion(S.region); store.set('settings', S); }
+  else if (kind !== 'ta' && S.sub) { if (S.region === parentRegion(S.sub)) S.region = S.sub; delete S.sub; store.set('settings', S); }
+  $('regions').innerHTML = regionGroups(S.region, kind === 'ta');
+  $('regions-hint').textContent = kind === 'ta' ? T('タイムアタックはランキングの区分に合わせて、大きい地域だけ。')
+    : T('大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。');
   renderRegionMap(S.region);
   // 国の数より多い問題数は「全部」にする。P.want に選んだ問題数を残し、国の多い地域に戻したら元に戻す
   P.count = fitCount(P.want ?? P.count, S.region);
@@ -1305,7 +1308,7 @@ $('regions').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.d
 // 地図の国をタップすると、その国の細かい地域（なければ6地域）を選ぶ。同じ地域をもう一度タップすると親の地域、その次は全世界
 $('rmap').onclick = e => {
   const a = e.target.closest('[data-a]')?.dataset.a, c = a && C.find(x => x.a === a); if (!c) return;
-  const sub = P.kind === 'ta' ? null : Object.keys(SUBREGIONS).find(k => SUBREGIONS[k].set.has(a));
+  const sub = kindNow() === 'ta' ? null : Object.keys(SUBREGIONS).find(k => SUBREGIONS[k].set.has(a));
   const steps = [sub, c.r, 'all'].filter(Boolean), i = steps.indexOf(S.region);
   S.region = steps[i < 0 ? 0 : (i + 1) % steps.length]; store.set('settings', S); renderSetup();
 };
@@ -1320,7 +1323,7 @@ addEventListener('pagehide', () => { if (G?.kind === 'daily' && !G.ended) endGam
 $('quit').onclick = () => {
   if (G?.kind === 'dojo') return show('dojo');   // 道場は確認なしで戻る（show が endGame('quit') を呼ぶ）
   if (G?.kind !== 'daily') return show('setup');
-  if (G.ended || confirm('やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？')) show('daily');
+  if (G.ended || confirm(T('やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？'))) show('daily');
 };
 
 /* ---------- クイズ ---------- */
@@ -1332,7 +1335,7 @@ const TA_GUARD_MS = 250;
 const timed = () => G.kind === 'ta' || G.kind === 'daily';
 // 正解したら答えを出さずにすぐ次へ進むか。タイムアタック・今日の難問はいつも、練習・挑戦は設定「正解したらすぐ次の問題へ」（S.quick）のとき
 const quick = () => timed() || !!S.quick;
-const QUIT_LABEL = 'やめてモード選択へ';
+const QUIT_LABEL = T('やめてモード選択へ');
 const PRELOAD_MS = 10000;   // 国旗の先読みを待つのはここまで（こえたら待つのをやめて始める）
 // 国旗をまとめて読む。全部が読み終わる（読めなかったものもふくむ）か ms たったら resolve する（reject しない）
 function preloadFlags(codes, ms = PRELOAD_MS) {
@@ -1349,7 +1352,7 @@ function preloadFlags(codes, ms = PRELOAD_MS) {
 // 待つあいだにやめた・別のゲームを始めたら（G !== g か g.ended）何もしない
 async function prepThenStart(codes) {
   const g = G, box = $('qcard');
-  box.className = 'qcard'; box.innerHTML = '<p class="qlabel prep" role="status">じゅんび中…</p>';
+  box.className = 'qcard'; box.innerHTML = `<p class="qlabel prep" role="status">${T('じゅんび中…')}</p>`;
   updateProgress();   // 上の進み具合は新しいゲームの1問目のものにしておく（［もう一回］で前のゲームの数字が残らないように）
   await preloadFlags(codes);
   if (G !== g || g.ended) return;
@@ -1382,7 +1385,7 @@ async function startDaily(qs, sid) {
   G.sid = sid || 'daily-' + Date.now().toString(36);
   $('ptime').textContent = RANKING.formatTime(0);
   $('pcoin')?.remove();   // 今日の難問はコインを出さない（前の練習・挑戦の #pcoin を残さない。rpg.js は drill:start でしか作り直さない）
-  $('quit').textContent = 'やめる（今日の挑戦はここまで）';
+  $('quit').textContent = T('やめる（今日の挑戦はここまで）');
   show('quiz');
   return prepThenStart(qs.flatMap(q => [q.a, ...q.opts]));
 }
@@ -1394,7 +1397,7 @@ function startDojo({ seq, group, mode, sid }) {
   const set = seq.map((a, i) => Object.assign(Object.create(byA.get(a)), { qi: i }));
   G = { mode: modeOf(mode), kind: 'dojo', region: 'all', group: group.slice(), set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0, hint: false };
   G.sid = sid || 'dojo-' + Date.now().toString(36);
-  $('quit').textContent = 'やめて道場へ';
+  $('quit').textContent = T('やめて道場へ');
   $('ptime').textContent = '';
   $('pcoin')?.remove();   // 道場はコインを出さない（前の練習・挑戦の #pcoin を残さない）
   preloadFlags(group);   // 待たない（選択肢はグループの国だけなので、先に読んでおく）
@@ -1430,12 +1433,12 @@ function nextQuestion() {
   const main = document.createElement('div'); main.className = 'qmain'; box.append(main);
   const showName = m.nameOpt && P.name && !timed() && G.kind !== 'dojo';   // 道場の国名→国旗で国名を出すと答えが分かる
   // 国名ONのときは選択肢に国名を出す（問題文にも出すと名前合わせで解けてしまうので出さない）
-  const labels = { f2n: 'この国旗はどこの国？', n2f: 'この国の国旗は？', m2f: '色がついている場所の国旗は？', f2m: 'この国旗の国はどこ？', tap: 'この国旗の国はどこ？ 地図をタップ' };
+  const labels = { f2n: T('この国旗はどこの国？'), n2f: T('この国の国旗は？'), m2f: T('色がついている場所の国旗は？'), f2m: T('この国旗の国はどこ？'), tap: T('この国旗の国はどこ？ 地図をタップ') };
   main.insertAdjacentHTML('beforeend', `<p class="qlabel">${esc(labels[m.k])}</p>`);
-  if (m.q === 'flag') main.insertAdjacentHTML('beforeend', `<img class="qflag" src="${flag(c.a)}" alt="国旗">`);
-  if (m.a === 'tap' && G.hint) main.insertAdjacentHTML('beforeend', `<p class="qsub">${esc(c.n)}</p>`);   // 白地図タップは国名表示ありなら問題に国名も出す
-  if (m.q === 'name') main.insertAdjacentHTML('beforeend', `<p class="qbig">${esc(c.n)}</p><p class="qsub">${esc(c.r)}</p>`);
-  if (m.q === 'map') main.append(zoomableMap(c, '出題中の国の位置', { region: mapRegion(G.region) }));
+  if (m.q === 'flag') main.insertAdjacentHTML('beforeend', `<img class="qflag" src="${flag(c.a)}" alt="${T('国旗')}">`);
+  if (m.a === 'tap' && G.hint) main.insertAdjacentHTML('beforeend', `<p class="qsub">${esc(cName(c))}</p>`);   // 白地図タップは国名表示ありなら問題に国名も出す
+  if (m.q === 'name') main.insertAdjacentHTML('beforeend', `<p class="qbig">${esc(cName(c))}</p><p class="qsub">${esc(T(c.r))}</p>`);
+  if (m.q === 'map') main.append(zoomableMap(c, T('出題中の国の位置'), { region: mapRegion(G.region) }));
   if (m.a === 'tap') {
     box.append(tapMap(c, mapRegion(G.region)));
     if (matchMedia('(hover: hover) and (pointer: fine)').matches) box.querySelector('.tapmap').focus({ preventScroll: true });   // PC はすぐ矢印キーが使えるように
@@ -1445,10 +1448,10 @@ function nextQuestion() {
     ch.className = 'choices' + (m.a === 'name' ? ' textc' : '');
     G.cur.opts.forEach((o, k) => {
       const b = document.createElement('button'); b.className = 'choice'; b.dataset.a = o.a;
-      if (m.a === 'name') b.innerHTML = `<kbd>${k + 1}</kbd><span>${esc(o.n)}</span>`;
-      if (m.a === 'flag') { b.classList.add('flagc'); b.innerHTML = `<kbd>${k + 1}</kbd><img src="${flag(o.a)}" alt="選択肢${k + 1}の国旗">`; }
-      if (m.a === 'map') { b.classList.add('mapc'); b.innerHTML = `<kbd>${k + 1}</kbd>`; b.append(mapSvg(o, `選択肢${k + 1}の地図`, { region: mapRegion(G.region), w: 640, h: 480 })); }
-      if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
+      if (m.a === 'name') b.innerHTML = `<kbd>${k + 1}</kbd><span>${esc(cName(o))}</span>`;
+      if (m.a === 'flag') { b.classList.add('flagc'); b.innerHTML = `<kbd>${k + 1}</kbd><img src="${flag(o.a)}" alt="${T('選択肢{k}の国旗', { k: k + 1 })}">`; }
+      if (m.a === 'map') { b.classList.add('mapc'); b.innerHTML = `<kbd>${k + 1}</kbd>`; b.append(mapSvg(o, T('選択肢{k}の地図', { k: k + 1 }), { region: mapRegion(G.region), w: 640, h: 480 })); }
+      if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(cName(o))}</span>`);
       ch.append(b);
     });
     // すぐ次へ進むとき（quick）は出した直後のクリックを無視する（TA_GUARD_MS）。数字キーも b.click() でここを通る
@@ -1456,8 +1459,10 @@ function nextQuestion() {
     box.append(ch);
   }
   // すぐ次へ進むときは正解だと答えを出さないので、ここに出るのはまちがえたときの正解だけ
-  const slotHint = quick() ? 'まちがえたら、ここに正解が出るよ' : G.kind === 'dojo' ? '答えたら、ここで国旗をくらべるよ' : '答えたら、ここに国のプロフィールが出るよ';
-  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys">${m.a === 'tap' ? '矢印キーで動かし <kbd>Enter</kbd> で真ん中を答える・＋−で拡大' : '<kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる'} ・ <kbd>Enter</kbd> で次へ</p></div>`);
+  const slotHint = quick() ? T('まちがえたら、ここに正解が出るよ') : G.kind === 'dojo' ? T('答えたら、ここで国旗をくらべるよ') : T('答えたら、ここに国のプロフィールが出るよ');
+  const kb = s => `<kbd>${s}</kbd>`;
+  const keys = m.a === 'tap' ? T('矢印キーで動かし {enter} で真ん中を答える・＋−で拡大', { enter: kb('Enter') }) : T('{k1}〜{k4} キーでも答えられる', { k1: kb(1), k4: kb(4) });
+  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys">${T('{keys} ・ {enter} で次へ', { keys, enter: kb('Enter') })}</p></div>`);
   G.shownAt = performance.now();
   updateProgress();
   if (timed() && G.done === 0) startTimer();
@@ -1478,13 +1483,13 @@ function updateProgress(answered) {
   const n = G.set.length, remaining = G.queue.length + (answered ? 0 : 1);
   $('pbar').style.width = (G.done / n * 100) + '%';
   if (G.kind === 'practice' || G.kind === 'dojo') {
-    $('pnum').textContent = `覚えた ${G.done} / ${n}`;
-    $('pscore').textContent = `残り ${remaining}問`;
+    $('pnum').textContent = T('覚えた {d} / {n}', { d: G.done, n });
+    $('pscore').textContent = T('残り {n}問', { n: remaining });
   } else { // 挑戦とタイムアタック（タイムアタックは挑戦回数が1のままなので #pscore は空）
     $('pnum').textContent = `${Math.min(G.done + 1, n)} / ${n}`;
-    $('pscore').textContent = G.kind === 'daily' ? `むずかしさ ${'★'.repeat(G.daily[Math.min(G.done, n - 1)].stage)}` : G.attempts > 1 ? `${G.attempts}回目の挑戦` : '';
+    $('pscore').textContent = G.kind === 'daily' ? T('むずかしさ {s}', { s: '★'.repeat(G.daily[Math.min(G.done, n - 1)].stage) }) : G.attempts > 1 ? T('{n}回目の挑戦', { n: G.attempts }) : '';
   }
-  $('pstreak').textContent = G.streak >= 2 ? (S.dopa ? comboText(G.streak) : `${G.streak}連続！`) : '';
+  $('pstreak').textContent = G.streak >= 2 ? (S.dopa ? comboText(G.streak) : T('{n}連続！', { n: G.streak })) : '';
   $('pstreak').classList.toggle('hot', G.streak >= 5);
   $('ppts').textContent = `${fmt(G.pts)} pt`;
 }
@@ -1537,26 +1542,28 @@ function answer(a, isRight) {
   }
   const r = document.createElement('div');
   r.className = 'reveal';
-  let verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : '正解！') : G.kind === 'ta' ? `失格…\u3000正解は「${esc(c.n)}」` : daily ? `ここまで！\u3000正解は「${esc(c.n)}」` : `ざんねん。正解は「${esc(c.n)}」`;
-  if (!right && G.kind === 'challenge') verdict += '。最初からやり直し！';
-  if (!right && (G.kind === 'practice' || dojo)) verdict += '。あとでもう一度出るよ';
+  const n = esc(cName(c));
+  const verdict = right ? (S.dopa ? PRAISE[Math.random() * PRAISE.length | 0] : T('正解！'))
+    : G.kind === 'ta' ? T('失格…\u3000正解は「{n}」', { n }) : daily ? T('ここまで！\u3000正解は「{n}」', { n })
+    : G.kind === 'challenge' ? T('ざんねん。正解は「{n}」。最初からやり直し！', { n })
+    : T('ざんねん。正解は「{n}」。あとでもう一度出るよ', { n });   // 練習・道場
   if (dojo) {   // 国旗をくらべるのが目的なので、プロフィールと地図は出さない（地図がまだ読めていなくてもよい）
     const other = byA.get(right ? dojoRival(c.a) : a);
     r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${compareHTML(c, other, right)}${triviaHTML([flagTrivia(c.a)].filter(Boolean))}`;
   } else {
-    const km = !right && G.mode.a === 'tap' && G.cur.km != null ? `<p class="tapkm">タップした所から約${fmt(G.cur.km)} km</p>` : '';
+    const km = !right && G.mode.a === 'tap' && G.cur.km != null ? `<p class="tapkm">${T('タップした所から約{km} km', { km: fmt(G.cur.km) })}</p>` : '';
     r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${km}${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
-    if (G.mode.q !== 'map' && G.mode.a !== 'map' && G.mode.a !== 'tap') r.append(mapSvg(c, `${c.n}の位置`, { region: mapRegion(G.region) }));
+    if (G.mode.q !== 'map' && G.mode.a !== 'map' && G.mode.a !== 'tap') r.append(mapSvg(c, T('{n}の位置', { n: cName(c) }), { region: mapRegion(G.region) }));
   }
   const nx = document.createElement('button');
   nx.className = 'btn next'; nx.id = 'next';
-  if (!right && G.kind === 'challenge') { nx.textContent = '最初から →'; nx.onclick = restartChallenge; }
-  else if (G.kind === 'ta') { nx.textContent = 'もう一回'; nx.onclick = startGame; }
-  else if (daily) { nx.textContent = '結果を見る →'; nx.onclick = () => show('daily'); }
-  else { nx.textContent = G.queue.length ? '次の問題 →' : dojo ? '道場へ →' : '結果を見る'; nx.onclick = nextQuestion; }
+  if (!right && G.kind === 'challenge') { nx.textContent = T('最初から →'); nx.onclick = restartChallenge; }
+  else if (G.kind === 'ta') { nx.textContent = T('もう一回'); nx.onclick = startGame; }
+  else if (daily) { nx.textContent = T('結果を見る →'); nx.onclick = () => show('daily'); }
+  else { nx.textContent = G.queue.length ? T('次の問題 →') : dojo ? T('道場へ →') : T('結果を見る'); nx.onclick = nextQuestion; }
   if (G.kind === 'ta') {
     const back = document.createElement('button'), row = document.createElement('div');
-    back.className = 'btn ghost'; back.textContent = 'モード選択へ'; back.onclick = () => show('setup');
+    back.className = 'btn ghost'; back.textContent = T('モード選択へ'); back.onclick = () => show('setup');
     row.className = 'row end'; row.append(back, nx); r.append(row);
   } else r.append(nx);
   const slot = $('qcard').querySelector('.rslot');
@@ -1588,15 +1595,15 @@ function restartChallenge() {
   nextQuestion();
 }
 function factsHTML(c) {
-  return `<div class="facts"><img src="${flag(c.a)}" alt="${esc(c.n)}の国旗"><dl>
-    <dd class="name">${esc(c.n)}</dd>
-    <dt>首都</dt><dd>${esc(c.c)}</dd>
-    <dt>地域</dt><dd>${esc(c.r)}</dd>
-    <dt>面積</dt><dd class="mono">${fmt(c.ar)} km²</dd>
+  return `<div class="facts"><img src="${flag(c.a)}" alt="${esc(T('{n}の国旗', { n: cName(c) }))}"><dl>
+    <dd class="name">${esc(cName(c))}</dd>
+    <dt>${T('首都')}</dt><dd>${esc(cCap(c))}</dd>
+    <dt>${T('地域')}</dt><dd>${esc(T(c.r))}</dd>
+    <dt>${T('面積')}</dt><dd class="mono">${fmt(c.ar)} km²</dd>
     <dt>ISO</dt><dd class="mono">${c.a.toUpperCase()}</dd></dl></div>`;
 }
 /* 豆知識（trivia.js の window.TRIVIA = { 国: [{ k: 種類, t: 文 }] }）。読めない・形がおかしいときは何も出さない */
-const TRIVIA_LABEL = { flag: '🏳️ 国旗', geo: '🗺️ 地理', culture: '🍜 文化' };
+const TRIVIA_LABEL = { flag: T('🏳️ 国旗'), geo: T('🗺️ 地理'), culture: T('🍜 文化') };
 const triviaLast = {}; // 国ごとに前に出した文（メモリだけ。保存しない）
 const hasTriviaText = x => typeof x?.t === 'string' && x.t !== '';
 // 正解したときに出す1つ。2件以上あれば、その国で前に出した文を避けてランダムに。テストが差しかえるので TRIVIA は毎回読む
@@ -1635,8 +1642,8 @@ function dojoRival(a) {
 }
 // 道場の「くらべる」パネル: 正解の国旗と、まちがえたら選んだ国・正解したら似ている国の国旗を並べる（縦横比のまま）
 function compareHTML(c, other, right = false) {
-  const fig = (x, cap) => `<figure><img src="${flag(x.a)}" alt="${esc(x.n)}の国旗"><figcaption>${cap} <b>${esc(x.n)}</b></figcaption></figure>`;
-  return `<div class="dj-compare">${fig(c, '正解')}${other ? fig(other, right ? 'にている' : 'えらんだ') : ''}</div>`;
+  const fig = (x, cap) => `<figure><img src="${flag(x.a)}" alt="${esc(T('{n}の国旗', { n: cName(x) }))}"><figcaption>${cap} <b>${esc(cName(x))}</b></figcaption></figure>`;
+  return `<div class="dj-compare">${fig(c, T('正解'))}${other ? fig(other, right ? T('にている') : T('えらんだ')) : ''}</div>`;
 }
 function endGame(outcome) {            // 1回のゲームにつき必ず1回だけ drill:result を出す
   if (!G || G.ended) return;
@@ -1926,7 +1933,7 @@ const playR = playRegionOf(location.hash);
 // 前の S.sub（タイムアタック中に覚えた細かい地域）も、選んだ地域を上書きしないよう消す
 if (playR) {
   S.region = playR; delete S.sub; store.set('settings', S);
-  if (SUBREGIONS[playR] && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
+  if (SUBREGIONS[playR] && kindNow() === 'ta') { P.kind = 'practice'; store.set('setup', P); }
 }
 // #theme=<id> はそのテーマでモード選択を開く（保存しない）。知らない値は無視してホーム
 const themeId = playR ? null : themeOf(location.hash);
