@@ -17,6 +17,16 @@ const MARK_START = '<!-- country:start -->', MARK_END = '<!-- country:end -->';
 
 export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 export const fmt = n => n.toLocaleString('en-US');   // 本編の fmt（ja-JP）と同じ3桁区切り
+// 漢字をふくむ国名の読み（五十音順に並べるため）。漢字の国名はここに全部書く（tests/unit/theme-pages.test.mjs）
+export const KANA = {
+  ae: 'アラブシュチョウコクレンポウ', cd: 'コンゴミンシュキョウワコク', cf: 'チュウオウアフリカ', cg: 'コンゴキョウワコク', cn: 'チュウゴク',
+  dm: 'ドミニカコク', do: 'ドミニカキョウワコク', fm: 'ミクロネシアレンポウ', gq: 'セキドウギニア', jp: 'ニホン', kp: 'キタチョウセン',
+  kr: 'カンコク', mh: 'マーシャルショトウ', mk: 'キタマケドニア', sb: 'ソロモンショトウ', ss: 'ミナミスーダン', tl: 'ヒガシティモール',
+  us: 'アメリカガッシュウコク', vc: 'セントビンセントオヨビグレナディーンショトウ', za: 'ミナミアフリカ',
+};
+export const yomi = c => KANA[c.a] ?? c.n;
+// 国名の五十音順（読みで比べる。同じならコード順）
+export const byJa = (x, y) => yomi(x).localeCompare(yomi(y), 'ja') || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 const byCode = (x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 const hasText = x => typeof x?.t === 'string' && x.t.trim() !== '';
 

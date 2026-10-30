@@ -7,6 +7,7 @@ import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { readThemeInputs, renderThemes, THEME_IDS } from '../../tools/make_theme_pages.mjs';
+import { KANA, yomi } from '../../tools/make_country_pages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SITE = 'https://chikokunn1011.github.io/country-drill/';
@@ -156,4 +157,21 @@ test('stops_without_rpg_lists', async () => {   // rpg-core.js に島国・内�
     writeFileSync(join(dir, 'rpg-core.js'), read('rpg-core.js').replace("landlocked: { n: '内陸国'", "landlocked: { n: 'x'"));
     assert.throws(() => readThemeInputs(dir), /内陸国/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('kanji_names_by_reading', () => {        // 漢字の国名も読みの五十音順に並ぶ（カタカナの国名のあとにまとめて出ない）
+  const kanji = C.filter(c => /[一-鿿]/.test(c.n)).map(c => c.a).sort();
+  assert.deepEqual(Object.keys(KANA).sort(), kanji, 'KANA は漢字の国名の全部');
+  for (const r of Object.values(KANA)) assert.match(r, /^[ァ-ヶー]+$/, r);
+  const order = h => [...h.matchAll(/<a class="ccard" href="\.\.\/country\/([a-z]{2})\.html">/g)].map(m => m[1]);
+  const sun = order(read('themes/sun.html'));
+  const at = a => { const i = sun.indexOf(a); assert.ok(i >= 0, a); return i; };
+  assert.ok(at('na') < at('ne') && at('ne') < at('jp') && at('jp') < at('np'), 'ナミビア < ニジェール < 日本（ニホン） < ネパール');
+  for (const id of THEME_IDS.filter(id => !/area$|^similar$/.test(id))) {
+    const list = order(read(`themes/${id}.html`)).map(a => byA.get(a));
+    const lastKatakana = list.findLastIndex(c => !/[一-鿿]/.test(c.n));
+    const firstKanji = list.findIndex(c => /[一-鿿]/.test(c.n) && yomi(c) < (list[lastKatakana]?.n ?? ''));
+    for (let i = 1; i < list.length; i++) assert.ok(yomi(list[i - 1]).localeCompare(yomi(list[i]), 'ja') <= 0, `${id}: ${list[i - 1].n} → ${list[i].n}`);
+    if (firstKanji >= 0) assert.ok(firstKanji < lastKatakana, `${id}: 漢字の国名がカタカナのあとにまとまっている`);
+  }
 });

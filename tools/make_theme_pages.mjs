@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readInputs, head, footerHTML, flagImg, esc, fmt, SITE, DESC_MAX } from './make_country_pages.mjs';
+import { readInputs, head, footerHTML, flagImg, esc, fmt, byJa, SITE, DESC_MAX } from './make_country_pages.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MARK_START = '<!-- theme:start -->', MARK_END = '<!-- theme:end -->';
@@ -33,7 +33,6 @@ const THEMES = {
   smallarea: { n: '面積が小さい国ランキング', lead: `面積が小さい国の${RANK_N}か国を、いちばん小さい国から並べました。面積は国旗マスターのデータ（km²）です。` },
 };
 
-const byJa = (x, y) => x.n.localeCompare(y.n, 'ja') || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 
 // rpg-core.js の THEMES から `<key>: { n: '<name>', a: '…'.split(' ') }` を読む。無ければ投げる
 function rpgList(src, key, name) {
@@ -65,11 +64,13 @@ function themeCountries(inp, id) {
   if (id === 'similar') { const s = new Set(inp.SIMILAR.flat()); return C.filter(c => s.has(c.a)); }
   if (id === 'island') return C.filter(c => inp.ISLAND.includes(c.a));
   if (id === 'landlocked') return C.filter(c => inp.LANDLOCKED.includes(c.a));
-  const sorted = [...C].sort((x, y) => (id === 'bigarea' ? y.ar - x.ar : x.ar - y.ar) || (x.a < y.a ? -1 : 1));
-  const top = new Set(sorted.slice(0, RANK_N).map(c => c.a));
+  const top = new Set(rankOrder(C, id).slice(0, RANK_N).map(c => c.a));
   return C.filter(c => top.has(c.a));
 }
-const rankOrder = (list, id) => [...list].sort((x, y) => (id === 'bigarea' ? y.ar - x.ar : x.ar - y.ar) || (x.a < y.a ? -1 : 1));
+// 面積の順（bigarea は大きい順、smallarea は小さい順。同じならコード順）
+function rankOrder(list, id) {
+  return [...list].sort((x, y) => (id === 'bigarea' ? y.ar - x.ar : x.ar - y.ar) || (x.a < y.a ? -1 : 1));
+}
 
 const card = (inp, c) => `      <a class="ccard" href="../country/${c.a}.html">${flagImg(inp, c.a, '', true)}<span>${esc(c.n)}</span></a>`;
 const cards = (inp, list) => `  <div class="ccards">
