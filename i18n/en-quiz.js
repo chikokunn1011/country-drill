@@ -9,14 +9,14 @@ Object.assign(window.I18N_EN ??= {}, {
   '{r}を細かく': 'Subregions of {r}',
   '世界地図。{r}（{n}か国）に色がついている': { one: 'World map with {r} ({n} country) highlighted', other: 'World map with {r} ({n} countries) highlighted' },
   'タイムアタックはランキングの区分に合わせて、大きい地域だけ。': 'Time Attack uses only the large regions, to match the leaderboard.',
-  '大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。': 'Pick a large region to see its subregions. You can also tap a country on the map.',
+  '大きい地域を選ぶと細かい地域も出る。地図の国をタップしても選べる。': 'Pick a large region to see its subregions. You can also tap a country on the map to choose its region.',
   // タイムアタックで遊べないとき（英語版ではタイムアタックのカードを出さないので見えない）
   'テーマでは遊べない': 'Not available in a collection',
   '{m}では遊べない': 'Not available in {m}',
   // テーマ（まとめページの［このテーマでクイズ］）
   'テーマ: {t}（{n}か国）': { one: 'Collection: {t} ({n} country)', other: 'Collection: {t} ({n} countries)' },
   // 今日の難問をやめるとき（英語版では今日の難問は出ない）
-  'やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？': 'If you quit now, today’s Daily Puzzle ends with the answers you’ve gotten so far. Quit?',
+  'やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？': 'If you quit now, today’s Daily Puzzle ends with your score so far. Quit?',
 
   // クイズ: やめるボタン・じゅんび
   'やめてモード選択へ': 'Quit to mode select',
@@ -64,7 +64,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '次の問題 →': 'Next question →',
   '道場へ →': 'Back to the Dojo →',
   '結果を見る': 'See results',
-  'モード選択へ': 'Mode select',
+  'モード選択へ': 'Change mode',
 
   // 国のプロフィール（factsHTML）
   '{n}の国旗': 'Flag of {n}',

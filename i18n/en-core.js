@@ -40,7 +40,7 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // 遊び方（KINDS）
   '練習': 'Practice',
-  'まちがえた問題は後半にもう一度出る。全部正解したら終了': 'Questions you miss come back later. Finish when you get them all right.',
+  'まちがえた問題は後半にもう一度出る。全部正解したら終了': 'Questions you miss come back later. It ends when you get them all right.',
   '挑戦': 'Challenge',
   'まちがえたら最初からやり直し。ノーミスでクリアを目指す': 'One mistake sends you back to the start. Aim for a perfect run.',
   'タイムアタック': 'Time Attack',
@@ -53,12 +53,12 @@ Object.assign(window.I18N_EN ??= {}, {
   '全体': 'World',
   '戻す': 'Reset',
   '{r}の白地図。国旗の国をタップ。矢印キーで動かし、Enter で真ん中の場所を答える':
-    'Blank map: {r}. Tap the flag’s country. Use the arrow keys to move the map and press Enter to answer with the center point.',
+    'Blank map: {r}. Tap the country for this flag. Use the arrow keys to move the map and press Enter to answer with the spot in the center.',
 
   // ドパガキ向け（Hype mode）のほめ言葉
   '正解！！': 'Correct!!',
   'ナイス！': 'Nice!',
-  '天才！？': 'Genius!?',
+  '天才！？': 'Genius?!',
   'すごすぎ！': 'Amazing!',
   'さすが！': 'Well done!',
   '神！': 'Legendary!',
@@ -78,6 +78,6 @@ Object.assign(window.I18N_EN ??= {}, {
   '大きめ': 'Large',
   'とても大きい': 'Extra large',
   'オフ': 'Off',
-  'まちがえた記録: {n}か国': { one: 'Mistakes recorded: {n} country', other: 'Mistakes recorded: {n} countries' },
+  'まちがえた記録: {n}か国': { one: 'Mistake history: {n} country', other: 'Mistake history: {n} countries' },
   'まちがえた記録はまだない': 'No mistakes recorded yet',
 });

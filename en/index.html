@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <base href="../">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A free 4-choice quiz to learn the flags, names and locations of all 195 countries. Narrow it down by region and browse the flag gallery. No sign-up: play right away on your phone or computer.">
+<meta name="description" content="A free 4-choice quiz to learn the flags, names, and locations of all 195 countries. Filter by region and browse the flag gallery. No sign-up: play right away on your phone or computer.">
 <title>Flag Master | Flag, Country & Map Quiz (195 countries)</title>
 <meta name="google-site-verification" content="EvNloJ_6_Amt132QL7Yd_EoJnU5yICC31HWlkEtPt2U">
 <link rel="canonical" href="https://chikokunn1011.github.io/country-drill/en/">
@@ -14,7 +14,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Flag Master">
 <meta property="og:title" content="Flag Master | Flag, Country & Map Quiz">
-<meta property="og:description" content="Learn the flags, names and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.">
+<meta property="og:description" content="Learn the flags, names, and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.">
 <meta property="og:url" content="https://chikokunn1011.github.io/country-drill/en/">
 <meta property="og:image" content="https://chikokunn1011.github.io/country-drill/icons/ogp.png">
 <meta property="og:image:width" content="1200">
@@ -22,7 +22,7 @@
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"WebApplication","name":"Flag Master","url":"https://chikokunn1011.github.io/country-drill/en/","description":"A free 4-choice quiz to learn the flags, names and locations of all 195 countries.","applicationCategory":"EducationalApplication","operatingSystem":"Web","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}
+{"@context":"https://schema.org","@type":"WebApplication","name":"Flag Master","url":"https://chikokunn1011.github.io/country-drill/en/","description":"A free 4-choice quiz to learn the flags, names, and locations of all 195 countries.","applicationCategory":"EducationalApplication","operatingSystem":"Web","inLanguage":"en","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}
 </script>
 <link rel="icon" href="favicon.ico" sizes="32x32">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -480,7 +480,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <!-- 入口は全部ここに置く。本体以外のファイルが使う入口は hidden で始め、そのファイルが homeEntry() で出す -->
     <div class="home-big" id="home-big">
       <button class="hbig main" id="home-play"><b class="hb-title">Play quiz</b><span class="hb-desc">Guess the flag, name or location</span><span class="hb-note"></span></button>
-      <button class="hbig" id="home-daily" hidden><b class="hb-title">Daily Puzzle</b><span class="hb-desc">A new puzzle every day. Compete with everyone.</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-daily" hidden><b class="hb-title">Daily Puzzle</b><span class="hb-desc">A new puzzle every day. Compete with other players.</span><span class="hb-note"></span></button>
       <button class="hbig" id="home-rpg" hidden><b class="hb-title">Adventure</b><span class="hb-desc">Recruit allies with coins and head into dungeons</span><span class="hb-note"></span></button>
     </div>
     <div class="home-icons" id="home-icons">
@@ -490,7 +490,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <button class="hicon" id="home-profile" hidden><span class="hi-ico" aria-hidden="true">👤</span><span class="hi-label">Profile</span><span class="hi-sub"></span></button>
       <button class="hicon" id="home-settings"><span class="hi-ico" aria-hidden="true">⚙️</span><span class="hi-label">Settings</span><span class="hi-sub"></span></button>
     </div>
-    <div class="pwa-band" id="home-pwa" hidden><span>Add to your home screen to play even offline</span><button class="linkbtn" id="home-pwa-add">Add</button><button class="pwa-x" id="home-pwa-x" aria-label="Close">×</button></div>
+    <div class="pwa-band" id="home-pwa" hidden><span>Add it to your home screen to play even when offline</span><button class="linkbtn" id="home-pwa-add">Add</button><button class="pwa-x" id="home-pwa-x" aria-label="Close">×</button></div>
   </section>
 
   <!-- 設定 -->
@@ -522,7 +522,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="field">
         <span class="lbl">Effects</span>
         <label class="switch"><input type="checkbox" id="set-dopa"> Hype mode</label>
-        <p class="hint">An intense mode where right answers set off confetti, combos and score multipliers (with flashier sound effects too).</p>
+        <p class="hint">An intense mode where right answers set off confetti, combos, and score multipliers (with flashier sound effects too).</p>
       </div>
       <div class="field" id="set-pwa-field" hidden>
         <span class="lbl">App</span>
@@ -609,7 +609,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       </div>
       <div class="col">
       <div class="seg" id="rk-tabs" role="group" aria-label="Period"><button type="button" data-p="all">All time</button><button type="button" data-p="week">This week</button></div>
-      <p class="hint">Top 50 players, one personal best each. “This week” starts Monday at 0:00 Japan time.</p>
+      <p class="hint">Top 50 players, personal bests only. “This week” starts at midnight Monday, Japan time.</p>
       <ol class="rklist" id="rk-list" aria-busy="false"></ol>
       <p class="rkempty" id="rk-empty" hidden>No one here yet. Grab the top spot!</p>
       <div class="rkerror" id="rk-error" hidden><p>Couldn’t connect to the leaderboard</p><button class="btn ghost" id="rk-retry">Reload</button></div>
@@ -623,7 +623,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
   <section id="scr-book" class="wrap" hidden>
     <div class="row">
       <div class="seg" id="bview" role="group" aria-label="View"><button type="button" data-v="list">List</button><button type="button" data-v="map">Map</button></div>
-      <input type="search" id="q" placeholder="Search country or capital" aria-label="Search">
+      <input type="search" id="q" placeholder="Country or capital" aria-label="Search">
       <select id="bregion" aria-label="Region"></select>
       <label class="switch" id="hidecap-row"><input type="checkbox" id="hidecap"> Hide capitals</label>
       <span class="count" id="bcount"></span>

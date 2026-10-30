@@ -33,7 +33,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '黒・黄・赤': 'Black, yellow, red',
   '赤・白・緑': 'Red, white, green',
   '赤・白・赤': 'Red, white, red',
-  '赤白のしま＋青': 'Red and white stripes + blue',
+  '赤白のしま＋青': 'Red and white stripes with blue',
   'まんなかに丸': 'Circle in the center',
   '赤地に三日月': 'Crescent on red',
   '赤地に黄色': 'Yellow on red',

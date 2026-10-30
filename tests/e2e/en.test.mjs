@@ -40,9 +40,9 @@ t('en_settings', async page => {
   // まちがえた記録が無いとき・あるとき（1か国は単数）
   assert.equal((await page.innerText('#set-record')).trim(), 'No mistakes recorded yet');
   await page.evaluate(() => { misses = { jp: 1 }; renderSettings(); });
-  assert.equal((await page.innerText('#set-record')).trim(), 'Mistakes recorded: 1 country');
+  assert.equal((await page.innerText('#set-record')).trim(), 'Mistake history: 1 country');
   await page.evaluate(() => { misses = { jp: 1, fr: 2 }; renderSettings(); });
-  assert.equal((await page.innerText('#set-record')).trim(), 'Mistakes recorded: 2 countries');
+  assert.equal((await page.innerText('#set-record')).trim(), 'Mistake history: 2 countries');
   // 音を切ると音量は Off
   await page.click('#set-sound');
   assert.equal((await page.innerText('#set-vol-n')).trim(), 'Off');
@@ -106,7 +106,7 @@ t('en_setup', async page => {
   assert.equal(await page.locator('#kinds [data-k="ta"]').count(), 0);
   assert.deepEqual((await texts(page, '#regions .chips > .chip')).map(noCount),
     ['Whole world', 'Asia', 'Europe', 'Africa', 'North & Central America', 'South America', 'Oceania']);
-  assert.equal((await page.textContent('#regions-hint')).trim(), 'Pick a large region to see its subregions. You can also tap a country on the map.');
+  assert.equal((await page.textContent('#regions-hint')).trim(), 'Pick a large region to see its subregions. You can also tap a country on the map to choose its region.');
   const counts = await texts(page, '#counts .chip');
   assert.deepEqual(counts.slice(0, 3), ['5 questions', '10 questions', '20 questions']);
   assert.match(counts[3], /^All \(\d+\)$/);
@@ -288,7 +288,7 @@ t('en_result_practice', async page => {
   assert.equal(await page.locator('#r-share').count(), 0);
   assert.equal(await page.locator('.tabox').count(), 0);
   assert.equal((await page.innerHTML('#r-ext')).trim(), '');
-  assert.equal((await page.textContent('#r-setup')).trim(), 'Mode select');
+  assert.equal((await page.textContent('#r-setup')).trim(), 'Change mode');
   assert.equal((await page.textContent('#r-again')).trim(), 'Play again');
   await page.waitForTimeout(400);   // TA_GUARD_MS
   await page.click('#r-again');

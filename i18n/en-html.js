@@ -7,13 +7,13 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // head
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。地域しぼり、タイムアタックとランキング、国旗図鑑、冒険RPGも。登録なしでスマホ・PCからすぐ遊べる。':
-    'A free 4-choice quiz to learn the flags, names and locations of all 195 countries. Narrow it down by region and browse the flag gallery. No sign-up: play right away on your phone or computer.',
+    'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries. Filter by region and browse the flag gallery. No sign-up: play right away on your phone or computer.',
   '国旗マスター｜国旗・国名・場所を覚える4択クイズ（195か国）': 'Flag Master | Flag, Country & Map Quiz (195 countries)',
   '国旗マスター': 'Flag Master',
   '国旗マスター｜国旗・国名・場所を覚える4択クイズ': 'Flag Master | Flag, Country & Map Quiz',
   '世界195か国の国旗・国名・場所を4択クイズで覚えよう。タイムアタック、国旗図鑑、冒険RPGも。':
-    'Learn the flags, names and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.',
-  '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。': 'A free 4-choice quiz to learn the flags, names and locations of all 195 countries.',
+    'Learn the flags, names, and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.',
+  '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。': 'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries.',
 
   // トップバー・地図の読みこみ
   '図鑑': 'Gallery',
@@ -26,13 +26,13 @@ Object.assign(window.I18N_EN ??= {}, {
   'クイズで遊ぶ': 'Play quiz',
   '国旗・国名・場所を当てる': 'Guess the flag, name or location',
   '今日の難問': 'Daily Puzzle',
-  '毎日かわる問題で、みんなと競う': 'A new puzzle every day. Compete with everyone.',
+  '毎日かわる問題で、みんなと競う': 'A new puzzle every day. Compete with other players.',
   '冒険': 'Adventure',
   'コインで仲間を集めてダンジョンへ': 'Recruit allies with coins and head into dungeons',
   'ランキング': 'Leaderboard',
   'バッジ': 'Badges',
   'プロフィール': 'Profile',
-  'ホーム画面に追加すると、電波がなくても遊べる': 'Add to your home screen to play even offline',
+  'ホーム画面に追加すると、電波がなくても遊べる': 'Add it to your home screen to play even when offline',
   '追加する': 'Add',
   '閉じる': 'Close',
 
@@ -52,7 +52,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'プレイのクイズで、正解なら答えを出さずに次へ（まちがえたら正解を見せる）。': 'In quizzes, a right answer skips the answer card and moves on (a wrong answer still shows the right one).',
   '演出': 'Effects',
   'ドパガキ向け': 'Hype mode',
-  '正解すると紙吹雪・コンボ・スコア倍率でド派手に盛り上がる、刺激つよめのモード（効果音もド派手になる）。': 'An intense mode where right answers set off confetti, combos and score multipliers (with flashier sound effects too).',
+  '正解すると紙吹雪・コンボ・スコア倍率でド派手に盛り上がる、刺激つよめのモード（効果音もド派手になる）。': 'An intense mode where right answers set off confetti, combos, and score multipliers (with flashier sound effects too).',
   'アプリ': 'App',
   'ホーム画面に追加する': 'Add to home screen',
   '追加すると、アプリのようにすぐ開けて、電波がなくても遊べるよ。': 'Once added, it opens instantly like an app and works even offline.',
@@ -79,7 +79,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '期間': 'Period',
   '歴代': 'All time',
   '今週': 'This week',
-  '上位50人まで。同じ人は自己ベストだけ。「今週」は月曜0時（日本時間）から。': 'Top 50 players, one personal best each. “This week” starts Monday at 0:00 Japan time.',
+  '上位50人まで。同じ人は自己ベストだけ。「今週」は月曜0時（日本時間）から。': 'Top 50 players, personal bests only. “This week” starts at midnight Monday, Japan time.',
   'まだ誰もいない。1位のチャンス！': 'No one here yet. Grab the top spot!',
   'ランキングに接続できなかった': 'Couldn’t connect to the leaderboard',
   '再読み込み': 'Reload',
@@ -89,7 +89,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '表示': 'View',
   '一覧': 'List',
   '地図': 'Map',
-  '国名・首都で検索': 'Search country or capital',   // 390px の検索の欄に収まる長さ
+  '国名・首都で検索': 'Country or capital',   // 390px の検索の欄に収まる長さ
   '検索': 'Search',
   '首都をかくす': 'Hide capitals',
 
