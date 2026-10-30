@@ -17,8 +17,8 @@ before(async () => { server = await startServer(); browser = await chromium.laun
 after(async () => { await browser?.close(); await server?.close(); });
 
 // 未訳の機能の入口（英語版では見えてはいけない）: 今日の難問・冒険・ランキング・バッジ・プロフィール・タイムアタックのカード・
-// クイズのコイン・結果のシェア・豆知識の欄
-const UNTRANSLATED = ['#home-daily', '#home-rpg', '#home-badges', '#pcoin', '#r-share', '.trivia'];
+// クイズのコイン・豆知識の欄（結果のシェアは PR6 で英語に）
+const UNTRANSLATED = ['#home-daily', '#home-rpg', '#home-badges', '#pcoin', '.trivia'];
 const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
 
 // 英語の静的なページ（本編 en/ のあとにまわる順）

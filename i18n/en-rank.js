@@ -6,6 +6,11 @@ Object.assign(window.I18N_EN ??= {}, {
   '全部（{n}問）': 'All ({n} questions)',
   // 結果をシェア（share-card.js）
   '結果をシェア': 'Share result',
+  // 画像の左上のサイト名と、文・画像のタグ（share-card.js の SHARECARD.tag()）
+  '国旗マスター': 'Flag Master',
+  '#国旗マスター': '#FlagMaster',
+  // 画像のまん中の「クリア！」と順位のあいだ（日本語は全角の空白）
+  '　': ' · ',
   '国旗マスター タイムアタック {cond}\n{time} でクリア！\n{tag}': 'Flag Master Time Attack {cond}\nCleared in {time}!\n{tag}',
   // 順位相当とランキングへの登録（profile.js の「載せる」箱）
   'ランキングを見る': 'View leaderboard',

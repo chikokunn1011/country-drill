@@ -1707,7 +1707,7 @@ function showResult() {
     const time = RANKING.formatTime(G.timeMs);
     // 順位は rankOf の返事を待たないので入れない（あとから描き直さない）。国名・首都は入れない
     SHARECARD.attach($('r-share'), { kind: 'ta', title: cond, big: time, sub: T('クリア！'), rank: null, flags: G.set.map(c => c.a), grid: [],
-      text: T('国旗マスター タイムアタック {cond}\n{time} でクリア！\n{tag}', { cond, time, tag: SHARECARD.SHARE.tag }) });
+      text: T('国旗マスター タイムアタック {cond}\n{time} でクリア！\n{tag}', { cond, time, tag: SHARECARD.tag() }) });
   }
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
@@ -1979,7 +1979,7 @@ addEventListener('load', () => loadMap().catch(() => {}));
 <script src="rpg-team.js?v=5"></script>
 <script src="rpg-rank.js?v=9"></script>
 <script src="badges.js?v=13"></script>
-<script src="share-card.js?v=1"></script>
+<script src="share-card.js?v=2"></script>
 <script src="daily.js?v=5"></script>
 <script src="streak.js?v=2"></script>
 <script src="dojo.js?v=2"></script>

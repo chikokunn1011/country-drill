@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, settle, settleResult, clearTimeAttack, clearByAnswering } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, settle, settleResult, clearTimeAttack, clearByAnswering, QUIET_BADGES } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -191,6 +191,50 @@ t('pc_result_fits', async page => {
   const m = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: innerHeight }));
   assert.ok(m.sh <= m.ih, JSON.stringify(m));
 }, { viewport: { width: 1366, height: 657 } });
+
+// ---- 英語版（PR6）: 文は英語・#FlagMaster・URL は英語版・ファイル名 flag-master.png。画像は日本語と同じ 1200×675 ----
+const EN = { path: 'en/', locale: 'en-US', storage: { badges: QUIET_BADGES } };
+// 渡した png を data URL にして、その大きさを読む
+const pngUrl = page => page.evaluate(async () => {
+  const f = __shared.files[0];
+  const url = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
+  const img = new Image(); img.src = url; await img.decode();
+  return { name: f.name, type: f.type, w: img.naturalWidth, h: img.naturalHeight, text: __shared.text, head: url.slice(0, 22) };
+});
+t('share_card_en', async page => {
+  await shareTA(page);
+  await page.waitForFunction(() => window.__shared);
+  assert.equal(await page.locator('#r-share').innerText(), 'Share result');
+  const s = await pngUrl(page);
+  assert.deepEqual([s.type, s.name, s.w, s.h, s.head], ['image/png', 'flag-master.png', 1200, 675, 'data:image/png;base64,']);
+  assert.match(s.text, /^Flag Master Time Attack [^\n]+\nCleared in [^\n]+!\n#FlagMaster\nhttps:\/\/chikokunn1011\.github\.io\/country-drill\/en\/$/);
+  assert.doesNotMatch(s.text, /[　-ヿ㐀-鿿！-ﾟ]/);
+  // 日本語のページで同じ条件の画像と同じ大きさ
+  await page.goto(new URL('..', page.url().split('#')[0]).href);
+  await shareTA(page);
+  await page.waitForFunction(() => window.__shared);
+  const j = await pngUrl(page);
+  assert.deepEqual([j.name, j.w, j.h], ['kokki-master.png', s.w, s.h]);
+  assert.match(j.text, /#国旗マスター\nhttps:\/\/chikokunn1011\.github\.io\/country-drill\/$/);
+}, EN);
+
+// 英語版: 画像を作り終わる前に押す → 文と英語版の URL。X の投稿画面も英語版の URL
+t('share_card_en_text_only', async page => {
+  await clearTimeAttack(page);
+  await page.click('#r-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await page.evaluate(() => ({ url: __shared.url, text: __shared.text }));
+  assert.equal(s.url, URL_ + 'en/');
+  assert.match(s.text, /^Flag Master Time Attack [\s\S]*#FlagMaster$/);
+}, { ...EN, init: holdBlob });
+
+t('share_card_en_x', async page => {
+  await shareTA(page);
+  await page.waitForFunction(() => window.__opened);
+  const u = new URL((await nothing(page)).opened[0]);
+  assert.equal(u.searchParams.get('url'), URL_ + 'en/');
+  assert.match(u.searchParams.get('text'), /^Flag Master Time Attack [\s\S]*#FlagMaster$/);
+}, { ...EN, share: { how: 'deny' } });
 
 // ---- 今日の難問（daily.js の #dl-share）----
 // 時計を日本時間の決まった時刻にする（daily.test.mjs の at と同じ）
