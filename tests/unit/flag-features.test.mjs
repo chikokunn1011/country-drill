@@ -52,3 +52,16 @@ test('features_theme_sizes', t => {
   t.diagnostic(KEYS.map(k => `${k}=${n[k]}`).join(' '));
   for (const k of ['stars', 'crescent', 'vtricolor', 'htricolor']) assert.ok(n[k] >= 10, `${k} が ${n[k]} か国`);
 });
+
+test('similar_tips_match', () => {
+  const dctx = {}; vm.runInNewContext(read('daily-core.js'), dctx);
+  const SIMILAR = plain(dctx.DAILY_CORE.SIMILAR);
+  const tips = JSON.parse(read('data/similar_tips.json'));
+  assert.equal(tips.length, SIMILAR.length);
+  SIMILAR.forEach((g, i) => {
+    const tip = tips[i];
+    assert.deepEqual(tip.g, g, `${i} 番目のグループ`);
+    assert.ok(typeof tip.t === 'string' && tip.t.trim() !== '' && tip.t.length <= 120, `${g.join(' ')} の t（${tip.t?.length} 字）`);
+    assert.ok(typeof tip.note === 'string' && tip.note.trim() !== '', `${g.join(' ')} の note`);
+  });
+});
