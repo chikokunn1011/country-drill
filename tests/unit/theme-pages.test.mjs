@@ -282,7 +282,9 @@ test('en_theme_content', () => {
   const isl = read('en/themes/island.html');
   for (const a of themesData().island.a) assert.ok(isl.includes(`href="../country/${a}.html"`), a);
   const idx = read('en/themes/index.html');
-  assert.ok(idx.includes('25 pairs'));
+  assert.ok(idx.includes('25 groups'));
+  assert.ok(!sim.includes('pairs') && !idx.includes('pairs'));
+  assert.ok(sim.includes('How to tell similar flags apart: 25 groups,'));
   for (const id of THEME_IDS) assert.ok(idx.includes(`<span>${esc(EN_TITLES[id])}<br>`), id);
 });
 

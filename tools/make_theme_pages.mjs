@@ -28,7 +28,7 @@ const THEMES = {
   stars: { n: '星がある国旗', lead: '国旗に星がある国の一覧です。五角形の星のほか、とがった形の星も数えています。',
     e: 'Flags with stars', leadE: 'Countries whose flags have stars. Besides five-pointed stars, we also count other pointed stars.' },
   cross: { n: '十字がある国旗', lead: '国旗のおもな模様に十字がある国の一覧です。北欧の国やユニオンジャックの入った国が多く入ります。',
-    e: 'Flags with a cross', leadE: 'Countries whose flags have a cross as a main design. Many are Nordic countries or countries with the Union Jack in their flag.' },
+    e: 'Flags with a cross', leadE: 'Countries whose flags have a cross as their main design. Many are Nordic countries or countries with the Union Jack in their flag.' },
   crescent: { n: '三日月がある国旗', lead: '国旗に三日月がある国の一覧です。星といっしょに描かれていることが多い模様です。',
     e: 'Flags with a crescent moon', leadE: 'Countries whose flags have a crescent moon. It is often drawn together with a star.' },
   sun: { n: '太陽がある国旗', lead: '国旗に太陽がある国の一覧です。日本の日の丸もここに入ります。',
@@ -44,7 +44,7 @@ const THEMES = {
   redwhite: { n: '赤と白だけの国旗', lead: '赤と白の2色だけでできた国旗の一覧です。',
     e: 'Red and white flags', leadE: 'Flags made of just two colors: red and white.' },
   similar: { n: '似ている国旗の見分け方', lead: '色や形がよく似ていて、まちがえやすい国旗の組です。組ごとに、見分けるところを一言で書いています。',
-    e: 'How to tell similar flags apart', leadE: 'Flags that look a lot alike in color or design and are easy to mix up. For each one, a short note says what to look for.' },
+    e: 'How to tell similar flags apart', leadE: 'Flags that look a lot alike in color or design and are easy to mix up. For each group, a short note says what to look for.' },
   island: { n: '島国の一覧', lead: 'ほかの国と陸で国境を接していない島国の一覧です。',
     e: 'Island countries', leadE: 'Island countries that share no land border with any other country.' },
   landlocked: { n: '内陸国の一覧', lead: '海に面していない内陸国の一覧です。カスピ海は湖として数えています。',
@@ -206,17 +206,17 @@ export const EN = {
   allCountries: 'All countries',
   quiz: n => `Play quiz with this collection (${EN.countries(n)})`,
   countries: n => `${n} ${n === 1 ? 'country' : 'countries'}`,
-  pairs: n => `${n} ${n === 1 ? 'pair' : 'pairs'}`,
+  groups: n => `${n} ${n === 1 ? 'group' : 'groups'}`,
   desc: (t, count) => `${t}: ${count}, shown with their flags.`,
   descTail: 'Try the quiz on Flag Master.',
   indexTitle: 'Flag collections by theme | Flag Master',
   indexDesc: 'Flags with stars, crosses, or crescent moons, how to tell similar flags apart, island and landlocked countries, rankings by area, and more, grouped by theme.',
-  indexLead: 'Pages that group flags by design and color, or by the shape of the country. Choose a collection to see the flags that fit it.',
+  indexLead: 'Pages that group flags by design and color, or by features of the country itself. Choose a collection to see the flags that fit it.',
 };
 // 英語の国名の ABC 順（同じならコード順）
 const byEn = (x, y) => x.e.localeCompare(y.e, 'en') || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 const UP_EN = '../../';
-const countLabelEn = (inp, id, list) => (id === 'similar' ? EN.pairs(inp.SIMILAR.length) : EN.countries(list.length));
+const countLabelEn = (inp, id, list) => (id === 'similar' ? EN.groups(inp.SIMILAR.length) : EN.countries(list.length));
 const flagImgEn = (inp, a) => flagImg(inp, a, '', true, UP_EN);
 const cardEn = (inp, c) => `      <a class="ccard" href="../country/${c.a}.html">${flagImgEn(inp, c.a)}<span>${esc(c.e)}</span></a>`;
 const cardsEn = (inp, list) => `  <div class="ccards">
