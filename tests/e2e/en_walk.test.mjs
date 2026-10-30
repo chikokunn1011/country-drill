@@ -16,9 +16,9 @@ let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 未訳の機能の入口（英語版では見えてはいけない）: 今日の難問・冒険・ランキング・バッジ・プロフィール・タイムアタックのカード・
-// クイズのコイン・豆知識の欄（結果のシェアは PR6 で英語に）
-const UNTRANSLATED = ['#home-daily', '#home-rpg', '#home-badges', '#pcoin', '.trivia'];
+// 未訳の機能の入口（英語版では見えてはいけない）: 冒険・バッジ・クイズのコイン・豆知識の欄
+// （ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6 で英語に）
+const UNTRANSLATED = ['#home-rpg', '#home-badges', '#pcoin', '.trivia'];
 const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
 
 // 英語の静的なページ（本編 en/ のあとにまわる順）
@@ -114,6 +114,23 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     }
     await screen('dojo');
     await check('dojo done');
+    // 今日の難問（説明 → 1問目をまちがえて結果・昨日のタブ）
+    await home();
+    await page.click('#home-daily');
+    await screen('daily');
+    await check('daily intro');
+    await page.click('#dl-start');
+    await settle(page);
+    await check('daily quiz');
+    await answerWrong(page);
+    await page.waitForSelector('#qcard .reveal');
+    await check('daily wrong');
+    await page.click('#next');
+    await screen('daily');
+    await check('daily result');
+    await page.click('#dl-tabs [data-t="yday"]');
+    await page.click('#dl-answers summary');
+    await check('daily yesterday');
     // 静的なページ
     for (const path of STATIC) {
       await page.goto(new URL(path, server.url).href);

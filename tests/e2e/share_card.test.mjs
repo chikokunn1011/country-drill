@@ -324,3 +324,29 @@ t('daily_fallback_url', async page => {
   assert.equal(s.url, URL_);
   assert.match(s.text, /^国旗マスター 今日の難問 10\/28\n/);
 }, { init: NOON + holdBlob, storage: dailyRec() });
+
+// 英語版の今日の難問（PR6 Task 7）: 画像の文（題・結果・順位）は英語、文は #FlagMaster で終わり、URL は英語版。
+// 画像に描いた文字は fillText を見る（__drawn）。sub が空なので、順位の前に区切り（' · '）は入らない
+const spyFill = `{
+  const f = CanvasRenderingContext2D.prototype.fillText;
+  CanvasRenderingContext2D.prototype.fillText = function (s, ...r) { (window.__drawn ||= []).push(String(s)); return f.call(this, s, ...r); };
+}`;
+t('daily_en_card', async page => {
+  await openDaily(page);
+  await dready(page);
+  const d = await page.evaluate(() => window.__data);
+  assert.equal(d.title, 'Daily Puzzle 10/28');
+  assert.equal(d.big, 'Perfect! 1:23.40');
+  assert.equal(d.sub, '');
+  assert.equal(d.rank, '#3 today');
+  assert.equal(d.text, 'Flag Master Daily Puzzle 10/28\n' + '🟩'.repeat(20) + '\nPerfect! 1:23.40\n#FlagMaster');
+  const drawn = await page.evaluate(() => window.__drawn);
+  for (const s of ['Flag Master', 'Daily Puzzle 10/28', 'Perfect! 1:23.40', '#3 today', '#FlagMaster']) assert.ok(drawn.includes(s), `${s} / ${drawn.join(' | ')}`);
+  assert.deepEqual(drawn.filter(s => /[　-ヿ㐀-鿿！-ﾟ]/.test(s)), []);
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await pngUrl(page);
+  assert.deepEqual([s.name, s.w, s.h], ['flag-master.png', 1200, 675]);
+  assert.equal(s.text, d.text + '\n' + URL_ + 'en/');
+}, { ...EN, init: NOON + spyAttach + spyFill, storage: { ...EN.storage, ...dailyRec({ correct: 20, outcome: 'clear', sent: { name: 'Chiko', rank: 3 } }) } });
+

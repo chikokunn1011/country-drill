@@ -158,7 +158,7 @@ test('translate_css_alt', () => {
   assert.deepEqual([...css.matchAll(/content:[^;}]*/g)].map(m => m[0]).filter(s => JA_RE.test(s)), []);
 });
 
-// 埋めこみの英語版: noindex のまま、今日の難問（PR6）のリンクは外し、「もっと遊ぶ」は英語版のトップへ。日本語が残らない
+// 埋めこみの英語版: noindex のまま、今日の難問のリンクは英語版の #daily へ（PR6）、「もっと遊ぶ」は英語版のトップへ。日本語が残らない
 test('en_embed', () => {
   const out = renderEn(readEnInputs(ROOT));
   assert.ok('en/embed.html' in out, 'renderEn が en/embed.html を作る（en_current で見る）');
@@ -168,7 +168,7 @@ test('en_embed', () => {
   assert.ok(base > h.indexOf('<meta charset="utf-8">') && base < h.search(/\s(?:href|src)="(?!https?:)[^"]*"/));
   assert.ok(h.includes('<meta name="robots" content="noindex">'));
   assert.ok(h.includes('<title>Today’s flag | Flag Master</title>'));
-  assert.doesNotMatch(html, /id="e-daily"/);
+  assert.match(html, /<a id="e-daily" href="en\/#daily" target="_blank" rel="noopener">Try the Daily Puzzle \(20 questions\)<\/a>/);
   assert.match(html, /<a id="e-more" href="en\/" target="_blank" rel="noopener">Play more<\/a>/);
   const srcs = scriptSrcs(html);
   assert.deepEqual(srcs.map(s => s.split('?')[0]), ['i18n.js', 'i18n/en-embed.js', 'countries.js', 'daily-core.js', 'embed.js']);

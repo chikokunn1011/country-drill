@@ -12,9 +12,9 @@ import { JA_RE } from './i18n_scan.mjs';
 import { SITE } from './make_country_pages.mjs';
 
 // 英語のページで読まない script（未訳の機能）
-export const EN_SKIP = ['trivia.js', 'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js', 'daily.js', 'streak.js'];
+export const EN_SKIP = ['trivia.js', 'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js', 'streak.js'];
 // ページごとの辞書（i18n/<名前>.js。まだ無いファイルは入れない）
-export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile'], 'embed.html': ['en-embed'] };
+export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily'], 'embed.html': ['en-embed'] };
 // 英語版があるページ（<a href> の # の前がこれなら頭に en/）
 export const EN_PAGES = ['./', 'index.html', 'howto.html', 'about.html', 'privacy.html', 'country/', 'themes/', 'embed.html'];
 
@@ -170,10 +170,8 @@ export function renderEn(inp, used = new Set()) {
   html = once(html, `<meta property="og:url" content="${SITE}">`, `<meta property="og:url" content="${SITE}en/">`);
   html = once(html, '<meta property="og:locale" content="ja_JP">', '<meta property="og:locale" content="en_US">');
   html = once(html, '<link rel="manifest" href="manifest.webmanifest">', '<link rel="manifest" href="en/manifest.webmanifest">');
-  // 埋めこみ: 今日の難問（PR6 で訳す）へのリンク #e-daily を外す。noindex はそのまま
-  const embed = inp.embed.replace(/^[ \t]*<a id="e-daily"[^\n]*\n/m, '');
-  if (embed === inp.embed) throw new Error('embed.html に #e-daily の行が無い');
-  return { 'en/index.html': renderPage(html, 'index.html', inp, used), 'en/embed.html': renderPage(embed, 'embed.html', inp, used) };
+  // 埋めこみ: noindex はそのまま。今日の難問へのリンク #e-daily（./#daily）は enLinks で英語版の en/#daily に
+  return { 'en/index.html': renderPage(html, 'index.html', inp, used), 'en/embed.html': renderPage(inp.embed, 'embed.html', inp, used) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -23,8 +23,9 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => 
 t('en_home', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.deepEqual(await jaLeft(page), []);
-  // 未訳の機能の入口は出さない（冒険・バッジは PR7・PR8、今日の難問は PR6 の Task 7 まで）
-  for (const id of ['home-daily', 'home-rpg', 'home-badges'])
+  // 未訳の機能の入口は出さない（冒険・バッジは PR7・PR8）。今日の難問は出る（PR6）
+  assert.equal(await page.isVisible('#home-daily'), true);
+  for (const id of ['home-rpg', 'home-badges'])
     assert.equal(await page.isVisible('#' + id), false, id);
   assert.match(await page.title(), /Flag Master/);
   assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');

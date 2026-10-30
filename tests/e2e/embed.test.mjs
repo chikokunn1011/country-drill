@@ -148,7 +148,7 @@ t('no_answer_in_alt', async () => {
 });
 
 // 英語版（en/embed.html）: 問題・選択肢・答えの文が英語、見えている日本語が無い、辞書に無いキーの warn が無い。
-// alt・aria-label に国名（英語の名前も）が入らない。今日の難問のリンクは無く、「もっと遊ぶ」は英語版のトップへ
+// alt・aria-label に国名（英語の名前も）が入らない。今日の難問のリンクは英語版の #daily へ、「もっと遊ぶ」は英語版のトップへ
 t('embed_en', async () => {
   const names = C.flatMap(c => [c.n, c.e]);
   for (const mode of ['f2n', 'n2f']) await open({ mode, path: 'en/embed.html', locale: 'en-US' }, async (page, app) => {
@@ -168,7 +168,8 @@ t('embed_en', async () => {
     assert.deepEqual(await jaLeft(page), [], mode);
     await page.click(`.e-opt[data-a="${wrongOf(mode)}"]`);
     assert.equal(await text(page, '#e-msg'), 'Not quite. Pick again.');
-    assert.equal(await page.locator('#e-daily').count(), 0);
+    assert.equal(await text(page, '#e-daily'), 'Try the Daily Puzzle (20 questions)');
+    assert.equal(await page.$eval('#e-daily', a => { const u = new URL(a.href); return u.pathname + u.hash; }), '/en/#daily');
     assert.equal(await text(page, '#e-more'), 'Play more');
     assert.equal(await page.$eval('#e-more', a => new URL(a.href).pathname), '/en/');
     assert.deepEqual(await jaLeft(page), [], mode);

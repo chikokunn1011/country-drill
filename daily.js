@@ -4,6 +4,7 @@
   // クイズの画面は index.html の startDaily（タイムアタックと同じ進み方）を使い、進み具合は drill:daily で受け取る。
   // その日のランキングは Supabase の daily_scores（supabase/schema.sql の submit_daily2 / top_daily2 / daily_rank_of）。載せるのはプロフィール（profile.js）で。
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
+  // 画面の文は T()（i18n.js）。英語の訳は i18n/en-daily.js。日付の区切りは英語版でも日本時間の0時のまま（英語の画面でだけ、その人の時間を I18N.localOf で添える）
 
   const NEED = {
     C: typeof C, byA: typeof byA, flag: typeof flag, esc: typeof esc, $: typeof $, store: typeof store, show: typeof show,
@@ -17,10 +18,19 @@
   // 「挑戦する」を押した時点で playing を保存するので、リロードしてもやり直せない（playing のまま開いたら、そこまでの記録で終わり）
   const KEY = 'daily';
   const today = () => K.jstDay(new Date());
-  const md = day => { const [, m, d] = day.split('-'); return `${+m}月${+d}日`; };
+  // 日本時間の日付の表示: 日本語 '10月30日'・英語 'Oct 30'（I18N.dayLabel）。短い形 '10/30' は英語でも同じ
+  const md = day => I18N.dayLabel(day);
   const mdShort = day => { const [, m, d] = day.split('-'); return `${+m}/${+d}`; };
   const STAGE = ['', '★', '★★', '★★★'];
+  // i18n-data:start
   const MODE_LABEL = { f2n: '国旗 → 国名', n2f: '国名 → 国旗', m2f: '場所 → 国旗', f2m: '国旗 → 場所' };
+  // i18n-data:end
+  // ほかの人や自分が入れた名前（訳さない。英語のページの日本語のチェック jaLeft は data-ugc の中を見ない）
+  const ugc = name => `<span data-ugc>${esc(name)}</span>`;
+  // 日本時間の h:m が、その人の時間で何時かの添え書き（英語のページで、日本時間とずれている人だけ。ほかは ''）
+  const yourTime = (h, m) => { const t = I18N.localOf(h, m); return t ? T('（あなたの時間で{t}）', { t }) : ''; };
+  // 順位の言い方（「今日3位」・'#3 today'）
+  const rankWord = (day, n) => day === today() ? T('今日{n}位', { n }) : T('昨日{n}位', { n });
   // profile.js が読めなかった（配信漏れ）ときは、ランキングは見るだけ
   const P = () => window.PROFILE ?? null;
   const qsCache = {};
@@ -66,15 +76,15 @@
   const sec = document.createElement('section');
   sec.id = 'scr-daily'; sec.className = 'wrap'; sec.hidden = true;
   sec.innerHTML = `<div class="panel daily">
-    <div class="dl-head"><h2>今日の難問</h2><p class="dl-date mono" id="dl-date"></p></div>
+    <div class="dl-head"><h2>${T('今日の難問')}</h2><p class="dl-date mono" id="dl-date"></p></div>
     <div class="cols">
       <div class="col" id="dl-main"></div>
       <div class="col">
-        <div class="seg" id="dl-tabs" role="group" aria-label="日付"><button type="button" data-t="today">今日</button><button type="button" data-t="yday">昨日</button></div>
-        <p class="hint">上位50人まで。全問正解の人がタイム順で上、その下は正解した数が多い順（同じ数なら速い順）。</p>
+        <div class="seg" id="dl-tabs" role="group" aria-label="${T('日付')}"><button type="button" data-t="today">${T('今日')}</button><button type="button" data-t="yday">${T('昨日')}</button></div>
+        <p class="hint">${T('上位50人まで。全問正解の人がタイム順で上、その下は正解した数が多い順（同じ数なら速い順）。')}</p>
         <ol class="rklist dl-list" id="dl-list" aria-busy="false"></ol>
-        <p class="rkempty" id="dl-empty" hidden>まだ誰もいない。1位のチャンス！</p>
-        <div class="rkerror" id="dl-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="dl-retry">再読み込み</button></div>
+        <p class="rkempty" id="dl-empty" hidden>${T('まだ誰もいない。1位のチャンス！')}</p>
+        <div class="rkerror" id="dl-error" hidden><p>${T('ランキングに接続できなかった')}</p><button class="btn ghost" id="dl-retry">${T('再読み込み')}</button></div>
         <div id="dl-answers"></div>
       </div>
     </div>
@@ -90,17 +100,18 @@
     const qs = questions(day).slice(0, upto);
     const li = qs.map((q, i) => {
       const c = byA.get(q.a);
-      const mark = !r ? '<span></span>' : i < r.correct ? '<span class="dl-ok" aria-label="正解">○</span>' : i === r.correct && r.outcome === 'fail' ? '<span class="dl-ng" aria-label="まちがえ">×</span>' : '<span class="dl-skip" aria-label="とどかず">—</span>';
-      return `<li>${mark}<span class="mono dl-no">${q.no}</span><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span class="dl-mode">${MODE_LABEL[q.mode]} ${STAGE[q.stage]}</span></li>`;
+      const mark = !r ? '<span></span>' : i < r.correct ? `<span class="dl-ok" aria-label="${T('正解')}">○</span>` : i === r.correct && r.outcome === 'fail' ? `<span class="dl-ng" aria-label="${T('まちがえ')}">×</span>` : `<span class="dl-skip" aria-label="${T('とどかず')}">—</span>`;
+      return `<li>${mark}<span class="mono dl-no">${q.no}</span><img src="${flag(c.a)}" alt=""><b>${esc(cName(c))}</b><span class="dl-mode">${T(MODE_LABEL[q.mode])} ${STAGE[q.stage]}</span></li>`;
     }).join('');
-    const rest = upto < N ? `<p class="hint">${upto ? 'ここから先' : '問題と答え'}は、明日「昨日」のタブで見られるよ。</p>` : '';
+    const rest = upto < N ? `<p class="hint">${upto ? T('ここから先は、明日「昨日」のタブで見られるよ。') : T('問題と答えは、明日「昨日」のタブで見られるよ。')}</p>` : '';
     return `<details class="dl-ans"${r ? ' open' : ''}><summary>${title}</summary>${li ? `<ol class="dl-qs">${li}</ol>` : ''}${rest}</details>`;
   }
   // どこまで正解したか（シェア用）。grid は画像の20マス（share-card.js）、bar は文の 🟩🟥⬜。決まりは grid の1か所
   const grid = r => Array.from({ length: N }, (_, i) => i < r.correct ? 'ok' : i === r.correct && r.outcome === 'fail' ? 'ng' : 'skip');
   const bar = r => grid(r).map(g => ({ ok: '🟩', ng: '🟥', skip: '⬜' })[g]).join('');
-  const resultLine = r => r.correct >= N ? `全問正解！ ${RANKING.formatTime(r.timeMs)}` : `${r.correct} / ${N} 問正解`;
-  const shareText = r => `国旗マスター 今日の難問 ${mdShort(r.day)}\n${bar(r)}\n${resultLine(r)}\n#国旗マスター`;
+  const resultLine = r => r.correct >= N ? T('全問正解！ {time}', { time: RANKING.formatTime(r.timeMs) }) : T('{c} / {n} 問正解', { c: r.correct, n: N });
+  // タグは share-card.js の SHARECARD.tag()（英語版は #FlagMaster）。share-card.js が読めなかったときは同じ辞書のキー
+  const shareText = r => T('国旗マスター 今日の難問 {d}\n{bar}\n{line}\n{tag}', { d: mdShort(r.day), bar: bar(r), line: resultLine(r), tag: window.SHARECARD?.tag?.() ?? T('#国旗マスター') });
 
   function render() {
     settle();
@@ -110,44 +121,43 @@
     $('dl-date').textContent = md(day);
     const main = $('dl-main');
     if (busyElsewhere(r)) {
-      main.innerHTML = '<p class="dl-lead">いま別のタブで挑戦中だよ。終わったら、ここに結果が出るよ。</p>';
+      main.innerHTML = `<p class="dl-lead">${T('いま別のタブで挑戦中だよ。終わったら、ここに結果が出るよ。')}</p>`;
     } else if (!r) {
       main.innerHTML = `<div class="dl-intro">
-        <p class="dl-lead">毎日0時（日本時間）に新しい${N}問。<b>挑戦できるのは1日1回だけ</b>。</p>
+        <p class="dl-lead">${T('毎日0時（日本時間）に新しい{n}問{t}。{b}。', { n: N, t: yourTime(0, 0), b: `<b>${T('挑戦できるのは1日1回だけ')}</b>` })}</p>
         <ul class="dl-rules">
-          <li>国旗・国名・場所の問題がまざって出る</li>
-          <li>後半ほどむずかしい（似た国旗・小さい国）</li>
-          <li>1問でもまちがえたら、そこまでの正解数が記録</li>
-          <li>全問正解ならタイムで勝負</li>
+          <li>${T('国旗・国名・場所の問題がまざって出る')}</li>
+          <li>${T('後半ほどむずかしい（似た国旗・小さい国）')}</li>
+          <li>${T('1問でもまちがえたら、そこまでの正解数が記録')}</li>
+          <li>${T('全問正解ならタイムで勝負')}</li>
         </ul>
-        <p class="hint">「挑戦する」を押したら、とちゅうでやめても今日の挑戦は終わり。準備ができたらどうぞ。</p>
-        <div class="row center"><button class="btn" id="dl-start">挑戦する</button></div>
+        <p class="hint">${T('「挑戦する」を押したら、とちゅうでやめても今日の挑戦は終わり。準備ができたらどうぞ。')}</p>
+        <div class="row center"><button class="btn" id="dl-start">${T('挑戦する')}</button></div>
       </div>`;
       $('dl-start').onclick = start;
     } else {
       const clear = r.correct >= N;
-      const head = clear ? '全問正解！' : r.outcome === 'quit' ? 'とちゅうでやめた' : 'ここまで！';
-      const big = clear ? `<span>${RANKING.formatTime(r.timeMs)}</span>` : `${r.correct}<small> / ${N} 問正解</small>`;
+      const head = clear ? T('全問正解！') : r.outcome === 'quit' ? T('とちゅうでやめた') : T('ここまで！');
+      const big = clear ? `<span>${RANKING.formatTime(r.timeMs)}</span>` : `${r.correct}<small>${T(' / {n} 問正解', { n: N })}</small>`;
       main.innerHTML = `<div class="result dl-result">
-        ${r.day !== day ? `<p class="hint">昨日（${md(r.day)}）の挑戦の記録。0時30分までなら載せられるよ</p>` : ''}
+        ${r.day !== day ? `<p class="hint">${T('昨日（{d}）の挑戦の記録。0時30分（日本時間）までなら載せられるよ', { d: md(r.day) })}${yourTime(0, 30)}</p>` : ''}
         <p class="qlabel">${head}</p><p class="score">${big}</p>
-        ${clear ? '' : `<p class="hint">タイム ${RANKING.formatTime(r.timeMs)}</p>`}
+        ${clear ? '' : `<p class="hint">${T('タイム {t}', { t: RANKING.formatTime(r.timeMs) })}</p>`}
         <p class="tarank" id="dl-rank"></p>
-        ${canSend(r) ? (P() ? '<div id="dl-post"></div>' : '<p class="tamsg ng">ランキングに載せるには、ページを読み直してね</p>') : r.sent ? `<p class="tamsg ok">「${esc(r.sent.name)}」で載せたよ！</p>` : ''}
-        <div class="row center"><button class="btn ghost" id="dl-share">結果をシェア</button></div>
+        ${canSend(r) ? (P() ? '<div id="dl-post"></div>' : `<p class="tamsg ng">${T('ランキングに載せるには、ページを読み直してね')}</p>`) : r.sent ? `<p class="tamsg ok">${T('「{name}」で載せたよ！', { name: ugc(r.sent.name) })}</p>` : ''}
+        <div class="row center"><button class="btn ghost" id="dl-share">${T('結果をシェア')}</button></div>
         <p class="hint dl-next" id="dl-next"></p>
-        ${r.day !== day ? '<div class="row center"><button class="btn" id="dl-start">今日の難問に挑戦する</button></div>' : ''}
-      </div>${answersHTML(r.day, r.day === day ? '今日の問題と答え' : '昨日の問題と答え', r, r.day === day ? Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)) : N)}`;
+        ${r.day !== day ? `<div class="row center"><button class="btn" id="dl-start">${T('今日の難問に挑戦する')}</button></div>` : ''}
+      </div>${answersHTML(r.day, r.day === day ? T('今日の問題と答え') : T('昨日の問題と答え'), r, r.day === day ? Math.min(N, r.correct + (r.outcome === 'fail' ? 1 : 0)) : N)}`;
       if ($('dl-start')) $('dl-start').onclick = start;
-      const dayWord = r.day === day ? '今日' : '昨日';
       // 結果画像のシェア（share-card.js）。国旗は出さない（答えは明日まで隠す）。読めなければ文だけのシェア
-      if (window.SHARECARD) SHARECARD.attach($('dl-share'), { kind: 'daily', title: `今日の難問 ${mdShort(r.day)}`, big: resultLine(r), sub: '',
-        rank: r.sent?.rank ? `${dayWord}${r.sent.rank}位` : null, flags: [], grid: grid(r), text: shareText(r) });
+      if (window.SHARECARD) SHARECARD.attach($('dl-share'), { kind: 'daily', title: T('今日の難問 {d}', { d: mdShort(r.day) }), big: resultLine(r), sub: '',
+        rank: r.sent?.rank ? rankWord(r.day, r.sent.rank) : null, flags: [], grid: grid(r), text: shareText(r) });
       else $('dl-share').onclick = () => share(r);
       if (canSend(r) && P()) post(r);
       if (RANKING.enabled && !r.sent) RANKING.dailyRankOf({ day: r.day, correct: r.correct, timeMs: r.timeMs })
-        .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = `${dayWord}${n}位 相当`; }, e => console.warn('daily rankOf', e));
-      if (r.sent?.rank) $('dl-rank').textContent = `${dayWord}${r.sent.rank}位（載せたとき）`;
+        .then(n => { if (n && $('dl-rank') && !sec.hidden) $('dl-rank').textContent = T('{r} 相当', { r: rankWord(r.day, n) }); }, e => console.warn('daily rankOf', e));
+      if (r.sent?.rank) $('dl-rank').textContent = T('{r}（載せたとき）', { r: rankWord(r.day, r.sent.rank) });
       tickNext();
       if (V.fresh) { V.fresh = false; if (clear) window.SND?.play?.('perfect'); }
     }
@@ -162,7 +172,7 @@
     const el = $('dl-next');
     if (!el || sec.hidden) return;
     const ms = K.msToNextDay(new Date()), h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3);
-    el.textContent = `次の問題まで あと${h}時間${m}分`;
+    el.textContent = T('次の問題まで あと{h}時間{m}分', { h, m });
     // 日付が変わったら、挑戦前の画面にする
     if (ms < 60e3) nextTimer = setTimeout(() => { if (!sec.hidden) render(); }, ms + 500);
     else nextTimer = setTimeout(tickNext, 60e3);
@@ -181,7 +191,7 @@
   // 送っている途中に画面を開き直すと新しい箱ができる（r.sent はまだ無い）ので、同じ日・同じ合言葉の送信は posting の返事を待って同じ答えにする（二重に送らない）
   let posting = null;   // { day, token, done: Promise }
   function post(r) {
-    P().postBox($('dl-post'), { label: 'ランキングに載せる？', send: token => {
+    P().postBox($('dl-post'), { label: T('ランキングに載せる？'), send: token => {
       if (posting?.day === r.day && posting.token === token) return posting.done;
       const done = sendDaily(r, token).finally(() => { if (posting?.done === done) posting = null; });
       posting = { day: r.day, token, done };
@@ -189,7 +199,6 @@
     } });
   }
   async function sendDaily(r, token) {
-    const dayWord = r.day === today() ? '今日' : '昨日';
     const res = await RANKING.dailySubmit2({ token, day: r.day, correct: r.correct, total: N, timeMs: r.timeMs });
     // 前に送ったときに載っていて、返事だけ届かなかった（1日1回なので2回目は already）: 載せたことにする
     if (!res.ok && res.reason !== 'already') return res;
@@ -198,22 +207,23 @@
     if (now?.day === r.day) save({ ...now, sent: { name, rank } });
     // 箱の外（順位・表）だけ新しくする。箱は postBox が「載せたよ」に描きかえる
     if (!sec.hidden) {
-      if (rank && $('dl-rank')) $('dl-rank').textContent = `${dayWord}${rank}位`;
+      if (rank && $('dl-rank')) $('dl-rank').textContent = rankWord(r.day, rank);
       V.tab = r.day === today() ? 'today' : 'yday';
       for (const b of $('dl-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === V.tab));
       load();
     }
-    return { ok: true, text: res.ok ? `「${name}」で載せたよ！${rank ? ` ${dayWord}${rank}位` : ''}` : RANKING.message('already') };
+    // 状態の文は textContent（profile.js の postBox）なので、名前はそのまま入れる
+    return { ok: true, text: res.ok ? (rank ? T('「{name}」で載せたよ！ {r}', { name, r: rankWord(r.day, rank) }) : T('「{name}」で載せたよ！', { name })) : RANKING.message('already') };
   }
   // 画面を離れたら箱を外す（隠れた箱が、あとでプロフィールを作った・自動を ON にしたときに載せないままにした記録を送らないように。
   // postBox は箱が DOM から外れると聞くのをやめる。開き直せば render が作り直す）
   document.addEventListener('drill:screen', e => { if (e.detail?.name !== 'daily') $('dl-post')?.remove(); });
 
-  // share-card.js が読めなかったときのシェア（文だけ。share が無ければクリップボード）
+  // share-card.js が読めなかったときのシェア（文だけ。share が無ければクリップボード）。URL はこのページ（英語版なら …/en/）
   function share(r) {
     const text = shareText(r);
     const url = location.origin + location.pathname;
-    const copied = () => { const b = $('dl-share'); if (b) { b.textContent = 'コピーしたよ'; setTimeout(() => { if ($('dl-share')) $('dl-share').textContent = '結果をシェア'; }, 2000); } };
+    const copied = () => { const b = $('dl-share'); if (b) { b.textContent = T('コピーしたよ'); setTimeout(() => { if ($('dl-share')) $('dl-share').textContent = T('結果をシェア'); }, 2000); } };
     if (typeof navigator.share === 'function') {
       try { Promise.resolve(navigator.share({ text, url })).catch(() => {}); } catch {}
     } else navigator.clipboard?.writeText(`${text}\n${url}`).then(copied, () => {});
@@ -226,7 +236,7 @@
     const day = V.tab === 'today' ? today() : K.addDays(today(), -1);
     // 昨日の問題と答え（昨日のタブのときだけ。昨日の自分の記録があれば印もつける）
     const r = rec();
-    $('dl-answers').innerHTML = V.tab === 'yday' ? answersHTML(day, `昨日（${md(day)}）の問題と答え`, r?.day === day && r.status === 'done' ? r : null) : '';
+    $('dl-answers').innerHTML = V.tab === 'yday' ? answersHTML(day, T('昨日（{d}）の問題と答え', { d: md(day) }), r?.day === day && r.status === 'done' ? r : null) : '';
     list.setAttribute('aria-busy', true); $('dl-retry').disabled = true;
     let rows = null;
     try { rows = await RANKING.dailyTop2({ day }); } catch (e) { console.warn('daily top', e); }
@@ -240,8 +250,10 @@
     list.innerHTML = (rows ?? []).map((x, i) => {
       const p = rows[i - 1];
       if (!i || x.correct !== p.correct || x.timeMs !== p.timeMs) no = i + 1;   // 同じ記録は同じ順位（daily_rank_of とそろえる）
-      const score = x.correct >= x.total ? '<b class="dl-all">全問正解</b>' : `<b>${x.correct}問</b>`;
-      const nick = P() ? P().nameHTML(x) : esc(x.nickname);
+      // '{c}問' は表の正解の数（英語 '7 correct'。'{n}問' の '7 questions' とは別のキー）
+      const score = x.correct >= x.total ? `<b class="dl-all">${T('全問正解')}</b>` : `<b>${T('{c}問', { c: x.correct })}</b>`;
+      // 名前は訳さないので data-ugc の要素に（profile.js が読めなかったときも）
+      const nick = P() ? P().nameHTML(x) : ugc(x.nickname);
       return `<li class="${no <= 3 ? 'top' : ''}${me && x.pid === me ? ' me' : ''}"><span class="no">${no}</span><span class="nick">${nick}</span>${score}<span class="mono">${RANKING.formatTime(x.timeMs)}</span></li>`;
     }).join('');
   }
@@ -254,7 +266,7 @@
   function markHome() {
     if (typeof homeEntry !== 'function') return;
     const done = !!todayRec();
-    homeEntry('home-daily', { open: openToday, note: `<span class="mono dl-homeday">${mdShort(today())}</span>${done ? '<span class="dl-homedone">挑戦ずみ</span>' : '<span class="dl-new">NEW</span>'}` });
+    homeEntry('home-daily', { open: openToday, note: `<span class="mono dl-homeday">${mdShort(today())}</span>${done ? `<span class="dl-homedone">${T('挑戦ずみ')}</span>` : '<span class="dl-new">NEW</span>'}` });
   }
   markHome();
   document.addEventListener('drill:screen', e => { if (e.detail?.name === 'home') markHome(); });

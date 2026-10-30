@@ -47,10 +47,11 @@ async function openWithProfile(page, db, { name = 'Chiko', token = 'tok-en', sen
 }
 const noHScroll = page => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth);
 
-// ホームの入口: ランキングとプロフィールは出る。冒険・バッジ（PR7・PR8）と今日の難問（Task 7）はまだ
+// ホームの入口: ランキング・プロフィール・今日の難問は出る。冒険・バッジ（PR7・PR8）はまだ
 for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) t(`en_home_entries_${vname}`, async page => {
   await page.waitForFunction(() => window.PROFILE);
-  for (const id of ['home-rank', 'home-profile']) assert.equal(await page.isVisible('#' + id), true, id);
+  for (const id of ['home-rank', 'home-profile', 'home-daily']) assert.equal(await page.isVisible('#' + id), true, id);
+  assert.match(await text(page, '#home-daily'), /^Daily Puzzle\s+A new puzzle every day\. Compete with other players\.\s+\d{1,2}\/\d{1,2}\s*NEW$/);
   for (const id of ['home-rpg', 'home-badges']) assert.equal(await page.isVisible('#' + id), false, id);
   assert.equal((await text(page, '#home-rank .hi-label')).trim(), 'Leaderboard');
   assert.equal((await text(page, '#home-profile .hi-label')).trim(), 'Profile');
@@ -339,4 +340,211 @@ t('langsw_keeps_ranking', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
   assert.equal(await text(page, '#scr-ranking h2'), 'ランキング');
   assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/#ranking');
+});
+
+/* ---------- 今日の難問（Task 7） ---------- */
+// 時計を決まった時刻にする（daily.test.mjs の at と同じ）
+const at = iso => `{ const off = Date.parse('${iso}') - Date.now(), D = Date;
+  globalThis.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + off])); } static now() { return D.now() + off; } }; }`;
+const dToday = page => page.evaluate(() => DAILY.today());
+const dRec = page => stored(page, 'daily');
+const dlRows = async (page, n) => {
+  await page.waitForFunction(n => document.querySelectorAll('#dl-list li').length === n && $('dl-list').getAttribute('aria-busy') === 'false', n);
+  return page.locator('#dl-list li').allInnerTexts();
+};
+const startDailyEn = async page => { await page.click('#home-daily'); await page.click('#dl-start'); await page.locator('#scr-quiz').waitFor(); await page.waitForFunction(() => G?.cur); };
+
+// ホーム → 説明 → 3問正解・1問まちがい → 結果・答えの一覧（英語の国名）・自動で載る → ホームは Done
+t('en_daily_play', async (page, { db }) => {
+  await openWithProfile(page, db, { name: 'Chiko' });
+  await mapLoaded(page);
+  const day = await dToday(page);
+  const md = day.split('-').slice(1).map(Number).join('/');
+  assert.match(await text(page, '#home-daily .hb-note'), new RegExp(`^${md}\\s*NEW$`));
+  await page.click('#home-daily');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  assert.equal((await text(page, '#scr-daily h2')).trim(), 'Daily Puzzle');
+  assert.equal(await text(page, '#dl-date'), await page.evaluate(d => I18N.dayLabel(d), day));
+  assert.match(await text(page, '#dl-date'), /^[A-Z][a-z]{2} \d{1,2}$/);
+  assert.match(await text(page, '#dl-main .dl-lead'), /^A new set of 20 questions every day at midnight Japan time.*\. You can play only once a day\.$/);
+  assert.equal(await text(page, '#dl-start'), 'Take the challenge');
+  assert.deepEqual(await page.locator('#dl-tabs button').allInnerTexts(), ['Today', 'Yesterday']);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#dl-start');
+  await page.locator('#scr-quiz').waitFor();
+  await page.waitForFunction(() => G?.cur);
+  for (let i = 0; i < 3; i++) await answerCorrect(page);
+  await answerWrong(page);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#next');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  assert.equal(await text(page, '#dl-main .qlabel'), 'Game over!');
+  assert.match(await text(page, '#dl-main .score'), /^3\s*\/ 20 correct$/);
+  assert.match(await text(page, '#dl-main'), /Time \S+/);
+  assert.match(await text(page, '#dl-next'), /^Next puzzle in \d+h \d+m$/);
+  // 答えの一覧: とどいた4問、国名は英語
+  const qs = await page.evaluate(d => DAILY.questions(d).slice(0, 4).map(q => byA.get(q.a).e), day);
+  assert.deepEqual(await page.locator('#dl-main .dl-qs li b').allInnerTexts(), qs);
+  assert.equal(await page.locator('#dl-main .dl-ans summary').innerText(), 'Today’s questions and answers');
+  assert.match(await text(page, '#dl-main .dl-ans .hint'), /^You can see the rest tomorrow on the “Yesterday” tab\.$/);
+  for (const m of await page.locator('#dl-main .dl-qs .dl-mode').allInnerTexts()) assert.match(m, /^(Flag|Name|Location) → (Flag|Name|Location) ★{1,3}$/);
+  // 自動で載る
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.equal(await text(page, '#dl-post .tamsg'), 'Posted as Chiko! #1 today');
+  assert.equal(db.dailyRows.length, 1);
+  assert.deepEqual([db.dailyRows[0].day, db.dailyRows[0].nickname, db.dailyRows[0].correct], [day, 'Chiko', 3]);
+  assert.match((await dlRows(page, 1))[0], /^1\s+Chiko\s+3 correct\s+\S+$/);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal(await noHScroll(page), true);
+  // 開き直すと「載せたとき」の順位と、載せた名前（data-ugc）
+  await page.click('#brand');
+  assert.match(await text(page, '#home-daily .hb-note'), new RegExp(`^${md}\\s*Done$`));
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-rank'), '#1 today (when posted)');
+  assert.equal(await text(page, '#dl-main .tamsg.ok'), 'Posted as Chiko!');
+  assert.equal(await page.locator('#dl-main .tamsg.ok [data-ugc]').innerText(), 'Chiko');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// その人の時間を添える: ニューヨークでは 0時（日本時間）= 11:00 AM（2026-10-30 は夏時間）、0時30分 = 11:30 AM
+t('en_daily_local_time', async page => {
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-main .dl-lead'),
+    'A new set of 20 questions every day at midnight Japan time (11:00 AM your time). You can play only once a day.');
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York', init: at('2026-10-30T03:00:00Z') });
+
+t('en_daily_local_time_yesterday', async page => {
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-main .dl-result > .hint:first-child'),
+    'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time (11:30 AM your time)');
+  assert.equal(await text(page, '#dl-main .dl-ans summary'), 'Yesterday’s questions and answers');
+  assert.equal(await text(page, '#dl-start'), 'Play today’s puzzle');
+  await page.locator('#dl-rank', { hasText: 'Would rank' }).waitFor();
+  assert.equal(await text(page, '#dl-rank'), 'Would rank #1 yesterday');
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York', init: at('2026-10-29T15:10:00Z'),
+  storage: { badges: QUIET_BADGES, daily: { day: '2026-10-29', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
+
+// 東京では添えない（ほかの文は同じ）
+t('en_daily_local_time_tokyo', async page => {
+  await page.click('#home-daily');
+  const lead = await text(page, '#dl-main .dl-lead');
+  assert.equal(lead, 'A new set of 20 questions every day at midnight Japan time. You can play only once a day.');
+  assert.doesNotMatch(lead, /your time/);
+}, { timezoneId: 'Asia/Tokyo', init: at('2026-10-30T03:00:00Z') });
+
+t('en_daily_local_time_tokyo_yesterday', async page => {
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-main .dl-result > .hint:first-child'), 'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time');
+}, { timezoneId: 'Asia/Tokyo', init: at('2026-10-29T15:10:00Z'),
+  storage: { badges: QUIET_BADGES, daily: { day: '2026-10-29', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
+
+// ほかの人の日本語の名前はそのまま（data-ugc）。全問正解は Perfect、ほかは {n} correct。昨日のタブの問題と答えは英語
+t('en_daily_board', async (page, { db }) => {
+  await page.waitForFunction(() => window.PROFILE);
+  const day = await dToday(page), yday = await page.evaluate(d => DAILY_CORE.addDays(d, -1), day);
+  const at = new Date().toISOString();
+  db.profiles.push({ id: 1, pid: 'otherpid0001', token: 'other', nickname: 'チコ', title: '旅人' });
+  db.dailyRows.push({ day, profile_id: 1, nickname: 'チコ', correct: 20, total: 20, time_ms: 83400, created_at: at },
+    { day, nickname: 'たろう', correct: 7, total: 20, time_ms: 30000, created_at: at },
+    { day: yday, nickname: 'はなこ', correct: 1, total: 20, time_ms: 5000, created_at: at });
+  await page.click('#home-daily');
+  const r = await dlRows(page, 2);
+  assert.match(r[0], /^1\s+チコ\s+Perfect\s+1:23\.40$/);
+  assert.match(r[1], /^2\s+たろう\s+7 correct\s+30\.00s$/);
+  for (const n of ['チコ', 'たろう']) assert.equal(await page.locator('#dl-list .nick [data-ugc]', { hasText: n }).count(), 1, n);
+  assert.doesNotMatch(await text(page, '#dl-list'), /旅人/);
+  assert.equal(await text(page, '#dl-tabs + .hint'),
+    'Top 50 players. Perfect runs rank first by time, then everyone else by most correct answers (faster time breaks ties).');
+  assert.deepEqual(await jaLeft(page), []);
+  // 昨日
+  await page.click('#dl-tabs [data-t="yday"]');
+  assert.match((await dlRows(page, 1))[0], /^1\s+はなこ\s+1 correct\s+5\.00s$/);
+  const want = await page.evaluate(d => I18N.dayLabel(d), yday);
+  assert.equal(await text(page, '#dl-answers summary'), `Yesterday’s (${want}) questions and answers`);
+  await page.click('#dl-answers summary');
+  const names = await page.evaluate(d => DAILY.questions(d).map(q => byA.get(q.a).e), yday);
+  assert.deepEqual(await page.locator('#dl-answers .dl-qs li b').allInnerTexts(), names);
+  assert.deepEqual(await jaLeft(page), []);
+  // 空の日
+  db.dailyRows.length = 0;
+  await page.click('#dl-tabs [data-t="today"]');
+  await page.locator('#dl-empty:not([hidden])').waitFor();
+  assert.equal(await text(page, '#dl-empty'), 'No one here yet. Grab the top spot!');
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York' });
+
+// profile.js が無いときの表の名前も data-ugc
+t('en_daily_board_no_profile', async (page, { db }) => {
+  const day = await dToday(page);
+  db.dailyRows.push({ day, nickname: 'たろう', correct: 7, total: 20, time_ms: 30000, created_at: new Date().toISOString() });
+  await page.click('#home-daily');
+  await dlRows(page, 1);
+  assert.equal(await page.locator('#dl-list .nick [data-ugc]', { hasText: 'たろう' }).count(), 1);
+  assert.deepEqual(await jaLeft(page), []);
+}, { blockScripts: ['profile.js'] });
+
+// 英語で挑戦した結果が、同じ端末の日本語版の今日の難問に「挑戦ずみ」で出る。日本語版からは挑戦できない
+t('en_daily_shared', async page => {
+  await startDailyEn(page);
+  await answerCorrect(page);
+  await answerWrong(page);
+  await page.click('#next');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  const r = await dRec(page);
+  assert.deepEqual([r.status, r.correct, r.outcome], ['done', 1, 'fail']);
+  await page.goto(new URL('./', server.url).href);
+  await mapLoaded(page);
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.match(await text(page, '#home-daily .hb-note'), /挑戦ずみ/);
+  await page.click('#home-daily');
+  assert.equal(await page.locator('#dl-start').count(), 0);
+  assert.match(await text(page, '#dl-main'), /ここまで！/);
+  assert.match(await text(page, '#dl-main'), /1\s*\/ 20 問正解/);
+  assert.deepEqual(await dRec(page), r);
+}, { timezoneId: 'America/New_York' });
+
+// ［Share result］の文（share-card.js が読めないとき・画像を作り終わる前とも、文は同じ）
+const stubShareEn = `{ Object.defineProperty(navigator, 'share', { configurable: true, value: o => { window.__shared = o; return Promise.resolve(); } });
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => false }); window.open = () => null; }`;
+// 画像を作り終わらないようにする（文と URL のシェアになる）
+const holdBlobEn = `{ HTMLCanvasElement.prototype.toBlob = function () {}; }`;
+const DONE10 = { day: '2026-10-30', sid: 'x', status: 'done', outcome: 'fail', correct: 12, timeMs: 83400, sent: null };
+for (const [name, extra] of [['en_daily_share_text', { hold: holdBlobEn }], ['en_daily_share_text_no_card', { blockScripts: ['share-card.js'] }]]) t(name, async page => {
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-share'), 'Share result');
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await page.evaluate(() => __shared);
+  assert.equal(s.text, 'Flag Master Daily Puzzle 10/30\n' + '🟩'.repeat(12) + '🟥' + '⬜'.repeat(7) + '\n12 / 20 correct\n#FlagMaster');
+  assert.doesNotMatch(s.text, JA);
+  const names = await page.evaluate(() => DAILY.questions('2026-10-30').flatMap(q => { const c = byA.get(q.a); return [c.n, c.e]; }));
+  for (const n of names) assert.ok(!s.text.includes(n), n);
+  assert.match(s.url, /\/en\/$/);
+}, { init: at('2026-10-30T03:00:00Z') + stubShareEn + (extra.hold ?? ''), storage: { badges: QUIET_BADGES, daily: DONE10 }, blockScripts: extra.blockScripts });
+
+// 全問正解の文
+t('en_daily_share_text_clear', async page => {
+  await page.click('#home-daily');
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  assert.equal(await page.evaluate(() => __shared.text), 'Flag Master Daily Puzzle 10/30\n' + '🟩'.repeat(20) + '\nPerfect! 1:23.40\n#FlagMaster');
+}, { init: at('2026-10-30T03:00:00Z') + stubShareEn + holdBlobEn, storage: { badges: QUIET_BADGES, daily: { ...DONE10, correct: 20, outcome: 'clear' } } });
+
+// 英語版の今日の難問で「日本語」→ 日本語版の今日の難問。日本語版の切りかえは en/#daily
+t('langsw_keeps_daily', async page => {
+  await page.click('#home-daily');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), './#daily');
+  await page.click('#topbar .langsw a');
+  await page.waitForURL(u => new URL(u).pathname === '/' && new URL(u).hash === '#daily');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.equal(await text(page, '#scr-daily h2'), '今日の難問');
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/#daily');
+  await page.click('#topbar .langsw a');
+  await page.waitForURL(u => new URL(u).pathname === '/en/' && new URL(u).hash === '#daily');
+  await page.locator('#scr-daily:not([hidden])').waitFor();
+  assert.equal(await text(page, '#scr-daily h2'), 'Daily Puzzle');
 });
