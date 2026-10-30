@@ -63,6 +63,7 @@ const similarAdd = code => dir => edit(dir, 'daily-core.js', s => s.replace("'qa
 const triviaEmpty = a => dir => setTrivia(dir, a, []);
 const rmFlag = a => dir => rmSync(join(dir, 'flags', `${a}.svg`));
 const noFooterMarks = dir => edit(dir, 'index.html', s => s.replace('<!-- footer:start -->', ''));
+const noThemes = dir => rmSync(join(dir, 'themes'), { recursive: true, force: true });
 
 test('regenerate_same', () => {            // 作り直すと同じ（コミット済みと1文字もちがわない）
   const out = render(readInputs(ROOT));
@@ -172,7 +173,8 @@ test('sitemap_markers', () => {
 
 test('cli_stops_on_bad_input', () => {      // 一時の root に入力を写し、1つずつこわす。終了コード1・stderr・何も書かない
   for (const [break_, re] of [[similarAdd('zz'), /SIMILAR に知らないコード: zz/], [triviaEmpty('fr'), /豆知識が0件: fr/],
-                              [rmFlag('fr'), /flags\/fr\.svg が無い/], [noFooterMarks, /フッターの目印が無い/]])
+                              [rmFlag('fr'), /flags\/fr\.svg が無い/], [noFooterMarks, /フッターの目印が無い/],
+                              [noThemes, /themes\/index\.html が無い/]])
     withTmp(dir => {
       copyInputs(dir); break_(dir);
       const r = spawnSync('node', ['tools/make_country_pages.mjs', '--root', dir, '--out', dir], { cwd: ROOT, encoding: 'utf8' });
@@ -275,7 +277,9 @@ test('country_page_meaning', () => {
   const order = ['class="cflag"', 'class="cfacts"', '<h2>国旗の意味</h2>', '<h2>豆知識</h2>', '<h2>となりの国</h2>', '<h2>似ている国旗</h2>',
     '<h2>この国旗が出てくるまとめ</h2>', 'class="cplay"', 'class="prevnext"', '<footer>'].map(at);
   assert.deepEqual(order, [...order].sort((x, y) => x - y));
-  assert.ok(!fr.includes('note'));
+  // note（出典のメモ）は出さない
+  const frNote = JSON.parse(read('data/flag_meanings.json')).find(m => m.a === 'fr').note;
+  assert.ok(frNote.length > 0 && !fr.includes(frNote) && !fr.includes(frNote.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')));
 });
 
 test('country_page_neighbors', () => {

@@ -63,7 +63,7 @@ export function readInputs(root) {
   // 国旗の意味: コード → 文（note は出さない）
   const MEANINGS = Object.fromEntries(JSON.parse(read('data/flag_meanings.json')).map(m => [m.a, m.t]));
   // まとめ: 作ってあるまとめページ（themes/<id>.html）を、入口 themes/index.html のカードの順（THEME_IDS の順）に読む →
-  // [{ id, n: h1 の題, a: ページにリンクがある国 }]。まとめページがまだ無い（初めて作る）ときは空
+  // [{ id, n: h1 の題, a: ページにリンクがある国 }]。まとめページがまだ無いときは空（tools/make_theme_pages.mjs もこれを読むので投げない。check が止める）
   const themesDir = join(root, 'themes'), unesc = t => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
   const THEME_PAGES = existsSync(join(themesDir, 'index.html'))
     ? [...read('themes/index.html').matchAll(/<a class="ccard" href="([\w-]+)\.html">/g)].map(([, id]) => {
@@ -106,6 +106,7 @@ export function check(inp) {
     else if (descHead(c, inp.MEANINGS[c.a]).length > DESC_MAX) out.push(`国旗の意味の最初の文が長すぎる: ${c.a}`);
   }
   if (inp.footer == null) out.push('フッターの目印が無い');
+  if (!inp.THEME_PAGES.length) out.push('themes/index.html が無い（先に node tools/make_theme_pages.mjs を動かす）');
   if (!inp.sitemap.includes(MARK_START) || !inp.sitemap.includes(MARK_END)) out.push('sitemap.xml の目印が無い');
   // となりの国の直し: 知らないコード・地図と同じになる直し（add が地図にある、remove が地図に無い）
   const pairs = mapPairs(inp);
