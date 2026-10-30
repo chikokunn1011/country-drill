@@ -244,13 +244,15 @@ t('en_misses_shared', async (page, app) => {
   assert.equal((await ja.innerText('#set-record')).trim(), 'まちがえた記録: 1か国');
 });
 
-// まとめページの［このテーマでクイズ］（en/#theme=stars）。テーマの題は Task 12 で英語に（ここでは欄が出て、練習になることだけ）
+// まとめページの［このテーマでクイズ］（en/#theme=stars）。テーマの題は themes.js の英語の題 e
 t('en_theme_hash', async page => {
   await page.waitForSelector('#scr-setup:not([hidden])');
   assert.ok(await page.isVisible('#theme-field'));
   assert.equal(await page.getAttribute('#kinds [data-k="practice"]', 'aria-pressed'), 'true');
   assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
-  assert.match((await page.textContent('#theme-name')).trim(), /^Collection: .+ \(\d+ countries\)$/);
+  const n = await page.evaluate(() => window.THEMES_DATA.stars.a.length);
+  assert.equal(n, 70);
+  assert.equal((await page.textContent('#theme-name')).trim(), `Collection: Flags with stars (${n} countries)`);
 }, { path: 'en/#theme=stars', storage: { badges: QUIET_BADGES, setup: { mode: 'f2n', kind: 'ta', count: 10 } } });
 
 // ---- 結果画面（Task 7） ----

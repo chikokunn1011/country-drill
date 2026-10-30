@@ -122,43 +122,60 @@ const playRegion = (inp, c) => Object.entries(inp.SUBREGIONS).find(([, o]) => o.
 const playHref = r => `../index.html#play=${encodeURIComponent(r)}`;
 // 似ている国（SIMILAR のグループの順、自分を除く。2つのグループに入っていても1回だけ）
 const similarOf = (inp, byA, a) => [...new Set(inp.SIMILAR.filter(g => g.includes(a)).flat())].filter(b => b !== a).map(b => byA.get(b));
-const flagSrc = (inp, a) => `../flags/${a}.svg?v=${inp.FLAG_V}`;
-export const flagImg = (inp, a, alt, lazy) => `<img src="${flagSrc(inp, a)}" alt="${esc(alt)}" width="640" height="480"${lazy ? ' loading="lazy"' : ''}>`;
-// フッター: 相対 href の頭に ../ を付ける（http・# で始まるものはそのまま）
-export const footerHTML = inp => `<footer>
+const flagSrc = (inp, a, up = '../') => `${up}flags/${a}.svg?v=${inp.FLAG_V}`;
+// up: ページからサイトの根への相対（en/ の下のページは ../../）
+export const flagImg = (inp, a, alt, lazy, up = '../') => `<img src="${flagSrc(inp, a, up)}" alt="${esc(alt)}" width="640" height="480"${lazy ? ' loading="lazy"' : ''}>`;
+// フッター: 相対 href の頭に up を付ける（http・# で始まるものはそのまま）。英語のページは en/index.html のフッター（根からの相対）と ../../
+export const footerHTML = (inp, footer = inp.footer, up = '../') => `<footer>
   <!-- footer:start -->
-  ${inp.footer.replace(/href="(?!https?:|#)([^"]*)"/g, 'href="../$1"')}
+  ${footer.replace(/href="(?!https?:|#)([^"]*)"/g, `href="${up}$1"`)}
   <!-- footer:end -->
 </footer>`;
 
-// css: 国のページは country.css。まとめページ（tools/make_theme_pages.mjs）はほかの css も渡す
-export function head(inp, { title, description, url, crumbs, css = ['country.css?v=2'] }) {
+// ページの URL からサイトの根への相対（themes/x.html → ../、en/themes/x.html → ../../）
+const upOf = url => '../'.repeat(url.slice(SITE.length).split('/').length - 1);
+// 言語の切りかえ（本文の最初の <a class="back"> の行に置く）。alt は相手の言語のページの URL。見た目は pages.css の .langsw
+export const langsw = (lang, url, alt) => {
+  const href = upOf(url) + alt.slice(SITE.length);
+  return lang === 'en'
+    ? `<span class="langsw"><a href="${href}" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>`
+    : `<span class="langsw"><b>日本語</b> / <a href="${href}" hreflang="en" lang="en">English</a></span>`;
+};
+
+// css: 国のページは country.css。まとめページ（tools/make_theme_pages.mjs）はほかの css も渡す。
+// lang: 'ja'（既定）か 'en'。alt: 相手の言語のページの URL（あれば hreflang を3行。x-default は日本語のページ）
+export function head(inp, { title, description, url, crumbs, css = ['country.css?v=2'], lang = 'ja', alt = null }) {
   const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: crumbs.map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })) };
+  const en = lang === 'en', up = upOf(url), ja = en ? alt : url;
+  const hreflang = alt ? `
+<link rel="alternate" hreflang="ja" href="${ja}">
+<link rel="alternate" hreflang="en" href="${en ? url : alt}">
+<link rel="alternate" hreflang="x-default" href="${ja}">` : '';
   return `<!doctype html>
-<html lang="ja">
+<html lang="${en ? 'en' : 'ja'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}">
-<link rel="canonical" href="${url}">
+<link rel="canonical" href="${url}">${hreflang}
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="国旗マスター">
+<meta property="og:site_name" content="${en ? 'Flag Master' : '国旗マスター'}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${url}">
 <meta property="og:image" content="${OGP}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:locale" content="ja_JP">
+<meta property="og:locale" content="${en ? 'en_US' : 'ja_JP'}">
 <meta name="twitter:card" content="summary_large_image">
 <script type="application/ld+json">
 ${JSON.stringify(ld).replace(/</g, '\\u003c')}
 </script>
-<link rel="icon" href="../favicon.ico" sizes="32x32">
-<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<link rel="icon" href="${up}favicon.ico" sizes="32x32">
+<link rel="icon" href="${up}icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="${up}icons/apple-touch-icon.png">
 <meta name="theme-color" content="#1f5f8b">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -167,7 +184,7 @@ ${inp.fontLink}
 // 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
 ${inp.themeScript}
 </script>
-<link rel="stylesheet" href="../pages.css?v=${inp.PAGES_V}">
+<link rel="stylesheet" href="${up}pages.css?v=${inp.PAGES_V}">
 ${css.map(h => `<link rel="stylesheet" href="${h}">`).join('\n')}
 </head>
 `;

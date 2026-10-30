@@ -50,3 +50,9 @@ th { background: var(--surface); }
 footer { font-size: .75rem; color: var(--muted); text-align: center; max-width: 720px; margin: 40px auto 0; }
 .foot-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 14px; margin-top: 4px; }
 .foot-links a { color: var(--muted); padding: 4px 2px; }
+
+/* 言語の切りかえ（index.html の .langsw と同じ見た目）。<a class="back"> の行の右に置く */
+.langsw { float: right; font-size: .78rem; line-height: 1.3; color: var(--muted); white-space: nowrap; padding: 10px 0 6px; }
+.langsw b { color: var(--ink); }
+.langsw a { display: inline-block; padding: 6px 2px; margin-block: -6px; color: var(--accent); font-weight: 700; text-decoration: none; }
+.langsw a:hover { text-decoration: underline; }
