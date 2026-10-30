@@ -150,7 +150,7 @@ test('ja_rpg_unchanged', { timeout: 300_000 }, async t => {
 });
 
 /* ---------- 英語の冒険（Task 5: 冒険ホーム・入口・コインの表示。I18N.hide から 'rpg' を外す） ---------- */
-// rpg-rank は Task 9 まで英語のページで読まない（EN_SKIP）。rpg-team は Task 7、rpg-battle は Task 8 から読む。
+// 冒険の rpg-*.js は全部英語のページでも読む（EN_SKIP は空。rpg-cards は Task 6、rpg-team は Task 7、rpg-battle は Task 8、rpg-rank は Task 9 から）。
 // 塔の札（バトルの画面が要る）は Task 8 の en_tower で見る。かざりの窓（RPG.cardHTML が要る）は Task 6 から en_profile_decorations で見る（preflight C2）
 const EN_OPTS = { path: 'en/', locale: 'en-US', seed: 1, storage: { badges: QUIET_BADGES } };
 // 英語版を開いて fn(page, app) を呼び、最後にページの例外・[i18n] の warn（辞書に無いキー）・[rpg] の console.error が無いかも見る
@@ -799,13 +799,15 @@ te('en_battle_win', async page => {
   assert.equal((await txt(page, '#bt-flee')).trim(), '← Run');
   assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Amazon Jungle · F1');
   assert.match(await txt(page, '#bt-intro'), /Correct answers to win: about \d+ · Mistakes allowed: up to \d+/);
-  assert.match(await txt(page, '#bt-intro'), /A correct answer attacks! A wrong answer brings a counterattack\./);
+  assert.match(await txt(page, '#bt-intro'), /Answer correctly to attack! A wrong answer brings a counterattack\./);
   // 編成の行: 既定の名前は Team 1（data-ugc にしない）・チームボーナス
   assert.equal((await txt(page, '#bt-tname')).trim(), 'Team 1');
   assert.equal(await page.locator('#bt-tname [data-ugc]').count(), 0);
   assert.equal((await page.locator('.rpg-bteam-b').textContent()).trim(), 'Team bonus: South America×2 +10%');
   assert.equal((await txt(page, '#bt-team')).trim(), 'Edit team');
-  assert.equal(await page.getAttribute('#bt-ehp', 'aria-label').then(s => /’s HP$/.test(s)), true);
+  const mon = await page.evaluate(() => RPG.monName(RPG_CORE.MONSTERS.samerica[0]));
+  assert.equal(await page.getAttribute('#bt-ehp', 'aria-label'), `${mon}’s HP`);
+  assert.equal((await txt(page, '#scr-battle .rpg-hpname')).trim(), mon);
   assert.equal(await page.getAttribute('#bt-hhp', 'aria-label'), 'Traveler’s HP');
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#bt-fight');
@@ -849,7 +851,7 @@ te('en_battle_lose', async page => {
     await page.click('#bt-next');
     await page.waitForFunction(() => ['question', 'end'].includes(RPG_BATTLE.state().phase));
   }
-  assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'Defeated…! But you’ve learned the countries you missed.');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'Defeated…! But now you should know the countries you missed.');
   const end = await txt(page, '#bt-end');
   assert.match(end, /Effort prize \+\d+/);
   assert.match(end, /Effort gauge 1\/\d+/);
@@ -872,7 +874,7 @@ te('en_battle_flee', async page => {
   let msg = '';
   page.once('dialog', d => { msg = d.message(); d.dismiss(); });
   await page.click('#bt-flee');
-  assert.equal(msg, 'Run? (You won’t get a reward)');
+  assert.equal(msg, 'Run? (You won’t get a reward.)');
   assert.equal((await bstate(page)).phase, 'question');
 });
 
@@ -914,7 +916,7 @@ te('en_boss_share', async page => {
   await startBattle(page, 'world', 5);
   assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Map Eater’s Lair · Boss');
   await winBattle(page);
-  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'World: won back!');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'Welcome back, World!');
   assert.equal((await txt(page, '#bt-share')).trim(), 'Share');
   assert.deepEqual(await jaLeft(page), []);
   let s = await shareText();
@@ -924,7 +926,7 @@ te('en_boss_share', async page => {
   await startBattle(page, 'moon', 5);
   assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Moon · Boss');
   await winBattle(page);
-  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'Moon: won back!');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'Welcome back, Moon!');
   s = await shareText();
   assert.match(s.text, /^I defeated the Great Moon Rabbit King in Flag Quest! Allies: \d+\/195 countries #FlagMaster$/);
   assert.doesNotMatch(s.text, JA_TEXT);
@@ -947,7 +949,7 @@ te('en_tower', async page => {
   await page.click('#rpg-tower-go');
   await shown(page, '#bt-fight');
   assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Tower of Heroes · Floor 1');
-  assert.match(await txt(page, '#bt-intro'), /Your HP carries over to the next floor \(you recover \d+% on each new floor, and fully recover when you defeat the mini-boss every \d+ floors\)/);
+  assert.match(await txt(page, '#bt-intro'), /Your HP carries over to the next floor \(\+\d+% HP on each new floor, full HP when you defeat the mini-boss every \d+ floors\)/);
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#bt-fight');
   await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
@@ -956,7 +958,7 @@ te('en_tower', async page => {
   assert.match((await txt(page, '#bt-tclear .rpg-bend-x')).trim(), /^First win on this floor \+\d+$/);
   assert.match(await txt(page, '#bt-tclear'), /HP [\d,]+\/[\d,]+ \(\d+% recovered\)/);
   assert.equal((await txt(page, '#bt-tquit')).trim(), 'Quit');
-  assert.equal((await txt(page, '#bt-tnext')).trim(), 'Next floor (floor 2)');
+  assert.equal((await txt(page, '#bt-tnext')).trim(), 'Go to floor 2');
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#bt-tquit');
   await shown(page, '#bt-end');
@@ -967,7 +969,7 @@ te('en_tower', async page => {
   assert.deepEqual(await jaLeft(page), []);
   // 10階の中ボス
   assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
-  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Tower of Heroes · Floor 10 · mini-boss');
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Tower of Heroes · Floor 10 · Mini-boss');
   assert.match(await txt(page, '#bt-intro'), /Each correct answer wins back one flag/);
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#bt-fight');
@@ -975,7 +977,7 @@ te('en_tower', async page => {
   let msg = '';
   page.once('dialog', d => { msg = d.message(); d.dismiss(); });
   await page.click('#bt-flee');
-  assert.equal(msg, 'Run? (No reward for this floor. Your Tower of Heroes run ends here.)');
+  assert.equal(msg, 'Run? (No reward for this floor. Your Tower of Heroes climb ends here.)');
   // HP 1 で1階 → まちがえて負け
   assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(1, 1)), true);
   await page.click('#bt-fight');
@@ -1092,6 +1094,30 @@ test('ja_battle_lines', { timeout: 120_000 }, async () => {
     await page.click('#bt-next');
     await shown(page, '#bt-end');
     assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), '英雄の塔 1階でたおれた');
+    // 塔の会う画面の HP の文・中ボスをたおした HP の文・やめた終わり（おつかれさま）
+    await writeSave(page, saveWith({ lv: 99, floors: { world: 5 }, story: ['ch1'], tower: { best: 12 } }));
+    assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
+    assert.match(await txt(page, '#bt-intro'), /HP はつぎの階に持ちこし（階を上がると\d+%回復、\d+階ごとの中ボスをたおすと全回復）/);
+    await page.click('#bt-fight');
+    await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+    await winTowerFloor(page);
+    assert.match(await txt(page, '#bt-tclear'), /HP [\d,]+\/[\d,]+（中ボスをたおして全回復！）/);
+    assert.equal((await txt(page, '#bt-tnext')).trim(), 'つぎの階へ（11階）');
+    await page.click('#bt-tquit');
+    await shown(page, '#bt-end');
+    assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'おつかれさま！');
+    assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), '英雄の塔 10階まで（自己ベスト 12階）');
+    // 仲間ありの通常のフロアのダメージの文（援護つき。会心と、会心でないもの）
+    await writeSave(page, saveWith({ lv: 1, cards: { br: [1, 0], ar: [1, 0] }, teams: [{ n: '編成1', c: ['br', 'ar'] }] }));
+    await startBattle(page, 'samerica', 1);
+    [n, log] = await rightWith(0);
+    assert.match(log, new RegExp(`^会心！ ${n}！ おしゃべりオウムに\\d+ダメージ（ブラジル・アルゼンチンの援護）$`));
+    [n, log] = await rightWith(0.99);
+    assert.match(log, new RegExp(`^${n}！ おしゃべりオウムに\\d+ダメージ（ブラジル・アルゼンチンの援護）$`));
+    // 始めていない画面
+    await page.evaluate(() => { RPG.opts = {}; show('rpg'); show('battle'); });
+    assert.equal((await txt(page, '#scr-battle .hint')).trim(), 'バトルは冒険ホームのダンジョンから始めてね');
+    assert.equal((await txt(page, '#bt-home')).trim(), '冒険ホームへ');
     assert.deepEqual(app.errors.map(String), []);
   } finally { await app.close(); }
 });
