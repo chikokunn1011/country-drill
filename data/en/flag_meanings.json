@@ -1,0 +1,782 @@
+[
+{
+"a": "af",
+"t": "In the black, red, and green tricolor, black is said to stand for a troubled past, red for the blood shed for independence, and green for hope and prosperity. The emblem in the center shows a mosque with a mihrab, which marks the direction of prayer."
+},
+{
+"a": "al",
+"t": "The colors have no official meaning. Red is often explained as courage or shed blood, and the black double-headed eagle as a link to \"Shqipëria\" (land of the eagles), the name Albanians use for their own country."
+},
+{
+"a": "dz",
+"t": "Green is said to stand for hope and Islam, and white for purity and peace. The red crescent and star are symbols of Islam, and the red is also explained as the blood shed in the war of independence."
+},
+{
+"a": "ad",
+"t": "Blue and red are said to be colors linked to France, and yellow and red to Spain (Catalonia), reflecting a history of two joint heads of state. The emblem in the center shows the miter and staff of the Bishop of Urgell, the stripes of Foix and Catalonia, and the cows of Béarn."
+},
+{
+"a": "ao",
+"t": "The constitution states that red stands for the blood shed under colonial rule and in the fight for independence, and black for the African continent. The yellow star stands for international solidarity and progress."
+},
+{
+"a": "ag",
+"t": "Red stands for the energy of the people, black for their African roots, and blue for hope. The overall V shape is said to stand for \"Victory.\""
+},
+{
+"a": "ar",
+"t": "The light blue and white go back to the flag raised in 1812 by Belgrano, a leader of the independence movement. They are widely explained as the colors of the sky and clouds, but there are several theories about where the colors came from."
+},
+{
+"a": "am",
+"t": "Armenia's flag law states that red stands for the Armenian Highlands and the struggle for survival, faith, and freedom. Blue stands for the wish to live under a peaceful sky."
+},
+{
+"a": "au",
+"t": "The Union Jack in the upper left stands for historical ties with Britain. The five stars on the right stand for the Southern Cross, shining in the Australian sky."
+},
+{
+"a": "at",
+"t": "The colors have no official meaning. The red-white-red pattern is said to go back to the coat of arms of the House of Babenberg in the 13th century, and it is considered one of the oldest national flag colors still in use."
+},
+{
+"a": "az",
+"t": "The white crescent and eight-pointed star in the center are said to stand for Islam and Turkic heritage. There are several explanations for the star's eight points, such as the eight Turkic peoples, and none of them is official."
+},
+{
+"a": "bs",
+"t": "The gold stripe in the center is said to stand for the bright rays of the sun and for the islands' sandy beaches and land resources. The flag was adopted at independence in 1973."
+},
+{
+"a": "bh",
+"t": "Red is a color long used by the countries of the Gulf. White is said to have been added as a sign of peace under treaties made with Britain in the 19th century."
+},
+{
+"a": "bd",
+"t": "Green is said to stand for the lush green land and youth, and the red disc for the sun rising over Bengal and the blood shed in the 1971 war of independence."
+},
+{
+"a": "bb",
+"t": "The blue bands on the left and right stand for the sea and sky, and the gold in the center for the island's sandy beaches. The trident belongs to Neptune, god of the sea, and is said to come from the colonial-era coat of arms."
+},
+{
+"a": "by",
+"t": "Red is often explained as the battles fought to defend the homeland and victory, and green as rich forests, fields, and hope. The pattern near the flagpole is based on the embroidery of the rushnyk, a traditional cloth."
+},
+{
+"a": "be",
+"t": "The colors have no official meaning. The layout of three vertical bands is said to have followed the French flag around the time of independence in 1830."
+},
+{
+"a": "bz",
+"t": "Blue is said to be the color of the party that led the country to independence, and the red stripes at the top and bottom the color of the opposition party. Together they are explained as cooperation between the two parties. The large mahogany tree in the coat of arms stands for the logging industry that supported the country."
+},
+{
+"a": "bj",
+"t": "Green is said to stand for hope, red for the courage of the ancestors, and yellow for the country's wealth. Adopted in 1959, it was replaced by another flag for a time but brought back in 1990."
+},
+{
+"a": "bt",
+"t": "Yellow stands for the king's secular authority, and orange for Buddhist teachings. The white dragon stands for the country's name, \"Druk Yul\" (Land of the Dragon); its white color for loyalty and purity; and the jewels in its claws for the nation's wealth."
+},
+{
+"a": "bo",
+"t": "Red is said to stand for the blood of the heroes who died for independence, and green for rich nature and hope. The current colors were set in 1851."
+},
+{
+"a": "ba",
+"t": "The three corners of the yellow triangle are also said to stand for the three peoples that make up the country. The white stars on blue are colors that suggest Europe, and the cut-off stars at the top and bottom are said to show that they go on without end."
+},
+{
+"a": "bw",
+"t": "The black and white stripes in the center stand for racial harmony, with many different people living together peacefully. This black-and-white pairing is also said to come from the zebra, the national animal."
+},
+{
+"a": "br",
+"t": "Green and yellow are said to have first been the colors of Emperor Pedro I's House of Braganza and the Empress's House of Habsburg. Today they are often explained as forests and resources such as gold. The motto on the band reads \"Order and Progress.\""
+},
+{
+"a": "bn",
+"t": "The white and black diagonal stripes are said to stand for the two ministers who support the sultan. In the national emblem in the center, the crescent stands for Islam, the umbrella for royal power, and the hands on both sides for a government that protects the people's well-being."
+},
+{
+"a": "bg",
+"t": "White is said to stand for peace and freedom, and red for the courage and the blood of those who fought for independence. Official meanings for the colors are not set in the constitution or other laws."
+},
+{
+"a": "bf",
+"t": "Red is said to stand for the revolution, and green for farming and abundance. The yellow star is explained as the light that guides the revolution, and the flag was adopted in 1984 when the country changed its name."
+},
+{
+"a": "bi",
+"t": "Red is said to stand for the struggle for independence, green for hope, and white for peace. The three stars stand for the national motto, \"Unity, Work, Progress,\" and are also said to stand for three ethnic groups."
+},
+{
+"a": "cv",
+"t": "Blue stands for the sea and sky around the country. The white, red, and white stripes stand for the road to building the nation, with white said to mean peace and red the effort of the people."
+},
+{
+"a": "kh",
+"t": "Blue is said to stand for the king, red for the people, and white for Buddhism, matching the national motto \"Nation, Religion, King.\""
+},
+{
+"a": "cm",
+"t": "Green is said to stand for the forests of the south, yellow for the savanna and sun of the north, and red for national unity. The star in the center is called the \"star of unity.\""
+},
+{
+"a": "ca",
+"t": "Red and white were made the national colors in 1921. The maple leaf had been used as a symbol of Canada since the 19th century, and it became the current national flag in 1965."
+},
+{
+"a": "cf",
+"t": "Blue, white, and red are the colors of France, and green, yellow, and red are the colors of Africa. The design is said to express a hope for cooperation between the two. The vertical red band is said to stand for the blood shed together, and the yellow star in the upper left for independence."
+},
+{
+"a": "td",
+"t": "Blue is said to stand for the sky and hope, yellow for the sun and the northern desert, and red for progress and sacrifice for the nation. The colors combine the blue and red of the French flag with the Pan-African yellow."
+},
+{
+"a": "cl",
+"t": "The white star is said to be a guiding star that lights the way to progress and honor. The flag is also known as \"La Estrella Solitaria\" (the Lone Star)."
+},
+{
+"a": "cn",
+"t": "Red stands for the revolution, and the yellow stars for light shining over the red land. The large star is said to stand for the leadership of the Communist Party of China, and the four small stars for the people united under it."
+},
+{
+"a": "co",
+"t": "Yellow is often explained as the country's wealth, blue as the two seas on either side of the country, and red as the blood shed for independence. The colors were originally inherited from the flag of Gran Colombia."
+},
+{
+"a": "km",
+"t": "The four stripes and four stars stand for the four islands of the Comoros. The green triangle and white crescent are said to stand for Islam."
+},
+{
+"a": "cg",
+"t": "Green is said to stand for farming and rich forests, and yellow for the friendship and pride of the people. The meaning of red is unclear, but it is sometimes linked to the struggle for independence."
+},
+{
+"a": "cd",
+"t": "Sky blue is said to stand for peace, red for the blood of those who gave their lives for the country, and yellow for the nation's wealth. The yellow star in the upper left is said to stand for the country's bright future."
+},
+{
+"a": "cr",
+"t": "Blue is said to stand for the sky and ideals, white for peace and wisdom, and red for the blood shed for freedom and the warmth of the people. Red is said to have been added in 1848, following the example of the French tricolor."
+},
+{
+"a": "ci",
+"t": "Orange is said to stand for the northern savanna and fertile land, white for peace, and green for the southern forests and hope."
+},
+{
+"a": "hr",
+"t": "Red, white, and blue are the Pan-Slavic colors found on many Slavic countries' flags. The crown above the coat of arms holds five shields: an old Croatian coat of arms, Dubrovnik, Dalmatia, Istria, and Slavonia."
+},
+{
+"a": "cu",
+"t": "The white stripes are said to stand for the purity of the ideals of independence, and the red triangle for the blood shed for independence. The white star stands for freedom and independence."
+},
+{
+"a": "cy",
+"t": "The white background stands for peace, and the color of the island's shape is said to come from its long fame as a source of copper. The design is said to avoid blue and red so that it would not favor either the Greek or the Turkish side."
+},
+{
+"a": "cz",
+"t": "White and red come from the colors of the coat of arms of Bohemia. The blue triangle near the flagpole is said to come from the blue field of the coat of arms of Moravia, and no official meaning has been set for each color."
+},
+{
+"a": "dk",
+"t": "The Dannebrog, a white cross on red, is known for the legend that it fell from the sky in the middle of a battle in 1219. The white cross is said to stand for Christianity, and the flag became the model for the cross flags of the Nordic countries."
+},
+{
+"a": "dj",
+"t": "Light blue stands for the sky and sea, and green for the land, and they are sometimes linked to the country's two main peoples, the Issa and the Afar. White is said to stand for peace, and the red star for unity."
+},
+{
+"a": "dm",
+"t": "Green stands for the rich forests, and the cross for Christianity. In the cross, yellow stands for the soil, black for the people's African roots, and white for clean water; the red disc stands for social justice, and the ten stars for the ten parishes."
+},
+{
+"a": "do",
+"t": "Blue is said to stand for freedom, red for the blood of the heroes who died for independence, and the white cross for faith and the unity of the people. The ribbon on the coat of arms bears the motto \"God, Homeland, Liberty.\""
+},
+{
+"a": "ec",
+"t": "Yellow is said to stand for the rich land and resources, blue for the sky and sea, and red for the blood shed for independence. Like Colombia and Venezuela, it carries on the colors of the flag of Gran Colombia."
+},
+{
+"a": "eg",
+"t": "Red is said to stand for the hard times and struggles before the revolution, and white for the bloodless revolution of 1952. Black is said to stand for the end of colonial rule and oppression."
+},
+{
+"a": "sv",
+"t": "The blue bands at the top and bottom are said to stand for the two oceans on either side of Central America, and white for peace. The ribbon on the coat of arms bears the motto \"God, Union, Liberty.\""
+},
+{
+"a": "gq",
+"t": "Green stands for rich nature and farming, white for peace, and red for the struggle for independence. The blue triangle near the flagpole is said to stand for the sea that links the mainland and the islands."
+},
+{
+"a": "er",
+"t": "Green is said to stand for farming and fertile land, blue for the Red Sea, and the red triangle for the blood shed in the war of independence."
+},
+{
+"a": "ee",
+"t": "These three colors were first raised in 1884 as the flag of a student society. One explanation is that blue stands for loyalty, black for a hard past, and white for the hope of a bright future."
+},
+{
+"a": "sz",
+"t": "Blue is said to stand for peace and stability, yellow for rich resources, and red for past battles. The black and white shield is explained as the will to defend the country and Black and white people living together in harmony."
+},
+{
+"a": "et",
+"t": "Green is said to stand for the fertile land, yellow for hope and peace, and red for the blood shed to defend the country. The star in the blue disc in the center stands for the equal unity of the country's many peoples."
+},
+{
+"a": "fj",
+"t": "The light blue background stands for the Pacific Ocean around the country. The Union Jack in the upper left stands for the country's ties to its history as a British colony."
+},
+{
+"a": "fi",
+"t": "The cross stands for Christianity, in the same cross design as the flags of other Nordic countries. The blue-and-white pairing is also known for having been proposed as the national colors by the writer Topelius in the 19th century."
+},
+{
+"a": "fr",
+"t": "The colors have no official meaning. Blue, white, and red are often linked to \"Liberty, Equality, Fraternity,\" but this is said to be an interpretation added later."
+},
+{
+"a": "ga",
+"t": "Green is said to stand for the rainforests that cover the country, and blue for the Atlantic Ocean. Together with the yellow in the middle, the three stripes picture the country's nature."
+},
+{
+"a": "gm",
+"t": "Red is said to stand for the sun and the savanna, green for forests and farming, and the white lines along the blue stripe for peace and unity."
+},
+{
+"a": "ge",
+"t": "The red cross on white comes from the cross of Saint George, the country's patron saint. The design, including the small crosses in the four corners, is said to be based on the medieval \"Jerusalem cross.\""
+},
+{
+"a": "de",
+"t": "The colors have no official meaning. Black, red, and gold spread in the 19th century as the flag of the movement for German unity and freedom."
+},
+{
+"a": "gh",
+"t": "Red stands for the blood of those who died for independence, gold for the country's rich mineral resources, and green for its rich forests. The flag was designed by Theodosia Okoh in 1957."
+},
+{
+"a": "gr",
+"t": "The white cross in the upper left stands for the Greek Orthodox faith. Blue and white are often explained as the sky and sea, or as breaking waves, but there is no official definition."
+},
+{
+"a": "gd",
+"t": "Red stands for courage and energy, gold for the sun and the warmth of the people, and green for the rich farmland. The seven stars are said to stand for the country's seven parishes."
+},
+{
+"a": "gt",
+"t": "The blue bands on the left and right are said to stand for the sky and for the Pacific Ocean and the Caribbean Sea on either side of the country. The white in the center is said to stand for peace and purity. The coat of arms has a scroll with the date of independence, \"September 15, 1821.\""
+},
+{
+"a": "gn",
+"t": "Red is said to stand for the sacrifice and work given for independence, yellow for the sun and justice, and green for the lush land and solidarity. They are explained as matching the national motto \"Work, Justice, Solidarity.\""
+},
+{
+"a": "gw",
+"t": "Red is said to stand for the blood shed in the war of independence, yellow for the sun and abundance, and green for hope and forests. The black star stands for the unity of the peoples of Africa."
+},
+{
+"a": "gy",
+"t": "Green is said to stand for farming and forests, and the white border for rivers and water. Red is said to stand for the passion for building the nation, and the black border for the endurance of the people."
+},
+{
+"a": "ht",
+"t": "Blue and red are often explained as standing for the unity of Black people and people of mixed race. The coat of arms in the center bears the motto \"Unity Is Strength.\""
+},
+{
+"a": "va",
+"t": "Yellow and white come from the gold and silver \"keys of heaven,\" which are said to have been entrusted to Saint Peter. The white side shows two crossed keys and the papal triple crown."
+},
+{
+"a": "hn",
+"t": "The blue bands at the top and bottom are said to stand for the Pacific Ocean and the Caribbean Sea. The white in the center is said to stand for the land between them and for peace. The blue-white-blue pattern was inherited from the flag of the former Federal Republic of Central America."
+},
+{
+"a": "hu",
+"t": "Red, white, and green come from the colors of the Hungarian coat of arms, used since the Middle Ages. The coat of arms shows red and white stripes and a double cross standing on three green hills."
+},
+{
+"a": "is",
+"t": "Blue is said to stand for Iceland's mountains and sky, and together with red and white it pictures the country's nature. As in other Nordic countries, the cross comes from the Christian tradition."
+},
+{
+"a": "in",
+"t": "Saffron is said to stand for courage and sacrifice, white for truth and peace, and green for the fertility and prosperity of the land. The wheel in the center, a Dharma wheel, stands for always moving forward by following dharma, the right law."
+},
+{
+"a": "id",
+"t": "Red is said to stand for courage and white for purity, and the flag is called \"Sang Saka Merah Putih\" (the revered red and white). The red-and-white pairing is said to come from the flag of the 13th-century Majapahit kingdom."
+},
+{
+"a": "ir",
+"t": "Green is said to stand for Islam and growth, white for peace, and red for courage and martyrdom. The red emblem in the center is a stylized form of the word \"Allah,\" and it also looks like a tulip."
+},
+{
+"a": "iq",
+"t": "It uses the Pan-Arab colors of red, white, black, and green, which are said to come from the flags of past Islamic dynasties. Red is often explained as courage, white as generosity, and black as past hardships."
+},
+{
+"a": "ie",
+"t": "Green stands for the Gaelic and Catholic tradition, and orange for the Protestant tradition, named after the supporters of William of Orange. White is said to be the color of hoped-for peace and cooperation between the two."
+},
+{
+"a": "il",
+"t": "The blue six-pointed \"Star of David\" in the center is a symbol of the Jewish people. The blue-on-white design was carried over from the flag of the Zionist movement of the late 19th century."
+},
+{
+"a": "it",
+"t": "The colors have no official meaning. The flag is said to have been born around 1797 from the French tricolor, with the green of the Milan civic guard's uniforms added. One explanation is that green stands for the plains, white for the snow of the Alps, and red for the blood of battle."
+},
+{
+"a": "jm",
+"t": "According to the official explanation, black stands for the strength and creativity of the people. Gold stands for sunlight and rich resources, and green for the rich land and hope."
+},
+{
+"a": "jp",
+"t": "The Hinomaru is a flag shaped like the sun, and it is also linked to the country's name, Nihon (\"origin of the sun\"). The colors have no meaning set by law, but red is sometimes explained as the sun or passion, and white as purity."
+},
+{
+"a": "jo",
+"t": "The three black, white, and green stripes stand for the colors of the flags of the Abbasid, Umayyad, and Fatimid dynasties. The red triangle stands for the Arab Revolt of 1916 and the Hashemite dynasty."
+},
+{
+"a": "kz",
+"t": "Sky blue is said to stand for the peaceful sky and the unity of the Turkic peoples. The gold band near the flagpole is drawn in a traditional pattern called \"koshkar-muiz\" (ram's horns)."
+},
+{
+"a": "ke",
+"t": "Black stands for the people of Kenya, red for the blood shed for independence, and green for the rich land and nature. The thin white lines are said to stand for peace and unity."
+},
+{
+"a": "ki",
+"t": "The blue and white waves at the bottom stand for the Pacific Ocean. The three white waves are said to stand for the three island groups: the Gilbert, Phoenix, and Line Islands."
+},
+{
+"a": "kp",
+"t": "Red is officially explained as the revolutionary tradition, white as the purity of one nation, and blue as the wish for peace. The red star is said to stand for building socialism."
+},
+{
+"a": "kr",
+"t": "The white background is said to stand for peace and purity, and the taegeuk in the center for yin (blue) and yang (red) in harmony, giving rise to all things."
+},
+{
+"a": "xk",
+"t": "The six white stars are said to stand for harmony among the six main ethnic groups living in Kosovo. Below the stars, the shape of Kosovo's land is shown in gold on the blue background."
+},
+{
+"a": "kw",
+"t": "Based on a poem, green is often explained as fertile land, white as pure deeds, red as the enemy's blood on the sword, and black as the battlefield."
+},
+{
+"a": "kg",
+"t": "Red stands for bravery and courage, and it is also said to come from the color of the flag raised by the hero Manas. The pattern in the sun is the tunduk, the roof opening of the yurt used by nomads, and it is said to stand for the homeland, the family, and the unity of the world."
+},
+{
+"a": "la",
+"t": "The red bands at the top and bottom are said to stand for the blood shed for independence. The blue in the center is said to stand for the country's wealth and the Mekong River that flows through it."
+},
+{
+"a": "lv",
+"t": "The red of the flag is a dark shade known as Latvian red. A legend tells of a white cloth wrapped around a wounded leader whose two edges were stained with blood; red is said to stand for shed blood, and white for honesty."
+},
+{
+"a": "lb",
+"t": "The red bands at the top and bottom are said to stand for the blood shed to defend the country, and white for peace and the snow of Lebanon's mountains. The cedar tree is said to stand for strength that never gives up and for eternity."
+},
+{
+"a": "ls",
+"t": "Blue is said to stand for the sky and rain, white for peace, and green for the fertile land. The current design was adopted in 2006 to mark 40 years of independence."
+},
+{
+"a": "lr",
+"t": "The 11 stripes are said to stand for the 11 people who signed the declaration of independence. The blue square is said to stand for the African continent, and the white star for being the first independent republic in Africa."
+},
+{
+"a": "ly",
+"t": "The three colors, red, black, and green, are said to stand for the three regions of Fezzan, Cyrenaica, and Tripolitania. The white crescent and star in the center were carried over from the flag used around independence in 1951."
+},
+{
+"a": "li",
+"t": "Blue is said to stand for the sky, and red for the glow of evening fires in people's homes. The crown in the upper left shows that the country is a principality, and it was added in 1937 to tell the flag apart from Haiti's, which looked just like it."
+},
+{
+"a": "lt",
+"t": "This tricolor was adopted at independence in 1918. Apart from the national flag, a historical flag showing the white knight \"Vytis\" is also used officially by law."
+},
+{
+"a": "lu",
+"t": "Red, white, and blue come from the coat of arms of the House of Luxembourg, a red lion standing on blue and white stripes. The individual colors have no official meanings."
+},
+{
+"a": "mg",
+"t": "White is said to stand for purity, red for national sovereignty, and green for hope. Another explanation is that red and white were the colors of the flag of the former Merina Kingdom, and green stands for the people of the coast."
+},
+{
+"a": "mw",
+"t": "Black stands for the peoples of Africa, red for the blood shed for freedom, and green for nature that stays green all year. The rising sun is said to stand for the dawn of hope and freedom for Africa."
+},
+{
+"a": "my",
+"t": "Blue stands for the unity of the people, and yellow for the rulers (sultans) of the states. The crescent stands for Islam, the religion of the federation, and the 14-pointed star for the unity of the states and the federal government."
+},
+{
+"a": "mv",
+"t": "Red is said to stand for the courage of the heroes who shed their blood for the country, and green for peace, prosperity, and the life-giving palm tree. The white crescent stands for the Islamic faith."
+},
+{
+"a": "ml",
+"t": "Green is said to stand for fertile land and hope, yellow for purity and mineral resources, and red for the blood shed for independence. The design places the Pan-African colors side by side in vertical bands."
+},
+{
+"a": "mt",
+"t": "The colors have no official meaning. The white and red are often linked to a legend that the Norman ruler Roger I gave away part of his own flag in the 11th century."
+},
+{
+"a": "mh",
+"t": "Blue stands for the Pacific Ocean. In the diagonal bands, orange is said to stand for courage and white for peace, and they mark the two island chains, Ralik and Ratak."
+},
+{
+"a": "mr",
+"t": "The green and yellow crescent and star stand for Islam. The red bands added at the top and bottom in 2017 are said to stand for the blood shed to defend the country."
+},
+{
+"a": "mu",
+"t": "Red is said to stand for the struggle for independence, blue for the Indian Ocean, and yellow for the light that independence brought. Green is said to stand for farming that stays green all year."
+},
+{
+"a": "mx",
+"t": "The meanings of green, white, and red are not set by law, and the explanations have changed over time. Today green is often explained as hope, white as unity, and red as the blood of heroes."
+},
+{
+"a": "fm",
+"t": "The blue field stands for the Pacific Ocean, and the four white stars for the four states: Chuuk, Pohnpei, Kosrae, and Yap. The design is based on the blue flag of the former UN Trust Territory."
+},
+{
+"a": "md",
+"t": "Blue, yellow, and red are the same colors as Romania's flag, reflecting the historical ties between the two countries. The shield in the coat of arms shows the head of an aurochs (a wild ox), which comes from the arms of the old Principality of Moldavia."
+},
+{
+"a": "mc",
+"t": "Red and white come from the colors of the coat of arms of the House of Grimaldi, which rules Monaco. The individual colors have no official meanings."
+},
+{
+"a": "mn",
+"t": "The blue in the center stands for the \"eternal blue sky,\" and the red on both sides is said to stand for strength and progress that thrive in harsh nature. The fire, sun, and moon in the Soyombo symbol are said to express the wish for the nation to keep prospering."
+},
+{
+"a": "me",
+"t": "The double-headed eagle is an emblem handed down from the Byzantine Empire, and it is said to stand for the bond between church and state. The shield on the eagle's chest shows a golden lion."
+},
+{
+"a": "ma",
+"t": "Red is a traditional color linked to the royal Alaouite dynasty, and it is also said to stand for courage. The green five-pointed star is called the \"Seal of Solomon\" and is often linked to the Five Pillars of Islam."
+},
+{
+"a": "mz",
+"t": "Green stands for the riches of the land, black for the African continent, and yellow for mineral resources. White stands for peace, and red for the struggle for independence. The book is said to stand for education, the hoe for farming, and the gun for the will to defend the country."
+},
+{
+"a": "mm",
+"t": "The constitution states that yellow stands for solidarity, green for peace and lush greenery, and red for courage and determination. The white star in the center is said to stand for the country lasting as one union."
+},
+{
+"a": "na",
+"t": "Blue is said to stand for the sky, the Atlantic Ocean, and rain, and red for the people and their courage. Green is said to stand for plants and farming, and white for peace and unity. The golden sun stands for life and energy."
+},
+{
+"a": "nr",
+"t": "The 12 points of the white star stand for the 12 tribes who first lived on Nauru. The blue field stands for the Pacific Ocean."
+},
+{
+"a": "np",
+"t": "The crimson is the color of the rhododendron, the national flower, and stands for courage, and the blue border stands for peace. The moon and sun are said to carry the wish that the nation will last as long as the moon and sun."
+},
+{
+"a": "nl",
+"t": "The colors have no official meaning. The flag is said to come from the orange, white, and blue flag of William of Orange, with the orange turning to red around the 17th century to make today's red, white, and blue."
+},
+{
+"a": "nz",
+"t": "The Union Jack in the upper left stands for historical ties with Britain. The red stars of the Southern Cross show the country's place in the South Pacific. In the 2015–2016 referendums, voters also chose to keep this flag."
+},
+{
+"a": "ni",
+"t": "The blue bands at the top and bottom are said to stand for the Pacific Ocean and the Caribbean Sea, and white for the land and peace. The triangle in the coat of arms stands for equality, and the five volcanoes for the five countries of the former Federal Republic of Central America."
+},
+{
+"a": "ne",
+"t": "Orange is said to stand for the Sahara Desert in the north, white for purity and hope, and green for the fertile land of the south and the Niger River basin."
+},
+{
+"a": "ng",
+"t": "The green bands on both sides are said to stand for the rich forests and farming, and the white in the center for peace and unity. The flag is based on a design chosen in a public contest in 1959."
+},
+{
+"a": "mk",
+"t": "The yellow sun on red is said to stand for \"the new sun of liberty\" sung about in the national anthem. In 1995, the design changed to the current one from the earlier flag with a 16-ray sun."
+},
+{
+"a": "no",
+"t": "Red, white, and blue are said to have been chosen as the \"colors of freedom,\" the same colors as those of France, the United States, and Britain. The design was created in 1821 by Frederik Meltzer, a member of parliament."
+},
+{
+"a": "om",
+"t": "White is said to stand for peace and prosperity, and red for battles against foreign enemies. Green is said to stand for the fertile land and the \"Green Mountain\" (Jebel Akhdar)."
+},
+{
+"a": "pk",
+"t": "The dark green stands for the people, most of whom are Muslim. The crescent is said to stand for progress, and the five-pointed star for light and knowledge."
+},
+{
+"a": "pw",
+"t": "Blue is said to stand for the Pacific Ocean and the move to independence, and the yellow full moon for peace, love, and calm. Nights with a full moon have traditionally been seen as the best time for fishing, planting, and festivals."
+},
+{
+"a": "pa",
+"t": "The blue star is said to stand for honesty and purity, and the red star for the authority and law of the nation. The design is said to have been created by the Amador family at independence in 1903."
+},
+{
+"a": "pg",
+"t": "Red and black are said to be colors often used in traditional art and daily life. The golden bird-of-paradise is said to stand for the nation's birth and rise, and the Southern Cross for the southern sky and ties with nearby countries."
+},
+{
+"a": "py",
+"t": "Red is said to stand for courage and patriotism, white for peace and unity, and blue for liberty and truth. The emblem on the front shows the \"Star of May,\" and the emblem on the back shows a lion and the words \"Peace and Justice.\""
+},
+{
+"a": "pe",
+"t": "Red is said to stand for the blood shed for independence, and white for peace and justice. A version with the national coat of arms in the center is also used at state ceremonies and other events."
+},
+{
+"a": "ph",
+"t": "Blue stands for peace and justice, red for patriotism and courage, and the white triangle for equality. The sun's eight rays stand for the first eight provinces to rise up against Spain, and the three stars for Luzon, Visayas, and Mindanao."
+},
+{
+"a": "pl",
+"t": "White and red come from the colors of Poland's coat of arms, a white eagle on red. White is sometimes explained as peace, and red as the blood shed in the fight for independence."
+},
+{
+"a": "pt",
+"t": "Green is said to stand for hope, and red for courage and the blood shed for the nation. The five small blue shields inside the shield are linked to the legendary Battle of Ourique, and the seven castles around them are said to stand for the history of expanding the country's land."
+},
+{
+"a": "qa",
+"t": "White is said to stand for peace, and maroon for the blood shed in past wars. The nine points are explained as showing that Qatar was the ninth emirate to sign a treaty with Britain, in 1916."
+},
+{
+"a": "ro",
+"t": "The blue, yellow, and red tricolor has been used since around the Revolution of 1848. Its colors are said to come from the coats of arms of Wallachia and Moldavia. The colors have no officially defined meanings."
+},
+{
+"a": "ru",
+"t": "The white, blue, and red tricolor is said to have spread as a ship's flag in the late 17th century, in the time of Peter the Great. The colors have no official meaning, but white is sometimes explained as nobility, blue as honesty, and red as courage."
+},
+{
+"a": "rw",
+"t": "Blue stands for happiness and peace, yellow for economic growth, and green for the hope of prosperity. The sun is said to stand for the light that guides the people and for unity. The current design was adopted in 2001."
+},
+{
+"a": "kn",
+"t": "Green stands for the fertile land, yellow for year-round sunshine, black for the people's African roots, and red for the struggle from slavery to independence."
+},
+{
+"a": "lc",
+"t": "Blue stands for the sky and sea, and gold for sunshine and prosperity. The black and white pairing is said to stand for people of African and European descent living together in harmony."
+},
+{
+"a": "vc",
+"t": "Blue is said to stand for the sky and sea, gold for the warmth of the sun and the sandy beaches, and green for lush plants and the energy of the people. The three green diamonds are also called the \"Gems of the Antilles.\""
+},
+{
+"a": "ws",
+"t": "Red is said to stand for courage, white for purity, and blue for freedom. The five white stars form the Southern Cross. The flag took its current form in 1949 and was kept after independence in 1962."
+},
+{
+"a": "sm",
+"t": "White is said to stand for the clouds and snow of Mount Titano and for peace, and blue for the sky and freedom. The ribbon below the coat of arms bears the word \"LIBERTAS\" (freedom), the nation's founding ideal."
+},
+{
+"a": "st",
+"t": "Green is said to stand for lush plants, yellow for the sun and cocoa, and red for the struggle for independence. The design uses the Pan-African colors."
+},
+{
+"a": "sa",
+"t": "Green is said to be the color of Islam. The white writing is the Shahada, the Islamic declaration of faith, and the sword below it is said to stand for justice and the strength of the nation."
+},
+{
+"a": "sn",
+"t": "Green is said to stand for hope, yellow for wealth, and red for life and the determination to be independent. The green star in the center is explained as standing for national unity and hope."
+},
+{
+"a": "rs",
+"t": "The national emblem in the center shows a white double-headed eagle and a shield with a cross surrounded by four firesteels. These four shapes are sometimes explained as the first letters of the words \"Only unity saves the Serbs.\""
+},
+{
+"a": "sc",
+"t": "Blue stands for the sky and sea, yellow for the life-giving sun, and red for the people working together in unity and love. White stands for social justice and harmony, and green for the land and nature."
+},
+{
+"a": "sl",
+"t": "Green is said to stand for farming and the country's rich natural features such as its mountains, and white for unity and justice. This tricolor was adopted at independence in 1961."
+},
+{
+"a": "sg",
+"t": "Red stands for universal brotherhood and equality, and white for pervading purity and virtue. The crescent is officially explained as standing for a young nation on the rise."
+},
+{
+"a": "sk",
+"t": "It places the national emblem on the Pan-Slavic white, blue, and red, making it easier to tell apart from flags with similar colors. The three hills in the emblem are said to stand for the Tatra, Fatra, and Mátra mountains."
+},
+{
+"a": "si",
+"t": "White, blue, and red come from the colors of the coat of arms of the medieval Duchy of Carniola. Below the emblem, the two wavy lines are said to stand for the sea and rivers, and the three gold stars to be based on the arms of the Counts of Celje."
+},
+{
+"a": "sb",
+"t": "Blue stands for water and the sea, green for the fertile land, and the yellow stripe for sunshine. The five stars are said to stand for the country's five districts at the time of independence."
+},
+{
+"a": "so",
+"t": "The light blue is said to follow the United Nations flag, tied to the country's history under UN trusteeship before independence. The five points of the white star are said to stand for the five regions where Somali people live."
+},
+{
+"a": "za",
+"t": "The government says the colors have no official meaning. Red, white, and blue are often explained as coming from the former colonial flags, and black, green, and yellow from the flags of the liberation movement."
+},
+{
+"a": "ss",
+"t": "Black stands for the people, red for the blood shed for independence, green for the fertile land, white for peace, and the blue triangle for the Nile River. The yellow star is said to stand for national unity."
+},
+{
+"a": "es",
+"t": "Red and yellow come from the colors chosen in 1785 by King Charles III for a naval flag that would be easy to spot at sea. The two pillars in the coat of arms stand for the \"Pillars of Hercules\" at the Strait of Gibraltar."
+},
+{
+"a": "lk",
+"t": "The green stripe stands for Muslims, and the orange stripe for Tamils. The bodhi leaves in the four corners are said to stand for the four Buddhist virtues: loving-kindness, compassion, joy, and equanimity."
+},
+{
+"a": "sd",
+"t": "Red is said to stand for the struggle and sacrifice for independence, white for peace and hope, and green for Islam and prosperity. Black is said to stand for \"the land of the Black people,\" which is said to be the origin of the country's name."
+},
+{
+"a": "sr",
+"t": "Green is said to stand for fertile land and hope, white for justice and freedom, and red for progress and love. The design is based on one chosen in a public contest at independence in 1975."
+},
+{
+"a": "se",
+"t": "As in other Nordic countries, the cross comes from the Christian tradition. The blue-and-yellow pairing is said to have been used on Swedish flags since at least the 16th century."
+},
+{
+"a": "ch",
+"t": "The colors have no official meaning. The white cross on red is said to come from the red banner of medieval Schwyz and the white cross used as a mark on the battlefield."
+},
+{
+"a": "sy",
+"t": "The Pan-Arab colors of red, white, black, and green are said to come from the flag of the Arab Revolt and the flags of past Islamic dynasties. The two green stars are said to stand for the two regions of the United Arab Republic, formed with Egypt in 1958."
+},
+{
+"a": "tj",
+"t": "Red is said to stand for national unity and victory, white for cotton and purity, and green for rich nature and valleys. The crown stands for the Tajik people, and it is often explained by linking the name \"Tajik\" with \"taj\" (crown)."
+},
+{
+"a": "tz",
+"t": "Green stands for the lush plant life, blue for the lakes and the Indian Ocean, black for the people, and the yellow borders for mineral resources. The flag was made by combining two flags when Tanganyika and Zanzibar united in 1964."
+},
+{
+"a": "th",
+"t": "Red is said to stand for the nation and its people, white for Buddhism, and blue for the king. King Rama VI adopted it in 1917, replacing the earlier flag with a white elephant."
+},
+{
+"a": "tl",
+"t": "The constitution states that yellow stands for the traces of colonial times, black for the darkness to be overcome, and red for the struggle for independence."
+},
+{
+"a": "tg",
+"t": "Green is said to stand for hope and farming, yellow for faith that hard work brings prosperity, and the red square for the blood shed for independence. The white star stands for hope and life."
+},
+{
+"a": "to",
+"t": "The red cross stands for the Christian faith; red is said to stand for the blood shed by Christ, and white for purity."
+},
+{
+"a": "tt",
+"t": "According to the official explanation, the three colors are said to stand for earth, water, and fire. Red stands for fire and the people's courage and friendliness, black for the riches of the earth, and white for the sea around the islands and the equality of all people."
+},
+{
+"a": "tn",
+"t": "Red is said to stand for the blood of those who died for the country, and white for peace. The white disc in the center stands for the sun, and the crescent and star are also symbols of Islam."
+},
+{
+"a": "tr",
+"t": "Red is said to stand for the blood of those who died for the country. A legend tells that the flag came from a crescent and star reflected in a pool of blood after a battle."
+},
+{
+"a": "tm",
+"t": "The crescent on the green field is said to stand for a bright future, and the five stars for the country's five provinces. The olive branches at the bottom stand for permanent neutrality, which the United Nations has also recognized."
+},
+{
+"a": "tv",
+"t": "The Union Jack in the upper left stands for the historical ties with Britain, and the light blue field for the Pacific Ocean around the country."
+},
+{
+"a": "ug",
+"t": "Black is said to stand for the peoples of Africa, yellow for the African sun, and red for the brotherhood that unites people (the same red blood)."
+},
+{
+"a": "ua",
+"t": "Blue and yellow are said to go back to the colors of the medieval coat of arms of the Galicia region, a golden lion on blue. This bicolor was used at independence in 1918 and became the official national flag in 1992."
+},
+{
+"a": "ae",
+"t": "The colors are the Pan-Arab colors that come from the flag of the Arab Revolt. Green is often explained as prosperity, white as peace, black as strength, and red as courage or unity, but there is no clear official definition."
+},
+{
+"a": "gb",
+"t": "The red cross of Saint George on white stands for England, and the white diagonal cross on blue for Saint Andrew of Scotland. The red diagonal cross stands for Saint Patrick of Ireland. It took its current form in 1801."
+},
+{
+"a": "us",
+"t": "The flag's colors have no official meaning. However, for the Great Seal, which uses the same colors, white is said to stand for purity, red for valor, and blue for perseverance and justice."
+},
+{
+"a": "uy",
+"t": "The \"Sun of May\" in the upper left is said to be a symbol of the movement for independence from Spain. The white and blue colors are also linked to the flag of Artigas, a leader of the independence movement."
+},
+{
+"a": "uz",
+"t": "Blue stands for the sky and water, white for peace and purity, and green for nature. The thin red lines are said to stand for the life force of the people, and the crescent for the new start of an independent nation."
+},
+{
+"a": "vu",
+"t": "Red stands for the blood of people and of wild boars, green for the rich islands, and black for the people. The yellow sideways Y is said to stand for the layout of the islands and the light of the Gospel."
+},
+{
+"a": "ve",
+"t": "Yellow is said to stand for the nation's wealth, blue for the Caribbean Sea, and red for the blood shed for independence. The eight stars stand for the seven provinces that declared independence and the province of Guayana, which joined later."
+},
+{
+"a": "vn",
+"t": "Red is said to stand for the revolution and the blood shed for independence. The five points of the yellow star are explained as the unity of workers, farmers, intellectuals, young people, and soldiers."
+},
+{
+"a": "ye",
+"t": "Red is said to stand for the blood shed for independence and unification, white for a bright future, and black for the dark times of the past. The flag was adopted when North and South Yemen united in 1990."
+},
+{
+"a": "zm",
+"t": "Green stands for rich nature, red for the struggle for freedom, black for the people, and orange for copper, a key resource. The eagle is said to stand for the nation's power to rise above its troubles."
+},
+{
+"a": "zw",
+"t": "Green stands for farming, yellow for mineral resources, red for the blood shed in the war of independence, and black for the people. The white triangle is said to stand for peace, and the red star for the nation's hope and its wishes for the future."
+}
+]
