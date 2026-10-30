@@ -32,6 +32,8 @@
 <script>
 // 画面の色（設定の theme、未設定はライト）を描く前に当てる。'auto' なら data-theme を付けず、端末の設定に合わせる
 try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+// 見やすさ（設定の fs・cvd）も同じく最初から。文字の大きさ 'l' / 'xl' は <html data-fs>、色の見分けやすさ ON は <html data-cvd>（'m'・OFF は属性なし）
+try { const s = JSON.parse(localStorage.getItem('settings')) || {}, de = document.documentElement; if (s.fs === 'l' || s.fs === 'xl') de.dataset.fs = s.fs; if (s.cvd === true) de.dataset.cvd = ''; } catch {}
 // 起きたエラーを localStorage adminErrors に新しい50件まで残す（admin.html のログタブで見る）。ここでは例外を出さない
 (() => { const rec = (msg, src, line, pre = '') => { try { let a; try { a = JSON.parse(localStorage.getItem('adminErrors')); } catch {} a = Array.isArray(a) ? a : [];
   let m; try { m = String(msg); } catch { m = typeof msg; } // Symbol や null-prototype でも止まらない
@@ -81,6 +83,10 @@ try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'l
   --grain: #ffffff; --grain-op: .045; --contour: #6fb3e0; --contour-op: .16; --tex-ocean: url("textures/ocean-dark.svg");
   color-scheme: dark;
 }
+/* 見やすさ: 文字の大きさ（設定の fs。'm' は属性なしで今のまま）。本文は 15px 固定なので、大きいときは rem にして一緒に大きくする。PC は pc.css */
+html[data-fs="l"] { font-size: 112.5%; }
+html[data-fs="xl"] { font-size: 125%; }
+html[data-fs] body { font-size: .9375rem; }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body {
@@ -218,6 +224,11 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .choice span { min-width: 0; overflow-wrap: anywhere; }
 .choice.ok { border-color: var(--ok); background: var(--ok-soft); }
 .choice.ng { border-color: var(--ng); background: var(--ng-soft); }
+/* 色だけに頼らない印（設定に関係なくいつも）。右上の枠の線の上に小さく乗せて、文字や国旗の絵に重ねない
+   （上にだけはみ出す。右にはみ出すとボタンの scrollWidth がふえて、はみ出しの計測にかかる） */
+.choice.ok::after, .choice.ng::after { position: absolute; top: -8px; right: 10px; width: 20px; height: 20px; border-radius: 50%; color: var(--surface); font: 900 .75rem/20px var(--font-body); text-align: center; pointer-events: none; }
+.choice.ok::after { content: "✓"; content: "✓" / "正解"; background: var(--ok); }
+.choice.ng::after { content: "✗"; content: "✗" / "まちがい"; background: var(--ng); }
 .choice:disabled { cursor: default; }
 .choice.flagc, .choice.mapc { flex-direction: column; align-items: stretch; padding: 10px; gap: 6px; }
 .choice.flagc kbd, .choice.mapc kbd { align-self: flex-start; }
@@ -367,6 +378,13 @@ body.dopa { --accent: #ff1f7a; --accent-ink: #ffffff; --hl: #ffc400; --ok: #00b8
   :root:not([data-theme="light"]) body.dopa { --accent: #ff4f9a; --accent-ink: #1a0010; --hl: #ffd400; --ok: #2bff88; --ok-soft: #0c3a22; --ng: #ff5a52; --ng-soft: #3d1414; }
 }
 :root[data-theme="dark"] body.dopa { --accent: #ff4f9a; --accent-ink: #1a0010; --hl: #ffd400; --ok: #2bff88; --ok-soft: #0c3a22; --ng: #ff5a52; --ng-soft: #3d1414; }
+/* 色の見分けやすさ（設定の cvd → <html data-cvd>）: 正解を青、まちがいをオレンジに（Okabe–Ito）。
+   body に置いて、ドパガキ（body.dopa）の色より強くする（ダークの2つは dopa と同じ強さなので、dopa より後ろに書く） */
+:root[data-cvd] body { --ok: #0072b2; --ok-soft: #dcecf7; --ng: #d55e00; --ng-soft: #fbe6d6; }
+@media (prefers-color-scheme: dark) {
+  :root[data-cvd]:not([data-theme="light"]) body { --ok: #56b4e9; --ok-soft: #12304a; --ng: #e69f00; --ng-soft: #3d2c08; }
+}
+:root[data-cvd][data-theme="dark"] body { --ok: #56b4e9; --ok-soft: #12304a; --ng: #e69f00; --ng-soft: #3d2c08; }
 body.dopa .btn:not(.ghost) { background: linear-gradient(120deg, #ff1f7a, #ff7a00, #ffc400, #ff1f7a); background-size: 300% 100%; color: #fff; animation: dopa-grad 3s linear infinite; box-shadow: 0 4px 0 rgb(120 0 50 / .35); text-shadow: 0 1px 2px rgb(0 0 0 / .3); }
 body.dopa .btn:not(.ghost):active { transform: translateY(3px); box-shadow: 0 1px 0 rgb(120 0 50 / .35); }
 body.dopa .bar { height: 12px; border-radius: 6px; }
@@ -400,7 +418,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 @keyframes fx-flash { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-<link rel="stylesheet" href="pc.css?v=3" media="(min-width: 900px)">
+<link rel="stylesheet" href="pc.css?v=4" media="(min-width: 900px)">
 <link rel="stylesheet" href="rpg.css?v=22">
 <link rel="stylesheet" href="badges.css?v=2">
 <link rel="stylesheet" href="daily.css?v=2">
@@ -446,6 +464,12 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
         <span class="lbl">画面の色</span>
         <div class="chips" id="set-theme"></div>
         <p class="hint">「端末に合わせる」は、スマホやPCのライト／ダークの設定と同じ色になるよ。</p>
+      </div>
+      <div class="field">
+        <span class="lbl">見やすさ</span>
+        <div class="chips" id="set-fs" role="group" aria-label="文字の大きさ"></div>
+        <label class="switch"><input type="checkbox" id="set-cvd"> 色の見分けやすさ</label>
+        <p class="hint">正解は青、まちがいはオレンジになります。</p>
       </div>
       <div class="field">
         <span class="lbl">音</span>
@@ -646,7 +670,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
 const emit = (type, detail) => document.dispatchEvent(new CustomEvent(type, { detail }));
-const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light', quick: false }, store.get('settings', {}));
+const S = Object.assign({ region: 'all', dopa: false, sound: true, vol: 70, theme: 'light', quick: false, fs: 'm', cvd: false }, store.get('settings', {}));
 const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 }, store.get('setup', {}));
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -1042,8 +1066,12 @@ $('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c
 
 /* ---------- 設定 ---------- */
 const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末に合わせる']];
+const FONT_SIZES = [['m', 'ふつう'], ['l', '大きめ'], ['xl', 'とても大きい']];
 function renderSettings() {
   $('set-theme').innerHTML = THEMES.map(([v, l]) => `<button class="chip" aria-pressed="${v === S.theme}" data-th="${v}">${l}</button>`).join('');
+  const fs = S.fs === 'l' || S.fs === 'xl' ? S.fs : 'm';
+  $('set-fs').innerHTML = FONT_SIZES.map(([v, l]) => `<button class="chip" aria-pressed="${v === fs}" data-fs="${v}">${l}</button>`).join('');
+  $('set-cvd').checked = S.cvd === true;
   $('set-dopa').checked = S.dopa;
   $('set-quick').checked = !!S.quick;
   $('set-sound').checked = S.sound;
@@ -1056,10 +1084,21 @@ function renderSettings() {
 }
 // 'light' / 'dark' は <html data-theme> で色を固定、'auto' は外して prefers-color-scheme に任せる（head の先読みと同じ）
 const applyTheme = () => { if (S.theme === 'light' || S.theme === 'dark') document.documentElement.dataset.theme = S.theme; else delete document.documentElement.dataset.theme; };
+// 見やすさ: 文字の大きさ（'l' / 'xl' だけ <html data-fs>）と色の見分けやすさ（true だけ <html data-cvd>）。head の先読みと同じ
+const applyA11y = () => {
+  const de = document.documentElement;
+  if (S.fs === 'l' || S.fs === 'xl') de.dataset.fs = S.fs; else delete de.dataset.fs;
+  if (S.cvd === true) de.dataset.cvd = ''; else delete de.dataset.cvd;
+};
 $('set-theme').onclick = e => {
   const b = e.target.closest('[data-th]'); if (!b) return;
   S.theme = b.dataset.th; store.set('settings', S); applyTheme(); renderSettings();
 };
+$('set-fs').onclick = e => {
+  const b = e.target.closest('[data-fs]'); if (!b) return;
+  S.fs = b.dataset.fs; store.set('settings', S); applyA11y(); renderSettings();
+};
+$('set-cvd').onchange = e => { S.cvd = e.target.checked; store.set('settings', S); applyA11y(); };
 $('set-quick').onchange = e => { S.quick = e.target.checked; store.set('settings', S); };
 const applyDopa = () => document.body.classList.toggle('dopa', S.dopa);
 $('set-dopa').onchange = e => {
@@ -1750,6 +1789,7 @@ function playRegionOf(hash) {
   return r === 'all' || REGIONS.includes(r) || Object.hasOwn(SUBREGIONS, r) ? r : null;
 }
 applyTheme();
+applyA11y();
 applyDopa();
 // #play=<地域> はその地域を選んで保存し、モード選択を開く。知らない値は無視してホーム
 const playR = playRegionOf(location.hash);
