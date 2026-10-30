@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
-import { startServer, openApp, jaLeft, warned, QUIET_BADGES, pickSetup, settle, answerCorrect, answerWrong, answerTap, recordEvents, events } from './helpers.mjs';
+import { startServer, openApp, jaLeft, warned, QUIET_BADGES, PC, pickSetup, settle, answerCorrect, answerWrong, answerTap, recordEvents, events } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -420,6 +420,22 @@ t('en_book_detail', async page => {
   assert.equal(await page.getAttribute('#detail svg.map', 'aria-label'), 'Location of France');
   assert.equal((await page.textContent('#dclose')).trim(), 'Close');
 });
+
+// PC（≥900px）の詳細: 豆知識が無くても右の列が空かない（国の情報と［Country page］は左の列、地図は右の列）
+t('en_book_detail_pc', async page => {
+  await openBook(page);
+  await page.click('#grid .card[data-a="fr"]');
+  await page.waitForSelector('#detail[open]');
+  const box = sel => page.locator(sel).boundingBox();
+  const [facts, link, map] = [await box('#detail .facts'), await box('#detail .cpage a'), await box('#detail svg.map')];
+  // リンクは国の情報の列の中で、国の情報のすぐ下
+  assert.ok(link.x >= facts.x - 1 && link.x + link.width <= facts.x + facts.width + 1, JSON.stringify({ facts, link }));
+  assert.ok(link.y >= facts.y + facts.height - 1 && link.y - (facts.y + facts.height) < 80, JSON.stringify({ facts, link }));
+  // 地図は右の列で、国の情報と同じ高さのあたり（右の列が空いていない）
+  assert.ok(map.x > facts.x + facts.width, JSON.stringify({ facts, map }));
+  assert.ok(map.y < facts.y + facts.height && map.y + map.height > facts.y, JSON.stringify({ facts, map }));
+  assert.ok(map.width > 400, JSON.stringify(map));
+}, { viewport: PC });
 
 t('en_book_map', async page => {
   await openBook(page, 'map');
