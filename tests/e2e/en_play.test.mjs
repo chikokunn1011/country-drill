@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, jaLeft, warned, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
+import { startServer, openApp, jaLeft, warned, mapLoaded, pickSetup, clearTimeAttack, answerCorrect, answerWrong, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -193,4 +193,150 @@ t('en_sync_keeps_title', async (page, { db }) => {
   assert.equal(db.profiles[0].badges_total, 80);
   // 自分のカードにも称号は出さない（英語版）
   assert.doesNotMatch(await text(page, '#pf-me'), /旅人/);
+});
+
+/* ---------- タイムアタックとランキング（Task 5） ---------- */
+const picked = (page, id) => page.$$eval(`#${id} [aria-pressed="true"]`, bs => bs.map(b => Object.values(b.dataset)[0]));
+const conds = async page => [await picked(page, 'rk-modes'), await picked(page, 'rk-regions'), await picked(page, 'rk-counts')];
+const rkRows = async (page, n) => {
+  await page.waitForFunction(n => document.querySelectorAll('#rk-list li').length === n && document.querySelector('#rk-list').getAttribute('aria-busy') === 'false', n);
+  return page.locator('#rk-list li').allInnerTexts();
+};
+const record = (board, nickname, time_ms, created_at = new Date()) => ({ board, nickname, time_ms, questions: 5, created_at: created_at.toISOString() });
+
+// 英語でタイムアタックをクリア → 順位相当・自動で載る・［View leaderboard］で同じ条件の表に自分
+t('en_time_attack', async (page, { db }) => {
+  await openWithProfile(page, db, { name: 'Chiko' });
+  await mapLoaded(page);
+  await clearTimeAttack(page, { mode: 'f2n', region: 'アジア', count: 5 });
+  assert.match(await text(page, '#ta-time'), /^\d/);
+  assert.equal(await text(page, '#ta-time'), await page.evaluate(() => RANKING.formatTime(G.timeMs)));
+  await page.locator('#ta-post .tamsg', { hasText: 'Posted!' }).waitFor();
+  assert.equal(await text(page, '#ta-post .tamsg'), 'Posted! #1 all time · #1 this week');
+  assert.equal(db.rows.length, 1);
+  assert.equal(db.rows[0].board, 'f2n:asia:5');
+  assert.equal(db.rows[0].nickname, 'Chiko');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.locator('#ta-open').waitFor();
+  assert.equal(await text(page, '#ta-open'), 'View leaderboard');
+  await page.click('#ta-open');
+  assert.equal(await page.isVisible('#scr-ranking'), true);
+  assert.deepEqual(await conds(page), [['f2n'], ['アジア'], ['5']]);
+  const [r] = await rkRows(page, 1);
+  assert.match(r, /^1\s+Chiko\s+\S+s\s+[A-Z][a-z]{2} \d{1,2}$/);
+  assert.equal(await page.locator('#rk-list li.me').count(), 1);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// プロフィールが無いときの順位相当の文
+t('en_ta_rank_text', async (page, { db }) => {
+  db.rows.push(record('f2n:all:5', 'はやい', 1));
+  await clearTimeAttack(page);
+  await page.locator('#ta-rank', { hasText: 'Would rank' }).waitFor();
+  assert.equal(await text(page, '#ta-rank'), 'Would rank #2 all time · #2 this week');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 1問まちがえて終わり → 文は英語
+t('en_ta_fail', async page => {
+  await pickSetup(page, { mode: 'f2n', region: 'all', count: 5, kind: 'ta' });
+  await page.click('#start');
+  await answerCorrect(page);
+  await answerWrong(page);
+  assert.match(await text(page, '.reveal'), /^Disqualified… The answer is .+\./);
+  assert.equal(await text(page, '#next'), 'Play again');
+  assert.equal(await page.locator('.reveal .btn.ghost', { hasText: 'Change mode' }).count(), 1);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('.reveal .btn.ghost');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+});
+
+// en/#ranking で表が開く。条件の切りかえ・今週の区切り（ニューヨークの時間で添える）・［Play with these settings］
+t('en_leaderboard', async (page, { db }) => {
+  const B = 'f2n:all:10';
+  db.rows.push({ ...record(B, 'Old', 5000, new Date(Date.now() - 8 * 864e5)), questions: 10 }, { ...record(B, 'New', 6000), questions: 10 });
+  await page.goto(new URL('en/#ranking', server.url).href);
+  await page.reload();   // hash だけの移動では読み直さない
+  await page.locator('#scr-ranking:not([hidden])').waitFor();
+  assert.equal((await text(page, '#scr-ranking h2')).trim(), 'Leaderboard');
+  assert.deepEqual(await page.locator('#rk-tabs button').allInnerTexts(), ['All time', 'This week']);
+  assert.match((await rkRows(page, 2))[0], /^1\s+Old\s+5\.00s\s+[A-Z][a-z]{2} \d{1,2}$/);
+  // 今週の区切りを、その人の時間で
+  const want = await page.evaluate(() => I18N.localOf(0, 0, { weekly: true }));
+  assert.match(want, /^(Sunday|Monday) \d{1,2}:00 (AM|PM)$/);
+  assert.equal(await page.isVisible('#rk-local'), true);
+  assert.equal(await text(page, '#rk-local'), `That’s ${want} your time.`);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#rk-tabs [data-p="week"]');
+  assert.match((await rkRows(page, 1))[0], /^1\s+New\s/);
+  await page.click('#rk-modes [data-k="m2f"]');
+  await page.click('#rk-regions [data-r="ヨーロッパ"]');
+  await page.click('#rk-counts [data-c="5"]');
+  assert.deepEqual(await conds(page), [['m2f'], ['ヨーロッパ'], ['5']]);
+  await page.locator('#rk-empty:not([hidden])').waitFor();
+  assert.equal(await text(page, '#rk-empty'), 'No one here yet. Grab the top spot!');
+  assert.deepEqual(await page.locator('#rk-modes .chip').allInnerTexts().then(a => a.filter(s => JA.test(s))), []);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal(await noHScroll(page), true);
+  await page.click('#rk-play');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+  assert.deepEqual(await picked(page, 'kinds'), ['ta']);
+  assert.deepEqual(await picked(page, 'modes'), ['m2f']);
+  assert.deepEqual(await picked(page, 'regions'), ['ヨーロッパ']);
+  assert.deepEqual(await picked(page, 'counts'), ['5']);
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York' });
+
+// 東京では添えない
+t('en_leaderboard_tokyo', async page => {
+  await page.locator('#scr-ranking:not([hidden])').waitFor();
+  await page.waitForFunction(() => $('rk-list').getAttribute('aria-busy') === 'false');
+  assert.equal(await page.evaluate(() => I18N.localOf(0, 0, { weekly: true })), '');
+  assert.equal(await page.isHidden('#rk-local'), true);
+  assert.equal(await text(page, '#scr-ranking .hint:not(#rk-local)'), 'Top 50 players, personal bests only. “This week” starts at midnight Monday, Japan time.');
+}, { timezoneId: 'Asia/Tokyo', path: 'en/#ranking' });
+
+// ほかの人の日本語の名前はそのまま。日付は日本時間の日付を英語の形で
+t('en_leaderboard_ja_names', async (page, { db }) => {
+  const B = 'f2n:all:10';
+  db.rows.push(
+    { ...record(B, 'チコ', 7000, new Date('2026-10-30T03:00:00Z')), questions: 10 },
+    { ...record(B, 'たろう', 61234, new Date('2026-01-02T15:30:00Z')), questions: 10 },   // 日本時間では 1/3
+  );
+  await page.evaluate(() => openRanking('f2n:all:10'));
+  const r = await rkRows(page, 2);
+  assert.match(r[0], /^1\s+チコ\s+7\.00s\s+Oct 30$/);
+  assert.match(r[1], /^2\s+たろう\s+1:01\.23\s+Jan 3$/);
+  for (const n of ['チコ', 'たろう']) assert.equal(await page.locator('#rk-list .nick [data-ugc]', { hasText: n }).count(), 1, n);
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York' });
+
+// 英語で載せた記録が、同じ端末の日本語版のランキングにも出る
+t('en_ta_shared', async (page, { db }) => {
+  await openWithProfile(page, db, { name: 'Chiko' });
+  await mapLoaded(page);
+  await clearTimeAttack(page, { mode: 'f2n', region: 'アジア', count: 5 });
+  await page.locator('#ta-post .tamsg', { hasText: 'Posted!' }).waitFor();
+  await page.goto(new URL('#ranking', server.url).href);
+  await page.locator('#scr-ranking:not([hidden])').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.deepEqual(await conds(page), [['f2n'], ['アジア'], ['5']]);
+  const [r] = await rkRows(page, 1);
+  assert.match(r, /^1\s+Chiko\s+\S+秒\s+\d+\/\d+$/);
+  assert.equal(await page.locator('#rk-list li.me').count(), 1);
+  // 日本語版には、その人の時間の添え書きを出さない（ニューヨークでも）
+  assert.equal(await page.isHidden('#rk-local'), true);
+}, { timezoneId: 'America/New_York' });
+
+// 英語版のランキングで「日本語」→ 日本語版のランキング
+t('langsw_keeps_ranking', async page => {
+  await page.click('#home-rank');
+  await page.locator('#scr-ranking:not([hidden])').waitFor();
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), './#ranking');
+  await page.click('#topbar .langsw a');
+  await page.waitForURL(u => new URL(u).pathname === '/' && new URL(u).hash === '#ranking');
+  await page.locator('#scr-ranking:not([hidden])').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.equal(await text(page, '#scr-ranking h2'), 'ランキング');
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/#ranking');
 });

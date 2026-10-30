@@ -1,6 +1,6 @@
 // v=2
 // 英語版: タイムアタックの結果とランキングの文（index.html のインラインの節 クイズ の taResult など）と、ranking.js の返事の文（PR6）。
-// タイムアタックは英語版でも選べる（PR6）。ranking.js・share-card.js・profile.js を英語版で読むのは PR6 のあとのタスクから
+// タイムアタックは英語版でも選べる（PR6）。ranking.js・profile.js は英語版でも読む（PR6）
 Object.assign(window.I18N_EN ??= {}, {
   // タイムアタックの条件の行
   '全部（{n}問）': 'All ({n} questions)',
@@ -12,6 +12,8 @@ Object.assign(window.I18N_EN ??= {}, {
   '歴代{all}位・今週{week}位': '#{all} all time · #{week} this week',
   '{r} 相当': 'Would rank {r}',
   'ページを読み直してね': 'Please reload the page',
+  // ランキングの「今週」の区切りを、その人の時間で（英語のページで日本時間とずれている人だけ。{t} は I18N.localOf の 'Sunday 10:00 AM'）
+  '「今週」の始まりは、あなたの時間で{t}': 'That’s {t} your time.',
   'ランキングに載せる': 'Post to the leaderboard',
   '載せたよ！ {r}': 'Posted! {r}',
   // ranking.js の返事の理由（MESSAGES）
