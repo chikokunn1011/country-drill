@@ -1,7 +1,7 @@
 {
 "rules": {
   "stars": "国旗の地や帯に星（五角星など、とがった形）がある。紋章の中だけの星も数える。",
-  "cross": "国旗のおもな模様としての十字（北欧十字・スイスの十字、ギリシャやユニオンジャックのように一部の区画にある十字もふくむ）。紋章の中の小さな十字は数えない。",
+  "cross": "国旗のおもな模様としての十字（北欧十字・スイスの十字、ギリシャやユニオンジャックのように一部の区画にある十字、ジャマイカのような斜めの十字もふくむ）。紋章の中の小さな十字は数えない。",
   "crescent": "三日月がある。",
   "sun": "太陽（光の線がある円、または「太陽」と公式に説明される円）がある。日本の日の丸もふくむ。",
   "animal": "動物・鳥・虫などの生きものの絵がある（紋章の中もふくむ）。",
@@ -13,7 +13,7 @@
 "flags": {
   "ad": ["animal","vtricolor"],
   "ae": [],
-  "af": ["sun","vtricolor"],
+  "af": ["vtricolor"],
   "ag": ["sun"],
   "al": ["animal"],
   "am": ["htricolor"],
@@ -29,7 +29,7 @@
   "bf": ["stars"],
   "bg": ["htricolor"],
   "bh": ["redwhite"],
-  "bi": ["stars"],
+  "bi": ["stars","cross"],
   "bj": [],
   "bn": ["crescent"],
   "bo": ["stars","sun","animal","htricolor"],
@@ -94,7 +94,7 @@
   "ir": ["htricolor"],
   "is": ["cross"],
   "it": ["vtricolor"],
-  "jm": [],
+  "jm": ["cross"],
   "jo": ["stars"],
   "jp": ["sun","redwhite"],
   "ke": [],
