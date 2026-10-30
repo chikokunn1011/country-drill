@@ -24,8 +24,9 @@
     return fill(typeof v === 'object' ? (vars?.n === 1 ? v.one : v.other) : v, vars);
   };
   // 国名・首都（countries.js の n・c と、英語の e・ec）
-  window.cName = c => en ? c.e : c.n;
-  window.cCap = c => en ? c.ec : c.c;
+  // 英語の e・ec が無い（HTTP キャッシュに残った前の countries.js）ときは日本語の n・c で代わりにする
+  window.cName = c => en ? c.e ?? c.n : c.n;
+  window.cCap = c => en ? c.ec ?? c.c : c.c;
 
   window.I18N = {
     lang,
@@ -36,6 +37,6 @@
     // 検索用: アクセントを外して小文字に（São Tomé → sao tome）。かなの濁点は消さない
     fold: s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(),
     // 国の並び: 英語は e の ABC 順、日本語は n の五十音順
-    byName: (x, y) => en ? x.e.localeCompare(y.e, 'en') : x.n.localeCompare(y.n, 'ja'),
+    byName: (x, y) => en ? (x.e ?? x.n).localeCompare(y.e ?? y.n, 'en') : x.n.localeCompare(y.n, 'ja'),
   };
 })();

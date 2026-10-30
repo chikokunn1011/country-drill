@@ -148,18 +148,18 @@ t('sw_skips_admin', async page => {
   assert.deepEqual(keys.filter(k => k.includes('admin')), []);
 });
 
-// ?v= の無いファイル（countries.js）はネット優先: 書きかえたら次に開いたとき新しい中身
+// ?v= の無いファイル（trivia.js）はネット優先: 書きかえたら次に開いたとき新しい中身
 test('sw_update_unversioned', { timeout: 90_000 }, async () => {
   const dir = tempRepo();
   const srv = await startServer({ root: dir });
   const app = await openApp(browser, { serviceWorkers: 'allow', url: srv.url });
   try {
     await swReady(app.page);
-    assert.equal(await app.page.evaluate(() => window.COUNTRIES.__mark), undefined);
-    const p = join(dir, 'countries.js');
-    writeFileSync(p, `${readFileSync(p, 'utf8')}\nwindow.COUNTRIES.__mark = 'new';\n`);
+    assert.equal(await app.page.evaluate(() => window.TRIVIA.__mark), undefined);
+    const p = join(dir, 'trivia.js');
+    writeFileSync(p, `${readFileSync(p, 'utf8')}\nwindow.TRIVIA.__mark = 'new';\n`);
     await app.page.reload();
-    assert.equal(await app.page.evaluate(() => window.COUNTRIES.__mark), 'new');
+    assert.equal(await app.page.evaluate(() => window.TRIVIA.__mark), 'new');
     assert.deepEqual(app.errors.map(String), []);
   } finally { await app.close(); await srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });
@@ -179,22 +179,22 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     await swReady(page);
     const [oldName] = await cacheNames(page);
     assert.match(oldName, /^drill-[0-9a-f]{12}$/);
-    // pc.css の中身と ?v=、countries.js（?v= 無し）を変えて sw.js を作り直す
+    // pc.css の中身と ?v=、trivia.js（?v= 無し）を変えて sw.js を作り直す
     const n = +readFileSync(join(dir, 'index.html'), 'utf8').match(/pc\.css\?v=(\d+)/)[1];
     const edit = (f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
     edit('pc.css', s => `${s}\n.pwa-test-mark { order: 7; }\n`);
     // en/index.html は make_en が index.html から作るので、?v= もいっしょに上がる
     for (const f of ['index.html', 'en/index.html']) edit(f, s => s.replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
-    edit('countries.js', s => `${s}\nwindow.COUNTRIES.__mark = 'new';\n`);
+    edit('trivia.js', s => `${s}\nwindow.TRIVIA.__mark = 'new';\n`);
     writeFileSync(join(dir, 'sw.js'), render(dir));
     const newName = `drill-${readFileSync(join(dir, 'sw.js'), 'utf8').match(/const VERSION = '(\w+)'/)[1]}`;
     assert.notEqual(newName, oldName);
-    // 再読み込みせずに新しい SW を入れる（install は HTTP キャッシュに古い countries.js・index.html があっても取り直す）。
+    // 再読み込みせずに新しい SW を入れる（install は HTTP キャッシュに古い trivia.js・index.html があっても取り直す）。
     // ?v= 付き・vendor/ は前の版のキャッシュから写すので、ネットに取りに行くのは上げた pc.css だけ
     requests.length = 0;
     await page.evaluate(() => navigator.serviceWorker.getRegistration().then(r => r.update()));
     await until(page, () => navigator.serviceWorker.getRegistration().then(r => r.waiting?.state === 'installed'));
-    assert.match(await cached(page, newName, 'countries.js'), /__mark = 'new'/);
+    assert.match(await cached(page, newName, 'trivia.js'), /__mark = 'new'/);
     assert.match(await cached(page, newName, 'index.html'), new RegExp(`pc\\.css\\?v=${n + 1}`));
     assert.match(await cached(page, newName, `pc.css?v=${n + 1}`), /pwa-test-mark/);
     assert.equal(await cached(page, newName, `pc.css?v=${n}`), null);   // 古い ?v= は新しい版に入れない
@@ -207,7 +207,7 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     await page.goto(srv.url);
     await until(page, name => caches.keys().then(k => k.length === 1 && k[0] === name), newName);
     assert.ok(await page.evaluate(n => [...document.styleSheets].some(x => x.href?.endsWith(`pc.css?v=${n}`) && [...x.cssRules].some(r => r.cssText.includes('pwa-test-mark'))), n + 1));
-    assert.equal(await page.evaluate(() => window.COUNTRIES.__mark), 'new');
+    assert.equal(await page.evaluate(() => window.TRIVIA.__mark), 'new');
     assert.deepEqual(errors.map(String), []);
   } finally { await context.close(); await b2.close(); await srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });

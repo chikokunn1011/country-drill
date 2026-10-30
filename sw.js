@@ -1,7 +1,7 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = 'da48db501d2e';
+const VERSION = '093419c41520';
 const PRECACHE = [
   "./",
   "index.html",
@@ -19,7 +19,7 @@ const PRECACHE = [
   "streak.css?v=1",
   "dojo.css?v=1",
   "i18n.js?v=1",
-  "countries.js",
+  "countries.js?v=2",
   "themes.js?v=2",
   "ranking.js?v=5",
   "daily-core.js?v=2",
@@ -328,6 +328,6 @@ self.addEventListener('fetch', e => {
   if (req.mode === 'navigate') { const s = shellFor(url); return e.respondWith(race(req, s ? shell(s) : null)); }
   // ?v= 付き・vendor/ はキャッシュ優先
   if (isFixed(url)) return e.respondWith(fromCache(req).then(r => r || fetch(req).then(res => keep(req, res))));
-  // それ以外（countries.js・trivia.js・textures など）はページと同じ
+  // それ以外（trivia.js・textures など）はページと同じ
   e.respondWith(race(req));
 });

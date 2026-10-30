@@ -27,7 +27,7 @@ test('sw_list_has_core', () => {
   const list = swList(ROOT), html = read('index.html');
   const has = u => assert.ok(list.includes(u), u);
   for (const u of ['./', 'index.html', 'world.js?v=1', 'vendor/d3-7.9.0.min.js', 'vendor/topojson-client-3.1.0.min.js',
-    'countries.js', 'trivia.js', 'manifest.webmanifest', 'icons/icon-192.png']) has(u);
+    'countries.js?v=2', 'trivia.js', 'manifest.webmanifest', 'icons/icon-192.png']) has(u);
   const v = [...html.matchAll(/(?:src|href)="([\w.-]+\.(?:js|css)\?v=\d+)"/g)].map(m => m[1]);
   assert.ok(v.length > 20);
   v.forEach(has);

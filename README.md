@@ -89,7 +89,7 @@
 
 - `sw.js`（service worker）は `pwa.js` が登録する。オフラインでも遊べるように、`index.html` と英語版の `en/index.html` が読むファイル・地図・国旗195枚などを端末に保存する（precache）
   - オフラインで本編を出すのは、根（`./`・`index.html`）→ `index.html` と、`en/`・`en/index.html` → `en/index.html` だけ。国のページ・テーマのページ（`country/`・`themes/`・`en/country/`・`en/themes/`）は保存しない
-  - ページと `?v=` の無いファイル（`countries.js`・`trivia.js`・textures など）はネット優先（3秒で返らない・つながらない・500番台なら保存したもの）。`?v=` 付きと `vendor/` は保存したもの優先
+  - ページと `?v=` の無いファイル（`trivia.js`・textures など）はネット優先（3秒で返らない・つながらない・500番台なら保存したもの）。`?v=` 付きと `vendor/` は保存したもの優先
   - 外のサイト（Supabase・Google Fonts など）と管理ページ（`admin*`）にはさわらない／保存しない
 - `sw.js` の一覧（`PRECACHE`）と版（`VERSION`）は `node tools/make_sw.mjs` で作る。手で書かない
   - precache に入るファイルの中身を変えたとき・`index.html` の `?v=` を上げたとき・読むファイルを足したときは流し直してコミットする（流し忘れると unit の `sw_is_current` が落ちて知らせる）

@@ -77,6 +77,18 @@ test('t_page_and_fold', () => {
   assert.ok(ja.I18N.byName(a, b) > 0);
 });
 
+// HTTP キャッシュに前の countries.js（e・ec が無い）が残っていても、英語のページは落ちずに日本語の n・c を出す
+test('t_en_fallback_old_countries', () => {
+  const { ctx } = load({ lang: 'en' });
+  const old = { n: '日本', c: '東京' }, other = { n: 'フランス', c: 'パリ' };
+  assert.equal(ctx.cName(old), '日本');
+  assert.equal(ctx.cCap(old), '東京');
+  assert.equal(typeof ctx.I18N.byName(old, other), 'number');
+  assert.ok(ctx.I18N.byName({ n: 'ア', e: 'Japan' }, { n: 'フランス' }) < 0);
+  // e・ec があればそちら
+  assert.equal(ctx.cName({ n: '日本', e: 'Japan' }), 'Japan');
+});
+
 test('scan_fixtures', () => {
   const one = src => { const r = scanJs(src); assert.equal(r.length, 1, `${src} → ${JSON.stringify(r)}`); return r[0]; };
   assert.equal(one("x = T('あ');").wrapped, true);
