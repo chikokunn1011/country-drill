@@ -92,6 +92,17 @@ test('en_scripts', () => {
   assert.deepEqual(srcs.filter(s => !s.startsWith('i18n/')), jaSrcs.filter(s => !EN_SKIP.includes(s.split('?')[0])).map(swap));
 });
 
+// PR8 Task 9: 未訳の script は無い。en/index.html の script は日本語の index.html と同じ並び（EN_SWAP の分を読みかえ、辞書を足したもの）
+test('en_scripts_all', () => {
+  assert.deepEqual(EN_SKIP, []);
+  const swap = s => { const [f, q] = s.split('?'); return Object.hasOwn(EN_SWAP, f) ? EN_SWAP[f] + (q === undefined ? '' : '?' + q) : s; };
+  const ja = scriptSrcs(read('index.html')), en = scriptSrcs(enIndex());
+  assert.deepEqual(en.filter(s => !s.startsWith('i18n/')), ja.map(swap));
+  const dicts = EN_DICTS['index.html'].map(n => `i18n/${n}.js?v=${read(`i18n/${n}.js`).match(/^\/\/ v=(\d+)/)[1]}`);
+  assert.deepEqual(en.filter(s => s.startsWith('i18n/')), dicts);
+  assert.ok(en.some(s => s.startsWith('rpg-rank.js?v=')));
+});
+
 test('en_no_japanese_html', () => {
   const left = visible(enIndex()).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.trim());
   assert.deepEqual(left, []);

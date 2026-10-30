@@ -20,7 +20,7 @@
   };
   // 英雄の塔の最高記録（勝ったいちばん上の階）
   const towerOf = d => { const n = d.tower?.best; return Number.isInteger(n) && n > 0 ? n : 0; };
-  const SORTS = { lv: 'レベル', dg: 'ダンジョン', tower: '英雄の塔' };
+  const SORTS = { lv: T('レベル'), dg: T('ダンジョン'), tower: T('英雄の塔') };
   // 自動更新: プロフィールがあって自動 ON で冒険を始めていれば、レベルアップ・バトルの勝ち（新しいフロア・ボス）・塔の新記録・起動時に記録が変わっていれば送る。
   // 記録は rpg_update2、塔は rpg_set_tower2 で別々に送る（1回に1つ。記録が先）。
   // 送ったものは localStorage の rpgSent（{ pid, lv, dungeons, floors, tower }。pid がいまのプロフィールとちがえば送っていない扱い、tower が無い = 0）。
@@ -40,7 +40,7 @@
     if (typeof RANKING.rpgSetTower2 === 'function' && best > (s.tower ?? 0)) return 'tower';
     return null;
   };
-  const ranks = r => `レベル順 ${r.rankLv}位・ダンジョン順 ${r.rankDg}位`;
+  const ranks = r => T('レベル順 {lv}位・ダンジョン順 {dg}位', { lv: r.rankLv, dg: r.rankDg });
   let autoTimer = null, lastSent = 0, sending = false;
   // 自動で送るときで、まだ送っていないものがあれば、少し待ってから送る（続けて上がったら1回にまとめる）
   const scheduleAuto = () => {
@@ -70,33 +70,34 @@
     else console.warn(`ranking auto ${what}`, res.reason);   // つながらない・断られたら、次のきっかけまで待つ
   };
 
-  const HTML = '<div class="rpg-head"><button type="button" class="linkbtn rpg-back">← 冒険</button><h2 class="rpg-h2">冒険ランキング</h2></div>'
+  // 自分の名前（#rr-auto-name）とほかの人の名前は訳さないので data-ugc（PR8）
+  const HTML = `<div class="rpg-head"><button type="button" class="linkbtn rpg-back">${T('← 冒険')}</button><h2 class="rpg-h2">${T('冒険ランキング')}</h2></div>`
     + '<div class="rpg-rr-cols"><div class="rpg-rr-side">'
     + '<div class="rpg-rr-me" id="rr-me"></div><p class="tarank" id="rr-rank"></p>'
     + '<div id="rr-post"></div>'
-    + '<div class="rpg-rr-auto" id="rr-auto" hidden><p>✅ <b id="rr-auto-name"></b> で載ってるよ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなる</p>'
-    + '<button type="button" class="linkbtn" id="rr-profile">プロフィール</button></div>'
-    + '<p class="hint" id="rr-note">ランキングにはプロフィールの名前とかざりで載るよ。名前を押すと、その人のプロフィールが見られる</p></div>'
-    + '<div class="rpg-rr-main"><div class="seg" id="rr-tabs" role="group" aria-label="並べ方">'
+    + `<div class="rpg-rr-auto" id="rr-auto" hidden><p>✅ ${T('{name} で載ってるよ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなる', { name: '<b id="rr-auto-name" data-ugc></b>' })}</p>`
+    + `<button type="button" class="linkbtn" id="rr-profile">${T('プロフィール')}</button></div>`
+    + `<p class="hint" id="rr-note">${T('ランキングにはプロフィールの名前とかざりで載るよ。名前を押すと、その人のプロフィールが見られる')}</p></div>`
+    + `<div class="rpg-rr-main"><div class="seg" id="rr-tabs" role="group" aria-label="${esc(T('並べ方'))}">`
     + Object.entries(SORTS).map(([k, v]) => `<button type="button" data-s="${k}">${v}</button>`).join('') + '</div>'
     + '<p class="hint" id="rr-how"></p>'
     + '<ol class="rklist rpg-rr-list" id="rr-list" aria-busy="false"></ol>'
-    + '<p class="rkempty" id="rr-empty" hidden>まだ誰もいない。1位のチャンス！</p>'
-    + '<p class="rkempty" id="rr-soon" hidden>英雄の塔のランキングは準備中だよ。もう少し待ってね</p>'
-    + '<div class="rkerror" id="rr-error" hidden><p>ランキングに接続できなかった</p><button class="btn ghost" id="rr-retry">再読み込み</button></div></div></div>';
-  const HOW = { lv: '上位50人まで。レベル → クリアしたダンジョン → フロアの順', dg: '上位50人まで。クリアしたダンジョン → フロア → レベルの順',
-    tower: '上位50人まで。最高記録の階 → レベルの順' };
+    + `<p class="rkempty" id="rr-empty" hidden>${T('まだ誰もいない。1位のチャンス！')}</p>`
+    + `<p class="rkempty" id="rr-soon" hidden>${T('英雄の塔のランキングは準備中だよ。もう少し待ってね')}</p>`
+    + `<div class="rkerror" id="rr-error" hidden><p>${T('ランキングに接続できなかった')}</p><button class="btn ghost" id="rr-retry">${T('再読み込み')}</button></div></div></div>`;
+  const HOW = { lv: T('上位50人まで。レベル → クリアしたダンジョン → フロアの順'), dg: T('上位50人まで。クリアしたダンジョン → フロア → レベルの順'),
+    tower: T('上位50人まで。最高記録の階 → レベルの順') };
 
   const R = { sort: 'lv', seq: 0 };
-  // 日付は日本時間で（タイムアタックのランキングとそろえる）
-  const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
-  const recText = r => `ダンジョン ${r.dungeons}/${DG.length}（フロア ${r.floors}/${MAX_FLOORS}）`;
+  // 日付は日本時間で（タイムアタックのランキングとそろえる）。日本語は '10/30'、英語は I18N.dayLabel の 'Oct 30'
+  const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return LANG === 'en' ? I18N.dayLabel(j.toISOString().slice(0, 10)) : `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+  const recText = r => T('ダンジョン {d}/{all}（フロア {f}/{fall}）', { d: r.dungeons, all: DG.length, f: r.floors, fall: MAX_FLOORS });
   // 名前のセル: ふだんは PROFILE.nameHTML（かざり付き・押すと窓）。profile.js が無いときは名前と知っている国のかざりだけ
   const nameOf = r => {
     if (P) return P.nameHTML(r);
     const deco = (Array.isArray(r.deco) ? r.deco : []).filter((a, j, l) => byA.has(a) && l.indexOf(a) === j).slice(0, 3)
-      .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
-    return esc(r.nickname) + (deco ? `<span class="rr-deco">${deco}</span>` : '');
+      .map(a => { const nm = esc(cName(byA.get(a))); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
+    return `<span data-ugc>${esc(r.nickname ?? '')}</span>` + (deco ? `<span class="rr-deco">${deco}</span>` : '');
   };
 
   // 載せる欄（#rr-post）の形: none（旅に出ていない）・reload（profile.js が無い）・auto（自動で載る）・box（PROFILE.postBox）。
@@ -133,7 +134,7 @@
     if (!r.ok) return r;
     $('rr-rank').textContent = '';
     load();
-    return { ok: true, text: `載せたよ！ ${ranks(r)}` };
+    return { ok: true, text: T('載せたよ！ {r}', { r: ranks(r) }) };
   };
   const drawPost = () => {
     const mode = postModeOf(), el = $('rr-post'), p = prof();
@@ -142,15 +143,15 @@
     if (mode === postMode) return;   // 箱は作り直さない（入力の途中・送っている途中を消さない）
     postMode = mode;
     // 箱は毎回新しい子要素に作る（同じ #rr-post に作ると、前の箱の listener が残って押すたびに何回も送る）
-    if (mode === 'box') { const box = document.createElement('div'); el.replaceChildren(box); P.postBox(box, { label: '冒険ランキングに載せる', send: sendBox }); }
-    else el.innerHTML = mode === 'reload' ? '<p class="tamsg ng">プロフィールが読みこめなかった。ページを読み直してね</p>' : '';
+    if (mode === 'box') { const box = document.createElement('div'); el.replaceChildren(box); P.postBox(box, { label: T('冒険ランキングに載せる'), send: sendBox }); }
+    else el.innerHTML = mode === 'reload' ? `<p class="tamsg ng">${T('プロフィールが読みこめなかった。ページを読み直してね')}</p>` : '';
   };
   const drawMe = () => {
     const d = RPG.get(), r = recordOf(d), tw = R.sort === 'tower', best = towerOf(d);
     $('rr-me').innerHTML = d.intro
-      ? `<p class="rpg-rr-h">きみの記録</p><p class="rpg-rr-rec"><b>Lv ${r.lv}</b><span>${recText(r)}</span></p>`
-        + (tw ? `<p class="hint rpg-rr-tw">🗼 英雄の塔 ${best ? `自己ベスト ${best}階` : 'まだ記録がないよ'}</p>` : '')
-      : '<p class="rpg-rr-h">まだ旅に出ていないよ</p><p class="hint">冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる</p>';
+      ? `<p class="rpg-rr-h">${T('きみの記録')}</p><p class="rpg-rr-rec"><b>Lv ${r.lv}</b><span>${recText(r)}</span></p>`
+        + (tw ? `<p class="hint rpg-rr-tw">🗼 ${T('英雄の塔 {rec}', { rec: best ? T('自己ベスト {n}階', { n: best }) : T('まだ記録がないよ') })}</p>` : '')
+      : `<p class="rpg-rr-h">${T('まだ旅に出ていないよ')}</p><p class="hint">${T('冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる')}</p>`;
     drawPost();
     $('rr-rank').textContent = '';
     if (!d.intro) return;
@@ -159,12 +160,12 @@
       if (!best) return;
       RANKING.rpgTowerRankOf({ tower: best, lv: r.lv }).then(n => {
         const now = RPG.get();
-        if (R.sort === 'tower' && towerOf(now) === best && now.lv === r.lv && $('rr-rank') && Number.isInteger(n)) $('rr-rank').textContent = `英雄の塔 ${n}位 相当`;
+        if (R.sort === 'tower' && towerOf(now) === best && now.lv === r.lv && $('rr-rank') && Number.isInteger(n)) $('rr-rank').textContent = T('{r} 相当', { r: T('英雄の塔 {n}位', { n }) });
       }, e => console.warn('ranking rpgTowerRankOf', e));
       return;
     }
     const want = { ...r };
-    RANKING.rpgRankOf(want).then(x => { if (R.sort !== 'tower' && same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = `${ranks(x)} 相当`; },
+    RANKING.rpgRankOf(want).then(x => { if (R.sort !== 'tower' && same(recordOf(RPG.get()), want) && $('rr-rank')) $('rr-rank').textContent = T('{r} 相当', { r: ranks(x) }); },
       e => console.warn('ranking rpgRankOf', e));
   };
   // 読み込み中は表を薄くするだけ。返事が前後しても、最後に頼んだ並べ方の表だけを出す
@@ -193,8 +194,8 @@
     let no = 0;
     list.innerHTML = (rows ?? []).map((r, i) => {
       if (!i || !sameRow(r, rows[i - 1])) no = i + 1;
-      const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = tw ? `<span class="mono rpg-rr-tw">🗼${r.tower}階</span>`
-        : `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>・F${r.floors}</small></span>`;
+      const lv = `<span class="mono rpg-rr-lv">Lv ${r.lv}</span>`, dg = tw ? `<span class="mono rpg-rr-tw">🗼${T('{n}階', { n: r.tower })}</span>`
+        : `<span class="mono rpg-rr-dg">🏰${r.dungeons}<small>${T('・')}F${r.floors}</small></span>`;
       const cls = [no <= 3 && 'top', mine && r.pid === mine && 'me'].filter(Boolean).join(' ');
       // かざりは名前の中に入れて列を増やさない（スマホで名前が細くならない）
       return `<li${cls ? ` class="${cls}"` : ''}><span class="no">${no}</span><span class="nick">${nameOf(r)}</span>`
@@ -289,7 +290,7 @@
   const panel = document.querySelector('#scr-ranking .panel > h2');
   if (panel) {
     const go = document.createElement('button');
-    go.type = 'button'; go.className = 'linkbtn rpg-only'; go.id = 'rk-to-rpg'; go.textContent = '🏆 冒険のランキングはこちら';
+    go.type = 'button'; go.className = 'linkbtn rpg-only'; go.id = 'rk-to-rpg'; go.textContent = '🏆 ' + T('冒険のランキングはこちら');
     go.onclick = () => RPG.open('rpgrank');
     panel.after(go);
   }

@@ -927,6 +927,8 @@ body.rpg-staging { overflow: hidden; }
 .rpg-rr-rec { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font: 700 1rem var(--font-display); }
 .rpg-rr-rec b { font: 900 1.6rem var(--font-display); }
 .rpg-rr-list li { grid-template-columns: 2.2em minmax(0, 1fr) auto auto auto; }
+/* 英語は記録（🗼999 floors・🏰21 · F105）と日付（Oct 31）が日本語より長いので、列のあいだを詰めて名前の列を細くしすぎない */
+.rpg-rr-list li:lang(en) { column-gap: 6px; }
 /* 名前の後ろのかざり（仲間の国旗3つまで。旗は動かさない）。.nick の中に入れて、名前の列を細くしない */
 .rr-deco { display: inline-flex; gap: 3px; margin-left: 6px; white-space: nowrap; vertical-align: -.1em; }
 .rr-deco img { height: 1em; width: auto; border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
