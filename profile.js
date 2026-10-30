@@ -15,7 +15,12 @@
   // 接続先が無い・古い ranking.js がキャッシュに残っているときは出さない（ホームの［プロフィール］も隠れたまま）
   if (!RANKING.enabled || typeof RANKING.profileCreate !== 'function') return;
   // 名前の入力欄（プロフィール画面の作る・名前を変える、結果画面の「載せる」箱）の下に出す注意書き
-  const NAME_NOTE = '<p class="hint pf-name-note">本名や学校名は使わないでね（<a href="privacy.html" target="_blank" rel="noopener">プライバシーポリシー</a>）</p>';
+  // リンクは同じ言語のページ（英語のページは <base href="../"> なので I18N.page で en/ を付ける）
+  const NAME_NOTE = `<p class="hint pf-name-note">${T('本名や学校名は使わないでね（{link}）', {
+    link: `<a href="${I18N.page('privacy.html')}" target="_blank" rel="noopener">${T('プライバシーポリシー')}</a>` })}</p>`;
+  // ほかの人や自分が入れた名前（訳さない。英語のページの日本語のチェック jaLeft は data-ugc の中を見ない）
+  const ugc = name => `<span data-ugc>${esc(name)}</span>`;
+  const EN = I18N.lang === 'en';
 
   // localStorage の profile: { token, pid, name, auto, isPublic, sent: { isPublic, title, deco, badges, badgesTotal } }
   // sent は最後にサーバーへ送った公開・称号・かざり・バッジの数（無い項目 = まだ送っていない）。
@@ -90,7 +95,7 @@
     const p = read();
     if (!p || (token !== undefined && p.token !== token)) return;
     drop(KEY);
-    toast('このプロフィールは別の端末に引き継がれたよ', 5000);
+    toast(T('このプロフィールは別の端末に引き継がれたよ'), 5000);
     changed();
   };
 
@@ -186,8 +191,9 @@
   // かな入力のまま打った・全角で打った（全角英数字・かな・半角カナが入っている）のに、そろえても表に無い字が残る: 英字に切りかえる案内を出す
   const wideCode = raw => /[\u3040-\u30ff\uff01-\uff5e\uff66-\uff9f]/.test(String(raw ?? '')) && /[^A-HJ-NP-Z2-9]/.test(normCode(raw));
   const fmtCode = c => c.match(/.{1,4}/g).join('-');
-  // 日本時間の「10/29 16:05」
+  // 日本時間の「10/29 16:05」。英語はその人の時間で「Oct 29, 4:05 PM」
   const jstTime = d => {
+    if (EN) return new Intl.DateTimeFormat(I18N.locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(d).replace(/[\u202f\u00a0]/g, ' ');
     const j = new Date(d.getTime() + 9 * 3600e3), two = n => String(n).padStart(2, '0');
     return `${j.getUTCMonth() + 1}/${j.getUTCDate()} ${two(j.getUTCHours())}:${two(j.getUTCMinutes())}`;
   };
@@ -236,7 +242,7 @@
   // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す。
   // 自動で送るのは描いた時点だけ。あとでほかの場所でプロフィールを作った・自動を ON にしたときは描き直すだけ（載せないままにした記録を、見ていないところで送らない）
   // next() は載せたあとにフォーカスを移す先（TA の［ランキングを見る］など。無い・隠れていれば状態の文。キーボードで来たときは枠が出る）
-  const postBox = (el, { label = 'ランキングに載せる？', send, next }) => {
+  const postBox = (el, { label = T('ランキングに載せる？'), send, next }) => {
     // state: idle（まだ）・busy（作っている・送っている）・fail（失敗。msg にわけ）・done（載せた。msg に文）
     const st = { state: 'idle', msg: '', input: null };
     const say = (text, cls = '') => { st.msg = text; st.cls = cls; };
@@ -260,14 +266,14 @@
       if (kind !== shown) {
         shown = kind;
         if (kind === 'none') body.innerHTML = '';
-        else if (kind === 'retry') body.innerHTML = '<button type="button" class="btn" data-pf="retry">もう一回送る</button>';
+        else if (kind === 'retry') body.innerHTML = `<button type="button" class="btn" data-pf="retry">${T('もう一回送る')}</button>`;
         else if (kind === 'form') {
           const v = st.input ?? store.get('nickname', '');
           body.innerHTML = `<form class="field" novalidate><label>${esc(label)}</label>`
-            + `<div class="row"><input type="text" autocomplete="nickname" enterkeyhint="send" placeholder="ニックネーム（12文字まで）" aria-label="ニックネーム" value="${esc(v)}">`
-            + '<button class="btn">プロフィールを作って載せる</button></div></form>';
-        } else body.innerHTML = `<p class="pf-post-q">${esc(label)}</p><button type="button" class="btn" data-pf="send">${esc(p.name)} で載せる</button>`;
-        tail.innerHTML = kind === 'form' ? '<p class="hint">名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ</p>' + NAME_NOTE : '';
+            + `<div class="row"><input type="text" autocomplete="nickname" enterkeyhint="send" placeholder="${esc(T('ニックネーム（12文字まで）'))}" aria-label="${esc(T('ニックネーム'))}" value="${esc(v)}">`
+            + `<button class="btn">${T('プロフィールを作って載せる')}</button></div></form>`;
+        } else body.innerHTML = `<p class="pf-post-q">${esc(label)}</p><button type="button" class="btn" data-pf="send">${T('{name} で載せる', { name: ugc(p.name) })}</button>`;
+        tail.innerHTML = kind === 'form' ? `<p class="hint">${T('名前でプロフィールを作ると、これからの記録は自動でランキングに載るよ')}</p>` + NAME_NOTE : '';
       }
       // フォーカスが箱の中にあったときだけ移す（自動 ON で描いたとき・ほかの場所を触っているときは動かさない）。
       // 次に押せるもの（fail は［もう一回送る］、done は next）があればそこへ。無ければ、消えた要素に残って <body> に落ちたとき・空になった状態の文に
@@ -281,10 +287,10 @@
     const go = async () => {
       const p = get();
       if (!p || st.state === 'busy') return;
-      st.state = 'busy'; say('送信中…'); draw();
+      st.state = 'busy'; say(T('送信中…')); draw();
       let r;
       try { r = await send(p.token); } catch (e) { console.warn('[profile] send', e); r = { ok: false, reason: 'network' }; }
-      if (r.ok) { st.state = 'done'; say(r.text ?? '載せたよ！', 'ok'); draw(); return; }
+      if (r.ok) { st.state = 'done'; say(r.text ?? T('載せたよ！'), 'ok'); draw(); return; }
       if (r.reason === 'not_found') { st.state = 'idle'; say(''); lost(p.token); draw(); return; }   // lost が描き直しを呼ぶが、箱は自分で
       st.state = 'fail'; say(RANKING.message(r.reason), 'ng'); draw();
     };
@@ -296,7 +302,7 @@
     el.addEventListener('submit', async e => {
       e.preventDefault();
       if (st.state === 'busy') return;
-      st.state = 'busy'; say('送信中…'); draw();
+      st.state = 'busy'; say(T('送信中…')); draw();
       const r = await create(st.input ?? store.get('nickname', ''));
       if (!r.ok) { st.state = 'idle'; say(RANKING.message(r.reason), 'ng'); draw(); el.querySelector('input')?.focus(); return; }
       st.state = 'idle';
@@ -316,48 +322,58 @@
   const sec = document.createElement('section');
   sec.id = 'scr-profile'; sec.className = 'wrap narrow'; sec.hidden = true;
   sec.innerHTML = `<div class="panel pf">
-    <h2>プロフィール</h2>
+    <h2>${T('プロフィール')}</h2>
     <div class="pf-main" id="pf-main"></div>
     <div id="pf-transfer"></div>
-    <div class="row end"><button class="btn" id="pf-done">ホームへ</button></div>
+    <div class="row end"><button class="btn" id="pf-done">${T('ホームへ')}</button></div>
   </div>`;
   ($('scr-ranking') ?? $('scr-home')).after(sec);
   // ---- ランキングの名前のセル・プロフィールのカード ----
   // かざり: 知っている国だけ、重なりは1つにして3つまで（rpg-rank.js と同じ見た目・クラス）
   const decoHTML = as => {
     const imgs = [...new Set(Array.isArray(as) ? as : [])].filter(a => byA.has(a)).slice(0, 3)
-      .map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
+      .map(a => { const nm = esc(cName(byA.get(a))); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; }).join('');
     return imgs ? `<span class="rr-deco">${imgs}</span>` : '';
   };
-  // ランキングの <span class="nick"> の中身。pid があれば押すとプロフィールの窓が開くボタン、古い記録（pid なし）は文字だけ
+  // ランキングの <span class="nick"> の中身。pid があれば押すとプロフィールの窓が開くボタン、古い記録（pid なし）は文字だけ。
+  // 名前は訳さないので data-ugc の要素に入れる
   const nameHTML = ({ nickname, pid, deco } = {}) => {
     const nm = esc(nickname ?? '');
-    return (pid ? `<button type="button" class="pf-name" data-pid="${esc(pid)}">${nm}</button>` : nm) + decoHTML(deco);
+    return (pid ? `<button type="button" class="pf-name" data-pid="${esc(pid)}" data-ugc>${nm}</button>` : `<span data-ugc>${nm}</span>`) + decoHTML(deco);
   };
-  // TA の board（'f2n:asia:10'）→「国旗→国名・アジア・10問」。地域は ranking.js の REGION_KEY の逆
+  // TA の board（'f2n:asia:10'）→「国旗→国名・アジア・10問」（英語は 'Flag → Name · Asia · 10 questions'）。地域は ranking.js の REGION_KEY の逆
+  // （データのキーの日本語。表示は T()）
+  // i18n-data:start
   const REGION_NAME = { asia: 'アジア', europe: 'ヨーロッパ', africa: 'アフリカ', namerica: '北・中央アメリカ', samerica: '南アメリカ', oceania: 'オセアニア' };
+  // i18n-data:end
   const boardLabel = board => {
     const [m, r, c] = String(board).split(':');
-    const mode = MODES.find(x => x.k === m)?.label.replace(/\s+/g, '') ?? m;
-    return `${mode}・${r === 'all' ? '全世界' : REGION_NAME[r] ?? r}・${c === 'all' ? '全部' : `${c}問`}`;
+    const label = MODES.find(x => x.k === m)?.label, mode = label == null ? m : EN ? label : label.replace(/\s+/g, '');
+    const region = r === 'all' ? T('全世界') : REGION_NAME[r] ? T(REGION_NAME[r]) : r;
+    return T('{mode}・{region}・{count}', { mode, region, count: c === 'all' ? T('全部') : T('{n}問', { n: +c }) });
   };
-  // 日本時間の日付（2026/10/28）
-  const jstDate = d => { const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCFullYear()}/${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+  // 日本時間の日付（2026/10/28。英語は Oct 28, 2026）
+  const jstDate = d => {
+    if (EN) return new Intl.DateTimeFormat(I18N.locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'Asia/Tokyo' }).format(d);
+    const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCFullYear()}/${j.getUTCMonth() + 1}/${j.getUTCDate()}`;
+  };
   // カードの中身（RANKING.profileCard の返事の形）。非公開は名前・かざり・ひとことだけ。無い項目（自分のカードの読みこみ前の TA など）は出さない
+  // 称号（日本語のバッジの称号）は、英語のページでは出さない（I18N.hide の 'title'。PR7 で訳したら出す）
   const cardHTML = card => {
-    const head = `<p class="pf-card-name"><b>${esc(card.nickname ?? '')}</b>${decoHTML(card.deco)}</p>`;
-    if (card.private) return `<div class="pf-card">${head}<p class="hint">このプロフィールは非公開だよ</p></div>`;
+    const head = `<p class="pf-card-name"><b data-ugc>${esc(card.nickname ?? '')}</b>${decoHTML(card.deco)}</p>`;
+    if (card.private) return `<div class="pf-card">${head}<p class="hint">${T('このプロフィールは非公開だよ')}</p></div>`;
     const line = s => `<p class="pf-card-line">${s}</p>`, dg = globalThis.RPG_CORE?.DUNGEONS?.length ?? 21;
-    let h = head + (card.title ? `<p class="pf-card-title">〈${esc(card.title)}〉</p>` : '');
-    if (card.badges != null) h += line(`バッジ ${card.badges}個（全${card.badgesTotal ?? 0}個中）`);
-    if (card.rpg) h += line(`冒険 Lv${card.rpg.lv}・ダンジョン${card.rpg.dungeons}/${dg}`);
-    if (card.rpg?.tower > 0) h += line(`英雄の塔 ${card.rpg.tower}階`);   // 最高記録の階。登っていなければ出さない
+    let h = head + (card.title && !I18N.hide.has('title') ? `<p class="pf-card-title">${T('〈{title}〉', { title: esc(card.title) })}</p>` : '');
+    if (card.badges != null) h += line(T('バッジ {n}個（全{t}個中）', { n: card.badges, t: card.badgesTotal ?? 0 }));
+    if (card.rpg) h += line(T('冒険 Lv{lv}・ダンジョン{d}/{all}', { lv: card.rpg.lv, d: card.rpg.dungeons, all: dg }));
+    if (card.rpg?.tower > 0) h += line(T('英雄の塔 {n}階', { n: card.rpg.tower }));   // 最高記録の階。登っていなければ出さない
     if (card.ta?.length) {
-      h += '<p class="pf-card-sub">タイムアタック</p><ul class="pf-card-ta">'
-        + card.ta.map(t => `<li><span>${esc(boardLabel(t.board))}</span> <span class="mono">${RANKING.formatTime(t.timeMs)}（${t.rank}位）</span></li>`).join('') + '</ul>';
+      h += `<p class="pf-card-sub">${T('タイムアタック')}</p><ul class="pf-card-ta">`
+        + card.ta.map(t => `<li><span>${esc(boardLabel(t.board))}</span> <span class="mono">${T('{time}（{rank}位）', { time: RANKING.formatTime(t.timeMs), rank: t.rank })}</span></li>`).join('') + '</ul>';
     }
-    if (card.daily) h += line(`今日の難問 参加${card.daily.plays}回（うち全問正解${card.daily.perfect}回）`);
-    if (card.since instanceof Date && !isNaN(card.since)) h += `<p class="hint">はじめた日 ${jstDate(card.since)}</p>`;
+    // 英語は1回なら once（{ one, other }）
+    if (card.daily) h += line(T('今日の難問 参加{n}回（うち全問正解{q}回）', { n: card.daily.plays, q: card.daily.perfect }));
+    if (card.since instanceof Date && !isNaN(card.since)) h += `<p class="hint">${T('はじめた日 {date}', { date: jstDate(card.since) })}</p>`;
     return `<div class="pf-card">${h}</div>`;
   };
 
@@ -366,8 +382,8 @@
   const dialog = () => {
     if (dlg) return dlg;
     dlg = document.createElement('dialog');
-    dlg.id = 'pf-card'; dlg.setAttribute('aria-label', 'プロフィール');
-    dlg.innerHTML = '<div class="inner"><button type="button" class="close" data-pfc="close">閉じる</button><div class="pf-card-body" role="status"></div></div>';
+    dlg.id = 'pf-card'; dlg.setAttribute('aria-label', T('プロフィール'));
+    dlg.innerHTML = `<div class="inner"><button type="button" class="close" data-pfc="close">${T('閉じる')}</button><div class="pf-card-body" role="status"></div></div>`;
     dlg.addEventListener('click', e => {
       if (e.target === dlg || e.target.closest('[data-pfc="close"]')) dlg.close();
       else if (e.target.closest('[data-pfc="reload"]')) openCard(dlg.dataset.pid);
@@ -378,13 +394,13 @@
   const openCard = async pid => {
     const d = dialog(), body = d.querySelector('.pf-card-body'), n = ++opening;
     d.dataset.pid = pid;
-    body.innerHTML = '<p class="hint">読みこみ中…</p>';
+    body.innerHTML = `<p class="hint">${T('読みこみ中…')}</p>`;
     if (!d.open) d.showModal();
     let r;
     try { r = await RANKING.profileCard({ pid }); } catch (e) { console.warn('[profile] profile_card', e); r = { ok: false, reason: 'network' }; }
     if (n !== opening) return;
     body.innerHTML = r.ok ? cardHTML(r)
-      : '<div class="pf-card-err"><p>読みこめなかった</p><button type="button" class="btn ghost" data-pfc="reload">再読み込み</button></div>';
+      : `<div class="pf-card-err"><p>${T('読みこめなかった')}</p><button type="button" class="btn ghost" data-pfc="reload">${T('再読み込み')}</button></div>`;
   };
   // ランキングの名前のボタン（3つのランキングで共通）は、ここで1つだけ受ける
   document.addEventListener('click', e => {
@@ -423,28 +439,28 @@
     if (!out) return;
     if (!issued || issued.token !== p?.token || issued.expiresAt <= new Date()) { out.innerHTML = ''; return; }
     out.innerHTML = `<div class="pf-tr-box"><p class="pf-tr-code mono" id="pf-tr-code">${fmtCode(issued.code)}</p>`
-      + `<p class="hint" id="pf-tr-exp">${jstTime(issued.expiresAt)} まで・1回だけ使えるよ。出し直すと前のコードは使えなくなる</p>`
-      + '<button type="button" class="btn ghost" id="pf-tr-copy">コピー</button></div>';
+      + `<p class="hint" id="pf-tr-exp">${T('{time} まで・1回だけ使えるよ。出し直すと前のコードは使えなくなる', { time: jstTime(issued.expiresAt) })}</p>`
+      + `<button type="button" class="btn ghost" id="pf-tr-copy">${T('コピー')}</button></div>`;
     $('pf-tr-copy').onclick = () => {
-      const c = fmtCode(issued.code), fail = () => toast('コピーできなかった。コードを長押ししてコピーしてね');
-      try { navigator.clipboard.writeText(c).then(() => toast('コピーしたよ'), fail); } catch { fail(); }
+      const c = fmtCode(issued.code), fail = () => toast(T('コピーできなかった。コードを長押ししてコピーしてね'));
+      try { navigator.clipboard.writeText(c).then(() => toast(T('コピーしたよ')), fail); } catch { fail(); }
     };
   };
   // 引き継ぎの欄。プロフィールがあれば［引き継ぎコードを出す］、いつも［引き継ぎコードを入れる］（spec §2.5）
   const renderTransfer = p => {
     const box = $('pf-transfer');
-    box.innerHTML = (p ? field('引き継ぎ', '<p class="hint">新しい端末に、プロフィールとこの端末のデータ（冒険・バッジ・設定など）を移せるよ</p>'
-        + '<button type="button" class="btn ghost pf-tr-start" id="pf-tr-start">引き継ぎコードを出す</button><div id="pf-tr-out" role="status"></div>') : '')
-      + field('<label for="pf-tr-in">引き継ぎコードを入れる</label>', '<form class="pf-form" id="pf-tr-form" novalidate><div class="row">'
+    box.innerHTML = (p ? field(T('引き継ぎ'), `<p class="hint">${T('新しい端末に、プロフィールとこの端末のデータ（冒険・バッジ・設定など）を移せるよ')}</p>`
+        + `<button type="button" class="btn ghost pf-tr-start" id="pf-tr-start">${T('引き継ぎコードを出す')}</button><div id="pf-tr-out" role="status"></div>`) : '')
+      + field(`<label for="pf-tr-in">${T('引き継ぎコードを入れる')}</label>`, '<form class="pf-form" id="pf-tr-form" novalidate><div class="row">'
         + '<input id="pf-tr-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done" placeholder="XXXX-XXXX-XXXX">'
-        + '<button class="btn ghost" id="pf-tr-claim">入れる</button></div></form><p class="tamsg" id="pf-tr-msg" role="status"></p>'
-        + '<p class="hint">前の端末で出したコードを入れると、この端末にプロフィールとデータが移るよ</p>');
+        + `<button class="btn ghost" id="pf-tr-claim">${T('入れる')}</button></div></form><p class="tamsg" id="pf-tr-msg" role="status"></p>`
+        + `<p class="hint">${T('前の端末で出したコードを入れると、この端末にプロフィールとデータが移るよ')}</p>`);
     if (p) {
       drawIssued();
       $('pf-tr-start').onclick = async () => {
-        if (!confirm('この端末のデータ（冒険・バッジ・設定など）を預けて、コードを出すよ。新しい端末でコードを入れると、この端末のプロフィールは使えなくなる')) return;
+        if (!confirm(T('この端末のデータ（冒険・バッジ・設定など）を預けて、コードを出すよ。新しい端末でコードを入れると、この端末のプロフィールは使えなくなる'))) return;
         const btn = $('pf-tr-start'), out = $('pf-tr-out');
-        btn.disabled = true; out.innerHTML = '<p class="tamsg">送信中…</p>';
+        btn.disabled = true; out.innerHTML = `<p class="tamsg">${T('送信中…')}</p>`;
         const r = await startTransfer();
         if (!btn.isConnected) return;   // not_found で描き直した
         btn.disabled = false;
@@ -458,13 +474,13 @@
       const btn = $('pf-tr-claim'), msg = $('pf-tr-msg'), raw = $('pf-tr-in').value, code = normCode(raw);
       if (!codeOk(code)) {
         msg.className = 'tamsg ng';
-        msg.textContent = wideCode(raw) ? '英字と数字で入れてね（0・O・1・I は使わない）' : RANKING.message('bad_code');
+        msg.textContent = wideCode(raw) ? T('英字と数字で入れてね（0・O・1・I は使わない）') : RANKING.message('bad_code');
         return;
       }
       const now = read();
-      if (!confirm('コードのプロフィールとデータをこの端末に移すよ。この端末の今のデータ（冒険・バッジ・設定など）は上書きされる'
-        + (now ? `。この端末のプロフィール「${now.name}」は使えなくなる` : ''))) return;
-      btn.disabled = true; msg.className = 'tamsg'; msg.textContent = '送信中…';
+      if (!confirm(now ? T('コードのプロフィールとデータをこの端末に移すよ。この端末の今のデータ（冒険・バッジ・設定など）は上書きされる。この端末のプロフィール「{name}」は使えなくなる', { name: now.name })
+        : T('コードのプロフィールとデータをこの端末に移すよ。この端末の今のデータ（冒険・バッジ・設定など）は上書きされる'))) return;
+      btn.disabled = true; msg.className = 'tamsg'; msg.textContent = T('送信中…');
       const r = await claimTransfer(code);
       if (r.ok) { location.reload(); return; }
       btn.disabled = false; msg.className = 'tamsg ng'; msg.textContent = RANKING.message(r.reason);
@@ -474,16 +490,16 @@
     const p = read(), main = $('pf-main');
     renderTransfer(p);
     if (!p) {
-      main.innerHTML = '<p class="pf-lead">プロフィールを作ると、タイムアタック・今日の難問・冒険のランキングにこの名前で載るよ。</p>'
-        + field('<label for="pf-name">プロフィールを作る</label>', '<form class="pf-form" id="pf-form" novalidate><div class="row">'
-          + '<input id="pf-name" type="text" autocomplete="nickname" enterkeyhint="done" placeholder="ニックネーム（12文字まで）">'
-          + '<button class="btn" id="pf-create">作る</button></div></form><p class="tamsg" id="pf-msg" role="status"></p>'
-          + '<p class="hint">ほかの人と同じニックネームは使えないよ。名前はあとから変えられる</p>' + NAME_NOTE);
+      main.innerHTML = `<p class="pf-lead">${T('プロフィールを作ると、タイムアタック・今日の難問・冒険のランキングにこの名前で載るよ。')}</p>`
+        + field(`<label for="pf-name">${T('プロフィールを作る')}</label>`, '<form class="pf-form" id="pf-form" novalidate><div class="row">'
+          + `<input id="pf-name" type="text" autocomplete="nickname" enterkeyhint="done" placeholder="${esc(T('ニックネーム（12文字まで）'))}">`
+          + `<button class="btn" id="pf-create">${T('作る')}</button></div></form><p class="tamsg" id="pf-msg" role="status"></p>`
+          + `<p class="hint">${T('ほかの人と同じニックネームは使えないよ。名前はあとから変えられる')}</p>` + NAME_NOTE);
       $('pf-name').value = store.get('nickname', '');
       $('pf-form').onsubmit = async e => {
         e.preventDefault();
         const btn = $('pf-create'), msg = $('pf-msg');
-        btn.disabled = true; msg.className = 'tamsg'; msg.textContent = '送信中…';
+        btn.disabled = true; msg.className = 'tamsg'; msg.textContent = T('送信中…');
         const r = await create($('pf-name').value);
         if (r.ok) return;   // changed() が描き直す
         btn.disabled = false; msg.className = 'tamsg ng'; msg.textContent = RANKING.message(r.reason);
@@ -491,16 +507,16 @@
       return;
     }
     main.innerHTML = `<div id="pf-me">${cardHTML(myCard(p))}</div>`
-      + field('<label for="pf-rename-in">名前を変える</label>', '<form class="pf-form" id="pf-rename-form" novalidate><div class="row">'
+      + field(`<label for="pf-rename-in">${T('名前を変える')}</label>`, '<form class="pf-form" id="pf-rename-form" novalidate><div class="row">'
         + '<input id="pf-rename-in" type="text" autocomplete="nickname" enterkeyhint="done">'
-        + '<button class="btn ghost" id="pf-rename">変える</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>'
-        + '<p class="hint">ランキングの名前は、前の記録もふくめて新しい名前になるよ</p>' + NAME_NOTE)
-      + field('かざり', '<p class="hint">冒険の仲間の国旗を3つまで、名前の横にかざれるよ</p>'
-        + (canDeco() ? '<button type="button" class="linkbtn pf-deco" id="pf-deco">冒険でかざりを選ぶ</button>' : ''))
-      + field('設定', '<label class="switch"><input type="checkbox" id="pf-public"> プロフィールを公開する</label>'
-        + '<p class="hint">オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ</p>'
-        + '<label class="switch"><input type="checkbox" id="pf-auto"> 記録をランキングに自動で載せる</label>'
-        + '<p class="hint">オフにすると、結果画面の［載せる］を押したときだけ載るよ</p>');
+        + `<button class="btn ghost" id="pf-rename">${T('変える')}</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>`
+        + `<p class="hint">${T('ランキングの名前は、前の記録もふくめて新しい名前になるよ')}</p>` + NAME_NOTE)
+      + field(T('かざり'), `<p class="hint">${T('冒険の仲間の国旗を3つまで、名前の横にかざれるよ')}</p>`
+        + (canDeco() ? `<button type="button" class="linkbtn pf-deco" id="pf-deco">${T('冒険でかざりを選ぶ')}</button>` : ''))
+      + field(T('設定'), `<label class="switch"><input type="checkbox" id="pf-public"> ${T('プロフィールを公開する')}</label>`
+        + `<p class="hint">${T('オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ')}</p>`
+        + `<label class="switch"><input type="checkbox" id="pf-auto"> ${T('記録をランキングに自動で載せる')}</label>`
+        + `<p class="hint">${T('オフにすると、結果画面の［載せる］を押したときだけ載るよ')}</p>`);
     loadMe(p);
     checkMe(p);
     $('pf-rename-in').value = p.name;
@@ -512,9 +528,9 @@
     $('pf-rename-form').onsubmit = async e => {
       e.preventDefault();
       const btn = $('pf-rename'), msg = $('pf-rename-msg');
-      btn.disabled = true; msg.className = 'tamsg'; msg.textContent = '送信中…';
+      btn.disabled = true; msg.className = 'tamsg'; msg.textContent = T('送信中…');
       const r = await rename($('pf-rename-in').value);
-      if (r.ok) { $('pf-rename-msg').className = 'tamsg ok'; $('pf-rename-msg').textContent = '名前を変えたよ'; return; }
+      if (r.ok) { $('pf-rename-msg').className = 'tamsg ok'; $('pf-rename-msg').textContent = T('名前を変えたよ'); return; }
       btn.disabled = false; msg.className = 'tamsg ng'; msg.textContent = RANKING.message(r.reason);
     };
   }
@@ -562,7 +578,7 @@
     const p = read();
     if (!p?.claimed) return;
     update(p.token, { claimed: undefined });
-    toast(`${esc(p.name)} のプロフィールを引き継いだよ`, 5000);
+    toast(T('{name} のプロフィールを引き継いだよ', { name: ugc(p.name) }), 5000);
   };
   const boot = () => ready.then(() => { welcome(); scheduleSync(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });

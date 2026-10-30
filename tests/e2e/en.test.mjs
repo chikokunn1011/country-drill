@@ -23,8 +23,8 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => 
 t('en_home', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.deepEqual(await jaLeft(page), []);
-  // 未訳の機能の入口は出さない
-  for (const id of ['home-daily', 'home-rpg', 'home-rank', 'home-badges', 'home-profile'])
+  // 未訳の機能の入口は出さない（冒険・バッジは PR7・PR8、今日の難問は PR6 の Task 7 まで）
+  for (const id of ['home-daily', 'home-rpg', 'home-badges'])
     assert.equal(await page.isVisible('#' + id), false, id);
   assert.match(await page.title(), /Flag Master/);
   assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
@@ -381,10 +381,11 @@ t('en_dopa', async page => {
   assert.deepEqual(await page.evaluate(([src, flags]) => window.__pops.filter(p => new RegExp(src, flags).test(p)), [JA_RE.source, JA_RE.flags]), []);
 }, { storage: { badges: QUIET_BADGES, settings: { dopa: true } } });
 
-// ランキングは英語版では開かない（ranking.js を読まない）
-t('en_no_ranking', async page => {
-  await page.waitForSelector('#scr-home:not([hidden])');
-  assert.equal(await page.isHidden('#scr-ranking'), true);
+// en/#ranking はランキングを直接開く（PR6 から英語版も ranking.js を読む）
+t('en_ranking_hash', async page => {
+  await page.waitForSelector('#scr-ranking:not([hidden])');
+  await page.waitForFunction(() => document.querySelector('#rk-list').getAttribute('aria-busy') === 'false');
+  assert.equal(await page.isHidden('#scr-home'), true);
   assert.deepEqual(await jaLeft(page), []);
 }, { path: 'en/#ranking' });
 

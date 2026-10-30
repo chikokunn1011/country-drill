@@ -507,7 +507,7 @@ t('nameHTML escapes', async page => {
   assert.doesNotMatch(h, /<button|<b>/);
   // pid があれば押せるボタン。かざりは知っている国だけ3つまで、重なりは1つに
   const b = await page.evaluate(() => PROFILE.nameHTML({ nickname: 'チコ"', pid: 'p"1', deco: ['jp', 'zz', 'jp', 'br', 'fr', 'de'] }));
-  assert.match(b, /^<button type="button" class="pf-name" data-pid="p&quot;1">チコ&quot;<\/button>/);
+  assert.match(b, /^<button type="button" class="pf-name" data-pid="p&quot;1" data-ugc>チコ&quot;<\/button>/);
   assert.equal((b.match(/<img /g) ?? []).length, 3);
   assert.match(b, /<span class="rr-deco">/);
   assert.doesNotMatch(b, /zz/);

@@ -660,8 +660,10 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="i18n/en-rank.js?v=2"></script>
 <script src="i18n/en-book.js?v=1"></script>
 <script src="i18n/en-dojo.js?v=1"></script>
+<script src="i18n/en-profile.js?v=1"></script>
 <script src="countries.js?v=2"></script>
 <script src="themes.js?v=2"></script>
+<script src="ranking.js?v=6"></script>
 <script src="daily-core.js?v=2"></script>
 <script src="sound.js?v=1"></script>
 <script>
@@ -1808,7 +1810,8 @@ async function loadRanking() {
   $('rk-error').hidden = !!rows;
   $('rk-empty').hidden = !rows || rows.length > 0;
   // 名前は profile.js の nameHTML（押すとプロフィールの窓・かざり）。profile.js が無ければ名前の文字だけ。自分の行（pid が同じ）は目立たせる
-  const nameOf = window.PROFILE?.nameHTML ?? (r => esc(r.nickname)), myPid = window.PROFILE?.get()?.pid;
+  // 名前はほかの人が入れた文字なので訳さず、data-ugc の要素に入れる
+  const nameOf = window.PROFILE?.nameHTML ?? (r => `<span data-ugc>${esc(r.nickname)}</span>`), myPid = window.PROFILE?.get()?.pid;
   let no = 0;
   list.innerHTML = (rows ?? []).map((r, i) => {
     if (!i || r.timeMs !== rows[i - 1].timeMs) no = i + 1; // 同じタイムは同じ順位（rank_of の「自分より速い人数＋1」とそろえる）
@@ -1963,6 +1966,7 @@ else { if (MAP_SCREENS.includes(start) && !mapReady) show('home'); show(start); 
 // 地図はホームが出たあと（load のあと）に、うしろで読みはじめる。失敗は loadMap が console.error に書く（地図の画面へ進むときに読み直す）
 addEventListener('load', () => loadMap().catch(() => {}));
 </script>
+<script src="profile.js?v=8"></script>
 <script src="dojo.js?v=2"></script>
 <script src="pwa.js?v=2"></script>
 </body>
