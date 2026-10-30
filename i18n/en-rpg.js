@@ -294,7 +294,7 @@ Object.assign(window.I18N_EN ??= {}, {
   // ---- ストーリー（rpg-core の STORY・STORY_END。子ども向けのやさしい英語・2人称 you, the Traveler・出来事を足さない） ----
   // 「地図喰い（ちずくい）」の（ちずくい）は読みがななので訳さない。「地球の国のなかまたち」は仲間（allies）ではなく friends
   '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。':
-    'The Map Eater, a monster that chews on the world map, and its monster minions ran off with flags from all over the world.',
+    'The Map Eater, a monster that chews on the world map, ran off with flags from all over the world, along with its monster minions.',
   '旅人のきみは、クイズで集めたコインで力をつけ、国のカードの仲間といっしょに6つの地域を旅する。':
     'You, the Traveler, grow stronger with the coins you collect in quizzes, and travel through six regions with your country card allies.',
   '国を思い出すたびに、国旗がひとつ戻ってくる。地図喰いの巣で親玉をたおして、195の旗を取りもどそう！':
@@ -303,7 +303,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '地図喰いをたおすと、195の旗が空に舞いもどった。':
     'When you defeated the Map Eater, the 195 flags came fluttering back into the sky.',
   'でも、地図喰いのいた場所に、鏡のような裂け目がひとつ残っている。':
-    'But where the Map Eater used to be, there is still one crack that looks like a mirror.',
+    'But where the Map Eater had been, there was still a single crack that looked like a mirror.',
   'のぞきこむと、そこにはそっくりだけど少しちがう、もうひとつの地球があった…':
     'When you peeked inside, you saw another Earth that looked just the same, but a little different…',
   '🪞 第2章 鏡の地球': '🪞 Chapter 2: Mirror Earth',
@@ -319,19 +319,19 @@ Object.assign(window.I18N_EN ??= {}, {
   '夜空を見上げると、星がひとつ、またひとつと消えていく。':
     'When you looked up at the night sky, the stars were vanishing, one after another.',
   '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。':
-    'The Star Eater, who gave birth to the Map Eater, had been targeting Earth from space.',
+    'The Star Eater, the mother of the Map Eater, had been targeting Earth from space.',
   '🪐 第3章 宇宙': '🪐 Chapter 3: Space',
   '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。':
     'The Star Eater is swallowing the stars one by one as it comes closer to Earth.',
   '星には、地球の国のなかまたちの記憶が眠っている。':
-    'Memories of your friends, the countries of Earth, are sleeping inside the stars.',
+    'Memories of the friendly countries of Earth are sleeping inside the stars.',
   '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！':
-    'Look down on Earth from space, remember where the countries are, and stop the Star Eater!',
+    'Look down at Earth from space, remember where the countries are, and stop the Star Eater!',
   '🌟 エンディング': '🌟 Ending',
   '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。':
-    'When the Star Eater disappeared, all the swallowed stars began to shine at once.',
+    'When the Star Eater disappeared, all the stars it had swallowed began to shine at once.',
   '地球も、鏡の地球も、宇宙も、もう安心だ。':
     'Earth, Mirror Earth, and Space are all safe now.',
   'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――':
-    'But the journey doesn’t end. No one has ever seen the top of the Tower of Heroes yet—',
+    'But the journey isn’t over. No one has seen the top of the Tower of Heroes yet—',
 });
