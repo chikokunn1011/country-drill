@@ -2,6 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { JA_RE } from '../../tools/i18n_scan.mjs';
 import { startServer, openApp, jaLeft, warned, QUIET_BADGES, pickSetup, settle, answerCorrect, answerWrong, answerTap, recordEvents, events } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -335,7 +336,8 @@ t('en_dopa', async page => {
   assert.match((await page.textContent('#rcard .rank')).trim(), /^RANK [SABC]$/);
   const pops = await page.evaluate(() => window.__pops);
   assert.ok(pops.includes('3 COMBO broken…'), pops.join(' | '));
-  assert.deepEqual(pops.filter(p => /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}！-｠]/u.test(p)), []);
+  // 日本語の判定は tools/i18n_scan.mjs の JA_RE（ページの中で作り直す）
+  assert.deepEqual(await page.evaluate(([src, flags]) => window.__pops.filter(p => new RegExp(src, flags).test(p)), [JA_RE.source, JA_RE.flags]), []);
 }, { storage: { badges: QUIET_BADGES, settings: { dopa: true } } });
 
 // ランキングは英語版では開かない（ranking.js を読まない）

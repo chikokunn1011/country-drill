@@ -1675,7 +1675,7 @@ function showResult() {
     cond = [G.mode.label, regionLabel(S.region), P.count === 'all' ? T('全部（{n}問）', { n }) : T('{n}問', { n })].join(T('／'));
   } else {
     head = G.attempts === 1 ? T('ノーミスでクリア！') : T('クリア！');
-    big = `${n}<small>${T('問連続正解')}</small>`;
+    big = T('{n}<small>問連続正解</small>', { n });
     stats = `<span>${T('挑戦 {b}回目でクリア', { b: `<b>${G.attempts}</b>` })}</span><span>${T('まちがえ {b}回', { b: `<b>${G.wrongs}</b>` })}</span>`;
   }
   const ratio = G.firstTry / n;
