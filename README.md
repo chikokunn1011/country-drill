@@ -80,6 +80,7 @@
 - 読むもの: `countries.js`・`trivia.js`・`daily-core.js` の `SIMILAR`・`index.html` の `REGIONS`・`SUBREGIONS`・フッター・`FLAG_V`・テーマの先読み・`privacy.html` の `pages.css?v=`・`world.js` と `data/neighbors_fix.json`（となりの国）・`data/flag_meanings.json`（国旗の意味）・`themes/*.html`（この国旗が出てくるまとめ）。どれかを変えたら流し直す（流し忘れると unit の `regenerate_same` が落ちて知らせる）
 - `sitemap.xml` は目印のあいだだけを書きかえる。国のページに `lastmod` は付けない
 - まとめページも作り直すときは、先に `node tools/make_theme_pages.mjs`、そのあと `node tools/make_country_pages.mjs`（国のページは作ってあるまとめページを読んで、その国が出てくるまとめにリンクする）
+- 全部を作り直す順番（`index.html`・`embed.html`・`i18n/`・`data/`・`countries.js` などを変えたとき。あとのものが前のものの出力を読むので、順番を変えない）: `node tools/make_en.mjs && node tools/make_theme_pages.mjs && node tools/make_country_pages.mjs && node tools/make_sw.mjs`（英語版の `en/index.html`・`en/embed.html` → まとめページ → 国のページ → `sw.js`）
 - SIMILAR に知らないコード・豆知識が0件の国・`flags/<コード>.svg` が無い国・フッターの目印が無い・国旗の意味（`data/flag_meanings.json`）が無い国や最初の文が長すぎる国がある・`themes/index.html` が無い・`data/neighbors_fix.json` に知らないコードや地図と同じになる直しがあるときは、何も書かずに終了コード1で止まる
 - 国のページの［この地域で遊ぶ］は `index.html#play=<地域>`（細かい地域があればそれ）を開き、その地域を選んだモード選択の画面になる。知らない値は無視してホームを出す
 - 本編の図鑑（一覧のくわしい窓と地図の情報欄）に「この国のページ ›」を出す。クイズの答えの欄には出さない
