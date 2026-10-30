@@ -156,7 +156,7 @@
   // admin で始まるものは管理ページ（admin.html）の置き場（adminAuth は sessionStorage）。この端末のものなので預けない
   const TRANSFER_KEYS = ['settings', 'setup', 'misses', 'nickname', 'rpg', 'badges', 'daily', 'bdgcat', 'bview', 'streak', 'dojo'];
   const LOCAL_KEYS = ['profile', 'profilePending', 'rpgRank', 'rpgRankPending', 'rpgRankDel', 'rpgSent', 'rpgUnreg', 'transferBackup', 'transferPending', 'badges-broken',
-    'adminSnaps', 'adminErrors', 'adminAuth'];
+    'pwa', 'adminSnaps', 'adminErrors', 'adminAuth'];
   const rawGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
   // { v: 1, keys: { キー: 中身の文字列 }, profile: { auto, isPublic } }。keys は一覧のキーで、この端末にあるものだけ（JSON にせず生の文字列のまま）。
   // profile は自動で載せる・公開の設定（profile キーは預けないので、ここだけ持っていく。無い古いデータでも読めるよう v は 1 のまま）
