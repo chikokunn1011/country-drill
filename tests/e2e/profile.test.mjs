@@ -689,7 +689,8 @@ t('transfer moves data', async (page, app) => {
   } finally { await b.close(); }
   // 前の端末: 次にサーバーとやりとりしたとき not_found → 知らせて、作るフォームになる（ゲームのデータはそのまま）
   // （B を見ているあいだに A の同期が not_found をもらって、知らせがもう消えていることもある）
-  await page.click('#brand');
+  // 知らせのトーストが #brand の上に重なっていることがある（重い時に長く残る）ので、クリックは要素に直接送る
+  await page.locator('#brand').dispatchEvent('click');
   await openProfile(page);
   await page.locator('#pf-form').waitFor({ timeout: 15_000 });
   assert.deepEqual(await page.evaluate(() => window.__toasts.filter(x => x.includes('引き継がれた'))), ['このプロフィールは別の端末に引き継がれたよ']);
