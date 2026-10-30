@@ -282,8 +282,15 @@ test('en_pages_no_japanese', () => {
 
 test('en_howto_only_available', () => {
   const h = read('en/howto.html');
-  for (const w of ['Time Attack', 'Ranking', 'Leaderboard', 'Daily', 'Adventure', 'Badges', 'Profile']) assert.ok(!h.includes(w), w);
-  for (const id of ['start', 'modes', 'kinds', 'book', 'embed', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`), id);
+  // 冒険・バッジは PR7・PR8 まで英語版に無い。タイムアタック・ランキング・今日の難問・プロフィールは PR6 で足した
+  for (const w of ['Adventure', 'Badges', 'Ranking']) assert.ok(!h.includes(w), w);
+  for (const w of ['Time Attack', 'Leaderboard', 'Daily Puzzle', 'Profile', 'Transfer code', 'midnight Japan time']) assert.ok(h.includes(w), w);
+  const ids = [...h.matchAll(/<h2 id="([^"]+)"/g)].map(m => m[1]);
+  assert.deepEqual(ids, ['start', 'modes', 'kinds', 'daily', 'dojo', 'book', 'profile', 'app', 'embed', 'faq']);
+  // 足した節の順番は日本語の howto と同じ
+  const ja = [...read('howto.html').matchAll(/<h2 id="([^"]+)"/g)].map(m => m[1]).filter(id => ids.includes(id));
+  assert.deepEqual(ids.filter(id => ja.includes(id)), ja);
+  assert.match(h, /<h2 id="kinds">Practice, Challenge, and Time Attack<\/h2>/);
   // 用語は辞書（i18n/en-*.js）と同じ
   for (const w of ['Play the quiz', 'Choose a mode', 'Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map', 'Practice', 'Challenge', 'Answer style', 'Gallery', 'Settings', 'Look-alike Flags Dojo', 'Add to home screen']) assert.ok(h.includes(w), w);
   assert.ok(h.includes('&lt;iframe src="https://chikokunn1011.github.io/country-drill/en/embed.html"'));
