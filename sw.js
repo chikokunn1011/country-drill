@@ -256,24 +256,33 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 
+const SCOPE = new URL('./', location.href).pathname;
+// 管理ページ（admin.html・admin*.js）は取っておかない
+const isAdmin = url => url.pathname.slice(SCOPE.length).startsWith('admin');
+// index.html の代わりに出してよいのは、根（./・index.html。? 付きも）を開いたときだけ
+const isShell = url => url.pathname === SCOPE || url.pathname === `${SCOPE}index.html`;
+
 // 取れたものはキャッシュに入れる
 const keep = (req, res) => {
-  if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }
+  if (res.ok && !isAdmin(new URL(req.url))) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }
   return res;
 };
 const fromNet = req => fetch(req).then(res => keep(req, res));
 const fromCache = req => caches.open(CACHE).then(c => c.match(req));
 
-// ページ: ネット優先。3秒で返らないかネットが落ちたらキャッシュ（無ければ index.html）
-const page = req => new Promise((ok, ng) => {
+// ページ: ネット優先。3秒で返らないかネットが落ちたらキャッシュ（根だけは無ければ index.html）。
+// それも無ければネットを待ち、だめならブラウザのふつうのオフラインの画面（国のページなどに本編を出さない）
+const page = req => new Promise(ok => {
   let done = false;
+  const net = fromNet(req);
   const fallback = () => {
     if (done) return;
     done = true;
-    fromCache(req).then(r => r || caches.open(CACHE).then(c => c.match('index.html')))
-      .then(r => r ? ok(r) : net.then(ok, ng));
+    fromCache(req).then(r => r || (isShell(new URL(req.url)) ? caches.open(CACHE).then(c => c.match('index.html')) : undefined))
+      .catch(() => undefined)
+      .then(r => r || net)
+      .then(ok, () => ok(Response.error()));
   };
-  const net = fromNet(req);
   const timer = setTimeout(fallback, PAGE_WAIT_MS);
   net.then(res => { if (!done) { done = true; clearTimeout(timer); ok(res); } }, () => { clearTimeout(timer); fallback(); });
 });
@@ -282,9 +291,8 @@ self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;   // 外のサイト（Supabase など）はさわらない
   if (req.mode === 'navigate') return e.respondWith(page(req));
-  const base = new URL('./', location.href).pathname;
   // ?v= 付き・vendor/ はキャッシュ優先
-  if (url.searchParams.has('v') || url.pathname.startsWith(`${base}vendor/`)) {
+  if (url.searchParams.has('v') || url.pathname.startsWith(`${SCOPE}vendor/`)) {
     return e.respondWith(fromCache(req).then(r => r || fromNet(req)));
   }
   // それ以外はネット優先、落ちたらキャッシュ

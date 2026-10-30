@@ -42,7 +42,41 @@ t('offline_play', async (page, { context }) => {
   }
   await page.locator('#scr-result').waitFor();
   assert.equal(await page.evaluate(() => G.set.length), 5);
+  // 場所 → 国旗: 地図（world.js・d3・topojson）も保存したものから描ける
+  await page.evaluate(() => show('setup'));
+  await pickSetup(page, { mode: 'm2f', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  assert.ok(await page.locator('#qcard svg.map path').count() > 50);
 }, { seed: 1 });
+
+// オフラインで、開いたことのないページ（国のページ・遊び方）には本編（index.html）を出さず、ブラウザのふつうのオフラインの画面にする
+t('offline_unvisited_pages', async (page, { context }) => {
+  await swReady(page);
+  await context.setOffline(true);
+  for (const path of ['country/zz.html', 'country/', 'howto.html']) {
+    await page.goto(new URL(path, server.url).href).catch(() => {});
+    assert.equal(await page.locator('#scr-home').count(), 0, path);
+    assert.equal(await page.evaluate(() => typeof G), 'undefined', path);
+  }
+  // 根は ? 付きでも本編が出る
+  await page.goto(new URL('?from=pwa', server.url).href);
+  await page.locator('#scr-home').waitFor();
+});
+
+// 管理ページ（admin.html・admin*.js）は SW のキャッシュに入れない
+t('sw_skips_admin', async page => {
+  await swReady(page);
+  await page.goto(new URL('admin.html', server.url).href);
+  await page.waitForLoadState('load');
+  const keys = await page.evaluate(async () => {
+    const out = [];
+    for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) out.push(new URL(r.url).pathname);
+    return out;
+  });
+  assert.ok(keys.length > 200);
+  assert.deepEqual(keys.filter(k => k.includes('admin')), []);
+});
 
 // ?v= の無いファイル（countries.js）はネット優先: 書きかえたら次に開いたとき新しい中身
 test('sw_update_unversioned', { timeout: 90_000 }, async () => {
@@ -61,17 +95,20 @@ test('sw_update_unversioned', { timeout: 90_000 }, async () => {
   } finally { await app.close(); await srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
-// SW が動いていても、外のサイト（偽 Supabase）への問い合わせはそのまま届く
-t('sw_ignores_other_origins', async (page, { db }) => {
-  await swReady(page);
-  await page.reload();
-  await page.locator('#scr-home').waitFor();
-  const n = db.calls.filter(c => c.name === 'top_scores2').length;
-  await page.click('#home-rank');
-  await page.waitForFunction(() => !document.getElementById('scr-ranking').hidden);
-  for (let i = 0; i < 100 && db.calls.filter(c => c.name === 'top_scores2').length <= n; i++) await new Promise(ok => setTimeout(ok, 20));
-  assert.ok(db.calls.filter(c => c.name === 'top_scores2').length > n);
-});
+// SW が動いていても、外のサイトへの GET（Google Fonts の CSS）は SW がさわらず、ページからそのままテストの route に届く
+// （SW が fetch し直すと request.serviceWorker() が付くので数えない）
+{
+  let fonts = 0, viaSw = 0;
+  t('sw_ignores_other_origins', async page => {
+    await swReady(page);
+    const n = fonts;
+    await page.reload();
+    await page.locator('#scr-home').waitFor();
+    assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller));
+    assert.ok(fonts > n, `route に届いた数 ${fonts}（前は ${n}）`);
+    assert.equal(viaSw, 0);
+  }, { routes: [['https://fonts.googleapis.com/**', route => { if (route.request().serviceWorker()) viaSw++; else fonts++; return route.fulfill({ status: 200, contentType: 'text/css', body: '' }); }]] });
+}
 
 // ---------- 「アプリとして追加」の帯（#home-pwa）と設定の欄（#set-pwa-field）。SW は要らないので既定の block ----------
 const b = (name, fn, opts = {}) => test(name, { timeout: 60_000 }, async () => {
