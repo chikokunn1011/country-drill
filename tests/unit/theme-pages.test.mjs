@@ -32,7 +32,7 @@ const enPages = () => ['en/themes/index.html', ...THEME_IDS.map(id => `en/themes
 const EN_TITLES = {
   stars: 'Flags with stars', cross: 'Flags with a cross', crescent: 'Flags with a crescent moon', sun: 'Flags with a sun',
   animal: 'Flags with animals or birds', unionjack: 'Flags with the Union Jack', vtricolor: 'Vertical tricolor flags',
-  htricolor: 'Horizontal tricolor flags', redwhite: 'Red and white flags', similar: 'How to tell similar flags apart',
+  htricolor: 'Horizontal tricolor flags', redwhite: 'Red and white flags', similar: 'How to tell look-alike flags apart',
   island: 'Island countries', landlocked: 'Landlocked countries', bigarea: 'Largest countries by area', smallarea: 'Smallest countries by area',
 };
 const RULES_EN = JSON.parse(read('data/en/feature_rules.json'));
@@ -284,7 +284,7 @@ test('en_theme_content', () => {
   const idx = read('en/themes/index.html');
   assert.ok(idx.includes('25 groups'));
   assert.ok(!sim.includes('pairs') && !idx.includes('pairs'));
-  assert.ok(sim.includes('How to tell similar flags apart: 25 groups,'));
+  assert.ok(sim.includes('How to tell look-alike flags apart: 25 groups,'));
   for (const id of THEME_IDS) assert.ok(idx.includes(`<span>${esc(EN_TITLES[id])}<br>`), id);
 });
 

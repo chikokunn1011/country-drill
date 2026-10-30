@@ -19,7 +19,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？': 'If you quit now, today’s Daily Puzzle ends with your score so far. Quit?',
 
   // クイズ: やめるボタン・じゅんび
-  'やめてモード選択へ': 'Quit to mode select',
+  'やめてモード選択へ': 'Quit and change mode',
   'やめる（今日の挑戦はここまで）': 'Quit (end today’s puzzle here)',
   'やめて道場へ': 'Quit to the Dojo',
   'じゅんび中…': 'Getting ready…',

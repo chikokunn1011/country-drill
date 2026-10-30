@@ -32,7 +32,7 @@ const THEMES = {
   crescent: { n: '三日月がある国旗', lead: '国旗に三日月がある国の一覧です。星といっしょに描かれていることが多い模様です。',
     e: 'Flags with a crescent moon', leadE: 'Countries whose flags have a crescent moon. It is often drawn together with a star.' },
   sun: { n: '太陽がある国旗', lead: '国旗に太陽がある国の一覧です。日本の日の丸もここに入ります。',
-    e: 'Flags with a sun', leadE: "Countries whose flags have a sun. Japan's flag, the Hinomaru, is on this list too." },
+    e: 'Flags with a sun', leadE: 'Countries whose flags have a sun. Japan’s flag, the Hinomaru, is on this list too.' },
   animal: { n: '動物・鳥がいる国旗', lead: '国旗に動物や鳥がいる国の一覧です。真ん中の紋章の中に小さく描かれているものも数えています。',
     e: 'Flags with animals or birds', leadE: 'Countries whose flags have animals or birds. We also count small ones drawn inside a coat of arms in the center.' },
   unionjack: { n: 'ユニオンジャックが入った国旗', lead: 'イギリスの国旗（ユニオンジャック）が入った国旗の一覧です。イギリス自身もふくみます。',
@@ -44,15 +44,15 @@ const THEMES = {
   redwhite: { n: '赤と白だけの国旗', lead: '赤と白の2色だけでできた国旗の一覧です。',
     e: 'Red and white flags', leadE: 'Flags made of just two colors: red and white.' },
   similar: { n: '似ている国旗の見分け方', lead: '色や形がよく似ていて、まちがえやすい国旗の組です。組ごとに、見分けるところを一言で書いています。',
-    e: 'How to tell similar flags apart', leadE: 'Flags that look a lot alike in color or design and are easy to mix up. For each group, a short note says what to look for.' },
+    e: 'How to tell look-alike flags apart', leadE: 'Flags that look a lot alike in color or design and are easy to mix up. For each group, a short note says what to look for.' },
   island: { n: '島国の一覧', lead: 'ほかの国と陸で国境を接していない島国の一覧です。',
     e: 'Island countries', leadE: 'Island countries that share no land border with any other country.' },
   landlocked: { n: '内陸国の一覧', lead: '海に面していない内陸国の一覧です。カスピ海は湖として数えています。',
     e: 'Landlocked countries', leadE: 'Landlocked countries that have no coastline. We count the Caspian Sea as a lake.' },
   bigarea: { n: '面積が大きい国ランキング', lead: `面積が大きい国の上位${RANK_N}か国です。面積は国旗マスターのデータ（km²）です。`,
-    e: 'Largest countries by area', leadE: `The top ${RANK_N} countries by area. Areas are from Flag Master's data (km²).` },
+    e: 'Largest countries by area', leadE: `The top ${RANK_N} countries by area. Areas are from Flag Master’s data (km²).` },
   smallarea: { n: '面積が小さい国ランキング', lead: `面積が小さい国の${RANK_N}か国を、いちばん小さい国から並べました。面積は国旗マスターのデータ（km²）です。`,
-    e: 'Smallest countries by area', leadE: `The ${RANK_N} smallest countries by area, starting with the very smallest. Areas are from Flag Master's data (km²).` },
+    e: 'Smallest countries by area', leadE: `The ${RANK_N} smallest countries by area, starting with the very smallest. Areas are from Flag Master’s data (km²).` },
 };
 
 
@@ -204,13 +204,13 @@ export const EN = {
   playLabel: 'Play',
   play: 'Play Flag Master',
   allCountries: 'All countries',
-  quiz: n => `Play quiz with this collection (${EN.countries(n)})`,
+  quiz: n => `Take the quiz on this collection (${EN.countries(n)})`,
   countries: n => `${n} ${n === 1 ? 'country' : 'countries'}`,
   groups: n => `${n} ${n === 1 ? 'group' : 'groups'}`,
   desc: (t, count) => `${t}: ${count}, shown with their flags.`,
   descTail: 'Try the quiz on Flag Master.',
   indexTitle: 'Flag collections by theme | Flag Master',
-  indexDesc: 'Flags with stars, crosses, or crescent moons, how to tell similar flags apart, island and landlocked countries, rankings by area, and more, grouped by theme.',
+  indexDesc: 'Flags grouped by theme: stars, crosses, and crescent moons; how to tell look-alike flags apart; island and landlocked countries; rankings by area; and more.',
   indexLead: 'Pages that group flags by design and color, or by features of the country itself. Choose a collection to see the flags that fit it.',
 };
 // 英語の国名の ABC 順（同じならコード順）

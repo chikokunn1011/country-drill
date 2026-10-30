@@ -285,7 +285,7 @@ test('en_howto_only_available', () => {
   for (const w of ['Time Attack', 'Ranking', 'Leaderboard', 'Daily', 'Adventure', 'Badges', 'Profile']) assert.ok(!h.includes(w), w);
   for (const id of ['start', 'modes', 'kinds', 'book', 'embed', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`), id);
   // 用語は辞書（i18n/en-*.js）と同じ
-  for (const w of ['Play quiz', 'Choose a mode', 'Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map', 'Practice', 'Challenge', 'Answer style', 'Gallery', 'Settings', 'Look-alike Flags Dojo', 'Add to home screen']) assert.ok(h.includes(w), w);
+  for (const w of ['Play the quiz', 'Choose a mode', 'Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map', 'Practice', 'Challenge', 'Answer style', 'Gallery', 'Settings', 'Look-alike Flags Dojo', 'Add to home screen']) assert.ok(h.includes(w), w);
   assert.ok(h.includes('&lt;iframe src="https://chikokunn1011.github.io/country-drill/en/embed.html"'));
   assert.ok(h.includes('en/embed.html?theme=dark') || h.includes('embed.html?theme=dark'));
   assert.ok(!/<iframe\b/.test(h) && !/<img\b/.test(h));

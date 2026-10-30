@@ -382,12 +382,12 @@ test('en_country_head', () => {            // 196枚。lang・title・canonical�
   }
   for (const c of C) {
     const h = read(`en/country/${c.a}.html`);
-    assert.equal(unesc(attr(h, /<title>([^<]*)<\/title>/)), `Flag of ${theName(c.e)} – Meaning & Neighbors | Flag Master`, c.a);
+    assert.equal(unesc(attr(h, /<title>([^<]*)<\/title>/)), `Flag of ${theName(c.e)}: meaning and neighbors | Flag Master`, c.a);
     const first = /^[\s\S]*?[.!?]["”)]?(?=\s+[A-Z"“(]|$)/.exec(MEANING_EN.get(c.a))[0];
     const d = desc(h), head = `Flag of ${theName(c.e)}: ${first}`;
     assert.ok(head.length <= 160 ? d.startsWith(head) : d.endsWith('…') && head.startsWith(d.slice(0, -1)), c.a);
   }
-  assert.equal(desc(read('en/country/fr.html')), `Flag of France: ${MEANING_EN.get('fr').split('. ')[0]}. France (Europe): flag, capital, area, and neighbors. Similar flags: Netherlands, Luxembourg, Paraguay.`);
+  assert.equal(desc(read('en/country/fr.html')), `Flag of France: ${MEANING_EN.get('fr').split('. ')[0]}. France (Europe): flag, capital, area, and neighbors. Look-alike flags: Netherlands, Luxembourg, Paraguay.`);
 });
 
 test('en_country_content', () => {
@@ -404,13 +404,13 @@ test('en_country_content', () => {
   assert.ok(nb.includes('de.html') && h.includes('<span>Germany</span>'));
   assert.deepEqual(nb, NB.get('fr').map(b => byA.get(b)).sort(byEn).map(b => `${b.a}.html`));
   assert.deepEqual(hrefsIn(h, 'ul.similar'), ['nl.html', 'lu.html', 'py.html']);
-  assert.ok(h.includes(`<a class="play-region" href="../#play=${encodeURIComponent('西ヨーロッパ')}">Play this region (Western Europe)</a>`));
+  assert.ok(h.includes(`<a class="play-region" href="../#play=${encodeURIComponent('西ヨーロッパ')}">Play this region: Western Europe</a>`));
   assert.ok(h.includes('<a href="../">Play Flag Master</a>') && h.includes('<a href="../#book">See it in the Gallery</a>'));
   assert.ok(!h.includes('index.html#'));
   assert.ok(!/豆知識|Trivia/i.test(h) && !h.includes('class="trivia"'));
   // 並び: 国旗 → 地域など → 意味 → となり → 似ている → まとめ → 遊ぶ → 前後 → フッター
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, s); return i; };
-  const order = ['class="cflag"', 'class="cfacts"', '<h2>What the flag means</h2>', '<h2>Neighboring countries</h2>', '<h2>Similar flags</h2>',
+  const order = ['class="cflag"', 'class="cfacts"', '<h2>What the flag means</h2>', '<h2>Neighboring countries</h2>', '<h2>Look-alike flags</h2>',
     '<h2>Flag collections with this flag</h2>', 'class="cplay"', 'class="prevnext"', '<footer>'].map(at);
   assert.deepEqual(order, [...order].sort((x, y) => x - y));
   assert.ok(hrefsIn(h, 'ul.cthemes').includes('../themes/vtricolor.html'));
@@ -418,7 +418,7 @@ test('en_country_content', () => {
   assert.ok(read('en/country/jp.html').includes('<p class="noneighbor">No land borders (island country)</p>'));
   const au = read('en/country/au.html');
   assert.ok(au.includes('<p class="noneighbor">No land borders</p>'));
-  assert.ok(au.includes(`href="../#play=${encodeURIComponent('オセアニア')}">Play this region (Oceania)</a>`));
+  assert.ok(au.includes(`href="../#play=${encodeURIComponent('オセアニア')}">Play this region: Oceania</a>`));
   // フッターは en/index.html のもの（../../ を付ける）
   const foot = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/;
   const want = foot.exec(read('en/index.html'))[1].trim().replace(/href="(?!https?:|#)([^"]*)"/g, 'href="../../$1"');
@@ -462,11 +462,11 @@ test('en_country_no_japanese', () => {     // 見える文字に日本語が無�
 
 test('en_the_name', () => {                // 「Flag of」のあとは the を付ける国がある。h1・一覧は e のまま
   const us = read('en/country/us.html');
-  assert.ok(us.includes('<title>Flag of the United States – Meaning &amp; Neighbors | Flag Master</title>'));
+  assert.ok(us.includes('<title>Flag of the United States: meaning and neighbors | Flag Master</title>'));
   assert.ok(us.includes('alt="Flag of the United States"') && us.includes('<h1>United States</h1>'));
   assert.ok(desc(us).startsWith('Flag of the United States: '));
   const bs = read('en/country/bs.html');
-  assert.ok(bs.includes('<title>Flag of the Bahamas – Meaning &amp; Neighbors | Flag Master</title>') && bs.includes('<h1>The Bahamas</h1>'));
+  assert.ok(bs.includes('<title>Flag of the Bahamas: meaning and neighbors | Flag Master</title>') && bs.includes('<h1>The Bahamas</h1>'));
   assert.equal(theName('The Gambia'), 'the Gambia');
   assert.equal(theName('France'), 'France');
   // 名前に Republic・Islands・United・States のある国は、みな THE_NAMES に入っている。THE_NAMES は e にある名前だけ

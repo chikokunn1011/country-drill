@@ -27,7 +27,7 @@ t('en_home', async page => {
   for (const id of ['home-daily', 'home-rpg', 'home-rank', 'home-badges', 'home-profile'])
     assert.equal(await page.isVisible('#' + id), false, id);
   assert.match(await page.title(), /Flag Master/);
-  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play quiz');
+  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
 });
 
 t('en_settings', async page => {
@@ -105,7 +105,7 @@ t('en_setup', async page => {
   assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
   assert.equal(await page.locator('#kinds [data-k="ta"]').count(), 0);
   assert.deepEqual((await texts(page, '#regions .chips > .chip')).map(noCount),
-    ['Whole world', 'Asia', 'Europe', 'Africa', 'North & Central America', 'South America', 'Oceania']);
+    ['World', 'Asia', 'Europe', 'Africa', 'North & Central America', 'South America', 'Oceania']);
   assert.equal((await page.textContent('#regions-hint')).trim(), 'Pick a large region to see its subregions. You can also tap a country on the map to choose its region.');
   const counts = await texts(page, '#counts .chip');
   assert.deepEqual(counts.slice(0, 3), ['5 questions', '10 questions', '20 questions']);
@@ -281,7 +281,7 @@ t('en_result_practice', async page => {
   const st = await texts(page, '#rcard .stats > span');
   assert.equal(st[0], 'Retries 1');
   assert.match(st[1], /^Best streak \d+$/);
-  assert.equal((await page.textContent('#rcard .hint')).trim(), 'Flag → Name / Practice / Whole world');
+  assert.equal((await page.textContent('#rcard .hint')).trim(), 'Flag → Name / Practice / World');
   // まちがえた国（英語の国名と首都）
   assert.equal((await page.textContent('#r-side .qlabel')).trim(), 'Countries you missed');
   assert.deepEqual(await texts(page, '.misslist li b'), [missed.e]);
@@ -405,7 +405,7 @@ t('en_book_map', async page => {
   await openBook(page, 'map');
   await page.waitForSelector('#bmapbox svg path[data-a]');
   assert.deepEqual(await jaLeft(page), []);
-  assert.match(await page.getAttribute('#bmapbox svg', 'aria-label'), /^Map: Whole world\./);
+  assert.match(await page.getAttribute('#bmapbox svg', 'aria-label'), /^Map: World\./);
   await page.click('#bmapbox path[data-a="br"]');
   await page.waitForSelector('#binfo .facts');
   assert.equal((await page.textContent('#binfo .facts .name')).trim(), 'Brazil');

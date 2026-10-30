@@ -1,7 +1,7 @@
 {
   "name": "Flag Master",
   "short_name": "Flag Master",
-  "description": "Learn the flags, names and locations of 195 countries with a 4-choice quiz.",
+  "description": "Learn the flags, names, and locations of all 195 countries with a 4-choice quiz.",
   "lang": "en",
   "start_url": "./",
   "scope": "./",

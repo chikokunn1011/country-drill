@@ -7,7 +7,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '{s}.{c}秒': '{s}.{c}s',
 
   // 地域（データのキーは日本語のまま。表示だけ）
-  '全世界': 'Whole world',
+  '全世界': 'World',
   'アジア': 'Asia',
   'ヨーロッパ': 'Europe',
   'アフリカ': 'Africa',

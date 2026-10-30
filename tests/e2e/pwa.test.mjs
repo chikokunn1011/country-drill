@@ -97,7 +97,7 @@ t('sw_en_shell', async (page, { context }) => {
   await page.goto(en('?from=pwa'));
   await page.locator('#scr-home').waitFor();
   await isEn();
-  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play quiz');
+  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
   await page.goto(en());
   await page.locator('#scr-home').waitFor();
   await isEn();

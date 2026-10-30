@@ -7,10 +7,10 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // head
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。地域しぼり、タイムアタックとランキング、国旗図鑑、冒険RPGも。登録なしでスマホ・PCからすぐ遊べる。':
-    'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries. Filter by region and browse the flag gallery. No sign-up: play right away on your phone or computer.',
-  '国旗マスター｜国旗・国名・場所を覚える4択クイズ（195か国）': 'Flag Master | Flag, Country & Map Quiz (195 countries)',
+    'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries. Filter by region and browse the Gallery. No sign-up: play right away on your phone or computer.',
+  '国旗マスター｜国旗・国名・場所を覚える4択クイズ（195か国）': 'Flag Master | Flag, country, and map quiz (195 countries)',
   '国旗マスター': 'Flag Master',
-  '国旗マスター｜国旗・国名・場所を覚える4択クイズ': 'Flag Master | Flag, Country & Map Quiz',
+  '国旗マスター｜国旗・国名・場所を覚える4択クイズ': 'Flag Master | Flag, country, and map quiz',
   '世界195か国の国旗・国名・場所を4択クイズで覚えよう。タイムアタック、国旗図鑑、冒険RPGも。':
     'Learn the flags, names, and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.',
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。': 'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries.',
@@ -23,8 +23,8 @@ Object.assign(window.I18N_EN ??= {}, {
   // ホーム（タイトルは <br> で2行）
   '国旗': 'Flag',
   'マスター': 'Master',
-  'クイズで遊ぶ': 'Play quiz',
-  '国旗・国名・場所を当てる': 'Guess the flag, name or location',
+  'クイズで遊ぶ': 'Play the quiz',
+  '国旗・国名・場所を当てる': 'Guess the flag, name, or location',
   '今日の難問': 'Daily Puzzle',
   '毎日かわる問題で、みんなと競う': 'A new puzzle every day. Compete with other players.',
   '冒険': 'Adventure',
@@ -71,7 +71,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'スタート': 'Start',
 
   // クイズ
-  'やめてモード選択へ': 'Quit to mode select',
+  'やめてモード選択へ': 'Quit and change mode',
 
   // ランキング（英語版ではまだ出さない。PR6 で使う）
   'モード': 'Mode',

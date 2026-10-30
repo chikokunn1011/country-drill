@@ -41,7 +41,7 @@ test('en_head', () => {
   assert.ok(h.includes('<meta property="og:locale" content="en_US">'));
   assert.ok(h.includes('<link rel="manifest" href="en/manifest.webmanifest">'));
   assert.ok(h.includes('<meta name="apple-mobile-web-app-title" content="Flag Master">'));
-  assert.ok(h.includes('<title>Flag Master | Flag, Country & Map Quiz (195 countries)</title>'));
+  assert.ok(h.includes('<title>Flag Master | Flag, country, and map quiz (195 countries)</title>'));
   for (const l of HREFLANG) assert.ok(h.includes(l), l);
   const ld = JSON.parse(h.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
   assert.equal(ld.name, 'Flag Master');
@@ -121,7 +121,7 @@ test('en_manifest', () => {
   const m = JSON.parse(read('en/manifest.webmanifest')), ja = JSON.parse(read('manifest.webmanifest'));
   assert.equal(m.name, 'Flag Master');
   assert.equal(m.short_name, 'Flag Master');
-  assert.equal(m.description, 'Learn the flags, names and locations of 195 countries with a 4-choice quiz.');
+  assert.equal(m.description, 'Learn the flags, names, and locations of all 195 countries with a 4-choice quiz.');
   assert.equal(m.lang, 'en');
   assert.equal(m.start_url, './');
   assert.equal(m.scope, './');
