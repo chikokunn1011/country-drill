@@ -1,6 +1,6 @@
 // v=1
 // 英語版（PR5）: index.html のモード選択とクイズ（インラインの節 モード選択・クイズ）。
-// キーは T('…') の日本語。Task 6 は出題と答えの欄まで、Task 7 で結果画面の文を足す
+// キーは T('…') の日本語。タイムアタック・ランキングの文は en-rank.js
 Object.assign(window.I18N_EN ??= {}, {
   // モード選択: 地域と問題数のボタン
   '全部（{n}）': 'All ({n})',
@@ -79,4 +79,22 @@ Object.assign(window.I18N_EN ??= {}, {
   '正解': 'Correct',
   'にている': 'Look-alike',
   'えらんだ': 'You picked',
+
+  // ドパガキ向け（Hype mode）: 連続正解が切れたときのポップ文字
+  '{n} COMBO 終了…': '{n} COMBO broken…',
+
+  // 結果画面
+  '／': ' / ',
+  'パーフェクト！': 'Perfect!',
+  'いい感じ！': 'Nice work!',
+  '次はもっといけるはず': 'You’ll do even better next time',
+  ' / {n} 一発正解': ' / {n} right on the first try',
+  'やり直し {b}回': 'Retries {b}',
+  '最高連続 {b}': 'Best streak {b}',
+  'ノーミスでクリア！': 'Perfect clear!',
+  'クリア！': 'Cleared!',
+  '問連続正解': ' correct in a row',
+  '挑戦 {b}回目でクリア': 'Cleared on attempt {b}',
+  'まちがえ {b}回': 'Mistakes {b}',
+  'まちがえた国': 'Countries you missed',
 });

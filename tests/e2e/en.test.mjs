@@ -254,3 +254,93 @@ t('en_theme_hash', async page => {
   assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
   assert.match((await page.textContent('#theme-name')).trim(), /^Collection: .+ \(\d+ countries\)$/);
 }, { path: 'en/#theme=stars', storage: { badges: QUIET_BADGES, setup: { mode: 'f2n', kind: 'ta', count: 10 } } });
+
+// ---- 結果画面（Task 7） ----
+// 練習・5問を、1問目だけまちがえて最後まで。まちがえた国を返す
+const playPractice5 = async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await settle(page);
+  const missed = await page.evaluate(() => ({ e: G.cur.c.e, ec: G.cur.c.ec }));
+  await answerWrong(page);
+  await page.click('#next');
+  for (let i = 0; i < 10 && await page.isHidden('#scr-result'); i++) {
+    await settle(page);
+    await answerCorrect(page);
+    await page.click('#next');
+  }
+  await page.waitForSelector('#scr-result:not([hidden])');
+  return missed;
+};
+
+t('en_result_practice', async page => {
+  const missed = await playPractice5(page);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal((await page.textContent('#rcard .result .qlabel')).trim(), 'Nice work!');
+  assert.equal((await page.textContent('#rcard .score')).trim(), '4 / 5 right on the first try');
+  const st = await texts(page, '#rcard .stats > span');
+  assert.equal(st[0], 'Retries 1');
+  assert.match(st[1], /^Best streak \d+$/);
+  assert.equal((await page.textContent('#rcard .hint')).trim(), 'Flag → Name / Practice / Whole world');
+  // まちがえた国（英語の国名と首都）
+  assert.equal((await page.textContent('#r-side .qlabel')).trim(), 'Countries you missed');
+  assert.deepEqual(await texts(page, '.misslist li b'), [missed.e]);
+  assert.deepEqual(await texts(page, '.misslist li span'), [missed.ec]);
+  // シェア・タイムアタックの箱・ほかのファイルの欄は出ない
+  assert.equal(await page.locator('#r-share').count(), 0);
+  assert.equal(await page.locator('.tabox').count(), 0);
+  assert.equal((await page.innerHTML('#r-ext')).trim(), '');
+  assert.equal((await page.textContent('#r-setup')).trim(), 'Mode select');
+  assert.equal((await page.textContent('#r-again')).trim(), 'Play again');
+  await page.waitForTimeout(400);   // TA_GUARD_MS
+  await page.click('#r-again');
+  await settle(page);
+  assert.ok(await page.isVisible('#scr-quiz'));
+  await page.evaluate(() => { endGame('quit'); showResult(); });
+  await page.waitForTimeout(400);
+  await page.click('#r-setup');
+  await page.waitForSelector('#scr-setup:not([hidden])');
+});
+
+t('en_result_challenge', async page => {
+  await pickSetup(page, { mode: 'n2f', kind: 'challenge', region: 'アジア', count: 5 });
+  await page.click('#start');
+  for (let i = 0; i < 5; i++) { await settle(page); await answerCorrect(page); await page.click('#next'); }
+  await page.waitForSelector('#scr-result:not([hidden])');
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal((await page.textContent('#rcard .result .qlabel')).trim(), 'Perfect clear!');
+  assert.equal((await page.textContent('#rcard .score')).trim(), '5 correct in a row');
+  assert.deepEqual(await texts(page, '#rcard .stats > span'), ['Cleared on attempt 1', 'Mistakes 0']);
+  assert.equal((await page.textContent('#rcard .hint')).trim(), 'Name → Flag / Challenge / Asia');
+  // 2回目以降のクリア
+  await page.evaluate(() => { G.attempts = 2; G.wrongs = 1; G.ended = false; showResult(); });
+  assert.equal((await page.textContent('#rcard .result .qlabel')).trim(), 'Cleared!');
+  assert.deepEqual(await texts(page, '#rcard .stats > span'), ['Cleared on attempt 2', 'Mistakes 1']);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// ドパガキ向け: ポップ文字（ほめ言葉・COMBO 終了）と結果の RANK 欄
+t('en_dopa', async page => {
+  await page.evaluate(() => { window.__pops = []; const pop = FX.pop; FX.pop = (t, c) => { window.__pops.push(t); return pop(t, c); }; });
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await settle(page);
+  for (let i = 0; i < 3; i++) { await answerCorrect(page); assert.deepEqual(await jaLeft(page), []); await page.click('#next'); await settle(page); }
+  await answerWrong(page);   // 3連続のあとでまちがえる → COMBO 終了
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#next');
+  for (let i = 0; i < 10 && await page.isHidden('#scr-result'); i++) { await settle(page); await answerCorrect(page); await page.click('#next'); }
+  await page.waitForSelector('#scr-result:not([hidden])');
+  assert.deepEqual(await jaLeft(page), []);
+  assert.match((await page.textContent('#rcard .rank')).trim(), /^RANK [SABC]$/);
+  const pops = await page.evaluate(() => window.__pops);
+  assert.ok(pops.includes('3 COMBO broken…'), pops.join(' | '));
+  assert.deepEqual(pops.filter(p => /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}！-｠]/u.test(p)), []);
+}, { storage: { badges: QUIET_BADGES, settings: { dopa: true } } });
+
+// ランキングは英語版では開かない（ranking.js を読まない）
+t('en_no_ranking', async page => {
+  await page.waitForSelector('#scr-home:not([hidden])');
+  assert.equal(await page.isHidden('#scr-ranking'), true);
+  assert.deepEqual(await jaLeft(page), []);
+}, { path: 'en/#ranking' });

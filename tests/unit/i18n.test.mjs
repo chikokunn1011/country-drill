@@ -25,10 +25,7 @@ const load = ({ lang, dict } = {}) => {
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
 const COVER = { 'i18n.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all',
-  'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', '起動'] };
-// 途中まで訳した節（T() のキーは辞書と突きあわせるが、日本語の取り残しはまだ見ない）。
-// クイズは Task 6 で出題と答えの欄まで、Task 7 で残り（結果画面）を訳して COVER へ移す
-const PARTIAL = { 'index.html': ['クイズ'] };
+  'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '起動'] };
 // まだ訳さないファイル（PR6: ranking・daily・profile・streak・share-card、PR7: badges・trivia、PR8: rpg-*）
 // dojo・embed は PR5 のあとのタスクで COVER へ移す
 const NOT_YET = ['ranking.js', 'daily.js', 'profile.js', 'streak.js', 'share-card.js', 'badges.js', 'trivia.js',
@@ -179,11 +176,11 @@ test('i18n_globals_unique', () => {
 });
 
 // ---- 英語の辞書（i18n/en-*.js を合わせたもの） ----
-// COVER のコード（index.html は節ごと）。partial なら PARTIAL の節も足す（T() のキーを見るとき）
-const coverSources = (partial = false) => {
+// COVER のコード（index.html は節ごと）
+const coverSources = () => {
   const sections = inlineSections(read('index.html'));
   const from = cover => Object.entries(cover).flatMap(([f, what]) => f === 'index.html' ? what.map(sec => sections[sec]) : [read(f)]);
-  return [...from(COVER), ...(partial ? from(PARTIAL) : [])];
+  return from(COVER);
 };
 // 辞書ファイルごとの中身 { 'en-core.js': {…}, … }
 const dictFiles = () => Object.fromEntries(readdirSync(new URL('i18n/', root)).filter(f => /^en-[\w-]+\.js$/.test(f)).sort().map(f => {
@@ -193,7 +190,7 @@ const dictFiles = () => Object.fromEntries(readdirSync(new URL('i18n/', root)).f
   return [f, { ...ctx.window.I18N_EN }];
 }));
 const I18N_EN = () => Object.assign({}, ...Object.values(dictFiles()));
-const codeKeys = () => coverSources(true).flatMap(tKeys);
+const codeKeys = () => coverSources().flatMap(tKeys);
 const dataStrings = () => coverSources().flatMap(src => scanJs(src).filter(e => e.data).map(e => e.text));
 const values = v => typeof v === 'object' ? [v.one, v.other] : [v];
 const holes = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');

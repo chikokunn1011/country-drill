@@ -1587,7 +1587,7 @@ function dopaAnswer(right) {
     FX.sfx('wrong'); FX.buzz([60, 40, 60]);
     FX.flash('rgb(255 59 48 / .35)');
     $('qcard').classList.remove('shake'); void $('qcard').offsetWidth; $('qcard').classList.add('shake');
-    if (G.streakLost >= 3) FX.pop(`${G.streakLost} COMBO 終了…`, 'small bad');
+    if (G.streakLost >= 3) FX.pop(T('{n} COMBO 終了…', { n: G.streakLost }), 'small bad');
   }
 }
 function restartChallenge() {
@@ -1662,20 +1662,21 @@ let resultAt = 0;
 function showResult() {
   if (G.kind === 'dojo') { endGame('clear'); return show('dojo'); }   // 道場は結果画面を使わず、道場の画面に結果を1行出す
   const n = G.set.length, missed = [...G.missed].map(a => byA.get(a));
-  let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(G.region)}`;
+  // 条件の行（英語は ' / ' でつなぐ）
+  let head, big, stats, cond = [G.mode.label, KINDS.find(k => k.k === G.kind).label, regionLabel(G.region)].join(T('／'));
   if (G.kind === 'practice') {
-    head = G.wrongs === 0 ? 'パーフェクト！' : G.firstTry >= n * .7 ? 'いい感じ！' : '次はもっといけるはず';
-    big = `${G.firstTry}<small> / ${n} 一発正解</small>`;
-    stats = `<span>やり直し <b>${G.wrongs}</b>回</span><span>最高連続 <b>${G.best}</b></span>`;
+    head = G.wrongs === 0 ? T('パーフェクト！') : G.firstTry >= n * .7 ? T('いい感じ！') : T('次はもっといけるはず');
+    big = `${G.firstTry}<small>${T(' / {n} 一発正解', { n })}</small>`;
+    stats = `<span>${T('やり直し {b}回', { b: `<b>${G.wrongs}</b>` })}</span><span>${T('最高連続 {b}', { b: `<b>${G.best}</b>` })}</span>`;
   } else if (G.kind === 'ta') { // 順位相当は表示してから問い合わせて入れる（taResult）
-    head = 'クリア！';
+    head = T('クリア！');
     big = `<span id="ta-time">${RANKING.formatTime(G.timeMs)}</span>`;
     stats = '<p class="tarank" id="ta-rank"></p>';
-    cond = `${G.mode.label}／${regionLabel(S.region)}／${P.count === 'all' ? `全部（${n}問）` : `${n}問`}`;
+    cond = [G.mode.label, regionLabel(S.region), P.count === 'all' ? T('全部（{n}問）', { n }) : T('{n}問', { n })].join(T('／'));
   } else {
-    head = G.attempts === 1 ? 'ノーミスでクリア！' : 'クリア！';
-    big = `${n}<small>問連続正解</small>`;
-    stats = `<span>挑戦 <b>${G.attempts}</b>回目でクリア</span><span>まちがえ <b>${G.wrongs}</b>回</span>`;
+    head = G.attempts === 1 ? T('ノーミスでクリア！') : T('クリア！');
+    big = `${n}<small>${T('問連続正解')}</small>`;
+    stats = `<span>${T('挑戦 {b}回目でクリア', { b: `<b>${G.attempts}</b>` })}</span><span>${T('まちがえ {b}回', { b: `<b>${G.wrongs}</b>` })}</span>`;
   }
   const ratio = G.firstTry / n;
   const rank = G.kind === 'challenge' ? (G.attempts === 1 ? 'S' : G.attempts <= 3 ? 'A' : 'B') : ratio === 1 ? 'S' : ratio >= .8 ? 'A' : ratio >= .6 ? 'B' : 'C';
@@ -1683,9 +1684,9 @@ function showResult() {
   const taForm = G.kind === 'ta' && RANKING.enabled;
   const shareBtn = G.kind === 'ta' && !!window.SHARECARD;   // 結果画像のシェア（share-card.js。読めなければボタンを出さない）
   $('rcard').innerHTML = `<div class="result">${dopaHead}<p class="qlabel">${head}</p><p class="score">${big}</p><div class="stats">${stats}</div>
-    <p class="hint">${cond}</p>${shareBtn ? '<div class="row center"><button type="button" class="btn ghost" id="r-share">結果をシェア</button></div>' : ''}</div>
-    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><div class="ta-post" id="ta-post"></div><button class="btn ghost" id="ta-open" hidden>ランキングを見る</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">まちがえた国</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(c.n)}</b><span>${esc(c.c)}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
-    <div class="row center"><button class="btn ghost" id="r-setup">モード選択へ</button><button class="btn" id="r-again">もう一回</button></div>`;
+    <p class="hint">${cond}</p>${shareBtn ? `<div class="row center"><button type="button" class="btn ghost" id="r-share">${T('結果をシェア')}</button></div>` : ''}</div>
+    <div class="rside" id="r-side">${taForm ? `<div class="tabox"><div class="ta-post" id="ta-post"></div><button class="btn ghost" id="ta-open" hidden>${T('ランキングを見る')}</button></div>` : ''}${missed.length ? `<p class="qlabel" style="font-size:1rem">${T('まちがえた国')}</p><ul class="misslist">${missed.map(c => `<li><img src="${flag(c.a)}" alt=""><b>${esc(cName(c))}</b><span>${esc(cCap(c))}</span></li>`).join('')}</ul>` : ''}<div class="r-ext" id="r-ext"></div></div>
+    <div class="row center"><button class="btn ghost" id="r-setup">${T('モード選択へ')}</button><button class="btn" id="r-again">${T('もう一回')}</button></div>`;
   $('r-again').onclick = startGame;
   $('r-setup').onclick = () => show('setup');
   endGame('clear');
@@ -1694,8 +1695,8 @@ function showResult() {
   if (shareBtn) {
     const time = RANKING.formatTime(G.timeMs);
     // 順位は rankOf の返事を待たないので入れない（あとから描き直さない）。国名・首都は入れない
-    SHARECARD.attach($('r-share'), { kind: 'ta', title: cond, big: time, sub: 'クリア！', rank: null, flags: G.set.map(c => c.a), grid: [],
-      text: `国旗マスター タイムアタック ${cond}\n${time} でクリア！\n${SHARECARD.SHARE.tag}` });
+    SHARECARD.attach($('r-share'), { kind: 'ta', title: cond, big: time, sub: T('クリア！'), rank: null, flags: G.set.map(c => c.a), grid: [],
+      text: T('国旗マスター タイムアタック {cond}\n{time} でクリア！\n{tag}', { cond, time, tag: SHARECARD.SHARE.tag }) });
   }
   $('r-again').focus({ preventScroll: true });
   if (S.dopa) { FX.sfx('fanfare'); FX.confetti(null, 220, true); FX.pop(G.wrongs === 0 ? 'PERFECT!!' : 'CLEAR!!'); }
@@ -1730,18 +1731,18 @@ function taSubmit(args) {
 // 書き込み先の要素はここで掴んでおくので、返事が来る前に次のゲームへ進んでも新しい結果画面は書き換えない
 function taResult(board, timeMs, questions) {
   const rank = $('ta-rank'), post = $('ta-post'), open = $('ta-open');
-  const ranks = r => `歴代${r.rankAll}位・今週${r.rankWeek}位`;
+  const ranks = r => T('歴代{all}位・今週{week}位', { all: r.rankAll, week: r.rankWeek });
   // 失敗したら画面には何も出さない（原因はコンソールに残す。オフラインと設定ミスを見分けるため）
-  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = `${ranks(r)} 相当`; }, e => console.warn('ranking rankOf', e));
+  RANKING.rankOf({ board, timeMs }).then(r => { rank.textContent = T('{r} 相当', { r: ranks(r) }); }, e => console.warn('ranking rankOf', e));
   // profile.js が読めない（配信漏れ・古い ranking.js がキャッシュに残っている）ときは載せられない
-  if (!window.PROFILE) { post.innerHTML = '<p class="tamsg ng" role="status">ページを読み直してね</p>'; return; }
+  if (!window.PROFILE) { post.innerHTML = `<p class="tamsg ng" role="status">${T('ページを読み直してね')}</p>`; return; }
   // プロフィールがあって自動 ON ならすぐ送る。載せたら「ランキングを見る」を出す
   PROFILE.postBox(post, {
-    label: 'ランキングに載せる',
+    label: T('ランキングに載せる'),
     send: token => taSubmit({ token, board, timeMs, questions }).then(r => {
       if (!r.ok) return r;
       open.hidden = false; open.onclick = () => openRanking(board);
-      return { ok: true, text: `載せたよ！ ${ranks(r)}` };
+      return { ok: true, text: T('載せたよ！ {r}', { r: ranks(r) }) };
     }),
   });
   // 結果画面を離れたら箱を外す（結果画面に戻ることはない。隠れた箱が、あとでプロフィールを作った・自動を ON にしたときに
