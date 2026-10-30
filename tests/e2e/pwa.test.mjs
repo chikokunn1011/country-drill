@@ -177,7 +177,8 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     const n = +readFileSync(join(dir, 'index.html'), 'utf8').match(/pc\.css\?v=(\d+)/)[1];
     const edit = (f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
     edit('pc.css', s => `${s}\n.pwa-test-mark { order: 7; }\n`);
-    edit('index.html', s => s.replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    // en/index.html は make_en が index.html から作るので、?v= もいっしょに上がる
+    for (const f of ['index.html', 'en/index.html']) edit(f, s => s.replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
     edit('countries.js', s => `${s}\nwindow.COUNTRIES.__mark = 'new';\n`);
     writeFileSync(join(dir, 'sw.js'), render(dir));
     const newName = `drill-${readFileSync(join(dir, 'sw.js'), 'utf8').match(/const VERSION = '(\w+)'/)[1]}`;
@@ -190,6 +191,7 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     assert.match(await cached(page, newName, 'countries.js'), /__mark = 'new'/);
     assert.match(await cached(page, newName, 'index.html'), new RegExp(`pc\\.css\\?v=${n + 1}`));
     assert.match(await cached(page, newName, `pc.css?v=${n + 1}`), /pwa-test-mark/);
+    assert.equal(await cached(page, newName, `pc.css?v=${n}`), null);   // 古い ?v= は新しい版に入れない
     assert.deepEqual(requests.filter(u => /[?&]v=|\/vendor\//.test(u)), [`/pc.css?v=${n + 1}`]);
     // 開いているページは古い SW のまま（入れかえない）。閉じて開き直すと新しい版
     assert.deepEqual((await cacheNames(page)).sort(), [newName, oldName].sort());
@@ -214,8 +216,10 @@ test('sw_install_copies_fixed', { timeout: 90_000 }, async () => {
     const { page, context } = app;
     await swReady(page);
     const n = +readFileSync(join(dir, 'index.html'), 'utf8').match(/pc\.css\?v=(\d+)/)[1];
-    const p = join(dir, 'index.html');
-    writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    for (const f of ['index.html', 'en/index.html']) {   // en/index.html も（make_en が index.html から作る）
+      const p = join(dir, f);
+      writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    }
     writeFileSync(join(dir, 'sw.js'), render(dir));
     const got = [];
     await context.route(u => u.searchParams.has('v') || u.pathname.includes('/vendor/'), route => {
