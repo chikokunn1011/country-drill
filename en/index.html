@@ -650,6 +650,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <script src="i18n/en-quiz.js?v=1"></script>
 <script src="i18n/en-rank.js?v=1"></script>
 <script src="i18n/en-book.js?v=1"></script>
+<script src="i18n/en-dojo.js?v=1"></script>
 <script src="countries.js"></script>
 <script src="themes.js?v=1"></script>
 <script src="daily-core.js?v=2"></script>
@@ -1954,7 +1955,7 @@ else { if (MAP_SCREENS.includes(start) && !mapReady) show('home'); show(start); 
 // 地図はホームが出たあと（load のあと）に、うしろで読みはじめる。失敗は loadMap が console.error に書く（地図の画面へ進むときに読み直す）
 addEventListener('load', () => loadMap().catch(() => {}));
 </script>
-<script src="dojo.js?v=1"></script>
+<script src="dojo.js?v=2"></script>
 <script src="pwa.js?v=2"></script>
 </body>
 </html>

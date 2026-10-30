@@ -37,7 +37,7 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // 答えの欄（答える前の案内）
   'まちがえたら、ここに正解が出るよ': 'If you miss, the answer will show up here',
-  '答えたら、ここで国旗をくらべるよ': 'Once you answer, compare the flags here',
+  '答えたら、ここで国旗をくらべるよ': 'Answer to compare the flags here',
   '答えたら、ここに国のプロフィールが出るよ': 'Once you answer, the country’s profile will show up here',
   '矢印キーで動かし {enter} で真ん中を答える・＋−で拡大': 'Move with the arrow keys, {enter} to pick the center, +/− to zoom',
   '{k1}〜{k4} キーでも答えられる': 'You can also answer with keys {k1}–{k4}',

@@ -96,13 +96,10 @@ test('topbar_height_390', { timeout: 120_000 }, async () => {
 const openSetup = async page => { await page.click('#home-play'); await page.waitForSelector('#scr-setup:not([hidden])'); };
 const texts = (page, sel) => page.$$eval(sel, els => els.map(e => e.textContent.trim()));
 const noCount = s => s.replace(/\s*\d+$/, '');   // 地域のチップの「 195」を外す
-// モード選択の道場への帯（dojo.js）は Task 9 で訳す。それまではこの1つだけ除いて見る（Task 9 でこの関数を消して jaLeft に）
-const DOJO_BAND = '🔍 似た国旗の道場 →';
-const jaLeftSetup = async page => (await jaLeft(page)).filter(x => x !== DOJO_BAND);
 
 t('en_setup', async page => {
   await openSetup(page);
-  assert.deepEqual(await jaLeftSetup(page), []);
+  assert.deepEqual(await jaLeft(page), []);
   assert.deepEqual(await texts(page, '#modes .modecard b'), ['Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map']);
   // タイムアタックのカードは出さない（「〜では遊べない」の札も出さない）
   assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
@@ -119,11 +116,11 @@ t('en_setup', async page => {
   assert.equal(await page.getAttribute('#regions .subs', 'aria-label'), 'Subregions of Asia');
   assert.equal((await page.textContent('#regions .subs .lbl2')).trim(), 'Subregions');
   assert.match(await page.getAttribute('#rmap svg', 'aria-label'), /^World map with Asia \(\d+ countries\) highlighted$/);
-  assert.deepEqual(await jaLeftSetup(page), []);
+  assert.deepEqual(await jaLeft(page), []);
   // どのモードでも日本語が残らない（白地図タップはタイムアタックが無いモード）
   for (const k of ['n2f', 'm2f', 'f2m', 'tap', 'f2n']) {
     await page.click(`#modes .modecard[data-k="${k}"]`);
-    assert.deepEqual(await jaLeftSetup(page), [], k);
+    assert.deepEqual(await jaLeft(page), [], k);
     assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge'], k);
   }
 });
@@ -136,7 +133,7 @@ t('en_saved_ta_shows_practice', async (page, app) => {
   assert.equal(await page.getAttribute('#kinds [data-k="practice"]', 'aria-pressed'), 'true');
   assert.equal(noCount((await page.textContent('#regions .chip[aria-pressed="true"]')).trim()), 'East Asia');
   assert.match((await page.textContent('#counts .chip[aria-pressed="true"]')).trim(), /^All \(\d+\)$/);
-  assert.deepEqual(await jaLeftSetup(page), []);
+  assert.deepEqual(await jaLeft(page), []);
   await page.click('#start');
   await settle(page);
   const [ev] = await events(page, 'drill:start');
@@ -430,4 +427,71 @@ t('en_book_long_names_fit', async page => {
   assert.ok(r.right <= r.gright + 0.5, JSON.stringify(r));
   assert.ok(r.name.every(Boolean), JSON.stringify(r));
   assert.ok(r.doc <= r.vw, JSON.stringify(r));
+});
+
+// ---- 似た国旗の道場（dojo.js）。Task 9 ----
+// 道場の画面に戻るまで、正解して［次へ］をくり返す（正解のたびに jaLeft を見る）
+const clearDojo = async page => {
+  for (let i = 0; i < 30 && await page.evaluate(() => document.body.dataset.screen === 'quiz'); i++) {
+    await answerCorrect(page);
+    assert.match(await page.innerText('.reveal .dj-compare'), /Correct[\s\S]*Look-alike/);
+    assert.deepEqual(await jaLeft(page), [], 'right ' + i);
+    await page.click('#next');
+  }
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'dojo');
+};
+
+t('en_dojo', async page => {
+  await openSetup(page);
+  assert.equal((await page.innerText('#to-dojo')).trim(), '🔍 Look-alike Flags Dojo →');
+  await page.click('#to-dojo');
+  await page.waitForSelector('#scr-dojo:not([hidden])');
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal((await page.innerText('#scr-dojo h2')).trim(), 'Look-alike Flags Dojo');
+  assert.deepEqual(await texts(page, '#dj-mode button'), ['Flag → Name', 'Name → Flag']);
+  assert.equal(await page.getAttribute('.dj-card[data-g="qa"] img', 'alt'), 'Flag of Qatar');
+  assert.equal((await page.innerText('.dj-card[data-g="qa"] .dj-label')).trim(), 'White zigzag');
+  // 1問まちがえて、10問を遊ぶ
+  await page.click('.dj-card[data-g="qa"]');
+  await settle(page);
+  assert.deepEqual(await jaLeft(page), []);
+  await answerWrong(page);
+  assert.match(await page.innerText('.reveal .dj-compare'), /Correct[\s\S]*You picked/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#next');
+  await clearDojo(page);
+  assert.equal((await page.innerText('#dj-last')).trim(), 'White zigzag: 9 / 10 right on the first try');
+  assert.equal(await page.isVisible('#dj-pairs'), true);
+  assert.equal((await page.innerText('#dj-pairs h3')).trim(), 'Often mixed-up pairs');
+  assert.equal((await page.innerText('#dj-pairs .dj-pn')).trim(), 'Bahrain & Qatar');
+  assert.equal((await page.innerText('#dj-pairs li b')).trim(), '1 time');
+  assert.deepEqual(await jaLeft(page), []);
+  // ノーミスでもう1回
+  await page.click('.dj-card[data-g="qa"]');
+  await clearDojo(page);
+  assert.equal((await page.innerText('#dj-last')).trim(), 'White zigzag: 10 / 10 right on the first try. No mistakes!');
+  assert.equal(await page.getAttribute('.dj-card[data-g="qa"] .dj-ok', 'aria-label'), 'Cleared with no mistakes');
+  assert.deepEqual(await jaLeft(page), []);
+  // 国名 → 国旗 でも日本語が残らない
+  await page.click('#dj-mode [data-m="n2f"]');
+  await page.click('.dj-card[data-g="no"]');
+  await settle(page);
+  assert.deepEqual(await jaLeft(page), []);
+  await answerWrong(page);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 英語版で遊んだ取りちがえは、日本語版の道場のペアに出る（同じ localStorage の dojo）
+t('en_dojo_shared', async page => {
+  await page.evaluate(() => show('dojo'));
+  await page.click('.dj-card[data-g="qa"]');
+  await answerWrong(page);
+  await page.click('#quit');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.dojo).mix), { 'bh-qa': 1 });
+  await page.goto(new URL('../', page.url()).href);
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  await page.evaluate(() => show('dojo'));
+  assert.equal((await page.innerText('#dj-pairs .dj-pn')).trim(), 'バーレーン・カタール');
+  assert.equal((await page.innerText('#dj-pairs li b')).trim(), '1回');
+  assert.equal((await page.innerText('#scr-dojo h2')).trim(), '似た国旗の道場');
 });
