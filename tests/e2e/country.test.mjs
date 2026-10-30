@@ -134,6 +134,22 @@ test('country_index', { timeout: 60_000 }, () => open({ path: 'country/' }, asyn
   assert.equal(await page.textContent('h1'), '日本');
 }));
 
+// 英語の国のページ: スマホ（390px）で横にはみ出さない。切りかえの「日本語」で日本語のページへ
+test('en_country_phone', { timeout: 60_000 }, () => open({ path: 'en/country/vc.html', viewport: PHONE }, async page => {
+  assert.equal(page.viewportSize().width, 390);
+  assert.equal(await page.getAttribute('html', 'lang'), 'en');
+  assert.equal(await page.textContent('h1'), 'Saint Vincent and the Grenadines');
+  for (const sel of ['.meaning', '.noneighbor', '.prevnext', '.langsw']) assert.ok(await page.locator(sel).first().isVisible(), sel);
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '横スクロール');
+  const over = await page.evaluate(() => [...document.querySelectorAll('.cfacts, .meaning, .similar li, .cthemes li, .cplay a, .prevnext a, .langsw')]
+    .filter(e => e.getBoundingClientRect().right > document.querySelector('main').getBoundingClientRect().right + 0.5).map(e => e.className || e.textContent));
+  assert.deepEqual(over, []);
+  await page.click('.langsw a[lang="ja"]');
+  await page.waitForURL(/\/country\/vc\.html$/);
+  assert.ok(!new URL(page.url()).pathname.startsWith('/en/'));
+  assert.equal(await page.getAttribute('html', 'lang'), 'ja');
+}));
+
 /* ---------- 図鑑から国のページへ ---------- */
 test('book_links_country_page', { timeout: 60_000 }, () => open({}, async page => {
   await page.evaluate(() => show('book'));
