@@ -84,6 +84,31 @@
 - 本編の図鑑（一覧のくわしい窓と地図の情報欄）に「この国のページ ›」を出す。クイズの答えの欄には出さない
 - `country/country.css` は国のページだけの決まり。色の変数は書かず、`pages.css` の変数だけを使う
 
+## アプリ化（service worker）
+
+- `sw.js`（service worker）は `pwa.js` が登録する。オフラインでも遊べるように、`index.html` が読むファイル・地図・国旗195枚などを端末に保存する（precache）
+  - ページと `?v=` の無いファイル（`countries.js`・`trivia.js`・textures など）はネット優先（3秒で返らない・つながらない・500番台なら保存したもの）。`?v=` 付きと `vendor/` は保存したもの優先
+  - 外のサイト（Supabase・Google Fonts など）と管理ページ（`admin*`）にはさわらない／保存しない
+- `sw.js` の一覧（`PRECACHE`）と版（`VERSION`）は `node tools/make_sw.mjs` で作る。手で書かない
+  - precache に入るファイルの中身を変えたとき・`index.html` の `?v=` を上げたとき・読むファイルを足したときは流し直してコミットする（流し忘れると unit の `sw_is_current` が落ちて知らせる）
+  - 版が変わると、次に開いた人のブラウザで新しい sw.js が入り、ページを全部閉じたあとに入れかわって古い版のキャッシュ（`drill-…`）を消す（遊んでいる途中では入れかえない）
+- `sw.js` は場所も名前も変えない（変えると、もう入っている古い sw.js がそのまま残って止められなくなる）
+- 止めるとき（緊急）: 同じ `sw.js` を、次の中身に置きかえて出す。入っている人のブラウザは次に開いたときにこれを取り、キャッシュを消して自分を外し、開いているページを読み直す
+
+  ```js
+  // sw.js（止めるための版）
+  self.addEventListener('install', () => self.skipWaiting());
+  self.addEventListener('activate', e => e.waitUntil((async () => {
+    for (const k of await caches.keys()) if (k.startsWith('drill-')) await caches.delete(k);
+    await self.registration.unregister();
+    for (const c of await self.clients.matchAll({ type: 'window' })) c.navigate(c.url);
+  })()));
+  ```
+
+  - あわせて `pwa.js` の登録をやめて、外す側にしてもよい（`pwa.js` の `?v=` を上げる）:
+    `navigator.serviceWorker?.getRegistrations().then(rs => rs.forEach(r => r.unregister()));`
+  - このとき `tests/unit/sw.test.mjs`・`tests/e2e/pwa.test.mjs` は落ちるので、止めているあいだは外す
+
 ## クレジット
 
 - 国旗: [flag-icons](https://github.com/lipis/flag-icons)（MIT）。`flags/*.svg` は flag-icons の svg を `tools/split_flags.mjs` で1枚ずつのファイルに分けたもの（中身は変えていない）。作り直すときは消す前の flags.js を取り出して渡す: `git show $(git log -1 --format=%h --diff-filter=D -- flags.js)^:flags.js > /tmp/flags.js && node tools/split_flags.mjs /tmp/flags.js flags`。svg の中身を変えたら `index.html` の `FLAG_V` を上げる

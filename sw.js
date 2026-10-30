@@ -1,7 +1,7 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = '447b2693d23e';
+const VERSION = 'a8e63686f173';
 const PRECACHE = [
   "./",
   "index.html",
@@ -242,59 +242,78 @@ const PRECACHE = [
 ];
 // precache:end
 const CACHE = `drill-${VERSION}`;
-const PAGE_WAIT_MS = 3000;
-
-// 1つずつ入れて、落ちたものはとばす（install は失敗させない）。skipWaiting はしない（遊んでいる途中で入れかえない）
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => Promise.all(PRECACHE.map(u => c.add(u).catch(() => {})))));
-});
-
-// 古い版のキャッシュを消す
-self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k.startsWith('drill-') && k !== CACHE).map(k => caches.delete(k))))
-    .then(() => self.clients.claim()));
-});
-
+const WAIT_MS = 3000;
 const SCOPE = new URL('./', location.href).pathname;
+const abs = u => new URL(u, location.href);
+// ?v= 付き・vendor/ は中身が変わらない（変えるときは URL が変わる）
+const isFixed = url => url.searchParams.has('v') || url.pathname.startsWith(`${SCOPE}vendor/`);
 // 管理ページ（admin.html・admin*.js）は取っておかない
 const isAdmin = url => url.pathname.slice(SCOPE.length).startsWith('admin');
 // index.html の代わりに出してよいのは、根（./・index.html。? 付きも）を開いたときだけ
 const isShell = url => url.pathname === SCOPE || url.pathname === `${SCOPE}index.html`;
+
+// precache に1つ入れる。中身が変わらないものは前の版のキャッシュにあれば写す。
+// それ以外はブラウザの HTTP キャッシュを確かめてから取る（no-cache。古い index.html と新しい ?v= が混ざらないように）
+const fill = (c, u) => {
+  const url = abs(u);
+  return (isFixed(url) ? caches.match(url.href) : Promise.resolve())
+    .then(old => old ? c.put(url.href, old) : c.add(isFixed(url) ? url.href : new Request(url.href, { cache: 'no-cache' })))
+    .catch(() => {});
+};
+// まだ入っていないものだけ入れる（落ちたものはとばす）
+const fillMissing = c => Promise.all(PRECACHE.map(u => c.match(abs(u).href).then(r => r || fill(c, u)).catch(() => {})));
+
+// install は失敗させない。skipWaiting はしない（遊んでいる途中で入れかえない）
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(fillMissing));
+});
+
+// 古い版のキャッシュを消す。install で入れそこねたものは、待たずにもう一度だけ入れてみる
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys()
+    .then(keys => Promise.all(keys.filter(k => k.startsWith('drill-') && k !== CACHE).map(k => caches.delete(k))))
+    .then(() => { caches.open(CACHE).then(fillMissing).catch(() => {}); return self.clients.claim(); }));
+});
 
 // 取れたものはキャッシュに入れる
 const keep = (req, res) => {
   if (res.ok && !isAdmin(new URL(req.url))) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {}); }
   return res;
 };
-const fromNet = req => fetch(req).then(res => keep(req, res));
 const fromCache = req => caches.open(CACHE).then(c => c.match(req));
+// HTTP キャッシュを確かめてから取る。ページ（navigate）の Request はそのまま作り直せないので URL で取る（転送は manual でブラウザにまかせる）
+const fresh = req => fetch(req.mode === 'navigate' ? new Request(req.url, { cache: 'no-cache', credentials: 'include', redirect: 'manual' })
+  : new Request(req, { cache: 'no-cache' })).then(res => keep(req, res));
 
-// ページ: ネット優先。3秒で返らないかネットが落ちたらキャッシュ（根だけは無ければ index.html）。
-// それも無ければネットを待ち、だめならブラウザのふつうのオフラインの画面（国のページなどに本編を出さない）
-const page = req => new Promise(ok => {
+// ネット優先。3秒で返らない・落ちた・500番台ならキャッシュ（alt: キャッシュに無いときの代わり）。
+// それも無ければネットを待ち（遅れて届いたものもキャッシュに入る）、だめならネットの失敗にする
+const race = (req, alt) => new Promise(ok => {
   let done = false;
-  const net = fromNet(req);
+  const net = fresh(req);
   const fallback = () => {
     if (done) return;
     done = true;
-    fromCache(req).then(r => r || (isShell(new URL(req.url)) ? caches.open(CACHE).then(c => c.match('index.html')) : undefined))
+    fromCache(req).then(r => r || (alt && alt()))
       .catch(() => undefined)
       .then(r => r || net)
       .then(ok, () => ok(Response.error()));
   };
-  const timer = setTimeout(fallback, PAGE_WAIT_MS);
-  net.then(res => { if (!done) { done = true; clearTimeout(timer); ok(res); } }, () => { clearTimeout(timer); fallback(); });
+  const timer = setTimeout(fallback, WAIT_MS);
+  const fail = () => { clearTimeout(timer); fallback(); };
+  net.then(res => {
+    if (res.status >= 500) return fail();
+    if (!done) { done = true; clearTimeout(timer); ok(res); }
+  }, fail);
 });
+const shell = () => caches.open(CACHE).then(c => c.match('index.html'));
 
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;   // 外のサイト（Supabase など）はさわらない
-  if (req.mode === 'navigate') return e.respondWith(page(req));
+  // ページ: 根だけは無ければ index.html。ほかのページ（国のページなど）に本編は出さない
+  if (req.mode === 'navigate') return e.respondWith(race(req, isShell(url) ? shell : null));
   // ?v= 付き・vendor/ はキャッシュ優先
-  if (url.searchParams.has('v') || url.pathname.startsWith(`${SCOPE}vendor/`)) {
-    return e.respondWith(fromCache(req).then(r => r || fromNet(req)));
-  }
-  // それ以外はネット優先、落ちたらキャッシュ
-  e.respondWith(fromNet(req).catch(() => fromCache(req).then(r => r || Promise.reject(new Error('offline')))));
+  if (isFixed(url)) return e.respondWith(fromCache(req).then(r => r || fetch(req).then(res => keep(req, res))));
+  // それ以外（countries.js・trivia.js・textures など）はページと同じ
+  e.respondWith(race(req));
 });

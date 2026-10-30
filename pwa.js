@@ -13,11 +13,17 @@
   if (!band || !field || !ios) { console.error('[pwa] #home-pwa・#set-pwa-field・#pwa-ios が無いので、追加の案内はお休み'); return; }
 
   const KEY = 'pwa', HIDE_MS = 30 * 864e5, D = DAILY_CORE;
-  // 壊れていたら作り直す（今日を最初の日にする）
+  // 無い・壊れていたら作り直す（今日を最初の日にする。前から遊んでいる人（settings か misses がある）は昨日にして、出した日から帯が出るように）。
+  // 先の日付の first は今日に、30日より先の hideUntil は 0 にそろえる（時計が狂っていた端末で出なくならないように）
   const load = () => {
-    const s = store.get(KEY, null);
-    if (s && s.v === 1 && D.validDay(s.first) && Number.isFinite(s.hideUntil) && s.hideUntil >= 0) return s;
-    const fresh = { v: 1, first: D.jstDay(), hideUntil: 0 };
+    const s = store.get(KEY, null), today = D.jstDay();
+    if (s && s.v === 1 && D.validDay(s.first) && Number.isFinite(s.hideUntil) && s.hideUntil >= 0) {
+      const fixed = { ...s, first: s.first > today ? today : s.first, hideUntil: s.hideUntil > Date.now() + HIDE_MS ? 0 : s.hideUntil };
+      if (fixed.first !== s.first || fixed.hideUntil !== s.hideUntil) store.set(KEY, fixed);
+      return fixed;
+    }
+    const played = store.get('settings', null) != null || store.get('misses', null) != null;
+    const fresh = { v: 1, first: played ? D.addDays(today, -1) : today, hideUntil: 0 };
     store.set(KEY, fresh);
     return fresh;
   };
@@ -27,8 +33,10 @@
   // iPhone・iPad（iPadOS はパソコンの UA なので、さわれるかで見る）。自動では追加できないので、手順の小窓を出す
   const isIos = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  // LINE・Facebook・Instagram の中のブラウザでは追加できないので、帯も欄も出さない
+  const inApp = / Line\/|FBAN|FBAV|Instagram/.test(ua);
   let deferred = null, installed = false;
-  const canAdd = () => !standalone && !installed && (!!deferred || isIos);
+  const canAdd = () => !standalone && !inApp && !installed && (!!deferred || isIos);
   const render = () => {
     field.hidden = !canAdd();
     band.hidden = !(canAdd() && st.first < D.jstDay() && Date.now() >= st.hideUntil);

@@ -25,15 +25,17 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 let lastUrl;
 // リポジトリ直下（root を渡したらそのフォルダ）を配信する静的サーバー（空いているポートで立てる）
 // root を渡したときは openApp の既定の url は変えない（変更前のコードと比べるときに使う）
-export async function startServer({ root } = {}) {
+// headers: どの返事にも足すヘッダー（{ 'cache-control': 'max-age=600' } で GitHub Pages のまねなど）。requests: 渡した配列に届いた URL（/ からのパスと ? 以下）を積む
+export async function startServer({ root, headers = {}, requests } = {}) {
   const dir = root ? resolve(root) : ROOT;
   const server = createServer(async (req, res) => {
+    requests?.push(req.url);
     const path = normalize(join(dir, decodeURIComponent(new URL(req.url, 'http://x').pathname)));
     const file = path.endsWith(sep) ? join(path, 'index.html') : path;
     if (!file.startsWith(dir + sep)) { res.writeHead(403).end(); return; }
     try {
       const body = await readFile(file);
-      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
+      res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', ...headers }).end(body);
     } catch { res.writeHead(404).end(); }
   });
   await new Promise(ok => server.listen(0, '127.0.0.1', ok));
