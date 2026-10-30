@@ -169,6 +169,7 @@ export function renderEn(inp, used = new Set()) {
   let html = inp.index;
   html = once(html, `<meta property="og:url" content="${SITE}">`, `<meta property="og:url" content="${SITE}en/">`);
   html = once(html, '<meta property="og:locale" content="ja_JP">', '<meta property="og:locale" content="en_US">');
+  html = once(html, `<meta property="og:image" content="${SITE}icons/ogp.png">`, `<meta property="og:image" content="${SITE}icons/ogp-en.png">`);
   html = once(html, '<link rel="manifest" href="manifest.webmanifest">', '<link rel="manifest" href="en/manifest.webmanifest">');
   // 埋めこみ: noindex はそのまま。今日の難問へのリンク #e-daily（./#daily）は enLinks で英語版の en/#daily に
   return { 'en/index.html': renderPage(html, 'index.html', inp, used), 'en/embed.html': renderPage(inp.embed, 'embed.html', inp, used) };

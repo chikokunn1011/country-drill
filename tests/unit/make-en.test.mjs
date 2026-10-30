@@ -40,6 +40,8 @@ test('en_head', () => {
   assert.ok(h.includes(`<meta property="og:url" content="${SITE}en/">`));
   assert.ok(h.includes('<meta property="og:locale" content="en_US">'));
   assert.ok(h.includes('<link rel="manifest" href="en/manifest.webmanifest">'));
+  assert.ok(h.includes(`<meta property="og:image" content="${SITE}icons/ogp-en.png">`), '英語の OGP 画像');
+  assert.ok(head(read('index.html')).includes(`<meta property="og:image" content="${SITE}icons/ogp.png">`), '日本語は ogp.png のまま');
   assert.ok(h.includes('<meta name="apple-mobile-web-app-title" content="Flag Master">'));
   assert.ok(h.includes('<title>Flag Master | Flag, country, and map quiz (195 countries)</title>'));
   for (const l of HREFLANG) assert.ok(h.includes(l), l);
@@ -48,6 +50,13 @@ test('en_head', () => {
   assert.equal(ld.inLanguage, 'en');
   assert.equal(ld.url, `${SITE}en/`);
   assert.doesNotMatch(ld.description, JA_RE);
+});
+
+test('ogp_en_png', () => {                 // icons/ogp-en.png（1200x630）。作り直し: node tools/make_ogp.mjs en
+  const b = readFileSync(join(ROOT, 'icons/ogp-en.png'));
+  assert.equal(b.toString('latin1', 1, 4), 'PNG');
+  assert.equal(b.toString('latin1', 12, 16), 'IHDR');
+  assert.deepEqual([b.readUInt32BE(16), b.readUInt32BE(20)], [1200, 630]);
 });
 
 test('ja_hreflang', () => {

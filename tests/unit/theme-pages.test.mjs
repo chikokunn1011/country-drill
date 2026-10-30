@@ -228,6 +228,9 @@ test('en_theme_pages_list', () => {            // 15枚、lang・title・canonic
     assert.ok(h.includes(`<meta property="og:url" content="${url}">`), p);
     assert.ok(h.includes('<meta property="og:locale" content="en_US">'), p);
     assert.ok(h.includes('<meta property="og:site_name" content="Flag Master">'), p);
+    assert.ok(h.includes(`<meta property="og:image" content="${SITE}icons/ogp-en.png">`), p);
+    const jp = p.slice(3), jh = read(jp);   // 日本語のまとめは ogp.png のまま
+    assert.ok(jh.includes(`<meta property="og:image" content="${SITE}icons/ogp.png">`), jp);
     if (id !== 'index') {
       assert.ok(h.includes(`<title>${EN_TITLES[id]} | Flag Master</title>`), p);
       assert.ok(h.includes(`<h1>${EN_TITLES[id]}</h1>`), p);
