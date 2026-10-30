@@ -1274,20 +1274,19 @@ function renderRegionMap(region) {
   } else frame.setAttribute('d', '');
   rmap.s.setAttribute('aria-label', T('世界地図。{r}（{n}か国）に色がついている', { r: regionLabel(region), n: pool.size }));
 }
-// いまのあそび方。テーマ中と、I18N.hide に 'ta' があるとき（PR5 の英語版。PR6 からは無い）はタイムアタックを選べないので練習として扱う
-// （P.kind は書きかえない。テーマをやめた・日本語版に戻ったら元に戻る）
-const kindNow = () => (THEME || I18N.hide.has('ta')) && P.kind === 'ta' ? 'practice' : P.kind;
+// いまのあそび方。テーマ中はタイムアタックを選べないので練習として扱う
+// （P.kind は書きかえない。テーマをやめたら元に戻る）
+const kindNow = () => THEME && P.kind === 'ta' ? 'practice' : P.kind;
 function renderSetup() {
   // タイムアタックで遊べないモード（白地図タップ）でタイムアタックを選んでいたら（引き継ぎ・古い端末の保存も）練習にする
-  const modeNoTa = !!modeOf(P.mode)?.noTa, hideTa = I18N.hide.has('ta'), noTa = modeNoTa || !!THEME || hideTa;
+  const modeNoTa = !!modeOf(P.mode)?.noTa, noTa = modeNoTa || !!THEME;
   if (modeNoTa && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
   const kind = kindNow(), region = themeKey();
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
   // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
   $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || kind === 'ta';
   $('nameopt').checked = P.name;
-  // 英語版はタイムアタックのカードそのものを出さない（「〜では遊べない」の札も出さない）
-  $('kinds').innerHTML = KINDS.filter(k => !(hideTa && k.k === 'ta')).map(k => noTa && k.k === 'ta'
+  $('kinds').innerHTML = KINDS.map(k => noTa && k.k === 'ta'
     ? `<button class="modecard" aria-pressed="false" data-k="ta" disabled aria-disabled="true"><b>${k.label}</b><span>${THEME ? T('テーマでは遊べない') : T('{m}では遊べない', { m: esc(modeOf(P.mode).label) })}</span></button>`
     : `<button class="modecard" aria-pressed="${k.k === kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
   // テーマ中は地域の地図とボタンの代わりにテーマ名と［テーマをやめる］を出す（S.region はさわらない）

@@ -96,6 +96,29 @@ test('local_of_new_york', () => {
   assert.equal(I18N.localOf(0, 30, { now: NOW, tz }), '11:30 AM');
 });
 
+// 夏時間が終わる週・日本時間の月曜の0時の前後・now がちょうど区切り（ニューヨーク。夏時間の前後で答えの時刻が変わるので、どちらの回を指したかが見える）
+test('local_of_edges', () => {
+  const { I18N } = load({ lang: 'en' }).ctx;
+  const at = (iso, o = {}) => I18N.localOf(o.h ?? 0, o.m ?? 0, { weekly: o.weekly, now: new Date(iso), tz: 'America/New_York' });
+  // 夏時間が終わる日の中（11/1 1:30 EDT の前と、切りかわった 1:30 EST のあと）。次の日本時間0時は 11/1 15:00Z
+  for (const iso of ['2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z']) {
+    assert.equal(at(iso), '10:00 AM', iso);
+    assert.equal(at(iso, { m: 30 }), '10:30 AM', iso);
+    assert.equal(at(iso, { weekly: true }), 'Sunday 10:00 AM', iso);
+  }
+  // 日本時間 11/1 0:00 の1秒前は今日の 0:00（10/31 15:00Z、EDT）、ちょうどなら次の日（11/1 15:00Z、EST）
+  assert.equal(at('2026-10-31T14:59:59Z'), '11:00 AM');
+  assert.equal(at('2026-10-31T15:00:00Z'), '10:00 AM');
+  // 今日が月曜（日本時間 10/26）: 0時の1秒前はこの月曜（10/25 15:00Z、EDT）、ちょうど・1秒あとは次の月曜（11/1 15:00Z、EST）
+  assert.equal(at('2026-10-25T14:59:59Z', { weekly: true }), 'Sunday 11:00 AM');
+  assert.equal(at('2026-10-25T15:00:00Z', { weekly: true }), 'Sunday 10:00 AM');
+  assert.equal(at('2026-10-25T15:00:01Z', { weekly: true }), 'Sunday 10:00 AM');
+  // 月曜の0時をすぎても 0:30 の前なら今日の 0:30（10/25 15:30Z、EDT）
+  assert.equal(at('2026-10-25T15:10:00Z', { weekly: true, m: 30 }), 'Sunday 11:30 AM');
+  // 日本時間の月曜 11/2 0:00 ちょうどの weekly は次の週（11/8 15:00Z、EST）
+  assert.equal(at('2026-11-01T15:00:00Z', { weekly: true }), 'Sunday 10:00 AM');
+});
+
 test('local_of_other_zones', () => {
   const en = load({ lang: 'en' }).ctx.I18N;
   assert.equal(en.localOf(0, 0, { now: NOW, tz: 'Asia/Kolkata' }), '8:30 PM');

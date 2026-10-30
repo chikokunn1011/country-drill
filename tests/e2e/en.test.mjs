@@ -162,7 +162,7 @@ t('en_setup', async page => {
 // 日本語版でタイムアタック・東アジア・全部を選んだまま英語版を開く: タイムアタックのまま（PR6 で英語版もタイムアタックを選べる）。
 // タイムアタックは大きい地域だけなので、日本語版と同じく東アジアは親のアジアになる（細かい地域は settings.sub に残る）
 const SAVED_TA = { badges: QUIET_BADGES, setup: { mode: 'f2n', kind: 'ta', count: 'all' }, settings: { region: '東アジア' } };
-t('en_saved_ta_kept', async page => {
+t('en_saved_ta_kept', async (page, app) => {
   await recordEvents(page);
   await openSetup(page);
   assert.equal(await page.locator('#kinds [data-k="ta"]').count(), 1);
@@ -171,6 +171,7 @@ t('en_saved_ta_kept', async page => {
   assert.equal((await page.textContent('#kinds [data-k="ta"] b')).trim(), 'Time Attack');
   assert.equal(noCount((await page.textContent('#regions .chip[aria-pressed="true"]')).trim()), 'Asia');
   assert.equal((await page.textContent('#regions-hint')).trim(), 'Time Attack uses only the large regions, to match the leaderboard.');
+  assert.deepEqual(await jaLeft(page), []);
   await page.click('#start');
   await settle(page);
   const [ev] = await events(page, 'drill:start');
@@ -178,6 +179,11 @@ t('en_saved_ta_kept', async page => {
   assert.equal(ev.region, 'アジア');
   const saved = await page.evaluate(() => { const s = JSON.parse(localStorage.settings); return [JSON.parse(localStorage.setup).kind, s.region, s.sub]; });
   assert.deepEqual(saved, ['ta', 'アジア', '東アジア']);
+  // 日本語版に戻ってもタイムアタックのまま
+  const ja = await app.context.newPage();
+  await ja.goto(server.url);
+  await ja.click('#home-play');
+  assert.equal(await ja.getAttribute('#kinds [data-k="ta"]', 'aria-pressed'), 'true');
 }, { storage: SAVED_TA });
 
 // 5つのモードを練習・5問で: 1問目をまちがえ、残りは正解して最後まで。問題と答えの欄に日本語が無い
