@@ -75,6 +75,25 @@ t('langsw_keeps_screen', async page => {
   assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/');
 }, { locale: 'ja-JP' });
 
+// テーマ（#theme=stars）のモード選択では切りかえも #theme=stars。［テーマをやめる］を押すと、画面はそのままで #play に変わる
+t('langsw_theme_leave', async page => {
+  await page.waitForSelector('#scr-setup:not([hidden])');
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/#theme=stars');
+  await page.click('#theme-leave');
+  assert.equal(path(page), '/');
+  assert.equal(await page.locator('#topbar .langsw a').getAttribute('href'), 'en/#play');
+  assert.equal(await page.locator('#scr-home .langsw a').getAttribute('href'), 'en/#play');
+}, { path: '#theme=stars' });
+
+// 切りかえのリンクは押しやすい高さ（24px 以上。WCAG 2.5.8）
+t('langsw_target_size', async page => {
+  for (const sel of ['#scr-home .langsw a', '#topbar .langsw a']) {
+    if (sel.startsWith('#topbar')) { await page.click('#home-settings'); await page.waitForSelector('#scr-settings:not([hidden])'); }
+    const h = await page.locator(sel).evaluate(e => e.getBoundingClientRect().height);
+    assert.ok(h >= 24, `${sel}: ${h}px`);
+  }
+});
+
 t('home_en_for_english_device', async page => {
   const box = page.locator('#home-en');
   assert.ok(await box.isVisible());

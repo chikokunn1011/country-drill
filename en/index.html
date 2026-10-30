@@ -190,7 +190,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 /* 言語の切りかえ（日本語 / English）。ホームは右上に重ねて置き、高さを足さない。トップバーは右の列の最後 */
 .langsw { font-size: .78rem; line-height: 1.3; color: var(--muted); white-space: nowrap; }
 .langsw b { color: var(--ink); }
-.langsw a { color: var(--accent); font-weight: 700; text-decoration: none; }
+.langsw a { display: inline-block; padding: 6px 2px; margin-block: -6px; color: var(--accent); font-weight: 700; text-decoration: none; }
 .langsw a:hover { text-decoration: underline; }
 .home > .langsw { position: absolute; top: 6px; right: 0; }
 /* 英語の端末への英語版の案内（日本語版だけ。保存しない） */
@@ -1113,11 +1113,16 @@ function show(name) {
   screenRender[name]?.();
   emit('drill:screen', { name });
   window.scrollTo({ top: 0 });
-  // 言語の切りかえは、もう一方の言語のページの同じ画面へ
-  const href = (I18N.lang === 'en' ? './' : 'en/') + langHref(name);
+  updateLangsw();
+}
+// 言語の切りかえ（.langsw a）の行き先を、もう一方の言語のページの今の画面にする。画面が変わったとき（show）と、
+// 画面はそのままで行き先が変わるとき（テーマをやめた）に呼ぶ
+function updateLangsw() {
+  const href = (I18N.lang === 'en' ? './' : 'en/') + langHref(document.body.dataset.screen);
   for (const a of document.querySelectorAll('.langsw a')) a.setAttribute('href', href);
 }
-// 言語の切りかえで移る先の画面の hash（起動のときに読む #settings・#book・#play・#theme=）。ほか（クイズ・結果・道場・ホームなど）は ''
+// 言語の切りかえで移る先の画面の hash（起動のときに読む #settings・#book・#play・#theme=）。ほか（クイズ・結果・道場・ホームなど）は ''。
+// #play は地域を付けない（選んだ地域は settings に保存してあり、同じオリジンのもう一方の言語のページもそれを読む）
 function langHref(name) {
   if (name === 'settings') return '#settings';
   if (name === 'book') return '#book';
@@ -1296,7 +1301,7 @@ $('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.di
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
 // ［テーマをやめる］: テーマを消して #theme= も URL から外し、いつもの地域選びに戻る
-function leaveTheme() { THEME = null; if (location.hash.startsWith('#theme=')) history.replaceState(null, '', location.pathname + location.search); }
+function leaveTheme() { THEME = null; if (location.hash.startsWith('#theme=')) history.replaceState(null, '', location.pathname + location.search); updateLangsw(); }
 $('theme-leave').onclick = () => { leaveTheme(); renderSetup(); };
 // 今日の難問の途中でページを閉じた・再読み込みした: その時点のタイムで終わりにする（むずかしい問題で考えた時間も入れる）
 addEventListener('pagehide', () => { if (G?.kind === 'daily' && !G.ended) endGame('quit'); });

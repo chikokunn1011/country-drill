@@ -204,7 +204,7 @@ body[data-screen="book"] #scr-book:has(> #bmap:not([hidden])) { flex: 1 0 auto; 
     grid-template-areas: ". flags" "eyebrow flags" "title flags" "status flags" "big flags" "icons flags" "en flags" ". flags";
   }
   #home-en { grid-area: en; }
-  #scr-home:has(> #home-en:not([hidden])) #home-pwa { grid-row: 8; }
+  body[data-screen="home"] #scr-home:has(> #home-en:not([hidden])) #home-pwa { grid-row: 8; }
   #home-status .bdg-titlerow { justify-content: flex-start; }
   .home .flags {
     grid-area: flags; align-self: center; justify-self: center;
