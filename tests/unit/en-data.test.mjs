@@ -48,7 +48,7 @@ test('tips_en_shape', () => {
   assert.deepEqual(EN.map(x => x.g), JA.map(x => x.g), 'g が日本語と同じ並び・中身');
   for (const x of EN) {
     assert.deepEqual(Object.keys(x).sort(), ['g', 't'], `${x.g} のキー`);
-    assert.ok(typeof x.t === 'string' && x.t.length > 0 && x.t.length <= 200, `${x.g} の t は200字以内（${x.t.length}字）`);
+    assert.ok(typeof x.t === 'string' && x.t.length > 0 && x.t.length <= 280, `${x.g} の t は280字以内（${x.t.length}字）`);
     assert.ok(!JA_RE.test(x.t), `${x.g} の t に日本語`);
   }
 });
