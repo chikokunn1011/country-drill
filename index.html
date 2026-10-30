@@ -655,7 +655,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <dialog id="detail"><div class="inner" id="detail-inner"></div></dialog>
 <dialog id="pwa-ios" aria-label="ホーム画面に追加"><div class="inner"><p>Safari の共有ボタン（□に↑）を押して、「ホーム画面に追加」を選んでね。</p><button class="btn" id="pwa-ios-ok">OK</button></div></dialog>
 
-<script src="i18n.js?v=2"></script>
+<script src="i18n.js?v=3"></script>
 <script src="countries.js?v=2"></script>
 <script src="themes.js?v=2"></script>
 <script src="ranking.js?v=6"></script>
@@ -1971,9 +1971,9 @@ else { if (MAP_SCREENS.includes(start) && !mapReady) show('home'); show(start); 
 // 地図はホームが出たあと（load のあと）に、うしろで読みはじめる。失敗は loadMap が console.error に書く（地図の画面へ進むときに読み直す）
 addEventListener('load', () => loadMap().catch(() => {}));
 </script>
-<script src="profile.js?v=8"></script>
+<script src="profile.js?v=9"></script>
 <script src="rpg-core.js?v=15"></script>
-<script src="rpg.js?v=15"></script>
+<script src="rpg.js?v=16"></script>
 <script src="rpg-cards.js?v=7"></script>
 <script src="rpg-battle.js?v=18"></script>
 <script src="rpg-team.js?v=5"></script>

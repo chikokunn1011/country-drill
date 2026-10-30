@@ -427,8 +427,8 @@
     if (n !== meLoading || !r.ok || !box || now?.token !== p.token) return;
     box.innerHTML = cardHTML(myCard(now, r));
   };
-  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］
-  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function'; };
+  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］（英語版は冒険の画面が無いあいだ＝I18N.hide の 'rpg' は出さない）
+  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function' && !I18N.hide.has('rpg'); };
   const field = (lbl, body) => `<div class="field"><span class="lbl">${lbl}</span>${body}</div>`;
   // プロフィール画面を開いたら、まだ使えるか確かめる（別の端末に引き継がれていたら not_found → lost で作るフォームに）
   const checkMe = async p => {

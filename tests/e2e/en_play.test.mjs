@@ -4,6 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { settleLayout, measureFit } from './layout.mjs';
+import { RPG_FILES } from './rpg_helpers.mjs';
 import { startServer, openApp, jaLeft, warned, mapLoaded, pickSetup, clearTimeAttack, clearByAnswering, answerCorrect, answerWrong, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -104,8 +105,8 @@ t('en_profile_transfer', async (page, app) => {
     .format(new Date(iso)).replace(/[  ]/g, ' '), db.transfers[0].expires_at);
   assert.ok(exp.includes(want), `${exp} / ${want}`);
   assert.deepEqual(await jaLeft(page), []);
-  // 別の端末の英語版で受け取る
-  const b = await openApp(browser, { ...EN });
+  // 別の端末の英語版で受け取る（日本語版の profile.test.mjs と同じく rpg を止める。rpg.js は起動時にセーブを今の形に書き直すので、生の文字のまま届いたかを見るため）
+  const b = await openApp(browser, { ...EN, blockScripts: RPG_FILES });
   Object.assign(b.db.rpc, db.rpc);
   try {
     const bd = acceptDialogs(b.page);
@@ -128,7 +129,7 @@ t('en_profile_transfer', async (page, app) => {
     assert.deepEqual(await jaLeft(b.page), []);
     assert.deepEqual(b.errors.map(String), []);
   } finally { await b.close(); }
-}, { timezoneId: 'America/New_York' });
+}, { timezoneId: 'America/New_York', blockScripts: RPG_FILES });
 
 // ほかの人の日本語の名前・称号: 名前はそのまま（data-ugc）、称号は出さない
 t('en_card_other_ja', async (page, { db }) => {
@@ -709,3 +710,114 @@ t('en_streak_shared', async page => {
   assert.equal(await page.getAttribute('#streak', 'aria-label'), 'れんぞく日数');
   assert.equal(await page.locator('#streak .sk-tz').count() === 0 || !(await page.isVisible('#streak .sk-tz')), true);
 }, { timezoneId: 'America/New_York', init: SK_NOON });
+
+/* ---------- 英語でもコインがたまる（PR7 Task 13。rpg.js を画面なしで読む。冒険の画面・入口・コインの表示は PR8） ---------- */
+// 読み込むたびにページのスクリプトより前に走る: 出たトーストの文字を window.__toasts に積む（rpg.js の起動時のトーストも拾う）
+const TOASTS_EARLY = `(() => {
+  window.__toasts = window.__toasts || [];
+  new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains('toast')) window.__toasts.push(n.textContent); })
+    .observe(document, { childList: true, subtree: true });
+})();`;
+const frames2 = page => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+const jaToasts = page => page.evaluate(() => window.__toasts.filter(s => /[぀-ヿ一-鿿]/.test(s)));
+// 冒険の画面・入口・コインの表示が無い（無いか見えない）
+const noRpgUi = async page => {
+  for (const id of ['pcoin', 'rpg-chip', 'home-rpg', 'set-rpg', 'scr-rpg']) {
+    const el = page.locator('#' + id);
+    assert.equal(await el.count() === 0 || !(await el.isVisible()), true, id);
+  }
+  assert.equal(await page.locator('#rpg-chip').count(), 0);
+  assert.equal(await page.locator('#set-rpg').count(), 0);
+  assert.equal(await page.locator('#scr-rpg').count(), 0);
+};
+
+t('en_coins_headless', async (page, app) => {
+  assert.equal(await page.evaluate(() => typeof window.RPG?.tx), 'function');
+  assert.equal(await stored(page, 'rpg') === null || (await stored(page, 'rpg')).earned === 0, true);
+  await noRpgUi(page);
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await answerCorrect(page);
+  await frames2(page);
+  assert.equal(await page.locator('#pcoin').count(), 0);   // 遊んでいるあいだもコインの表示は無い
+  await page.click('#next');
+  await clearByAnswering(page);
+  await page.locator('#scr-result:not([hidden])').waitFor();
+  await frames2(page);
+  const s = await stored(page, 'rpg');
+  assert.ok(s.coins > 0, `coins ${s.coins}`);
+  assert.ok(s.earned > 0, `earned ${s.earned}`);
+  assert.equal(await page.evaluate(() => $('r-ext')?.innerHTML ?? ''), '');
+  await noRpgUi(page);
+  assert.deepEqual(await jaToasts(page), []);
+  assert.deepEqual(await jaLeft(page), []);
+  // 設定にも冒険のスイッチは無い
+  await page.evaluate(() => show('settings'));
+  assert.equal(await page.locator('#set-rpg').count(), 0);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.evaluate(() => show('home'));
+  await noRpgUi(page);
+  assert.deepEqual(await jaToasts(page), []);
+  assert.deepEqual(app.consoleErrors.filter(s => s.startsWith('[rpg]')), []);
+}, { init: TOASTS_EARLY });
+
+// 英語でためたコインは、日本語版の冒険（ホームの入口の小さいコイン）にも出る（同じ localStorage の rpg）
+t('en_coins_shared', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await clearByAnswering(page);
+  await page.locator('#scr-result:not([hidden])').waitFor();
+  const { coins } = await stored(page, 'rpg');
+  assert.ok(coins > 0);
+  await page.goto(new URL('./', server.url).href);
+  await mapLoaded(page);
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.equal(await page.isVisible('#home-rpg'), true);
+  assert.equal(await text(page, '#home-rpg .rpg-homecoin'), await page.evaluate(n => RPG_CORE.shortCoins(n), coins));
+  assert.equal((await stored(page, 'rpg')).coins, coins);
+});
+
+// en/#rpg は冒険の画面を開かず、ホームのまま
+t('en_rpg_hash_home', async page => {
+  await page.goto(new URL('en/#rpg', server.url).href);
+  await mapLoaded(page);
+  await frames2(page);
+  assert.equal(await page.evaluate(() => document.body.dataset.screen), 'home');
+  assert.equal(await page.locator('#scr-rpg').count(), 0);
+  assert.equal(await page.isVisible('#scr-home'), true);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 読めないセーブ: 写し（rpg-broken-*）は取るが、日本語のトーストは出さない（コンソールに [rpg] の warn）
+t('en_rpg_broken_save_quiet', async (page, app) => {
+  await page.evaluate(() => localStorage.setItem('rpg', '{bad'));
+  await page.reload();
+  await mapLoaded(page);
+  await frames2(page);
+  const copies = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('rpg-broken-')).map(k => localStorage.getItem(k)));
+  assert.deepEqual(copies, ['{bad']);
+  assert.equal((await stored(page, 'rpg')).v, 1);
+  assert.deepEqual(await page.evaluate(() => window.__toasts), []);
+  assert.equal(await warned(app.warnings, /\[rpg\]/), true);
+  assert.deepEqual(await jaLeft(page), []);
+}, { init: TOASTS_EARLY });
+
+// 冒険をはじめたセーブがあっても、英語版のプロフィールにかざりの欄は出さない（日本語版は今までどおり出す）
+t('en_deco_hidden_with_rpg', async (page, { db }) => {
+  await page.evaluate(() => localStorage.setItem('rpg', JSON.stringify({ v: 1, intro: true, coins: 50 })));
+  await openWithProfile(page, db);
+  assert.equal(await page.evaluate(() => RPG.get().intro), true);
+  await openProfile(page);
+  await page.locator('#pf-me').waitFor();
+  assert.deepEqual(await page.locator('#pf-main .field > .lbl').allInnerTexts(), ['Change nickname', 'Settings']);
+  assert.equal(await page.locator('#pf-deco').count(), 0);
+  assert.doesNotMatch(await text(page, '#pf-main'), /Decorations|Adventure/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.goto(new URL('./', server.url).href);
+  await page.waitForFunction(() => window.PROFILE);
+  await page.evaluate(() => PROFILE.ready);
+  await openProfile(page);
+  await page.locator('#pf-me').waitFor();
+  assert.deepEqual(await page.locator('#pf-main .field > .lbl').allInnerTexts(), ['名前を変える', 'かざり', '設定']);
+  assert.equal(await page.locator('#pf-deco').count(), 1);
+});

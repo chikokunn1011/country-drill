@@ -12,7 +12,7 @@ import { JA_RE } from './i18n_scan.mjs';
 import { SITE } from './make_country_pages.mjs';
 
 // 英語のページで読まない script（未訳の機能）
-export const EN_SKIP = ['trivia.js', 'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js'];
+export const EN_SKIP = ['trivia.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js'];
 // ページごとの辞書（i18n/<名前>.js。まだ無いファイルは入れない）
 export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily'], 'embed.html': ['en-embed'] };
 // 英語版があるページ（<a href> の # の前がこれなら頭に en/）

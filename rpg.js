@@ -17,6 +17,9 @@
   };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
   if (missing.length) { console.error(`[rpg] 必要なものが読み込めなかったので、冒険はお休み: ${missing.join(' ')}`); return; }
+  // 画面なしのモード（英語のページ。I18N.hide の 'rpg'。PR8 で外す）: セーブ・コインの受け取り・イベント・バッジの支払い・タブ間の同期・window.RPG は
+  // 動かし、冒険の画面・入口・チップ・設定のスイッチ・#pcoin・結果のパネル・トーストは出さない（保存の注意はコンソールへ）
+  const HEADLESS = !!window.I18N?.hide?.has('rpg');
 
   const K = RPG_CORE, U = K.TUNING;
   const KEY = 'rpg', BROKEN = 'rpg-broken-';
@@ -29,6 +32,8 @@
     quota: '保存できなかった…',
     firstCoin: 'コインがたまったよ！ 冒険でレベルアップやガチャに使えるよ',
   };
+  // 保存の注意（読めない・新しい版・保存できない）。画面なしのモードではトーストの代わりにコンソールへ
+  const notice = s => { if (HEADLESS) console.warn('[rpg]', s); else toast(s); };
   const todayStr = () => K.today(new Date());
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
   const missesNow = () => (misses && typeof misses === 'object') ? misses : {};
@@ -73,7 +78,7 @@
   const writeRaw = str => {
     if (!ls) { mem = str; return true; }
     try { ls.setItem(KEY, str); } catch {
-      if (!saidQuota) { saidQuota = true; toast(MSG.quota); }
+      if (!saidQuota) { saidQuota = true; notice(MSG.quota); }
       return false;
     }
     return true;
@@ -97,7 +102,7 @@
       if (r.backup && raw !== backedUp) {
         backedUp = raw;
         backupRaw(raw);
-        if (!saidBroken) { saidBroken = true; toast(MSG.broken); }
+        if (!saidBroken) { saidBroken = true; notice(MSG.broken); }
       }
       const e0 = r.d.earned, out = fn(r.d), str = JSON.stringify(r.d);
       wrote = true;
@@ -141,12 +146,12 @@
   const startRun = det => {
     run = status === 'readOnly' ? null : K.newRun(det, base);   // 新しい版のデータのあいだはコインを数えない
     shown = run; last = null; answers = 0;
-    firstArmed = base.earned === 0; firstDue = false;
+    firstArmed = !HEADLESS && base.earned === 0; firstDue = false;   // 画面なしのモードでは、はじめてのコインのトーストを出さない
   };
   // #pcoin（#ppts の直後）: このゲームのコイン。直前の答えが目減りしていれば ×0.5、はじめて正解なら「はじめて！+20」（次の答えで消える）
   const drawPcoin = () => {
     let el = $('pcoin');
-    if (!shown || showCache === false) { el?.remove(); return; }
+    if (HEADLESS || !shown || showCache === false) { el?.remove(); return; }
     if (!el) {
       el = document.createElement('span');
       el.id = 'pcoin'; el.className = 'mono'; el.title = 'コイン（冒険で使える）';
@@ -214,7 +219,7 @@
     emitCoins(d, overcome, 'overcome');
     emitCoins(d, bounty, 'bounty');
     announce(rc, d);
-    if (d.show === false) return;   // 冒険の表示が OFF: コインと記録は貯まるが、何も出さない
+    if (HEADLESS || d.show === false) return;   // 画面なしのモード・冒険の表示が OFF: コインと記録は貯まるが、何も出さない
     if (det.outcome === 'clear') drawResult(rc, d);
     else {
       if (rc.delta > 0) toast(`${COIN} +${fmt(rc.delta)} コイン`);
@@ -291,7 +296,7 @@
       det.paid = paid === null ? false : paid === 0 ? 0 : wrote ? paid : false;
       if (det.paid > 0) {
         emitCoins(d, det.paid, 'badge');
-        if (det.retro === true) {
+        if (det.retro === true && !HEADLESS) {   // 画面なしのモードでは「バッジのごほうび」のトーストを出さない
           if (!retroSum) setTimeout(retroToast, 0);
           retroSum += det.paid;
         }
@@ -394,6 +399,7 @@
 
   // ホームの［冒険］の小さいコインと NEW、トップバーのチップ
   const drawEntrances = (d = get()) => {
+    if (HEADLESS) return;
     const chip = $('rpg-chip');
     if (typeof homeEntry === 'function') homeEntry('home-rpg', { note: `<small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}` });
     if (chip) {
@@ -1028,7 +1034,7 @@
     get status() { return status; },
     get wrote() { return wrote; },             // 最後の tx の書きこみが届いたか
     get warn() { return WARN[status] || ''; },   // 保存の注意（新しい版のデータ・この端末では保存できない）。無ければ ''
-    refresh, open, nextFloor, unlocked, snapshot,
+    refresh, open: HEADLESS ? () => {} : open, nextFloor, unlocked, snapshot,   // 画面なしのモードでは冒険の画面を開かない
     opts: {},   // RPG.open で渡したもの（開いた画面が読む）
     // ここから下の6つは rpg-cards.js（仲間の世界地図・シェア・演出、ガチャと仲間の画面）が本物に入れかえる（cardHTML・openCard も足す）。
     // rpg-cards.js が読み込めなかったときは、地図・シェア・演出なしで冒険ホーム・クイズのコイン・バトル（の保存）が動く
@@ -1067,13 +1073,13 @@
   /* ---------- 起動 ---------- */
   // 壊れた・v の無い・古いセーブの写しとトースト、掃除したセーブへの書き直しはここで1回だけ（以後の get と tx は書き直したものを読む）
   tx(() => {});
-  if (status === 'readOnly') toast(MSG.readOnly);
+  if (status === 'readOnly') notice(MSG.readOnly);
   base = get();
   showCache = base.show;
-  setupEntrances();
+  if (!HEADLESS) setupEntrances();   // 画面なしのモードでは画面・入口・チップ・設定のスイッチを作らない
   emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: owned(base) });
   // 直リンク（index.html の起動処理は #rpg を知らないので、画面を登録したあとでここから開く）
-  if (location.hash === '#rpg') show('rpg');
+  if (location.hash === '#rpg' && !HEADLESS) show('rpg');
   // そのときはまだ後ろのスクリプト（rpg-cards.js のガチャ・仲間の入口と世界地図、badges.js の称号など）が無いので、読み込みが終わったらもう1回描く
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { if (document.body.dataset.screen === 'rpg') renderHome(); }, { once: true });
 })();

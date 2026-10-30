@@ -77,12 +77,13 @@ test('t_page_and_fold', () => {
   assert.ok(ja.I18N.byName(a, b) > 0);
 });
 
-// PR6: 英語版はタイムアタックを選べる。隠すのは他人の称号だけ（PR7 で外す）
-test('hide_title_only', () => {
+// PR7: 英語版は冒険（rpg）の画面・入口・コインの表示を隠す（rpg.js は画面なしで読む。PR8 で外す）。'title' は Task 15 で外す
+test('hide_rpg', () => {
   const en = load({ lang: 'en' }).ctx;
   assert.equal(en.I18N.hide.has('ta'), false);
-  assert.equal(en.I18N.hide.has('title'), true);
-  assert.equal(load().ctx.I18N.hide.has('title'), false);
+  assert.equal(en.I18N.hide.has('rpg'), true);
+  assert.equal(load().ctx.I18N.hide.size, 0);
+  assert.equal(load().ctx.I18N.hide.has('rpg'), false);
 });
 
 // PR6: 日本時間の区切りが、その人の時間で何時か（tz はテスト用。ふだんは端末の時間帯）
