@@ -155,7 +155,14 @@ test('en_links_stay_english', { timeout: 120_000 }, async () => {
 
 // 日本語版のホームの見える文は origin/main と同じ（言語の切りかえ「日本語 / English」の分は除く）。
 // origin/main を git archive で一時フォルダに出して別のサーバーで配り、同じ条件で開いて比べる
-test('ja_unchanged', { timeout: 120_000 }, async () => {
+// PR5 だけの一度きりの見張り: origin/main が手元に無いとき・origin/main に en/index.html がある（PR5 が入った）ときは飛ばす（そのあとの PR がホームの文を変えても落ちないように）
+const gitOk = (...args) => { try { execFileSync('git', ['-C', REPO, ...args], { stdio: 'ignore' }); return true; } catch { return false; } };
+const jaUnchangedSkip = () => !gitOk('rev-parse', '--verify', '--quiet', 'origin/main^{commit}') ? 'origin/main が手元に無い（git fetch origin main で取れる）'
+  : gitOk('cat-file', '-e', 'origin/main:en/index.html') ? 'origin/main に en/index.html がある（PR5 が入ったので、比べる意味がない）'
+  : null;
+test('ja_unchanged', { timeout: 120_000 }, async t => {
+  const reason = jaUnchangedSkip();
+  if (reason) return t.skip(reason);
   const root = mkdtempSync(join(tmpdir(), 'en-walk-main-'));
   let base;
   try {
