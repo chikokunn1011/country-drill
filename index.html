@@ -1348,9 +1348,8 @@ function startDojo({ seq, group, mode, sid }) {
 // region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）。
 // pool を渡すと、その国の一覧から先にとる（テーマ中はテーマの国）
 function makeQuestion(c, region, pool = SUBREGIONS[region] ? poolFor(region) : []) {
-  const inSub = pool;
-  const sub = shuffle(inSub.filter(x => x !== c));
-  const near = shuffle(C.filter(x => x !== c && x.r === c.r && !inSub.includes(x)));
+  const sub = shuffle(pool.filter(x => x !== c));
+  const near = shuffle(C.filter(x => x !== c && x.r === c.r && !pool.includes(x)));
   const far = shuffle(C.filter(x => x !== c && x.r !== c.r));
   const opts = [c];
   for (const x of [...sub, ...near, ...far]) { if (opts.length >= 4) break; opts.push(x); }
@@ -1888,10 +1887,10 @@ addEventListener('load', () => loadMap().catch(() => {}));
 <script src="rpg-core.js?v=14"></script>
 <script src="rpg.js?v=14"></script>
 <script src="rpg-cards.js?v=6"></script>
-<script src="rpg-battle.js?v=16"></script>
+<script src="rpg-battle.js?v=17"></script>
 <script src="rpg-team.js?v=4"></script>
 <script src="rpg-rank.js?v=9"></script>
-<script src="badges.js?v=11"></script>
+<script src="badges.js?v=12"></script>
 <script src="share-card.js?v=1"></script>
 <script src="daily.js?v=5"></script>
 <script src="streak.js?v=2"></script>

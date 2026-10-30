@@ -134,3 +134,17 @@ t('theme_badges_ignore', async page => {
   await page.waitForFunction(() => BADGES.debug.dump().s.clears >= 1);
   assert.deepEqual(await page.evaluate(() => BADGES.debug.dump().s.rc), {});
 }, { path: 'index.html?bdgdebug=1#theme=stars', blockScripts: RPG_FILES });
+
+// バッジの［練習する］（地域のバッジ）は、テーマ中でもテーマをやめて、その地域でモード選択を開く
+t('theme_left_by_badge_practice', async page => {
+  await page.locator('#scr-setup').waitFor();
+  await page.evaluate(() => { BADGES.debug.grant('reg-europe@1'); BADGES.open('reg-europe'); });
+  await page.click('#detail-inner [data-bdg-practice]');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+  assert.equal(await visible(page, '#theme-field'), false);
+  assert.equal(await visible(page, '#regions'), true);
+  assert.deepEqual(await page.evaluate(() => [S.region, THEME, location.hash]), ['ヨーロッパ', null, '']);
+  await page.click('#start');
+  await settle(page);
+  assert.equal(await page.evaluate(() => G.region), 'ヨーロッパ');
+}, { path: 'index.html?bdgdebug=1#theme=stars', blockScripts: RPG_FILES });
