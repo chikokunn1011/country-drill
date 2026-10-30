@@ -279,3 +279,22 @@ test('merge_patch_cli', () => withTmpRoot(dir => {
   assert.throws(() => run('merge', '1', f));
   assert.equal(readFileSync(join(dir, 'data/en/trivia_facts.json'), 'utf8'), before, '止まったときは書かない');
 }));
+
+// 779件そろい、trivia-en.js が今の英訳から作ったものと同じ（node tools/trivia_en.mjs build の流し忘れで落ちる）
+test('trivia_en_complete', () => {
+  assert.equal(EN.length, 779, '英訳が779件');
+  const have = new Set(EN.map(r => r.id));
+  for (const id of IDS) assert.ok(have.has(id), `${id} の英訳が無い`);
+  const src = read('trivia-en.js');
+  assert.ok(src === buildTriviaEn(EN), 'trivia-en.js が古い。node tools/trivia_en.mjs build を流して');
+  const en = plain(load(src, 'TRIVIA')), ja = plain(load(read('trivia.js'), 'TRIVIA'));
+  assert.deepEqual(Object.keys(en), Object.keys(ja), '国と並びが trivia.js と同じ');
+  for (const a of Object.keys(ja)) {
+    assert.equal(en[a].length, ja[a].length, `${a} の件数`);
+    assert.deepEqual(en[a].map(x => x.k), ja[a].map(x => x.k), `${a} の k`);
+    for (const x of en[a]) {
+      assert.deepEqual(Object.keys(x), ['k', 't'], `${a} の形`);
+      assert.ok(!JA_RE.test(x.t), `${a} に日本語: ${x.t}`);
+    }
+  }
+});
