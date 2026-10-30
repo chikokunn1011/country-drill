@@ -193,6 +193,12 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .langsw a { display: inline-block; padding: 6px 2px; margin-block: -6px; color: var(--accent); font-weight: 700; text-decoration: none; }
 .langsw a:hover { text-decoration: underline; }
 .home > .langsw { position: absolute; top: 6px; right: 0; }
+/* スマホのトップバーでは、切りかえはもう一方の言語のリンクだけにする（今の言語と「/」は出さない）。全部出すとトップバーが2行になる */
+@media (max-width: 480px) {
+  .topbar .langsw { font-size: 0; }
+  .topbar .langsw b { display: none; }
+  .topbar .langsw a { font-size: .78rem; }
+}
 /* 英語の端末への英語版の案内（日本語版だけ。保存しない） */
 .home-en { margin: 0; font-size: .85rem; }
 .home-en a { color: var(--accent); font-weight: 700; }
@@ -257,7 +263,7 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
    （上にだけはみ出す。右にはみ出すとボタンの scrollWidth がふえて、はみ出しの計測にかかる） */
 .choice.ok::after, .choice.ng::after { position: absolute; top: -8px; right: 10px; width: 20px; height: 20px; border-radius: 50%; color: var(--surface); font: 900 .75rem/20px var(--font-body); text-align: center; pointer-events: none; }
 .choice.ok::after { content: "✓"; content: "✓" / "Correct"; background: var(--ok); }
-.choice.ng::after { content: "✗"; content: "✗" / "Wrong"; background: var(--ng); }
+.choice.ng::after { content: "✗"; content: "✗" / "Incorrect"; background: var(--ng); }
 .choice:disabled { cursor: default; }
 .choice.flagc, .choice.mapc { flex-direction: column; align-items: stretch; padding: 10px; gap: 6px; }
 .choice.flagc kbd, .choice.mapc kbd { align-self: flex-start; }

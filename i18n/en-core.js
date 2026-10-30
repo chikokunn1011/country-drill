@@ -62,9 +62,9 @@ Object.assign(window.I18N_EN ??= {}, {
   'すごすぎ！': 'Amazing!',
   'さすが！': 'Well done!',
   '神！': 'Legendary!',
-  'つよい！': 'So strong!',
+  'つよい！': 'Unstoppable!',
   '完璧！': 'Perfect!',
-  'ドパミン全開！': 'Dopamine overload!',
+  'ドパミン全開！': 'Full hype!',
 
   // 地図の読みこみの帯
   '地図を読みこみ中…': 'Loading map…',

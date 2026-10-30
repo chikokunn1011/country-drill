@@ -192,6 +192,12 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .langsw a { display: inline-block; padding: 6px 2px; margin-block: -6px; color: var(--accent); font-weight: 700; text-decoration: none; }
 .langsw a:hover { text-decoration: underline; }
 .home > .langsw { position: absolute; top: 6px; right: 0; }
+/* スマホのトップバーでは、切りかえはもう一方の言語のリンクだけにする（今の言語と「/」は出さない）。全部出すとトップバーが2行になる */
+@media (max-width: 480px) {
+  .topbar .langsw { font-size: 0; }
+  .topbar .langsw b { display: none; }
+  .topbar .langsw a { font-size: .78rem; }
+}
 /* 英語の端末への英語版の案内（日本語版だけ。保存しない） */
 .home-en { margin: 0; font-size: .85rem; }
 .home-en a { color: var(--accent); font-weight: 700; }

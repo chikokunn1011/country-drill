@@ -68,3 +68,25 @@ t('en_map_wait', async page => {
   assert.equal((await page.textContent('#mapwait-msg')).trim(), 'Couldn’t load the map');
   assert.deepEqual(await jaLeft(page), []);
 }, { blockScripts: ['world.js'], waitMap: false });
+
+// 390px のトップバーは1行（言語の切りかえを足す前の origin/main と同じ 35px）。スマホでは切りかえはもう一方の言語のリンクだけ。
+// 日本語版は rpg.js のチップ（#topbar-extra）も並ぶ
+const TOPBAR_390 = 35;
+const topbar = page => page.evaluate(() => ({
+  h: document.getElementById('topbar').getBoundingClientRect().height,
+  sub: document.querySelector('#brand small').getClientRects().length && document.querySelector('#brand small').getBoundingClientRect().height,
+  sw: [...document.querySelectorAll('#topbar .langsw > *')].filter(e => e.checkVisibility()).map(e => e.textContent),
+}));
+test('topbar_height_390', { timeout: 120_000 }, async () => {
+  for (const [path, other] of [['', 'English'], ['en/', '日本語']]) {
+    const app = await openApp(browser, { path: path + '#settings', storage: { badges: QUIET_BADGES } });
+    try {
+      await app.page.waitForSelector('#scr-settings:not([hidden])');
+      const tb = await topbar(app.page);
+      assert.ok(Math.abs(tb.h - TOPBAR_390) < 0.5 || (path && tb.h <= TOPBAR_390), `${path || 'ja'}: ${tb.h}px`);
+      assert.ok(tb.sub < 14, `「FLAGS · NAMES · MAP」が折れている（${tb.sub}px）`);
+      assert.deepEqual(tb.sw, [other]);
+      assert.deepEqual(app.errors.map(String), []);
+    } finally { await app.close(); }
+  }
+});
