@@ -112,6 +112,17 @@ t('en_topbar_one_line_360', async page => {
   assert.deepEqual(await jaLeft(page), []);
 }, { viewport: { width: 360, height: 640 }, storage: { badges: QUIET_BADGES, rpg: { v: 1, intro: true, coins: 123456 } } });
 
+// PR6: 端末の時間帯（timezoneId）で I18N.localOf が「その人の時間」を出す。ニックネーム（data-ugc）の日本語は jaLeft が数えない
+t('en_local_time_and_ugc', async page => {
+  const r = await page.evaluate(() => {
+    const now = new Date('2026-10-30T00:00:00Z');
+    return [I18N.localOf(0, 0, { now }), I18N.localOf(0, 0, { weekly: true, now }), I18N.dayLabel('2026-10-30')];
+  });
+  assert.deepEqual(r, ['11:00 AM', 'Sunday 10:00 AM', 'Oct 30']);
+  await page.evaluate(() => document.querySelector('#scr-home').insertAdjacentHTML('beforeend', '<p id="ugc-test" data-ugc><b>たろう</b></p><p id="ja-test">じろう</p>'));
+  assert.deepEqual(await jaLeft(page), ['じろう']);
+}, { timezoneId: 'America/New_York' });
+
 // ---- モード選択とクイズ（練習・挑戦）。Task 6 ----
 const openSetup = async page => { await page.click('#home-play'); await page.waitForSelector('#scr-setup:not([hidden])'); };
 const texts = (page, sel) => page.$$eval(sel, els => els.map(e => e.textContent.trim()));
@@ -121,9 +132,8 @@ t('en_setup', async page => {
   await openSetup(page);
   assert.deepEqual(await jaLeft(page), []);
   assert.deepEqual(await texts(page, '#modes .modecard b'), ['Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map']);
-  // タイムアタックのカードは出さない（「〜では遊べない」の札も出さない）
-  assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
-  assert.equal(await page.locator('#kinds [data-k="ta"]').count(), 0);
+  // PR6: タイムアタックのカードも出す
+  assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge', 'Time Attack']);
   assert.deepEqual((await texts(page, '#regions .chips > .chip')).map(noCount),
     ['World', 'Asia', 'Europe', 'Africa', 'North & Central America', 'South America', 'Oceania']);
   assert.equal((await page.textContent('#regions-hint')).trim(), 'Pick a large region to see its subregions. You can also tap a country on the map to choose its region.');
@@ -141,31 +151,33 @@ t('en_setup', async page => {
   for (const k of ['n2f', 'm2f', 'f2m', 'tap', 'f2n']) {
     await page.click(`#modes .modecard[data-k="${k}"]`);
     assert.deepEqual(await jaLeft(page), [], k);
-    assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge'], k);
+    assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge', 'Time Attack'], k);
+    // 白地図タップはタイムアタックが無い（札は英語）
+    assert.equal(await page.locator('#kinds [data-k="ta"][disabled]').count(), k === 'tap' ? 1 : 0, k);
   }
+  await page.click('#modes .modecard[data-k="tap"]');
+  assert.equal((await page.textContent('#kinds [data-k="ta"] span')).trim(), "Not available in Tap the map");
 });
 
-// 日本語版でタイムアタック・東アジア・全部を選んだまま英語版を開く: 練習になり、保存は書きかえない
+// 日本語版でタイムアタック・東アジア・全部を選んだまま英語版を開く: タイムアタックのまま（PR6 で英語版もタイムアタックを選べる）。
+// タイムアタックは大きい地域だけなので、日本語版と同じく東アジアは親のアジアになる（細かい地域は settings.sub に残る）
 const SAVED_TA = { badges: QUIET_BADGES, setup: { mode: 'f2n', kind: 'ta', count: 'all' }, settings: { region: '東アジア' } };
-t('en_saved_ta_shows_practice', async (page, app) => {
+t('en_saved_ta_kept', async page => {
   await recordEvents(page);
   await openSetup(page);
-  assert.equal(await page.getAttribute('#kinds [data-k="practice"]', 'aria-pressed'), 'true');
-  assert.equal(noCount((await page.textContent('#regions .chip[aria-pressed="true"]')).trim()), 'East Asia');
-  assert.match((await page.textContent('#counts .chip[aria-pressed="true"]')).trim(), /^All \(\d+\)$/);
-  assert.deepEqual(await jaLeft(page), []);
+  assert.equal(await page.locator('#kinds [data-k="ta"]').count(), 1);
+  assert.equal(await page.getAttribute('#kinds [data-k="ta"]', 'aria-pressed'), 'true');
+  assert.equal(await page.getAttribute('#kinds [data-k="practice"]', 'aria-pressed'), 'false');
+  assert.equal((await page.textContent('#kinds [data-k="ta"] b')).trim(), 'Time Attack');
+  assert.equal(noCount((await page.textContent('#regions .chip[aria-pressed="true"]')).trim()), 'Asia');
+  assert.equal((await page.textContent('#regions-hint')).trim(), 'Time Attack uses only the large regions, to match the leaderboard.');
   await page.click('#start');
   await settle(page);
   const [ev] = await events(page, 'drill:start');
-  assert.equal(ev.kind, 'practice');
-  assert.equal(ev.region, '東アジア');
-  const saved = await page.evaluate(() => [JSON.parse(localStorage.setup).kind, JSON.parse(localStorage.settings).region]);
-  assert.deepEqual(saved, ['ta', '東アジア']);
-  // 日本語版に戻るとタイムアタックのまま
-  const ja = await app.context.newPage();
-  await ja.goto(server.url);
-  await ja.click('#home-play');
-  assert.equal(await ja.getAttribute('#kinds [data-k="ta"]', 'aria-pressed'), 'true');
+  assert.equal(ev.kind, 'ta');
+  assert.equal(ev.region, 'アジア');
+  const saved = await page.evaluate(() => { const s = JSON.parse(localStorage.settings); return [JSON.parse(localStorage.setup).kind, s.region, s.sub]; });
+  assert.deepEqual(saved, ['ta', 'アジア', '東アジア']);
 }, { storage: SAVED_TA });
 
 // 5つのモードを練習・5問で: 1問目をまちがえ、残りは正解して最後まで。問題と答えの欄に日本語が無い
@@ -269,7 +281,11 @@ t('en_theme_hash', async page => {
   await page.waitForSelector('#scr-setup:not([hidden])');
   assert.ok(await page.isVisible('#theme-field'));
   assert.equal(await page.getAttribute('#kinds [data-k="practice"]', 'aria-pressed'), 'true');
-  assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge']);
+  // テーマ中はタイムアタックを選べない（PR6: カードは出して、札は英語）
+  assert.deepEqual(await texts(page, '#kinds .modecard b'), ['Practice', 'Challenge', 'Time Attack']);
+  assert.equal(await page.getAttribute('#kinds [data-k="ta"]', 'aria-disabled'), 'true');
+  assert.equal((await page.textContent('#kinds [data-k="ta"] span')).trim(), 'Not available in a collection');
+  assert.deepEqual(await jaLeft(page), []);
   const n = await page.evaluate(() => window.THEMES_DATA.stars.a.length);
   assert.equal(n, 70);
   assert.equal((await page.textContent('#theme-name')).trim(), `Collection: Flags with stars (${n} countries)`);

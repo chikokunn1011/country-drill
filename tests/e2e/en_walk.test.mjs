@@ -18,7 +18,7 @@ after(async () => { await browser?.close(); await server?.close(); });
 
 // 未訳の機能の入口（英語版では見えてはいけない）: 今日の難問・冒険・ランキング・バッジ・プロフィール・タイムアタックのカード・
 // クイズのコイン・結果のシェア・豆知識の欄
-const UNTRANSLATED = ['#home-daily', '#home-rpg', '#home-rank', '#home-badges', '#home-profile', '#kinds [data-k="ta"]', '#pcoin', '#r-share', '.trivia'];
+const UNTRANSLATED = ['#home-daily', '#home-rpg', '#home-rank', '#home-badges', '#home-profile', '#pcoin', '#r-share', '.trivia'];
 const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
 
 // 英語の静的なページ（本編 en/ のあとにまわる順）

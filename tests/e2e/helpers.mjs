@@ -450,9 +450,10 @@ async function supabaseRoute(route, db) {
 // routes: 開く前に context.route に渡す [url のパターン, ハンドラ] の並び（国旗・world.js を遅らせる・止めるときなど）
 // serviceWorkers: newContext にそのまま渡す。既定は 'block'（sw.js が動くと、SW が取りに行く通信は context.route を通らない）。pwa.test.mjs だけ 'allow'
 // locale: newContext にそのまま渡す（navigator.language）。既定は 'ja-JP'（日本語の端末。'en-US' などにするとホームに英語版への案内が出る）
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [], serviceWorkers = 'block', locale = 'ja-JP' } = {}) {
+// timezoneId: newContext にそのまま渡す（端末の時間帯。'America/New_York' など）。省略時は渡さない（このマシンの時間帯）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [], serviceWorkers = 'block', locale = 'ja-JP', timezoneId } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
-  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch, serviceWorkers, locale });
+  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch, serviceWorkers, locale, ...(timezoneId ? { timezoneId } : {}) });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
   if (seed !== undefined) await context.addInitScript(seed => {
     let t = seed;
@@ -617,12 +618,13 @@ export const recordEvents = page => page.evaluate(types => {
 export const events = (page, type) => page.evaluate(type => window.__ev.filter(e => !type || e.type === type), type);
 
 // 英語版（PR5）: 見えている日本語の一覧。見えている要素（checkVisibility()）の文字と、aria-label・title・alt・placeholder・
-// value（ボタン）、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）の中は除く
+// value（ボタン）、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）と、
+// data-ugc の要素（PR6: ほかの人が入れた文字＝ニックネーム。訳さない）の中は除く
 export const jaLeft = async page => {
   const { JA_RE } = await import('../../tools/i18n_scan.mjs');
   return page.evaluate(([src, flags]) => {
     const re = new RegExp(src, flags), out = [];
-    const shown = el => el && el.checkVisibility({ visibilityProperty: true }) && !el.closest('[lang="ja"]');
+    const shown = el => el && el.checkVisibility({ visibilityProperty: true }) && !el.closest('[lang="ja"], [data-ugc]');
     const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     for (let n; (n = walk.nextNode());) if (re.test(n.data) && shown(n.parentElement)) out.push(n.data.trim());
     for (const el of document.body.querySelectorAll('*')) {
