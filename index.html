@@ -208,7 +208,8 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .tapmap .tapline { stroke: var(--ng); stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 /* 照準（キーボードで答える点）。地図にフォーカスがあるときだけ出す */
 .tapmap .aim { display: none; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
-.tapmap:focus .aim { display: inline; }
+.tapmap:focus-visible .aim { display: inline; }   /* タップでフォーカスしたとき（スマホ）は出さない */
+.tapmap:focus:not(:focus-visible) { outline: none; }
 .tapkm { margin: 0; font-weight: 700; }
 .zoomctl { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
 .zoomctl button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1rem var(--font-mono); cursor: pointer; }
@@ -825,7 +826,7 @@ function tapMap(c, region) {
   const box = document.createElement('div'); box.className = 'mapbox tapbox';
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.classList.add('map', 'zoomable', 'tapmap'); s.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  s.setAttribute('role', 'img'); s.setAttribute('tabindex', '0');
+  s.setAttribute('role', 'application'); s.setAttribute('tabindex', '0');
   s.setAttribute('aria-label', `${regionLabel(region)}の白地図。国旗の国をタップ。矢印キーで動かし、Enter で真ん中の場所を答える`);
   const proj = boxProjection(REGION_BOX[region] || WORLD_BOX, W, H), path = d3.geoPath(proj);
   if (G?.cur?.c === c) G.cur.proj = proj;
@@ -878,7 +879,10 @@ function tapMap(c, region) {
       e.stopPropagation();   // 答えた Enter で document の［次へ］まで進まない
       if (!e.repeat) {
         const b = s.getBoundingClientRect(), el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-        tryAnswer(d3.zoomTransform(s).invert([W / 2, H / 2]), (s.contains(el) && el.closest('[data-a]')?.dataset.a) || '');
+        const p = d3.zoomTransform(s).invert([W / 2, H / 2]), ll = tapLonLat(p);
+        // 真ん中が画面の外・何かに隠れているときは、その点を含む国の形から探す
+        const at = (s.contains(el) && el.closest('[data-a]')?.dataset.a) || (ll && featCountry.get(feats.find(g => d3.geoContains(g, ll)))?.a) || '';
+        tryAnswer(p, at);
       }
     } else return;
     e.preventDefault();
