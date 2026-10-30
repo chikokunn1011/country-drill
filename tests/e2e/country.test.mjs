@@ -100,9 +100,9 @@ test('country_page_sections_fit', { timeout: 120_000 }, async () => {
       const over = await page.evaluate(() => [...document.querySelectorAll('.meaning, .neighbors li, .cthemes li, .prevnext a')]
         .filter(e => e.getBoundingClientRect().right > document.querySelector('main').getBoundingClientRect().right + 0.5).map(e => e.className || e.textContent));
       assert.deepEqual(over, [], where);
-      // となりの国のリンクは押しやすい高さ（44px 以上）
-      const low = await page.evaluate(() => [...document.querySelectorAll('.neighbors a')].filter(e => e.getBoundingClientRect().height < 44).map(e => e.textContent));
-      assert.deepEqual(low, [], `${where} となりの国の高さ`);
+      // となりの国・まとめ・前後の国のリンクは押しやすい高さ（44px 以上）
+      const low = await page.evaluate(() => [...document.querySelectorAll('.neighbors a, .cthemes a, .prevnext a')].filter(e => e.getBoundingClientRect().height < 44).map(e => e.textContent));
+      assert.deepEqual(low, [], `${where} リンクの高さ`);
     });
   }
 });

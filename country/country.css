@@ -37,9 +37,9 @@
 .neighbors a:hover span { text-decoration: underline; }
 .noneighbor { color: var(--muted); }
 
-/* この国旗が出てくるまとめ */
+/* この国旗が出てくるまとめ（押しやすい高さ） */
 .page .cthemes { padding-left: 1.2em; }
-.cthemes li { margin: 0 0 6px; }
+.cthemes a { display: inline-flex; align-items: center; min-height: 44px; }
 
 /* 前の国・次の国（同じ地域の五十音順）。前が無ければ次を右に寄せる */
 .prevnext { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }

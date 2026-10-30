@@ -175,12 +175,12 @@ ${css.map(h => `<link rel="stylesheet" href="${h}">`).join('\n')}
 
 // description の頭: 「<国名>の国旗の意味: <国旗の意味の最初の文>」
 const descHead = (c, meaning) => `${c.n}の国旗の意味: ${meaning.split('。')[0]}。`;
-// 頭のあとに、地域・似ている国旗・さそいの文を、120字に収まるところまで文ごとに付ける（文の途中では切らない）
+// 頭のあとに、地域・似ている国旗・さそいの文を、文ごとに付ける（文の途中では切らない）。120字をこえる文は飛ばして次の文を見る
 function countryDescription(inp, c, sims) {
   const rest = [`${c.n}（${c.r}）の国旗と、首都・面積・豆知識。`, ...(sims.length ? [`似ている国旗: ${sims.map(s => s.n).join('・')}。`] : []),
     '国旗マスターで国旗・国名・場所をクイズで覚えよう。'];
   let d = descHead(c, inp.MEANINGS[c.a]);
-  for (const s of rest) { if ((d + s).length > DESC_MAX) break; d += s; }
+  for (const s of rest) { if ((d + s).length > DESC_MAX) continue; d += s; }
   return d;
 }
 
