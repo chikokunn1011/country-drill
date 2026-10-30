@@ -1,7 +1,7 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = 'b8a02512ea1b';
+const VERSION = '115bf8e5c13c';
 const PRECACHE = [
   "./",
   "index.html",
@@ -18,21 +18,21 @@ const PRECACHE = [
   "profile.css?v=3",
   "streak.css?v=2",
   "dojo.css?v=1",
-  "i18n.js?v=2",
+  "i18n.js?v=3",
   "countries.js?v=2",
   "themes.js?v=2",
   "ranking.js?v=6",
   "daily-core.js?v=2",
   "trivia.js",
   "sound.js?v=1",
-  "profile.js?v=8",
+  "profile.js?v=9",
   "rpg-core.js?v=15",
-  "rpg.js?v=15",
+  "rpg.js?v=16",
   "rpg-cards.js?v=7",
   "rpg-battle.js?v=18",
   "rpg-team.js?v=5",
   "rpg-rank.js?v=9",
-  "badges.js?v=13",
+  "badges.js?v=14",
   "share-card.js?v=2",
   "daily.js?v=6",
   "streak.js?v=3",
@@ -46,6 +46,8 @@ const PRECACHE = [
   "i18n/en-dojo.js?v=1",
   "i18n/en-profile.js?v=1",
   "i18n/en-daily.js?v=1",
+  "i18n/en-badges.js?v=1",
+  "trivia-en.js",
   "vendor/d3-7.9.0.min.js",
   "vendor/topojson-client-3.1.0.min.js",
   "world.js?v=1",

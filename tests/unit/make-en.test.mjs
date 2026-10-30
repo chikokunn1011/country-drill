@@ -6,7 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
 import { SITE } from '../../tools/make_country_pages.mjs';
-import { EN_SKIP, EN_DICTS, LANGSW_EN, readEnInputs, translateHtml, renderEn } from '../../tools/make_en.mjs';
+import { EN_SKIP, EN_SWAP, EN_DICTS, LANGSW_EN, readEnInputs, translateHtml, renderEn } from '../../tools/make_en.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = p => readFileSync(join(ROOT, p), 'utf8');
@@ -79,8 +79,17 @@ test('en_scripts', () => {
   // i18n.js は本文のインラインの <script> より前
   const body = en.slice(en.indexOf('<body'));
   assert.ok(body.indexOf('<script src="i18n.js?v=') < body.search(/<script>/));
-  // EN_SKIP に無い script はみな同じ ?v= で残る
-  for (const s of scriptSrcs(ja)) if (!EN_SKIP.includes(s.split('?')[0])) assert.ok(srcs.includes(s), s);
+  // EN_SKIP に無い script はみな同じ ?v= で残る（EN_SWAP のものは差しかえた先の名前で、同じ ?v=）
+  const swap = s => { const [f, q] = s.split('?'); return Object.hasOwn(EN_SWAP, f) ? EN_SWAP[f] + (q === undefined ? '' : '?' + q) : s; };
+  for (const s of scriptSrcs(ja)) if (!EN_SKIP.includes(s.split('?')[0])) assert.ok(srcs.includes(swap(s)), swap(s));
+  // 豆知識は英訳（trivia-en.js）に差しかえ。日本語の index.html は trivia.js のまま
+  assert.deepEqual(EN_SWAP, { 'trivia.js': 'trivia-en.js' });
+  assert.ok(!EN_SKIP.includes('trivia.js'));
+  assert.ok(srcs.includes('trivia-en.js') && !srcs.includes('trivia.js'), 'en/index.html は trivia-en.js だけ');
+  const jaSrcs = scriptSrcs(ja);
+  assert.ok(jaSrcs.includes('trivia.js') && !jaSrcs.includes('trivia-en.js'), 'index.html は trivia.js だけ');
+  // 並びは日本語と同じ（外したものと辞書のほかは、差しかえた先も trivia.js のあった所）
+  assert.deepEqual(srcs.filter(s => !s.startsWith('i18n/')), jaSrcs.filter(s => !EN_SKIP.includes(s.split('?')[0])).map(swap));
 });
 
 test('en_no_japanese_html', () => {

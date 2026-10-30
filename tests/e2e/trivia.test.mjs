@@ -3,7 +3,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, answerWrong, clearTimeAttack, jaLeft, QUIET_BADGES } from './helpers.mjs';
+import { JA_RE } from '../../tools/i18n_scan.mjs';
 import { settleLayout } from './layout.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -354,3 +355,77 @@ t('book_map_scroll_resets', async page => {
   }
   assert.deepEqual(problems, []);
 }, { viewport: { width: 1280, height: 577 }, ...FIT_OPTS });
+
+/* ---------- 英語版（PR7）: trivia-en.js ---------- */
+const EN_OPTS = { path: 'en/', locale: 'en-US', storage: { badges: QUIET_BADGES } };
+const EN_LABEL = { flag: '🏳️ Flag', geo: '🗺️ Geography', culture: '🍜 Culture' };
+
+// 練習で1問正解すると英語の豆知識が1つ（ラベルも英語）。道場で正解すると国旗の豆知識（🏳️ Flag）
+t('en_answer_trivia', async page => {
+  await start(page);
+  await correct(page);
+  const a = await page.evaluate(() => G.cur.c.a), rows = await tvs(page, '.reveal .trivia .tv');
+  assert.equal(rows.length, 1);
+  const [tv] = rows, list = await triviaOf(page, a);
+  assert.ok(list.some(x => x.k === tv.k && x.t === tv.t), `TRIVIA.${a} にない: ${JSON.stringify(tv)}`);
+  assert.doesNotMatch(tv.t, JA_RE);
+  assert.equal(tv.label, EN_LABEL[tv.k]);
+  assert.equal(tv.title, tv.t);
+  assert.deepEqual(await jaLeft(page), []);
+
+  await page.evaluate(() => startDojo({ seq: ['td', 'ro', 'ad', 'md', 'td', 'ro', 'ad', 'md', 'td', 'ro'], group: ['td', 'ro', 'ad', 'md'], mode: 'f2n', sid: 'dj-en' }));
+  await page.waitForSelector('#qcard .choice');
+  await correct(page);
+  const d = await page.evaluate(() => G.cur.c.a), [fl] = await tvs(page, '.reveal .trivia .tv');
+  const flag = (await triviaOf(page, d)).filter(x => x.k === 'flag');
+  assert.deepEqual(fl, { k: 'flag', label: '🏳️ Flag', t: flag[0].t, title: flag[0].t });
+  assert.doesNotMatch(fl.t, JA_RE);
+  assert.deepEqual(await jaLeft(page), []);
+}, EN_OPTS);
+
+// 英訳でいちばん長い文: その国だけをその文にして出題し、390px では答えの欄が横にはみ出さず、
+// PC の下の帯（900〜1279）では1行で切れて title に全文、1280×800 では答えの欄がカードに収まる
+t('en_trivia_fits', async page => {
+  const longest = await page.evaluate(() => Object.entries(TRIVIA).flatMap(([a, v]) => v.map(x => ({ a, ...x }))).reduce((x, y) => y.t.length > x.t.length ? y : x));
+  assert.ok(longest.t.length > 150, `いちばん長い文 ${longest.t.length}字`);
+  const problems = [];
+  const answer = async () => {
+    await start(page);
+    await fix(page, longest.a);
+    await page.evaluate(({ a, k, t }) => { TRIVIA[a] = [{ k, t }]; }, longest);
+    await correct(page);
+    await settleLayout(page);
+    const [tv] = await tvs(page, '.reveal .trivia .tv');
+    if (tv?.t !== longest.t || tv?.title !== longest.t) problems.push(`${await page.evaluate(() => innerWidth)}: 豆知識がちがう ${JSON.stringify(tv)}`);
+    return page.evaluate(() => {
+      const box = el => { const r = el.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+      const rv = document.querySelector('#qcard > .reveal'), li = rv.querySelector('.trivia .tv');
+      return { vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth, card: box($('qcard')), reveal: box(rv), trivia: box(rv.querySelector('.trivia')),
+        li: { ...box(li), ch: li.clientHeight, sh: li.scrollHeight, cw: li.clientWidth, scw: li.scrollWidth, lh: parseFloat(getComputedStyle(li).lineHeight) } };
+    });
+  };
+  const inside = (key, m) => {
+    if (m.sw > m.vw) problems.push(`${key}: 横スクロール ${m.sw}/${m.vw}`);
+    if (m.li.scw > m.li.cw + 1) problems.push(`${key}: .tv の中が横にはみ出す ${m.li.scw}/${m.li.cw}`);
+    for (const [n, b] of [['reveal', m.reveal], ['trivia', m.trivia], ['li', m.li]])
+      if (b.left < m.card.left - 1 || b.right > m.card.right + 1) problems.push(`${key}: ${n} ${b.left}〜${b.right} が #qcard ${m.card.left}〜${m.card.right} の外`);
+  };
+  // スマホ: 全文が出て、横にはみ出さない
+  let m = await answer();
+  inside('390', m);
+  if (m.li.sh > m.li.ch + 1) problems.push(`390: 文が切れている ${m.li.sh}/${m.li.ch}`);
+  // PC の下の帯: 1行で切れる（全文は title）
+  await page.setViewportSize({ width: 1024, height: 768 });
+  m = await answer();
+  inside('1024x768', m);
+  if (m.li.ch > m.li.lh * 1.5) problems.push(`1024x768: 帯の豆知識が1行でない ${m.li.ch}/${m.li.lh}`);
+  if (!(m.li.sh > m.li.ch)) problems.push(`1024x768: 切れていない（もっと長い文で見る）${m.li.sh}/${m.li.ch}`);
+  // PC（1280×800）: 答えの列に収まる
+  await page.setViewportSize({ width: 1280, height: 800 });
+  m = await answer();
+  inside('1280x800', m);
+  if (m.trivia.bottom > m.reveal.bottom + 1) problems.push(`1280x800: .trivia.bottom ${m.trivia.bottom} > .reveal.bottom ${m.reveal.bottom}`);
+  if (m.reveal.bottom > m.card.bottom + 1) problems.push(`1280x800: .reveal.bottom ${m.reveal.bottom} > #qcard.bottom ${m.card.bottom}`);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(await jaLeft(page), []);
+}, { ...EN_OPTS, viewport: { width: 390, height: 844 }, ...FIT_OPTS }, 60_000);

@@ -361,12 +361,13 @@
     const j = new Date(d.getTime() + 9 * 3600e3); return `${j.getUTCFullYear()}/${j.getUTCMonth() + 1}/${j.getUTCDate()}`;
   };
   // カードの中身（RANKING.profileCard の返事の形）。非公開は名前・かざり・ひとことだけ。無い項目（自分のカードの読みこみ前の TA など）は出さない
-  // 称号（日本語のバッジの称号）は、英語のページでは出さない（I18N.hide の 'title'。PR7 で訳したら出す）
+  // 称号はサーバーに日本語で入っている。英語のページでは BADGES.titleLabel で英語にし、カタログに無い称号（古い称号・手で入れた文字）は出さない
   const cardHTML = card => {
     const head = `<p class="pf-card-name"><b data-ugc>${esc(card.nickname ?? '')}</b>${decoHTML(card.deco)}</p>`;
     if (card.private) return `<div class="pf-card">${head}<p class="hint">${T('このプロフィールは非公開だよ')}</p></div>`;
     const line = s => `<p class="pf-card-line">${s}</p>`, dg = globalThis.RPG_CORE?.DUNGEONS?.length ?? 21;
-    let h = head + (card.title && !I18N.hide.has('title') ? `<p class="pf-card-title">${T('〈{title}〉', { title: esc(card.title) })}</p>` : '');
+    const tl = EN ? window.BADGES?.titleLabel?.(card.title) ?? '' : card.title;
+    let h = head + (tl ? `<p class="pf-card-title">${T('〈{title}〉', { title: esc(tl) })}</p>` : '');
     if (card.badges != null) h += line(T('バッジ {n}個（全{t}個中）', { n: card.badges, t: card.badgesTotal ?? 0 }));
     if (card.rpg) h += line(T('冒険 Lv{lv}・ダンジョン{d}/{all}', { lv: card.rpg.lv, d: card.rpg.dungeons, all: dg }));
     if (card.rpg?.tower > 0) h += line(T('英雄の塔 {n}階', { n: card.rpg.tower }));   // 最高記録の階。登っていなければ出さない
@@ -427,8 +428,8 @@
     if (n !== meLoading || !r.ok || !box || now?.token !== p.token) return;
     box.innerHTML = cardHTML(myCard(now, r));
   };
-  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］
-  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function'; };
+  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］（英語版は冒険の画面が無いあいだ＝I18N.hide の 'rpg' は出さない）
+  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function' && !I18N.hide.has('rpg'); };
   const field = (lbl, body) => `<div class="field"><span class="lbl">${lbl}</span>${body}</div>`;
   // プロフィール画面を開いたら、まだ使えるか確かめる（別の端末に引き継がれていたら not_found → lost で作るフォームに）
   const checkMe = async p => {

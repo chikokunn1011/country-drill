@@ -1,6 +1,6 @@
 // 英語版（PR5）: index.html から en/index.html を、embed.html から en/embed.html を作る。
 //   ・<html lang="en">・<base href="../">（ファイルはルートのものをそのまま読む）・canonical / og / manifest を英語版に
-//   ・未訳の機能の script（EN_SKIP）を外し、i18n.js のすぐ後に英語の辞書 i18n/en-*.js を入れる
+//   ・未訳の機能の script（EN_SKIP）を外し、英訳のあるデータ（EN_SWAP: trivia.js → trivia-en.js）を差しかえ、i18n.js のすぐ後に英語の辞書 i18n/en-*.js を入れる
 //   ・HTML の文字を辞書（i18n/en-*.js と、HTML だけの i18n/en-html.js）で置きかえる。訳の無い日本語が残れば止まる
 //   ・言語の切りかえ（langsw の目印のあいだ）を英語版のものに、英語の端末への案内（#home-en）を外す
 // 使い方: node tools/make_en.mjs
@@ -12,9 +12,11 @@ import { JA_RE } from './i18n_scan.mjs';
 import { SITE } from './make_country_pages.mjs';
 
 // 英語のページで読まない script（未訳の機能）
-export const EN_SKIP = ['trivia.js', 'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js', 'badges.js'];
+export const EN_SKIP = ['rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
+// 英語のページで差しかえる script（日本語のデータ → 英訳。?v= はそのまま）。trivia-en.js は tools/trivia_en.mjs build が作る
+export const EN_SWAP = { 'trivia.js': 'trivia-en.js' };
 // ページごとの辞書（i18n/<名前>.js。まだ無いファイルは入れない）
-export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily'], 'embed.html': ['en-embed'] };
+export const EN_DICTS = { 'index.html': ['en-core', 'en-quiz', 'en-rank', 'en-book', 'en-dojo', 'en-profile', 'en-daily', 'en-badges'], 'embed.html': ['en-embed'] };
 // 英語版があるページ（<a href> の # の前がこれなら頭に en/）
 export const EN_PAGES = ['./', 'index.html', 'howto.html', 'about.html', 'privacy.html', 'country/', 'themes/', 'embed.html'];
 
@@ -152,8 +154,9 @@ function renderPage(html, page, inp, used) {
   html = once(html, '<html lang="ja">', '<html lang="en">');
   html = once(html, '<meta charset="utf-8">\n', '<meta charset="utf-8">\n<base href="../">\n');
   html = once(html, `<link rel="canonical" href="${SITE}">`, `<link rel="canonical" href="${SITE}en/">`);
-  // 未訳の機能の script を外す
-  html = html.replace(/<script src="([\w.-]+?)(?:\?v=\d+)?"><\/script>\n/g, (m, f) => EN_SKIP.includes(f) ? '' : m);
+  // 未訳の機能の script を外し、英訳のあるデータの script を差しかえる
+  html = html.replace(/<script src="([\w.-]+?)((?:\?v=\d+)?)"><\/script>\n/g, (m, f, q) =>
+    EN_SKIP.includes(f) ? '' : Object.hasOwn(EN_SWAP, f) ? `<script src="${EN_SWAP[f]}${q}"></script>\n` : m);
   // i18n.js のすぐ後に辞書
   const dicts = (EN_DICTS[page] ?? []).filter(n => n in inp.vers).map(n => `\n<script src="i18n/${n}.js?v=${inp.vers[n]}"></script>`).join('');
   html = html.replace(/<script src="i18n\.js\?v=\d+"><\/script>/, m => m + dicts);

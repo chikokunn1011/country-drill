@@ -25,13 +25,13 @@ const load = ({ lang, dict } = {}) => {
 
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
-const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all',
+const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all', 'badges.js': 'all',
   'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '図鑑', '起動'] };
-// まだ訳さないファイル（PR7: badges・trivia、PR8: rpg-*）
-const NOT_YET = ['badges.js', 'trivia.js',
+// まだ訳さないファイル（PR8: rpg-*）
+const NOT_YET = [
   'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
-// 見ないファイル（データ・管理画面・生成物の sw.js）
-const SKIP = ['countries.js', 'themes.js', 'world.js', 'admin.js', 'admin-api.js', 'admin-save.js', 'sw.js'];
+// 見ないファイル（データ・管理画面・生成物の sw.js）。trivia.js は日本語のデータで、英語のページは trivia-en.js（英訳のデータ。tests/unit/en-trivia.test.mjs が見る）に差しかえる
+const SKIP = ['countries.js', 'themes.js', 'world.js', 'admin.js', 'admin-api.js', 'admin-save.js', 'sw.js', 'trivia.js', 'trivia-en.js'];
 
 test('t_ja_identity', () => {
   const { ctx } = load();
@@ -77,12 +77,15 @@ test('t_page_and_fold', () => {
   assert.ok(ja.I18N.byName(a, b) > 0);
 });
 
-// PR6: 英語版はタイムアタックを選べる。隠すのは他人の称号だけ（PR7 で外す）
-test('hide_title_only', () => {
+// PR7: 英語版は冒険（rpg）の画面・入口・コインの表示を隠す（rpg.js は画面なしで読む。PR8 で外す）。ほかの人の称号は英語で出す（'title' は無い）
+test('hide_rpg', () => {
   const en = load({ lang: 'en' }).ctx;
   assert.equal(en.I18N.hide.has('ta'), false);
-  assert.equal(en.I18N.hide.has('title'), true);
-  assert.equal(load().ctx.I18N.hide.has('title'), false);
+  assert.equal(en.I18N.hide.has('rpg'), true);
+  assert.equal(en.I18N.hide.has('title'), false);   // 他人の称号は BADGES.titleLabel で英語にして出す
+  assert.deepEqual([...en.I18N.hide], ['rpg']);
+  assert.equal(load().ctx.I18N.hide.size, 0);
+  assert.equal(load().ctx.I18N.hide.has('rpg'), false);
 });
 
 // PR6: 日本時間の区切りが、その人の時間で何時か（tz はテスト用。ふだんは端末の時間帯）

@@ -4,7 +4,7 @@
 // 読むもの: countries.js・trivia.js・daily-core.js の SIMILAR・index.html（REGIONS・SUBREGIONS・フッター・FLAG_V・テーマの先読み・フォント）・
 // privacy.html の pages.css?v=・flags/*.svg・sitemap.xml・world.js（となりの国）・data/neighbors_fix.json・
 // data/flag_meanings.json（国旗の意味）・themes/*.html（まとめの題と国。tools/make_theme_pages.mjs が作るので、先にそちらを動かす）。
-// 英語のページは、さらに data/en/flag_meanings.json・i18n/en-core.js（地域の英語）・en/index.html のフッター（tools/make_en.mjs が作る）・
+// 英語のページは、さらに trivia-en.js（豆知識の英訳。tools/trivia_en.mjs build が作る）・data/en/flag_meanings.json・i18n/en-core.js（地域の英語）・en/index.html のフッター（tools/make_en.mjs が作る）・
 // en/themes/*.html（まとめの英語の題）を読む。日付と乱数は使わない（同じ入力からはいつも同じ出力）。作ったファイルはコミットする
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -80,13 +80,14 @@ export function readInputs(root) {
   const THEME_PAGES = themePages('themes');
   // 英語のページ（無いものは null・空。check が止める。tools/make_theme_pages.mjs も readInputs を使うので投げない）
   const opt = (f, fn) => (existsSync(join(root, f)) ? fn(read(f)) : null);
+  const TRIVIA_EN = opt('trivia-en.js', s => { const ctx = { window: {} }; vm.runInNewContext(s, ctx); return ctx.window.TRIVIA; }) ?? {};
   const MEANINGS_EN = opt('data/en/flag_meanings.json', s => Object.fromEntries(JSON.parse(s).map(m => [m.a, m.t]))) ?? {};
   const footerEn = opt('en/index.html', s => FOOTER_RE.exec(s)?.[1].trim() ?? null);
   // 地域の英語は本編の辞書（i18n/en-core.js）のものを使う
   const REGION_EN = opt('i18n/en-core.js', s => { const ctx = { window: {} }; vm.runInNewContext(s, ctx); return { ...ctx.window.I18N_EN }; }) ?? {};
   const THEME_PAGES_EN = themePages('en/themes');
   return { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles, featCodes, featNb, NEIGHBORS_FIX, MEANINGS, THEME_PAGES,
-    MEANINGS_EN, footerEn, REGION_EN, THEME_PAGES_EN };
+    TRIVIA_EN, MEANINGS_EN, footerEn, REGION_EN, THEME_PAGES_EN };
 }
 
 // 地図の形がとなり合う国の組（a-b と b-a の両方）。国に当たらない形（西サハラ・パレスチナなど）は飛ばす
@@ -127,6 +128,8 @@ export function check(inp) {
     if (typeof c.e !== 'string' || !c.e) out.push(`英語の国名 e が無い: ${c.a}`);
     if (typeof c.ec !== 'string' || !c.ec) out.push(`英語の首都 ec が無い: ${c.a}`);
     if (typeof inp.MEANINGS_EN[c.a] !== 'string' || !inp.MEANINGS_EN[c.a].trim()) out.push(`英語の国旗の意味が無い: ${c.a}`);
+    const listEn = inp.TRIVIA_EN?.[c.a];
+    if (!Array.isArray(listEn) || !listEn.some(hasText)) out.push(`英語の豆知識が0件: ${c.a}`);
   }
   for (const r of [...inp.REGIONS, ...Object.keys(inp.SUBREGIONS)]) if (typeof inp.REGION_EN[r] !== 'string') out.push(`地域の英語が無い（i18n/en-core.js）: ${r}`);
   if (inp.footerEn == null) out.push('en/index.html のフッターの目印が無い（先に node tools/make_en.mjs を動かす）');
@@ -320,7 +323,7 @@ ${footerHTML(inp)}
 `;
 }
 
-// ---- 英語のページ（en/country/）。文はこの表に書く（ブラウザの辞書は使わない）。豆知識の節は出さない ----
+// ---- 英語のページ（en/country/）。文はこの表に書く（ブラウザの辞書は使わない） ----
 // 「of」のあとに置く英語の国名（the を付ける）。e が "The " で始まれば小文字に、THE_NAMES にあれば "the " を付ける。
 // 見出し・一覧・リンクの文字は e のまま。THE_NAMES は countries.js の e から選んだもの（複数形・Republic・Islands・United など）
 export const THE_NAMES = new Set(['Central African Republic', 'Comoros', 'Czech Republic', 'Democratic Republic of the Congo', 'Dominican Republic',
@@ -336,6 +339,7 @@ export const EN = {
   flagAlt: e => `Flag of ${theName(e)}`,
   region: 'Region', area: 'Area', capital: 'Capital', iso: 'ISO',
   meaning: 'What the flag means',
+  funFacts: 'Fun facts',
   neighbors: 'Neighboring countries',
   noBorderIsland: 'No land borders (island country)',
   noBorder: 'No land borders',
@@ -356,6 +360,8 @@ export const EN = {
   rplay: 'Play this region ›',
 };
 const UP_EN = '../../';
+// 豆知識の種類のラベル（本編の英語と同じ語。日本語のページの TRIVIA_LABEL と同じく絵文字は付けない）
+const TRIVIA_LABEL_EN = { flag: 'Flag', geo: 'Geography', culture: 'Culture' };
 // 英語の国名の ABC 順（同じならコード順）
 export const byEn = (x, y) => x.e.localeCompare(y.e, 'en') || byCode(x, y);
 const regionEn = (inp, r) => inp.REGION_EN[r];
@@ -402,6 +408,8 @@ ${nb.map(b => `    <li><a href="${b.a}.html">${flagImgEn(inp, b.a, '', true)}<sp
 ${themes.map(t => `    <li><a href="../themes/${t.id}.html">${esc(t.n)}</a></li>`).join('\n')}
   </ul>
 ` : '';
+  const triviaEn = inp.TRIVIA_EN[c.a].filter(hasText)
+    .map(x => `    <li><span class="tv-k">${esc(TRIVIA_LABEL_EN[x.k] ?? x.k)}</span>${esc(x.t)}</li>`).join('\n');
   const [prev, next] = prevNextOfEn(inp, c), r6 = regionEn(inp, c.r);
   return head(inp, { title: EN.title(c.e), description: countryDescriptionEn(inp, c, sims), url, alt, lang: 'en',
     css: ['../../country/country.css?v=2'],
@@ -420,6 +428,11 @@ ${themes.map(t => `    <li><a href="../themes/${t.id}.html">${esc(t.n)}</a></li>
 
   <h2>${EN.meaning}</h2>
   <p class="meaning">${esc(inp.MEANINGS_EN[c.a])}</p>
+
+  <h2>${EN.funFacts}</h2>
+  <ul class="trivia">
+${triviaEn}
+  </ul>
 
   <h2>${EN.neighbors}</h2>
 ${neighbors}

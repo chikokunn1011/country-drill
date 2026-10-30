@@ -1,6 +1,7 @@
 // 英語版（PR5・PR6）: 英語の全画面を順にまわり、見えている日本語・ページの例外・[i18n] の warn・未訳の機能の入口が無いこと。
 // PR6: プロフィール Chiko で、タイムアタック・結果のシェア・ランキング・プロフィールの窓・プロフィール画面と引き継ぎ・今日の難問・れんぞく日数も。
 // 偽DB にはほかの人（日本語の名前 チコ）の記録を入れておき、表と窓に日本語の名前が出ても名前のほかに日本語が無いこと
+// PR7: バッジ1つ取れるセーブで、答えの豆知識・結果のバッジのパネル・ホームの称号の札・バッジ画面（分類・詳細・ひみつ・称号えらび）・図鑑の豆知識・チコの英語の称号・英語の国のページの Fun facts も。
 // 英語のページのリンクが /en/ の外へ出ないこと。日本語版のホームの見える文が origin/main と同じこと
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,9 +20,9 @@ let browser, server;
 before(async () => { server = await startServer(); browser = await chromium.launch(); });
 after(async () => { await browser?.close(); await server?.close(); });
 
-// 未訳の機能の入口（英語版では見えてはいけない）: 冒険・バッジ・クイズのコイン・豆知識の欄
-// （ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6 で英語に）
-const UNTRANSLATED = ['#home-rpg', '#home-badges', '#pcoin', '.trivia'];
+// 未訳の機能の入口（英語版では見えてはいけない）: 冒険・クイズのコイン
+// （ランキング・プロフィール・タイムアタック・結果のシェア・今日の難問は PR6、豆知識・バッジは PR7 で英語に。冒険のコインの札と設定の入口もまだ）
+const UNTRANSLATED = ['#home-rpg', '#rpg-chip', '#pcoin', '#set-rpg'];
 const shownEntries = page => page.evaluate(sels => sels.filter(s => [...document.querySelectorAll(s)].some(e => e.checkVisibility({ visibilityProperty: true }))), UNTRANSLATED);
 
 // 英語の静的なページ（本編 en/ のあとにまわる順）
@@ -31,14 +32,16 @@ const STATIC = ['en/embed.html', 'en/country/', 'en/country/fr.html', 'en/countr
 // navigator.share は渡したものを __shared に入れるだけ（端末のシェアの窓を出さない）。画像も渡せることにする
 const STUB_SHARE = `{ Object.defineProperty(navigator, 'share', { configurable: true, value: o => { window.__shared = o; return Promise.resolve(); } });
   Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => true }); window.open = () => null; }`;
-const openEn = (viewport, path = 'en/') => openApp(browser, { viewport, path, locale: 'en-US', seed: 1, init: STUB_SHARE, storage: { badges: QUIET_BADGES } });
+// バッジのセーブ: 練習のクリアで first-clear が1つ取れる（QUIET_BADGES から first-clear を抜いた形）。称号は取り済みのタイムアタッカー
+const ONE_TO_GET = { v: 1, got: { 'ta-clear@1': 1, 'dopa-on@1': 1 }, eq: 'ta-clear@1', sn: { 'ta-clear': 2, 'dopa-on': 2 }, sent: ['ta-clear@1', 'dopa-on@1'], tip: 3 };
+const openEn = (viewport, path = 'en/', badges = ONE_TO_GET) => openApp(browser, { viewport, path, locale: 'en-US', seed: 1, init: STUB_SHARE, storage: { badges } });
 
 // 偽DB に自分（Chiko）とほかの人（チコ: タイムアタック・今日の難問の記録）を入れ、localStorage に Chiko のプロフィールを入れて英語版を開き直す
 const ME = { token: 'tok-walk', pid: 'walkpid00001', name: 'Chiko' };
 async function withProfile(app) {
   const { page, db } = app;
   const day = await page.evaluate(() => DAILY.today()), at = new Date().toISOString();
-  db.profiles.push({ id: 1, pid: 'otherpid0001', token: 'other', nickname: 'チコ', title: '旅人', deco: ['jp'], badges: 12, badges_total: 80, created_at: '2026-10-01T00:00:00Z' },
+  db.profiles.push({ id: 1, pid: 'otherpid0001', token: 'other', nickname: 'チコ', title: 'ドリルの鬼', deco: ['jp'], badges: 12, badges_total: 80, created_at: '2026-10-01T00:00:00Z' },
     { id: 2, pid: ME.pid, token: ME.token, nickname: ME.name });
   db.rows.push({ board: 'f2n:all:5', profile_id: 1, nickname: 'チコ', time_ms: 999_000, questions: 5, created_at: at });
   db.dailyRows.push({ day, profile_id: 1, nickname: 'チコ', correct: 20, total: 20, time_ms: 83400, created_at: at });
@@ -60,6 +63,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     for (const e of errors.slice(seenErrors)) problems.push(`${label}: ページの例外 ${e}`);
     seenErrors = errors.length;
   };
+  let triviaSeen = 0;
   const screen = name => page.waitForSelector(`#scr-${name}:not([hidden])`);
   const home = async () => { await page.evaluate(() => show('home')); await screen('home'); };
   // confirm・alert の文（英語のはず）
@@ -90,6 +94,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
       else if (mode === 'f2n') await answerWrong(page);
       else await answerCorrect(page);
       await page.waitForSelector('#qcard .reveal');
+      triviaSeen += await page.locator('#qcard .reveal .trivia .tv').count();
       await check(`answer ${mode}`);
       await page.click('#quit');
       await screen('setup');
@@ -103,6 +108,11 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     await screen('result');
     await settleResult(page);
     await check('result');
+    // 結果のバッジのパネル（first-clear が1つ取れる）。ボタンの［Practice →］は無い（詳細にだけある）
+    await page.waitForSelector('#r-badges .bdg-row');
+    assert.match(await page.locator('#r-badges .bdg-h').innerText(), /^🏅 Badge earned!$/);
+    assert.equal(await page.locator('#r-badges .bdg-row').count(), 1);
+    await check('result badges');
     // タイムアタック1回（国旗→国名・全世界・5問）: クリアして自動で載る → 結果のシェア
     await home();
     await page.click('#home-play');
@@ -130,10 +140,36 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     for (const [who, sel] of [['me', '#rk-list li.me .pf-name'], ['チコ', '#rk-list li:not(.me) .pf-name']]) {
       await page.click(sel);
       await page.waitForSelector('#pf-card[open] .pf-card-line');
+      if (who !== 'me') assert.equal(await page.locator('#pf-card .pf-card-title').innerText(), '“Drill Machine”');   // サーバーの日本語の称号を英語で
       await check(`profile card ${who}`);
       await page.click('#pf-card [data-pfc="close"]');
       await page.waitForSelector('#pf-card:not([open])', { state: 'attached' });
     }
+    // ホームの称号の札 → バッジ画面（分類・詳細・ひみつのバッジ・称号えらび）
+    await home();
+    await page.waitForSelector('#home-title', { state: 'visible' });
+    assert.equal(await page.locator('#home-title').innerText(), '“Speed Apprentice”');
+    await check('home title');
+    await page.click('#home-badges');
+    await screen('badges');
+    await check('badges');
+    for (const cat of await page.$$eval('#bdg-cats [data-cat]', bs => bs.map(b => b.dataset.cat))) {
+      await page.click(`#bdg-cats [data-cat="${cat}"]`);
+      await check(`badges ${cat}`);
+    }
+    for (const id of ['answers', 'reg-asia', 'comeback']) {   // 3段のバッジ・地域（［Practice →］あり）・ひみつ
+      await page.click('#bdg-cats [data-cat="all"]');
+      await page.click(`#bdg-list [data-bdg-detail="${id}"]`);
+      await page.waitForSelector('#detail[open] .bdg-detail');
+      await check(`badge detail ${id}`);
+      await page.click('#detail [data-bdg-close]');
+      await page.waitForSelector('#detail:not([open])', { state: 'attached' });
+    }
+    await page.click('#bdg-change');
+    await page.waitForSelector('#detail[open] .bdg-picker');
+    await check('badge picker');
+    await page.click('#detail [data-bdg-close]');
+    await page.waitForSelector('#detail:not([open])', { state: 'attached' });
     // プロフィール画面 → 引き継ぎ（データを預けてコードを出すまで）
     await home();
     await page.click('#home-profile');
@@ -151,6 +187,7 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     await check('book list');
     await page.click('#grid .card[data-a="fr"]');
     await page.waitForSelector('#detail[open]');
+    assert.ok(await page.locator('#detail .trivia .tv').count() > 0, 'book detail: 豆知識');
     await check('book detail');
     await page.click('#dclose');
     await page.click('#bview button[data-v="map"]');
@@ -159,6 +196,8 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
     await page.click('#bmapbox path[data-a="br"]');
     await page.waitForSelector('#binfo .facts');
     await check('book map br');
+    // 練習の答えに英語の豆知識が出ていた
+    assert.ok(triviaSeen > 0, '練習の答えに豆知識が出ない');
     // 道場（1回: 1問まちがえて最後まで）
     await home();
     await page.click('#home-play');
@@ -206,6 +245,9 @@ for (const [vname, viewport] of [['phone', PHONE], ['pc', PC]]) test(`en_walk_${
       await page.waitForLoadState('load');
       assert.equal(await page.evaluate(() => document.documentElement.lang), 'en', path);
       await check(path);
+      if (path === 'en/country/fr.html') {
+        assert.equal(await page.locator('h2:has-text("Fun facts") + ul.trivia li .tv-k').count() > 0, true, `${path}: Fun facts`);
+      }
     }
     assert.equal(await warned(app.warnings, /\[i18n\]/), false, app.warnings.join('\n'));
     assert.deepEqual(problems, []);
@@ -245,6 +287,14 @@ test('en_links_stay_english', { timeout: 120_000 }, async () => {
     await page.waitForSelector('#pf-rename-in');
     await privacy('en/ profile');
     await links('en/ profile');
+    // バッジの詳細の［Practice →］: モード選択へ行っても /en/ のまま
+    await page.evaluate(() => { show('badges'); BADGES.open('reg-asia'); });
+    await page.waitForSelector('#detail[open] [data-bdg-practice]');
+    assert.equal(await page.locator('#detail [data-bdg-practice]').innerText(), 'Practice →');
+    await page.click('#detail [data-bdg-practice]');
+    await page.waitForSelector('#scr-setup:not([hidden])');
+    if (new URL(page.url()).pathname !== '/en/') out.push(`badge practice: ${page.url()}`);
+    await links('en/ setup (badge practice)');
     // 今日の難問
     await page.evaluate(() => show('daily'));
     await page.waitForSelector('#dl-start');

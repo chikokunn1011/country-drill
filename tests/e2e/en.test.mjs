@@ -23,10 +23,10 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => 
 t('en_home', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.deepEqual(await jaLeft(page), []);
-  // 未訳の機能の入口は出さない（冒険・バッジは PR7・PR8）。今日の難問は出る（PR6）
+  // 未訳の機能の入口は出さない（冒険は PR8）。今日の難問（PR6）とバッジ（PR7）は出る
   assert.equal(await page.isVisible('#home-daily'), true);
-  for (const id of ['home-rpg', 'home-badges'])
-    assert.equal(await page.isVisible('#' + id), false, id);
+  assert.equal(await page.isVisible('#home-badges'), true);
+  assert.equal(await page.isVisible('#home-rpg'), false);
   assert.match(await page.title(), /Flag Master/);
   assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
 });
@@ -437,7 +437,6 @@ t('en_book_detail', async page => {
   await page.click('#grid .card[data-a="fr"]');
   await page.waitForSelector('#detail[open]');
   assert.deepEqual(await jaLeft(page), []);
-  assert.equal(await page.locator('#detail .trivia').count(), 0);
   assert.equal(await page.getAttribute('#detail .cpage a', 'href'), 'en/country/fr.html');
   assert.equal(await page.evaluate(() => new URL(document.querySelector('#detail .cpage a').href).pathname), '/en/country/fr.html');
   assert.equal((await page.textContent('#detail .cpage a')).trim(), 'Country page ›');
@@ -445,7 +444,38 @@ t('en_book_detail', async page => {
   assert.equal((await page.textContent('#dclose')).trim(), 'Close');
 });
 
-// PC（≥900px）の詳細: 豆知識が無くても右の列が空かない（国の情報と［Country page］は左の列、地図は右の列）
+// 豆知識（PR7）: 英語のページは trivia-en.js。図鑑の小窓・地図の欄にその国の英語の豆知識が全部、ラベルも英語
+const EN_LABEL = { flag: '🏳️ Flag', geo: '🗺️ Geography', culture: '🍜 Culture' };
+const tvRows = (page, sel) => page.$$eval(sel, els => els.map(li => {
+  const lab = li.querySelector(':scope > .tv-k');
+  return { k: li.dataset.k, label: lab ? lab.textContent : null, t: [...li.childNodes].filter(n => n !== lab).map(n => n.textContent).join(''), title: li.title };
+}));
+async function checkTrivia(page, sel, a) {
+  const list = await page.evaluate(a => TRIVIA[a], a);
+  assert.ok(list.length >= 3, `${a} の豆知識`);
+  for (const { t } of list) assert.doesNotMatch(t, JA_RE, t);
+  assert.deepEqual(await tvRows(page, sel), list.map(({ k, t }) => ({ k, label: EN_LABEL[k], t, title: t })));
+  assert.deepEqual(await jaLeft(page), []);
+}
+
+t('en_book_trivia', async page => {
+  assert.equal(await page.evaluate(() => [...document.scripts].some(s => /(^|\/)trivia\.js$/.test(s.src))), false, 'trivia.js を読まない');
+  await openBook(page);
+  await page.click('#grid .card[data-a="fr"]');
+  await page.waitForSelector('#detail[open]');
+  await checkTrivia(page, '#detail .trivia .tv', 'fr');
+  assert.equal(await page.locator('#detail-inner > .close + .facts + .cpage + .trivia + svg.map').count(), 1);
+});
+
+t('en_map_trivia', async page => {
+  await openBook(page, 'map');
+  await page.waitForSelector('#bmapbox svg path[data-a]');
+  await page.click('#bmapbox path[data-a="br"]');
+  await page.waitForSelector('#binfo .trivia');
+  await checkTrivia(page, '#binfo .trivia .tv', 'br');
+});
+
+// PC（≥900px）の詳細: 右の列が空かない（国の情報と［Country page］は左の列、地図は右の列。PR7 からは英語でも豆知識が左の列に出る）
 t('en_book_detail_pc', async page => {
   await openBook(page);
   await page.click('#grid .card[data-a="fr"]');
@@ -469,7 +499,6 @@ t('en_book_map', async page => {
   await page.click('#bmapbox path[data-a="br"]');
   await page.waitForSelector('#binfo .facts');
   assert.equal((await page.textContent('#binfo .facts .name')).trim(), 'Brazil');
-  assert.equal(await page.locator('#binfo .trivia').count(), 0);
   assert.equal(await page.getAttribute('#binfo .cpage a', 'href'), 'en/country/br.html');
   assert.deepEqual(await jaLeft(page), []);
   // 検索で1件なら選ばれる

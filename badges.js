@@ -10,8 +10,11 @@
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8 };
   const RPG_MODES = ['f2n', 'n2f', 'm2f'];             // バトルの出題のうち、モードのビットを立てるもの
   // index.html の地域名（S.region の値）→ 地域キー。ダンジョン id も同じキー（ranking.js には頼らない）
+  // i18n-data:start
   const REGION_KEY = new Map([['アジア', 'asia'], ['ヨーロッパ', 'europe'], ['アフリカ', 'africa'], ['北・中央アメリカ', 'namerica'],
     ['南アメリカ', 'samerica'], ['オセアニア', 'oceania'], ['all', 'world']]);
+  const WORLD_LABEL = '全世界';                        // 地域のバッジの条件の文で、'world' を呼ぶ名前
+  // i18n-data:end
   const REGION_NAME = new Map([...REGION_KEY].map(([name, rk]) => [rk, name]));
   const REGION_IDS = ['samerica', 'oceania', 'namerica', 'europe', 'asia', 'africa', 'world'];   // 地域のバッジの並び（設計書 §2.4）
   const DUNGEONS = ['asia', 'europe', 'africa', 'namerica', 'samerica', 'oceania', 'world'];
@@ -47,7 +50,7 @@
       codes,
       rkOf: region => REGION_KEY.get(region) ?? null,            // 'all' か日本語の地域名 → 地域キー。知らない名前は null
       regionOf: rk => REGION_NAME.get(rk),                        // 地域キー → S.region の値（'all' か日本語名）
-      label: rk => rk === 'world' ? '全世界' : REGION_NAME.get(rk),
+      label: rk => rk === 'world' ? WORLD_LABEL : REGION_NAME.get(rk),
       REGION_IDS, DUNGEONS, pools,
       poolSize: rk => REGION_IDS.includes(rk) ? pools[rk].length : 0,
       micro: list.filter(c => c.ar < 1000).map(c => c.a),        // 面積 1,000km² 未満の国
@@ -244,11 +247,17 @@
   }
 
   // ---------- カタログ（設計書 §2、§3.1） ----------
+  // 日本語の文はここから i18n-data:end までのデータ。英語版はブラウザの後半で表示のときに T() を通す（コアは T を呼ばない）
+  // i18n-data:start
+  // 分類と段の日本語。ブラウザでは tierOf・catOf だけで表示する（金・あそび方・モード・地域は辞書のほかの意味と同じキーなので、
+  // T(TIER_LABEL[3])・T(CAT_LABEL.mode) と直接書くと英語版で Fri・Mode などになり、[i18n] の warn も出ない）
   const CAT_LABEL = { quiz: 'クイズ', kind: 'あそび方', mode: 'モード', region: '地域', daily: '図鑑・毎日', dopa: 'ドパガキ', rpg: '冒険' };
   const TIER_LABEL = ['', '銅', '銀', '金', '虹'];
   const n0 = v => typeof v === 'number' && Number.isFinite(v) ? v : 0;      // snapshot の数（数でなければ 0）
   const pop4 = m => (m & 1) + (m >> 1 & 1) + (m >> 2 & 1) + (m >> 3 & 1);  // 立っているモードのビットの数
   const nKeys = o => Object.keys(o).length;
+  // 型の文の {name} を v の値に置きかえる。T と同じく1回だけ（入れた値の中の {…} はそのまま）。v に無い名前は残す
+  const fillJa = (s, v) => s.replace(/\{(\w+)\}/g, (m, k) => v && own(v, k) ? String(v[k]) : m);
 
   // snapshot の克服の数。overcome が数ならその値、オブジェクトならキーの数。st.overcome も同じに読み、大きいほう
   function snapOvercome(snap) {
@@ -262,70 +271,74 @@
   const bossesOf = (s, x) => new Set([...s.rpg.boss, ...DUNGEONS.filter(id => n0(x.snap?.floors?.[id]) >= 5)]);
 
   // 国の一覧（countries.js の COUNTRIES）からカタログを作る。並びは設計書 §2.1→§2.7 の表の順
+  // 段は { goal, title, desc, dk, dv, … }。条件の文は型の文 dk と数 dv（g・s は数の文字、sub・region は日本語のデータ）。desc は日本語の文（fillJa(dk, dv)）
   function makeCatalog(list) {
     const xt = makeX(list);
-    const Tr = (goal, title, desc, more) => ({ goal, title, desc, ...more });
-    // 3段のバッジ。titles は設計書の表の「銅 / 銀 / 金」をそのまま
-    const T3 = (goals, titles, desc) => { const ts = titles.split(' / '); return goals.map((g, i) => Tr(g, ts[i], desc(g))); };
+    const Tr = (goal, title, dk, dv, more) => ({ goal, title, desc: fillJa(dk, dv), dk, dv, ...more });
     const num = n => n.toLocaleString('ja-JP');
+    const gOf = g => ({ g: String(g) });
+    // 3段（以上）のバッジ。titles は設計書の表の「銅 / 銀 / 金」の順の配列。dv(g) はその段の数
+    const T3 = (goals, titles, dk, dv = gOf) => goals.map((g, i) => Tr(g, titles[i], dk, dv(g)));
     const modeBadge = (mode, icon, name, sub, titles) => ({
       id: 'mode-' + mode, cat: 'mode', icon, name, sub, mode, unit: 'か国', skill: true,
       v: (s, x) => x.pools.world.filter(a => s.m[a] & MODE_BIT[mode]).length,
-      tiers: T3([30, 100, 195], titles, g => `「${sub}」で ${g}か国にヒントなしで正解`),
+      tiers: T3([30, 100, 195], titles, '「{sub}」で {g}か国にヒントなしで正解', g => ({ sub, g: String(g) })),
     });
     const regionBadge = (rk, icon, name, titles) => {
-      const ts = titles.split(' / '), label = xt.label(rk);
+      const dv = { region: xt.label(rk) };
       return { id: 'reg-' + rk, cat: 'region', icon, name, rk, skill: true, tiers: [   // 地域は段ごとに v がちがう
-        Tr(1, ts[0], `${label}で10問以上のゲームをクリア`, { v: s => s.rc[rk] & 1 ? 1 : 0 }),
-        Tr(1, ts[1], `${label}の「全部」をヒントなしでクリア`, { v: s => s.rc[rk] & 2 ? 1 : 0 }),
-        Tr(xt.pools[rk].length * 4, ts[2], `${label}の国すべてを4モードで正解`,
+        Tr(1, titles[0], '{region}で10問以上のゲームをクリア', { ...dv }, { v: s => s.rc[rk] & 1 ? 1 : 0 }),
+        Tr(1, titles[1], '{region}の「全部」をヒントなしでクリア', { ...dv }, { v: s => s.rc[rk] & 2 ? 1 : 0 }),
+        Tr(xt.pools[rk].length * 4, titles[2], '{region}の国すべてを4モードで正解', { ...dv },
           { v: (s, x) => x.pools[rk].reduce((t, a) => t + pop4(s.m[a]), 0), color: rk === 'world' ? 4 : 3 }),
       ] };
     };
-    const one = (title, desc, color = 1) => [Tr(1, title, desc, { color })];   // 1段だけのバッジ
+    const one = (title, dk, color = 1) => [Tr(1, title, dk, {}, { color })];   // 1段だけで数の無いバッジ
     const badges = [
       // 2.1 クイズ
       { id: 'first-clear', cat: 'quiz', icon: '🌱', name: 'はじめの一歩', v: s => s.clears,
         tiers: one('ドリルの新人', 'ゲームを1回クリアする（ヒントありでもOK）') },
       { id: 'answers', cat: 'quiz', icon: '📚', name: 'こつこつ正解', unit: '問', v: s => s.right,
-        tiers: T3([100, 1000, 5000], 'こつこつ派 / 努力の人 / ドリルの鬼', g => `正解の合計が ${num(g)}問`) },
+        tiers: T3([100, 1000, 5000], ['こつこつ派', '努力の人', 'ドリルの鬼'], '正解の合計が {g}問', g => ({ g: num(g) })) },
       { id: 'streak', cat: 'quiz', icon: '🔗', name: 'れんぞく正解', unit: '問', skill: true, v: s => s.streak,
-        tiers: T3([10, 30, 100], '波に乗る人 / 止まらない人 / 百連の達人', g => `1回のゲームかバトルで ${g}問続けて正解（ヒントなし）`) },
+        tiers: T3([10, 30, 100], ['波に乗る人', '止まらない人', '百連の達人'], '1回のゲームかバトルで {g}問続けて正解（ヒントなし）') },
       { id: 'overcome', cat: 'quiz', icon: '💪', name: '苦手克服', unit: 'か国', skill: true,
         v: (s, x) => Math.max(nKeys(s.ov), snapOvercome(x.snap)),
-        tiers: T3([1, 10, 50], 'リベンジャー / 苦手つぶし / にがて知らず', g => `苦手な国を ${g}か国克服（別のゲームでヒントなしの一発正解）`) },
+        tiers: T3([1, 10, 50], ['リベンジャー', '苦手つぶし', 'にがて知らず'], '苦手な国を {g}か国克服（別のゲームでヒントなしの一発正解）') },
       { id: 'micro', cat: 'quiz', icon: '🔬', name: 'ちっちゃい国探検隊', unit: 'か国', skill: true,
         v: (s, x) => x.micro.filter(a => s.m[a] > 0).length,
-        tiers: [Tr(xt.micro.length, 'ミクロの探検家', `面積 1,000km² 未満の国（${xt.micro.length}か国）すべてに、どれかのモードでヒントなしで正解`, { color: 2 })] },
+        tiers: [Tr(xt.micro.length, 'ミクロの探検家', '面積 1,000km² 未満の国（{g}か国）すべてに、どれかのモードでヒントなしで正解',
+          gOf(xt.micro.length), { color: 2 })] },
       // 2.2 あそび方
       { id: 'prac-perfect', cat: 'kind', icon: '✨', name: 'ノーミス練習', unit: '問', skill: true, v: s => s.perf,
-        tiers: T3([10, 20, 40], 'ていねい派 / ノーミス職人 / 完璧主義者', g => `${g}問以上の練習を、まちがえ0でクリア（ヒントなし）`) },
+        tiers: T3([10, 20, 40], ['ていねい派', 'ノーミス職人', '完璧主義者'], '{g}問以上の練習を、まちがえ0でクリア（ヒントなし）') },
       { id: 'chal-flawless', cat: 'kind', icon: '🎯', name: '一発クリア', unit: '問', skill: true, v: s => s.flaw,
-        tiers: T3([10, 20, 40], '集中モード / 鉄の集中力 / ミスを知らない人', g => `${g}問以上の挑戦を、1回目でクリア（ヒントなし）`) },
+        tiers: T3([10, 20, 40], ['集中モード', '鉄の集中力', 'ミスを知らない人'], '{g}問以上の挑戦を、1回目でクリア（ヒントなし）') },
       { id: 'chal-grit', cat: 'kind', icon: '🧗', name: '七転び八起き', skill: true, secret: true, hint: '挑戦でつまずいた条件に、もう一度いどむと…', v: s => s.grit,
         tiers: one('不屈の人', '挑戦（ヒントなし・10問以上）でまちがえたことのある条件（モード・地域・問題数が同じ）を、あとの別のゲームで1回目にクリア', 2) },
       { id: 'ta-clear', cat: 'kind', icon: '⏱️', name: 'タイムアタッカー', unit: '問', v: s => s.ta,
-        tiers: T3([5, 20, 40], 'スピード見習い / タイムアタッカー / 秒速の旅人', g => `${g}問以上のタイムアタックをクリア`) },
+        tiers: T3([5, 20, 40], ['スピード見習い', 'タイムアタッカー', '秒速の旅人'], '{g}問以上のタイムアタックをクリア') },
       { id: 'ta-speed', cat: 'kind', icon: '⚡', name: 'スピードスター', lower: true, v: s => s.taAvg,   // 小さいほどよい（これだけ）
-        tiers: T3([3000, 2000, 1400], 'せっかち名人 / スピードスター / 光速の目', g => `タイムアタック10問以上を1問 ${(g / 1000).toFixed(1)}秒以内でクリア`) },
+        tiers: T3([3000, 2000, 1400], ['せっかち名人', 'スピードスター', '光速の目'], 'タイムアタック10問以上を1問 {s}秒以内でクリア',
+          g => ({ s: (g / 1000).toFixed(1) })) },
       // 2.3 モード
-      modeBadge('f2n', '🚩', '旗ソムリエ', '国旗→国名', '旗見習い / 旗ソムリエ / 国旗の達人'),
-      modeBadge('n2f', '🔍', '旗さがし名人', '国名→国旗', '旗さがし屋 / 旗えらび名人 / 旗の目きき'),
-      modeBadge('m2f', '🗺️', '地図よみ', '場所→国旗', '地図好き / 地図よみ名人 / 歩く地図帳'),
-      modeBadge('f2m', '📍', 'ピンポイント', '国旗→場所', '方向音痴卒業 / ピンポイント職人 / 人間GPS'),
+      modeBadge('f2n', '🚩', '旗ソムリエ', '国旗→国名', ['旗見習い', '旗ソムリエ', '国旗の達人']),
+      modeBadge('n2f', '🔍', '旗さがし名人', '国名→国旗', ['旗さがし屋', '旗えらび名人', '旗の目きき']),
+      modeBadge('m2f', '🗺️', '地図よみ', '場所→国旗', ['地図好き', '地図よみ名人', '歩く地図帳']),
+      modeBadge('f2m', '📍', 'ピンポイント', '国旗→場所', ['方向音痴卒業', 'ピンポイント職人', '人間GPS']),
       // 2.4 地域
-      regionBadge('samerica', '🦙', '南米アドベンチャー', '南米の旅人 / 南米通 / 南米博士'),
-      regionBadge('oceania', '🐚', '南の島めぐり', '南の島の旅人 / オセアニア通 / オセアニア博士'),
-      regionBadge('namerica', '🌵', '北中米ロードトリップ', '北中米の旅人 / 北中米通 / 北中米博士'),
-      regionBadge('europe', '🏰', 'ヨーロッパ周遊', 'ヨーロッパの旅人 / ヨーロッパ通 / ヨーロッパ博士'),
-      regionBadge('asia', '🐼', 'アジア大陸横断', 'アジアの旅人 / アジア通 / アジア博士'),
-      regionBadge('africa', '🦁', 'アフリカ大冒険', 'アフリカの旅人 / アフリカ通 / アフリカ博士'),
-      regionBadge('world', '🌏', '世界一周', '世界の旅人 / 世界通 / 世界博士'),
+      regionBadge('samerica', '🦙', '南米アドベンチャー', ['南米の旅人', '南米通', '南米博士']),
+      regionBadge('oceania', '🐚', '南の島めぐり', ['南の島の旅人', 'オセアニア通', 'オセアニア博士']),
+      regionBadge('namerica', '🌵', '北中米ロードトリップ', ['北中米の旅人', '北中米通', '北中米博士']),
+      regionBadge('europe', '🏰', 'ヨーロッパ周遊', ['ヨーロッパの旅人', 'ヨーロッパ通', 'ヨーロッパ博士']),
+      regionBadge('asia', '🐼', 'アジア大陸横断', ['アジアの旅人', 'アジア通', 'アジア博士']),
+      regionBadge('africa', '🦁', 'アフリカ大冒険', ['アフリカの旅人', 'アフリカ通', 'アフリカ博士']),
+      regionBadge('world', '🌏', '世界一周', ['世界の旅人', '世界通', '世界博士']),
       // 2.5 図鑑・毎日
       { id: 'book', cat: 'daily', icon: '📖', name: '図鑑めくり', unit: 'か国', v: s => nKeys(s.bk),
-        tiers: T3([10, 50, 195], '図鑑好き / 図鑑マニア / 歩く図鑑', g => `図鑑で ${g}か国を開く`) },
+        tiers: T3([10, 50, 195], ['図鑑好き', '図鑑マニア', '歩く図鑑'], '図鑑で {g}か国を開く') },
       { id: 'days', cat: 'daily', icon: '📅', name: '通いなれた道', unit: '日', v: s => s.days,
-        tiers: T3([3, 10, 30], '常連さん / おなじみさん / ドリルが日課', g => `ゲームかバトルを終えた日が通算 ${g}日（連続でなくていい）`) },
+        tiers: T3([3, 10, 30], ['常連さん', 'おなじみさん', 'ドリルが日課'], 'ゲームかバトルを終えた日が通算 {g}日（連続でなくていい）') },
       { id: 'comeback', cat: 'daily', icon: '👋', name: 'おかえり！', secret: true, hint: 'しばらく旅に出て、また戻ってくると…', v: s => s.back,
         tiers: one('帰ってきた旅人', '前に遊んだ日から14日以上あけて、また遊ぶ') },
       // 2.6 ドパガキ
@@ -339,10 +352,10 @@
       { id: 'rpg-first-win', cat: 'rpg', icon: '⚔️', name: '初勝利', rpg: true, v: (s, x) => s.rpg.win || n0(x.snap?.st?.win) > 0 ? 1 : 0,
         tiers: one('かけだし勇者', 'バトルにはじめて勝つ') },
       { id: 'rpg-lv', cat: 'rpg', icon: '🧙', name: '旅人のレベル', rpg: true, v: (s, x) => Math.max(s.rpg.lv, n0(x.snap?.lv)),
-        tiers: T3([10, 30, 50], '一人前の旅人 / ベテラン旅人 / 伝説の旅人', g => `旅人のレベルが Lv ${g}`) },
+        tiers: T3([10, 30, 50], ['一人前の旅人', 'ベテラン旅人', '伝説の旅人'], '旅人のレベルが Lv {g}') },
       { id: 'rpg-boss', cat: 'rpg', icon: '👑', name: '旗を取りもどせ', unit: '地域', rpg: true,
         v: (s, x) => [...bossesOf(s, x)].filter(id => id !== 'world').length,
-        tiers: T3([1, 3, 6], '旗の守り手 / 三地域の勇者 / 六地域の勇者', g => `地域ボスを倒した数が ${g}地域`) },
+        tiers: T3([1, 3, 6], ['旗の守り手', '三地域の勇者', '六地域の勇者'], '地域ボスを倒した数が {g}地域') },
       { id: 'rpg-final', cat: 'rpg', icon: '👾', name: '世界を取りもどした', rpg: true, v: (s, x) => bossesOf(s, x).has('world') ? 1 : 0,
         tiers: one('世界を取りもどした者', '地図喰いを倒す', 4) },
       { id: 'rpg-nodmg', cat: 'rpg', icon: '🛡️', name: '無傷の勝利', rpg: true, v: s => s.rpg.nodmg,
@@ -354,15 +367,21 @@
       { id: 'rpg-master', cat: 'rpg', icon: '🏅', name: 'マスター昇格', rpg: true, v: s => s.rpg.master,
         tiers: one('4モードの達人', '覚えてシルバーに上がる', 2) },
       { id: 'rpg-cards', cat: 'rpg', icon: '🗂️', name: '仲間あつめ', unit: 'か国', rpg: true, v: (s, x) => Math.max(s.rpg.owned, n0(x.snap?.owned)),
-        tiers: T3([50, 100, 195], '50か国の友 / 100か国の友 / 世界の友', g => `仲間の数が ${g}か国`) },
+        tiers: T3([50, 100, 195], ['50か国の友', '100か国の友', '世界の友'], '仲間の数が {g}か国') },
       { id: 'rpg-bounty', cat: 'rpg', icon: '🔎', name: '手配書ハンター', unit: '日', rpg: true, v: (s, x) => Math.max(s.rpg.bounty, n0(x.snap?.bountyDays)),
-        tiers: T3([1, 10, 30], '新米探偵 / 敏腕探偵 / 名探偵', g => `手配書を全部達成した日が通算 ${g}日`) },
+        tiers: T3([1, 10, 30], ['新米探偵', '敏腕探偵', '名探偵'], '手配書を全部達成した日が通算 {g}日') },
       { id: 'rpg-tower', cat: 'rpg', icon: '🗼', name: '英雄の塔', unit: '階', rpg: true, v: (s, x) => n0(x.snap?.tower),
-        tiers: T3([10, 25, 50, 100], '塔の見習い / 塔の戦士 / 塔の勇者 / 英雄', g => `英雄の塔で ${g}階まで勝つ`) },
+        tiers: T3([10, 25, 50, 100], ['塔の見習い', '塔の戦士', '塔の勇者', '英雄'], '英雄の塔で {g}階まで勝つ') },
     ];
     // 段の色はふつう段の順（1 銅・2 銀・3 金）。1段だけのバッジと reg-world の金は color で決めてある
     return badges.map(b => ({ ...b, tiers: b.tiers.map((t, i) => ({ ...t, color: t.color || i + 1 })) }));
   }
+  // i18n-data:end
+  // 全部の段の日本語の称号（カタログの順）。英語版でほかの人の称号を照らすのに使う
+  const titlesOf = cat => cat.flatMap(b => b.tiers.map(t => t.title));
+  // 条件の文の型 dk に入れる値。地域（region）とモード（sub）の日本語の名前だけを tr で訳す（数はそのまま）。
+  // 表示は tr(t.dk, descVars(t.dv, tr))。ブラウザでは tr = T（コアは T を呼ばないので、呼ぶ側が渡す）
+  const descVars = (dv, tr) => ({ ...dv, ...(own(dv, 'region') && { region: tr(dv.region) }), ...(own(dv, 'sub') && { sub: tr(dv.sub) }) });
 
   // 判定に使う x。snapshot は例外・オブジェクトでないものを null にする
   function makeCtx(X, rpg) {
@@ -434,7 +453,8 @@
 
   // ---------- セーブ（設計書 §7.1）。base（最後に読めた・書けたもの）に ops（まだ書けていない op）を重ねたものが st ----------
   const clone = d => JSON.parse(JSON.stringify(d));
-  // storage は getItem / setItem / removeItem を持つもの（どれも例外を投げてよい）。ctx() は判定に使う x を返す
+  // storage は getItem / setItem / removeItem を持つもの（どれも例外を投げてよい）。ctx() は判定に使う x を返す。
+  // warn() は新しい版のセーブを読むだけにしたとき1回だけ呼ぶ
   function createStore({ storage, X, cat, ctx, now = () => Date.now(), warn = () => {} }) {
     let base = fresh(), ops = [], st = clone(base);   // st と base はいつも別のオブジェクト（push が base を変えないように）
     let ro = false, inCommit = false, auto = null, warned = false;
@@ -451,7 +471,7 @@
     }
     function take(r) {
       base = r.d; ro = r.ro;
-      if (ro && !warned) { warned = true; warn('[badges] 新しい版のセーブなので読むだけにする'); }
+      if (ro && !warned) { warned = true; warn(); }   // 知らせる文は呼ぶ側の console.warn（画面に出さない）
     }
     const layered = () => { const d = clone(base); for (const op of ops) apply(d, op, X); return d; };
     const write = d => { try { storage.setItem('badges', JSON.stringify(d)); return true; } catch { return false; } };
@@ -515,7 +535,7 @@
   }
 
   const CORE = { VERSION, KEY_RE, MODE_BIT, makeX, fresh, sanitize, migrate, today, dayNum, addDay, applyResult, apply, pickResult, pickRpg, sidGate,
-    CAT_LABEL, makeCatalog, makeCtx, snapOvercome, reached, valOf, visible, evaluate, stepInfo, tierLabel, bestKey, progressOf, summarize, listView,
+    CAT_LABEL, fillJa, titlesOf, descVars, makeCatalog, makeCtx, snapOvercome, reached, valOf, visible, evaluate, stepInfo, tierLabel, bestKey, progressOf, summarize, listView,
     createStore, pendingPay, payout };
   globalThis.BADGES_CORE = CORE;
   if (typeof document === 'undefined') return;   // node の vm ではここで終わる
@@ -530,12 +550,32 @@
   if (lacking.length === Object.keys(kinds).length) return;
   if (lacking.length) { console.error('[badges] 見つからない: ' + lacking.join(' ')); return; }
 
-  const X = makeX(C), CAT = makeCatalog(C);
+  const X = makeX(C), CAT = makeCatalog(C), catTitles = new Set(titlesOf(CAT));
   const ctx = () => makeCtx(X, window.RPG);
+
+  // ---------- 表示の文。カタログの日本語（データ）は表示のときだけ T() に通す。英語版は辞書 i18n/en-badges.js ----------
+  const nameOf = b => T(b.name), subOf = b => T(b.sub), hintOf = b => T(b.hint), titleOf = t => T(t.title);
+  const descOf = t => T(t.dk, descVars(t.dv, T));
+  // 辞書の同じキーをほかの所が別の意味で使っている語は、空の {k} を付けた別のキーにする（日本語の文は同じ）:
+  // 金（en-daily の曜日 Fri）、あそび方・モード・地域（en-html・en-quiz のモード選択の Answer style・Mode・Region。
+  // バッジの分類は Ways to play・Modes・Regions）
+  const K0 = { k: '' };
+  const tierOf = color => color === 3 ? T('金{k}', K0) : tierLabel(color) ? T(tierLabel(color)) : '';
+  const CAT_ALT = { kind: () => T('あそび方{k}', K0), mode: () => T('モード{k}', K0), region: () => T('地域{k}', K0) };
+  const catOf = c => CAT_ALT[c]?.() ?? T(CAT_LABEL[c]);
+  // 詳細の「◯◯のバッジ」（英語は単数の Mode badge・Region badge）
+  const catBadgeOf = c => ({ quiz: T('クイズのバッジ'), kind: T('あそび方のバッジ'), mode: T('モードのバッジ'), region: T('地域のバッジ'),
+    daily: T('図鑑・毎日のバッジ'), dopa: T('ドパガキのバッジ'), rpg: T('冒険のバッジ') })[c] ?? '';
+  // 数と単位（「あと◯か国」の◯か国）。英語は単数・複数があるので、1 のときだけ数のまま渡す（T の { one, other } は n === 1 で one）
+  // i18n-data:start
+  const UNIT_ID = new Map([['か国', 'country'], ['問', 'question'], ['日', 'day'], ['地域', 'region'], ['階', 'floor']]);
+  // i18n-data:end
+  const UNIT_T = { country: n => T('{n}か国', { n }), question: n => T('{n}問', { n }), day: n => T('{n}日', { n }), region: n => T('{n}地域', { n }), floor: n => T('{n}階', { n }) };
+  const amountOf = (b, v) => { const n = v === 1 ? 1 : fmt(v), f = UNIT_T[UNIT_ID.get(b.unit)]; return f ? f(n) : String(n); };
   // バッジのセーブ（index.html の store とは別）。localStorage には呼ぶたびにさわる（使えなくなっても例外は Store が受ける）
   const bs = createStore({
     storage: { getItem: k => localStorage.getItem(k), setItem: (k, v) => localStorage.setItem(k, v), removeItem: k => localStorage.removeItem(k) },
-    X, cat: CAT, ctx, warn: m => console.warn(m),
+    X, cat: CAT, ctx, warn: () => console.warn('[badges] 新しい版のセーブなので読むだけにする'),
   });
   // 時間（ms）
   const TOAST_MS = 4500;                               // バッジのトーストを出しておく時間（§5.3）
@@ -602,9 +642,9 @@
     const list = pending.splice(0), steps = list.filter(it => !('summary' in it)), sums = list.filter(it => 'summary' in it);
     const cap = Math.max(1, (innerWidth < 600 ? 2 : 3) - sums.length);   // ステップに使える枚数（まとめは起動時の1枚だけ）
     // { html, key, src }。key があるのは個別のトースト（ドパガキの演出をする）。src はそのトーストにしたお知らせ
-    const out = sums.map(it => ({ html: lineToast(`これまでの記録から バッジを${it.summary}個もらったよ！`), src: [it] }));
+    const out = sums.map(it => ({ html: lineToast(T('これまでの記録から バッジを{n}個もらったよ！', { n: it.summary })), src: [it] }));
     const single = it => ({ html: stepToast(it), key: it.key, src: [it] });
-    if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(`ほか${steps.length - cap + 1}個のバッジもゲット！`), src: steps.slice(cap - 1) });
+    if (steps.length > cap) out.push(...steps.slice(0, cap - 1).map(single), { html: lineToast(T('ほか{n}個のバッジもゲット！', { n: steps.length - cap + 1 })), src: steps.slice(cap - 1) });
     else out.push(...steps.map(single));
     showToast(out[0]);
     out.slice(1).forEach((o, i) => {
@@ -637,26 +677,26 @@
   }
 
   // つけている称号の印。［つける］を押して描き直したら、ここにフォーカスを移す（refocus）
-  const ON_HTML = '<span class="bdg-on" tabindex="-1">つけてる中</span>';
+  const ON_HTML = `<span class="bdg-on" tabindex="-1">${T('つけてる中')}</span>`;
   // 取ったステップ1つ分（トーストとパネルの行で同じ）。2行×3列: メダル｜名前と段・称号｜払われたコイン・［つける］（つけている称号なら「つけてる中」）
   // data-key・data-paid は、称号をつけかえたときにパネルの行を描き直すため（redrawPanel）
   function stepHTML({ key, paid, auto }) {
     const si = stepInfo(CAT, key);
     if (!si) return '';
     const coin = typeof paid === 'number' && Number.isFinite(paid) && paid > 0 ? paid : 0;   // 0 は「もう払ってある」（docs/events.md）
-    const title = `称号〈${esc(si.t.title)}〉`;
-    const l2 = auto ? `<p class="bdg-l2">${title}をつけたよ</p>`
-      : `<p class="bdg-l2">${title}</p>${bs.st.eq === key ? ON_HTML : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>`}`;
-    return `<div class="bdg-row" data-key="${key}" data-paid="${coin}"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${si.b.name} ${tierLabel(si.color)}`)}</p>`
+    const title = esc(titleOf(si.t));
+    const l2 = auto ? `<p class="bdg-l2">${T('称号〈{title}〉をつけたよ', { title })}</p>`
+      : `<p class="bdg-l2">${T('称号〈{title}〉', { title })}</p>${bs.st.eq === key ? ON_HTML : `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">${T('つける')}</button>`}`;
+    return `<div class="bdg-row" data-key="${key}" data-paid="${coin}"><span class="bdg-medal t${si.color}">${esc(si.b.icon)}</span><p class="bdg-l1">${esc(`${nameOf(si.b)} ${tierOf(si.color)}`)}</p>`
       + `<span class="bdg-paid">${coin ? `●+${coin}` : ''}</span>${l2}</div>`;
   }
   // トーストの中身。<div data-bdg-toast> の中を押したら消す（document の click）
-  const stepToast = item => `<div data-bdg-toast class="bdg-toast"><p class="bdg-h">バッジゲット！</p>${stepHTML(item)}</div>`;
-  const lineToast = msg => `<div data-bdg-toast class="bdg-toast bdg-line"><p class="bdg-msg">${msg}</p><button class="btn ghost bdg-btn" data-bdg-open>見る</button></div>`;
+  const stepToast = item => `<div data-bdg-toast class="bdg-toast"><p class="bdg-h">${T('バッジゲット！')}</p>${stepHTML(item)}</div>`;
+  const lineToast = msg => `<div data-bdg-toast class="bdg-toast bdg-line"><p class="bdg-msg">${msg}</p><button class="btn ghost bdg-btn" data-bdg-open>${T('見る')}</button></div>`;
 
   // 結果画面のパネル（§5.2）。#r-side（無ければ #rcard）の中の #r-ext の直前（無ければボタンの行の直前）
   const PANEL_ROWS = 4;
-  const TIP = '国名ヒントありのときは、ノーミス・モード・地域の銀と金などのバッジは進まないよ';
+  const TIP = T('国名ヒントありのときは、ノーミス・モード・地域の銀と金などのバッジは進まないよ');
   function resultPanel(items, res) {
     const tip = !!res.hint && bs.st.tip < 3;
     const host = $('r-side') || $('rcard');
@@ -686,7 +726,7 @@
   // パネルに行を足す。4行まで、それより多ければ「ほか◯個」の数を増やす（行は作り直さない）
   function panelAdd(box, items) {
     if (!items.length) return;
-    if (!box.querySelector(':scope > .bdg-h')) box.insertAdjacentHTML('afterbegin', '<p class="bdg-h">🏅 バッジを手に入れたよ！</p>');
+    if (!box.querySelector(':scope > .bdg-h')) box.insertAdjacentHTML('afterbegin', `<p class="bdg-h">${T('🏅 バッジを手に入れたよ！')}</p>`);
     let last = [...box.querySelectorAll(':scope > .bdg-h, :scope > .bdg-row')].pop(), rows = box.querySelectorAll(':scope > .bdg-row').length, extra = 0;
     for (const it of items) {
       if (rows >= PANEL_ROWS) { extra++; continue; }
@@ -696,11 +736,11 @@
     if (!extra) return;
     let more = box.querySelector(':scope > .bdg-more');
     if (!more) {
-      last.insertAdjacentHTML('afterend', '<div class="bdg-more"><span></span><button class="btn ghost bdg-btn" data-bdg-open>バッジを見る</button></div>');
+      last.insertAdjacentHTML('afterend', `<div class="bdg-more"><span></span><button class="btn ghost bdg-btn" data-bdg-open>${T('バッジを見る')}</button></div>`);
       more = last.nextElementSibling;
     }
     more.dataset.n = (Number(more.dataset.n) || 0) + extra;
-    more.firstElementChild.textContent = `ほか${more.dataset.n}個`;
+    more.firstElementChild.textContent = T('ほか{n}個', { n: Number(more.dataset.n) });
   }
   // パネルの行を、いまつけている称号に合わせて描き直す（押した行は「つけてる中」、自動でつけた行も「をつけたよ」をやめて［つける］）
   function redrawPanel() {
@@ -771,11 +811,12 @@
   // NEW: 取った段の時刻のどれかが、詳細を最後に開いた時刻（sn）より新しい
   const isNew = (b, d) => b.tiers.some((_, i) => { const k = stepKey(b, i); return own(d.got, k) && d.got[k] > (d.sn[b.id] || 0); });
   // 進み具合の文。ta-speed（lower）は「2.43→2.0秒」（記録が無ければ「記録なし」）、goal が 1（地域の銅・銀、1段だけのバッジなど）は「まだ」か「達成」、ほかは「34 / 100」
-  const progText = (b, v, goal) => b.lower ? (v > 0 ? `${(v / 1000).toFixed(2)}→${(goal / 1000).toFixed(1)}秒` : '記録なし')
-    : goal === 1 ? (v >= 1 ? '達成' : 'まだ') : `${fmt(Math.min(v, goal))} / ${fmt(goal)}`;
+  const progText = (b, v, goal) => b.lower ? (v > 0 ? T('{v}→{goal}秒', { v: (v / 1000).toFixed(2), goal: (goal / 1000).toFixed(1) }) : T('記録なし'))
+    : goal === 1 ? (v >= 1 ? T('達成') : T('まだ')) : `${fmt(Math.min(v, goal))} / ${fmt(goal)}`;
   const barHTML = r => `<div class="bdg-bar"><i style="width:${Math.round(r * 100)}%"></i></div>`;
-  const medalHTML = (b, d) => { const top = topOf(b, d); return `<span class="bdg-medal ${top < 0 ? 'off' : 't' + b.tiers[top].color}" aria-hidden="true"><i>${masked(b, d) ? '？' : esc(b.icon)}</i></span>`; };
-  const monthDay = t => { const dt = new Date(t); return `${dt.getMonth() + 1}/${dt.getDate()}`; };
+  const medalHTML = (b, d) => { const top = topOf(b, d); return `<span class="bdg-medal ${top < 0 ? 'off' : 't' + b.tiers[top].color}" aria-hidden="true"><i>${masked(b, d) ? T('？') : esc(b.icon)}</i></span>`; };
+  // 取った日（端末の時間）。英語は 'Oct 30'、日本語は '10/30'
+  const monthDay = t => { const dt = new Date(t); return I18N.lang === 'en' ? new Intl.DateTimeFormat(I18N.locale, { month: 'short', day: 'numeric' }).format(dt) : `${dt.getMonth() + 1}/${dt.getDate()}`; };
   const catsOf = x => ['all', ...Object.keys(CAT_LABEL).filter(c => c !== 'rpg' || x.rpg)];   // 分類のチップ（冒険は rpg.js があるときだけ）
 
   // ホーム（§6.1）: バッジのアイコン（index.html の #home-badges を homeEntry で出す）と称号の札（#home-status の先頭）。何度呼んでも同じ要素を書きかえる
@@ -784,7 +825,7 @@
     if (!status || typeof homeEntry !== 'function') return;
     const d = bs.st, x = ctx(), { got, total } = summarize(CAT, d, x);
     homeEntry('home-badges', { open: () => open(), note: `${got}/${total}`
-      + (visible(CAT, x).some(b => isNew(b, d)) ? '<span class="bdg-dot" role="img" aria-label="新しいバッジあり"></span>' : '') });
+      + (visible(CAT, x).some(b => isNew(b, d)) ? `<span class="bdg-dot" role="img" aria-label="${T('新しいバッジあり')}"></span>` : '') });
     const title = titleText();
     let row = status.querySelector(':scope > .bdg-titlerow');
     if (!title) { row?.remove(); return; }
@@ -793,18 +834,21 @@
       row.innerHTML = '<button class="bdg-titlechip" id="home-title" data-bdg-picker></button>';
       status.prepend(row);
     }
-    row.firstElementChild.innerHTML = `〈${esc(title)}〉`;   // ボタンは作り直さない（フォーカスを残す）
+    row.firstElementChild.innerHTML = T('〈{title}〉', { title: esc(T(title)) });   // ボタンは作り直さない（フォーカスを残す）
   }
 
   // バッジ画面のタイル（§6.2）
   function tileHTML(b, d, x) {
     const top = topOf(b, d), hide = masked(b, d), p = progressOf(b, d, x), next = p.next >= 0 ? b.tiers[p.next] : null;
-    const prog = next ? progText(b, p.v, p.goal) : 'コンプリート！';
-    const label = hide ? `ひみつのバッジ。${b.hint}` : !next ? `${b.name}。コンプリート`
-      : `${b.name}。${top < 0 ? 'まだ取っていない' : tierLabel(b.tiers[top].color) + 'まで取った'}。次の${tierLabel(next.color)}は${next.desc}、${p.goal === 1 ? '' : 'いま '}${prog}`;
+    const prog = next ? progText(b, p.v, p.goal) : T('コンプリート！');
+    // 読み上げの文。goal が 1 の段は「いま」を付けない（「まだ」「達成」）
+    const v = next && { name: nameOf(b), tier: tierOf(next.color), desc: descOf(next), prog, got: top < 0 ? '' : tierOf(b.tiers[top].color) };
+    const label = hide ? T('ひみつのバッジ。{hint}', { hint: hintOf(b) }) : !next ? T('{name}。コンプリート', { name: nameOf(b) })
+      : top < 0 ? (p.goal === 1 ? T('{name}。まだ取っていない。次の{tier}は{desc}、{prog}', v) : T('{name}。まだ取っていない。次の{tier}は{desc}、いま {prog}', v))
+      : p.goal === 1 ? T('{name}。{got}まで取った。次の{tier}は{desc}、{prog}', v) : T('{name}。{got}まで取った。次の{tier}は{desc}、いま {prog}', v);
     const dots = b.tiers.map((t, i) => own(d.got, stepKey(b, i)) ? `<i class="t${t.color}">●</i>` : '<i>○</i>').join('');
     return `<button class="bdg-tile" data-bdg-detail="${b.id}" aria-label="${esc(label)}">${medalHTML(b, d)}`
-      + `<b class="bdg-name">${hide ? '？？？' : esc(b.name)}</b>${b.sub && !hide ? `<small class="bdg-sub">${esc(b.sub)}</small>` : ''}`
+      + `<b class="bdg-name">${hide ? T('？？？') : esc(nameOf(b))}</b>${b.sub && !hide ? `<small class="bdg-sub">${esc(subOf(b))}</small>` : ''}`
       + `<span class="bdg-dots">${dots}</span>${hide ? '' : `${barHTML(p.ratio)}<span class="bdg-prog">${esc(prog)}</span>`}`
       + `${isNew(b, d) ? '<span class="bdg-new">NEW</span>' : ''}</button>`;
   }
@@ -813,8 +857,8 @@
     return list.filter(b => !b.secret).map(b => [b, progressOf(b, d, x)]).filter(([, p]) => p.next >= 0 && p.ratio >= .5 && p.ratio < 1)
       .sort((p, q) => q[1].ratio - p[1].ratio).slice(0, 3)
       .map(([b, p]) => {
-        const left = b.lower ? `${((p.v - p.goal) / 1000).toFixed(2)}秒` : `${fmt(p.goal - p.v)}${b.unit ?? ''}`;
-        return `<li>${esc(`${b.icon} ${b.name} ${tierLabel(b.tiers[p.next].color)} あと${left}`)}</li>`;
+        const left = b.lower ? T('{s}秒', { s: ((p.v - p.goal) / 1000).toFixed(2) }) : amountOf(b, p.goal - p.v);
+        return `<li>${esc(T('{icon} {name} {tier} あと{left}', { icon: b.icon, name: nameOf(b), tier: tierOf(b.tiers[p.next].color), left }))}</li>`;
       }).join('');
   }
   // 最近とったバッジ: 見えているバッジのステップを、取った時刻の新しい順に3つ
@@ -822,47 +866,47 @@
     const ids = new Set(list.map(b => b.id));
     return Object.entries(d.got).map(([k, t]) => [stepInfo(CAT, k), t]).filter(([si]) => si && ids.has(si.b.id))
       .sort((p, q) => q[1] - p[1]).slice(0, 3)
-      .map(([si, t]) => `<li>${esc(`${monthDay(t)} ${si.b.icon} ${si.b.name} ${tierLabel(si.color)}`)}</li>`).join('');
+      .map(([si, t]) => `<li>${esc(`${monthDay(t)} ${si.b.icon} ${nameOf(si.b)} ${tierOf(si.color)}`)}</li>`).join('');
   }
   function renderBadges() {
     const d = bs.st, x = ctx(), list = visible(CAT, x), sum = summarize(CAT, d, x), title = titleText();
-    $('bdg-total').textContent = `${sum.total}個中 ${sum.got}個`;
-    $('bdg-title').innerHTML = title ? `〈${esc(title)}〉` : 'まだ称号がない';
-    $('bdg-colors').textContent = [1, 2, 3, 4].map(c => `${tierLabel(c)} ${sum.byColor[c]}`).join(' · ');
+    $('bdg-total').textContent = T('{t}個中 {n}個', { t: sum.total, n: sum.got });
+    $('bdg-title').innerHTML = title ? T('〈{title}〉', { title: esc(T(title)) }) : T('まだ称号がない');
+    $('bdg-colors').textContent = [1, 2, 3, 4].map(c => `${tierOf(c)} ${sum.byColor[c]}`).join(' · ');
     $('bdg-soon').innerHTML = soonHTML(list, d, x);
     $('bdg-recent').innerHTML = recentHTML(list, d);
     // 分類のチップは、並びが変わったときだけ作り直す（押したチップのフォーカスと、行の横スクロールの位置を残す）
     const cats = catsOf(x), saved = store.get('bdgcat', 'all'), cur = cats.includes(saved) ? saved : 'all', box = $('bdg-cats');
     if (box.dataset.cats !== cats.join()) {
       box.dataset.cats = cats.join();
-      box.innerHTML = cats.map(c => `<button class="chip" data-cat="${c}">${c === 'all' ? 'すべて' : esc(CAT_LABEL[c])}</button>`).join('');
+      box.innerHTML = cats.map(c => `<button class="chip" data-cat="${c}">${c === 'all' ? T('すべて') : esc(catOf(c))}</button>`).join('');
     }
     for (const chip of box.children) chip.setAttribute('aria-pressed', chip.dataset.cat === cur);
     $('bdg-list').innerHTML = cats.filter(c => c !== 'all' && (cur === 'all' || c === cur))
-      .map(c => `<section class="bdg-cat" data-cat="${c}"><h2 class="bdg-cat-h">${esc(CAT_LABEL[c])}</h2>`
+      .map(c => `<section class="bdg-cat" data-cat="${c}"><h2 class="bdg-cat-h">${esc(catOf(c))}</h2>`
         + `<div class="bdg-tiles">${list.filter(b => b.cat === c).map(b => tileHTML(b, d, x)).join('')}</div></section>`).join('');
   }
 
   // 詳細ダイアログ（§6.3）。図鑑の #detail を使い回す（index.html の $('detail').onclick は上書きしない）
   function detailHTML(b) {
     const d = bs.st, x = ctx(), hide = masked(b, d);
-    const head = `<div class="bdg-dhead">${medalHTML(b, d)}<div><h2 class="bdg-dname">${hide ? '？？？' : esc(b.name)}</h2>`
-      + `<p class="bdg-dcat">${esc(CAT_LABEL[b.cat])}のバッジ</p></div></div>`;
-    if (hide) return `<div class="bdg-detail" data-id="${b.id}">${head}<p class="bdg-hint">${esc(b.hint)}</p></div>`;   // ヒントだけ
+    const head = `<div class="bdg-dhead">${medalHTML(b, d)}<div><h2 class="bdg-dname">${hide ? T('？？？') : esc(nameOf(b))}</h2>`
+      + `<p class="bdg-dcat">${esc(catBadgeOf(b.cat))}</p></div></div>`;
+    if (hide) return `<div class="bdg-detail" data-id="${b.id}">${head}<p class="bdg-hint">${esc(hintOf(b))}</p></div>`;   // ヒントだけ
     const tiers = b.tiers.map((t, i) => {
       const key = stepKey(b, i), got = own(d.got, key), v = valOf(b, t, d.s, x);
       const state = got ? `<p class="bdg-when">✓ ${monthDay(d.got[key])}</p>`
         : `<div class="bdg-tprog">${barHTML(ratioOf(b, v, t.goal))}<span class="bdg-prog">${esc(progText(b, v, t.goal))}</span></div>`;
       const act = got && d.eq === key ? ON_HTML
-        : got ? `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">つける</button>` : '<span class="bdg-lock">（取ると使える）</span>';
-      return `<li class="bdg-tier" data-key="${key}"><span class="bdg-tl t${t.color}">${tierLabel(t.color)}</span><div class="bdg-tbody">`
-        + `<p class="bdg-cond">${esc(t.desc)}</p>${state}<div class="bdg-trow"><p class="bdg-ttl">称号〈${esc(t.title)}〉</p>${act}</div></div></li>`;
+        : got ? `<button class="btn ghost bdg-btn" data-bdg-equip="${key}">${T('つける')}</button>` : `<span class="bdg-lock">${T('（取ると使える）')}</span>`;
+      return `<li class="bdg-tier" data-key="${key}"><span class="bdg-tl t${t.color}">${esc(tierOf(t.color))}</span><div class="bdg-tbody">`
+        + `<p class="bdg-cond">${esc(descOf(t))}</p>${state}<div class="bdg-trow"><p class="bdg-ttl">${T('称号〈{title}〉', { title: esc(titleOf(t)) })}</p>${act}</div></div></li>`;
     }).join('');
     // ［シェア］は「シェア」と「コピー済み」を重ねて置き、幅を初めから長いほうに合わせる（コピーしたときに幅が変わって行が折り返さない）
-    const acts = (topOf(b, d) >= 0 ? `<button class="btn ghost bdg-btn bdg-share" data-bdg-share="${b.id}"><span>シェア</span><span>コピー済み</span></button>` : '')
-      + (b.cat === 'region' || b.cat === 'mode' ? `<button class="btn ghost bdg-btn" data-bdg-practice="${b.id}">練習する →</button>` : '');
+    const acts = (topOf(b, d) >= 0 ? `<button class="btn ghost bdg-btn bdg-share" data-bdg-share="${b.id}"><span>${T('シェア')}</span><span>${T('コピー済み')}</span></button>` : '')
+      + (b.cat === 'region' || b.cat === 'mode' ? `<button class="btn ghost bdg-btn" data-bdg-practice="${b.id}">${T('練習する →')}</button>` : '');
     return `<div class="bdg-detail" data-id="${b.id}">${head}<ol class="bdg-tiers">${tiers}</ol>`
-      + `${b.skill ? '<p class="bdg-note">※ 国名ヒントありの正解は数えないよ</p>' : ''}${acts ? `<div class="row bdg-acts">${acts}</div>` : ''}</div>`;
+      + `${b.skill ? `<p class="bdg-note">${T('※ 国名ヒントありの正解は数えないよ')}</p>` : ''}${acts ? `<div class="row bdg-acts">${acts}</div>` : ''}</div>`;
   }
   // 称号えらび: 取った称号を段の色の大きい順（虹→銅）に。最後に「称号をつけない」
   function pickerHTML() {
@@ -870,13 +914,13 @@
     const pick = (key, inner) => `<button class="bdg-pick" data-bdg-pick="${key}" aria-pressed="${eq === key}">${inner}</button>`;
     const steps = visible(CAT, ctx()).flatMap(b => b.tiers.map((_, i) => stepKey(b, i))).filter(k => own(d.got, k))
       .map(k => [k, stepInfo(CAT, k)]).sort((p, q) => q[1].color - p[1].color);
-    return `<div class="bdg-picker"><h2 class="bdg-ph">称号をえらぶ</h2><div class="bdg-picks">`
-      + steps.map(([k, si]) => pick(k, `<span class="bdg-tl t${si.color}">${tierLabel(si.color)}</span>`
-        + `<span class="bdg-pt"><b>〈${esc(si.t.title)}〉</b><small>${esc(`${si.b.icon} ${si.b.name}`)}</small></span>`)).join('')
-      + `${pick('', '称号をつけない')}</div></div>`;
+    return `<div class="bdg-picker"><h2 class="bdg-ph">${T('称号をえらぶ')}</h2><div class="bdg-picks">`
+      + steps.map(([k, si]) => pick(k, `<span class="bdg-tl t${si.color}">${esc(tierOf(si.color))}</span>`
+        + `<span class="bdg-pt"><b>${T('〈{title}〉', { title: esc(titleOf(si.t)) })}</b><small>${esc(`${si.b.icon} ${nameOf(si.b)}`)}</small></span>`)).join('')
+      + `${pick('', T('称号をつけない'))}</div></div>`;
   }
   function drawDialog(html) {
-    $('detail-inner').innerHTML = `<button class="close" data-bdg-close>閉じる</button>${html}`;
+    $('detail-inner').innerHTML = `<button class="close" data-bdg-close>${T('閉じる')}</button>${html}`;
     if (!$('detail').open) $('detail').showModal();
   }
   function openDetail(id) {
@@ -910,7 +954,7 @@
     redrawPanel();                 // 結果画面のパネル（ドパガキ OFF だと、ほかに押した手ごたえが出ない）
     refocus(key);
     if (key && S.dopa && !reduced()) {   // つけた称号が変わった（外したときは出さない）
-      FX.pop('称号チェンジ！', 'small');
+      FX.pop(T('称号チェンジ！'), 'small');
       // FX.pop は body に足すが、showModal の #detail は top layer で z-index に関係なく上に来る。開いたままなら中へ移す
       const popEl = $('detail').open && document.querySelector('body > .fx-pop');
       if (popEl) $('detail').append(popEl);
@@ -938,11 +982,13 @@
     window.leaveTheme?.();   // まとめページのテーマ（index.html の THEME）が残っていると、選んだ地域ではなくテーマで出題してしまう
     show('setup');
   }
-  // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする。btn は押した［シェア］
+  // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする。btn は押した［シェア］。
+  // URL は share-card.js の url()（英語版は …/country-drill/en/）。読めなければ日本語版のトップ
   function share(id, btn) {
     const b = CAT.find(e => e.id === id), top = b ? topOf(b, bs.st) : -1;
     if (top < 0) return;
-    const t = b.tiers[top], text = `国旗マスターでバッジ『${b.name}（${tierLabel(t.color)}）』を取ったよ！ 称号〈${t.title}〉 ${SITE}`;
+    const t = b.tiers[top], text = T('国旗マスターでバッジ『{badge}（{tier}）』を取ったよ！ 称号〈{title}〉 {url}',
+      { badge: nameOf(b), tier: tierOf(t.color), title: titleOf(t), url: window.SHARECARD?.url?.() ?? SITE });
     try {
       if (navigator.share) navigator.share({ text }).catch(() => {});
       else navigator.clipboard?.writeText(text).then(() => copied(btn), () => {});
@@ -951,7 +997,7 @@
   // コピーできた。トーストはモーダルの #detail の下に隠れるので、開いている間は押したボタンの文字をしばらく「コピー済み」にする（data-copied。badges.css）
   let copiedTimer = 0;
   function copied(btn) {
-    if (!$('detail').open || !btn?.isConnected) { toast('コピーしたよ', COPIED_MS); return; }   // コピーが終わる前に閉じた
+    if (!$('detail').open || !btn?.isConnected) { toast(T('コピーしたよ'), COPIED_MS); return; }   // コピーが終わる前に閉じた
     clearTimeout(copiedTimer);
     btn.dataset.copied = '';
     copiedTimer = setTimeout(() => { delete btn.dataset.copied; }, COPIED_MS);
@@ -980,6 +1026,8 @@
   window.BADGES = {
     title: titleText,              // かっこなし
     titleKey: () => bs.st.eq || null,
+    // 日本語の称号（サーバーにあるほかの人の称号など）の表示用。英語のページではカタログの称号だけ英語にし、無い称号は ''
+    titleLabel: ja => I18N.lang !== 'en' ? ja : catTitles.has(ja) ? T(ja) : '',
     count: () => summarize(CAT, bs.st, ctx()),
     list: () => listView(CAT, bs.st, ctx()),
     open,
@@ -1002,15 +1050,15 @@
   sec.id = 'scr-badges'; sec.className = 'wrap'; sec.hidden = true;
   sec.innerHTML = `<div class="bdg-split">
     <div id="bdg-sum" class="bdg-sum panel">
-      <div class="bdg-head"><h2>バッジ</h2><span id="bdg-total"></span></div>
-      <div class="bdg-me"><span id="bdg-title" class="bdg-mytitle"></span><button class="btn ghost bdg-btn" id="bdg-change" data-bdg-picker>称号をかえる</button></div>
+      <div class="bdg-head"><h2>${T('バッジ')}</h2><span id="bdg-total"></span></div>
+      <div class="bdg-me"><span id="bdg-title" class="bdg-mytitle"></span><button class="btn ghost bdg-btn" id="bdg-change" data-bdg-picker>${T('称号をかえる')}</button></div>
       <p id="bdg-colors" class="bdg-colors"></p>
-      <div class="bdg-soon"><h3 class="bdg-sh">もうすぐ取れそう</h3><ul id="bdg-soon" class="bdg-lines"></ul></div>
-      <div class="bdg-recent"><h3 class="bdg-sh">最近とったバッジ</h3><ul id="bdg-recent" class="bdg-lines"></ul></div>
+      <div class="bdg-soon"><h3 class="bdg-sh">${T('もうすぐ取れそう')}</h3><ul id="bdg-soon" class="bdg-lines"></ul></div>
+      <div class="bdg-recent"><h3 class="bdg-sh">${T('最近とったバッジ')}</h3><ul id="bdg-recent" class="bdg-lines"></ul></div>
     </div>
-    <div class="bdg-main"><div id="bdg-cats" class="bdg-cats" role="group" aria-label="分類"></div><div id="bdg-list"></div></div>
+    <div class="bdg-main"><div id="bdg-cats" class="bdg-cats" role="group" aria-label="${T('分類')}"></div><div id="bdg-list"></div></div>
   </div>
-  <div class="row end"><button class="btn" id="bdg-home">ホームへ</button></div>`;
+  <div class="row end"><button class="btn" id="bdg-home">${T('ホームへ')}</button></div>`;
   $('scr-book').after(sec);
   $('bdg-home').onclick = () => show('home');
   $('bdg-cats').onclick = e => {
