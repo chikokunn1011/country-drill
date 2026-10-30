@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer, QUIET_BADGES, PHONE, PC, jaLeft, warned, pickSetup, answerCorrect, clearByAnswering, settleResult } from './helpers.mjs';
-import { openRpg, writeSave, saveWith, toastTexts, playPractice, winBattle, startTower, winTowerFloor, localToday, flipAll } from './rpg_helpers.mjs';
+import { openRpg, writeSave, saveWith, toastTexts, playPractice, winBattle, startTower, winTowerFloor, localToday, flipAll, startBattle, battleAnswer, battleGuard } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -150,8 +150,8 @@ test('ja_rpg_unchanged', { timeout: 300_000 }, async t => {
 });
 
 /* ---------- 英語の冒険（Task 5: 冒険ホーム・入口・コインの表示。I18N.hide から 'rpg' を外す） ---------- */
-// rpg-battle・rpg-team・rpg-rank は Task 7〜9 まで英語のページで読まない（EN_SKIP）。
-// なので塔の札（バトルの画面が要る）は Task 8 で見る。かざりの窓（RPG.cardHTML が要る）は Task 6 から en_profile_decorations で見る（preflight C2）
+// rpg-rank は Task 9 まで英語のページで読まない（EN_SKIP）。rpg-team は Task 7、rpg-battle は Task 8 から読む。
+// 塔の札（バトルの画面が要る）は Task 8 の en_tower で見る。かざりの窓（RPG.cardHTML が要る）は Task 6 から en_profile_decorations で見る（preflight C2）
 const EN_OPTS = { path: 'en/', locale: 'en-US', seed: 1, storage: { badges: QUIET_BADGES } };
 // 英語版を開いて fn(page, app) を呼び、最後にページの例外・[i18n] の warn（辞書に無いキー）・[rpg] の console.error が無いかも見る
 const te = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => {
@@ -771,6 +771,327 @@ test('ja_gain_lines', { timeout: 60_000 }, async () => {
     ]);
     assert.deepEqual(r.empty, []);
     assert.equal(r.names, 'zz・日本・&lt;x&gt;');
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});
+
+/* ---------- 英語のバトル・英雄の塔（Task 8: rpg-battle.js） ---------- */
+const bstate = page => page.evaluate(() => RPG_BATTLE.state());
+const logLast = page => page.evaluate(() => $('bt-log').lastElementChild?.textContent ?? '');
+// いまの問題にまちがえて、答え合わせが出るまで（［つぎへ］は押さない）。答えだった国コードを返す
+const missOnce = async page => {
+  await battleGuard(page);
+  const a = await page.evaluate(() => RPG_BATTLE.cur());
+  await page.locator(`#scr-battle .choice:not([data-a="${a}"])`).first().click();
+  await page.locator('#bt-reveal').waitFor();
+  return a;
+};
+const BR_AR = { lv: 5, cards: { br: [1, 0], ar: [1, 0] }, teams: [{ n: '編成1', c: ['br', 'ar'] }] };
+const enOf = (page, as) => page.evaluate(as => as.map(a => [cName(byA.get(a)), cCap(byA.get(a))]), as);
+
+// spec の「冒険のバトルを1回最後まで遊べる」: 会う画面 → まちがえ1回・正解 → 勝つ
+te('en_battle_win', async page => {
+  await writeSave(page, saveWith(BR_AR));
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 1));
+  await shown(page, '#bt-fight');
+  assert.match((await txt(page, '#bt-intro .rpg-bmeet')).trim(), /^\S+ [A-Z][\w’ -]+ appeared!$/);
+  assert.equal((await txt(page, '#bt-fight')).trim(), 'Fight');
+  assert.equal((await txt(page, '#bt-flee')).trim(), '← Run');
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Amazon Jungle · F1');
+  assert.match(await txt(page, '#bt-intro'), /Correct answers to win: about \d+ · Mistakes allowed: up to \d+/);
+  assert.match(await txt(page, '#bt-intro'), /A correct answer attacks! A wrong answer brings a counterattack\./);
+  // 編成の行: 既定の名前は Team 1（data-ugc にしない）・チームボーナス
+  assert.equal((await txt(page, '#bt-tname')).trim(), 'Team 1');
+  assert.equal(await page.locator('#bt-tname [data-ugc]').count(), 0);
+  assert.equal((await page.locator('.rpg-bteam-b').textContent()).trim(), 'Team bonus: South America×2 +10%');
+  assert.equal((await txt(page, '#bt-team')).trim(), 'Edit team');
+  assert.equal(await page.getAttribute('#bt-ehp', 'aria-label').then(s => /’s HP$/.test(s)), true);
+  assert.equal(await page.getAttribute('#bt-hhp', 'aria-label'), 'Traveler’s HP');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  assert.ok(['Which country has this flag?', 'Which flag belongs to this country?', 'Which flag belongs to the highlighted country?']
+    .includes((await txt(page, '#bt-q .qlabel')).trim()));
+  assert.match(await txt(page, '#bt-left'), /^Misses left \d+$/);
+  assert.deepEqual(await jaLeft(page), []);
+  // まちがえる: 答え合わせと反撃のログ
+  const a = await missOnce(page);
+  const [[name]] = await enOf(page, [a]);
+  assert.equal((await txt(page, '#bt-reveal .verdict')).trim(), `Not quite. The answer is ${name}.`);
+  assert.match(await logLast(page), /^.+ counterattacks! \d+ damage$/);
+  assert.equal((await txt(page, '#bt-next')).trim(), 'Next ⏎');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-next');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  // 正解: ダメージのログ（会心・援護つき）
+  const b = await page.evaluate(() => RPG_BATTLE.cur());
+  const [[bn]] = await enOf(page, [b]);
+  await battleAnswer(page, true);
+  const log = await logLast(page);
+  assert.ok(log.startsWith(`${bn}! `) || log.startsWith(`Critical hit! ${bn}! `), log);
+  assert.match(log, /! \d+ damage to .+ \(with help from Brazil · Argentina\)$/);
+  await winBattle(page);
+  assert.match((await txt(page, '#bt-end .rpg-bend-h')).trim(), /^Victory! \+[\d,]+ ?\(first clear ×3\)$/);
+  assert.equal((await txt(page, '#bt-nextfloor')).trim(), 'Next floor');
+  assert.equal((await txt(page, '#bt-home')).trim(), 'Go to Adventure home');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-nextfloor');
+  await shown(page, '#bt-fight');
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Amazon Jungle · F2');
+});
+
+te('en_battle_lose', async page => {
+  await writeSave(page, saveWith({}));
+  await startBattle(page, 'samerica', 1);
+  const missed = [];
+  while ((await bstate(page)).phase !== 'end') {
+    missed.push(await missOnce(page));
+    await page.click('#bt-next');
+    await page.waitForFunction(() => ['question', 'end'].includes(RPG_BATTLE.state().phase));
+  }
+  assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'Defeated…! But you’ve learned the countries you missed.');
+  const end = await txt(page, '#bt-end');
+  assert.match(end, /Effort prize \+\d+/);
+  assert.match(end, /Effort gauge 1\/\d+/);
+  assert.equal((await txt(page, '#bt-end .rpg-lbl')).trim(), 'Countries you missed');
+  const want = await enOf(page, [...new Set(missed)]);
+  const got = await page.$$eval('#bt-end .misslist li', els => els.map(e => [e.querySelector('b').textContent, e.querySelector('span').textContent]));
+  assert.deepEqual(got, want);
+  assert.equal((await txt(page, '#bt-practice')).trim(), 'Practice this region');
+  assert.equal((await txt(page, '#bt-again')).trim(), 'Play again');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-practice');
+  await shown(page, '#scr-setup');
+  assert.match(await page.evaluate(() => location.pathname), /\/en\/$/);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+te('en_battle_flee', async page => {
+  await writeSave(page, saveWith({}));
+  await startBattle(page, 'samerica', 1);
+  let msg = '';
+  page.once('dialog', d => { msg = d.message(); d.dismiss(); });
+  await page.click('#bt-flee');
+  assert.equal(msg, 'Run? (You won’t get a reward)');
+  assert.equal((await bstate(page)).phase, 'question');
+});
+
+// 宇宙（テーマ）の答え合わせのテーマの一言・鏡の地球の「えらんだのは」。月は Moon（曜日の Mon にしない）
+te('en_battle_reveal', async page => {
+  await writeSave(page, saveWith({ lv: 50, floors: MIRROR_CLEAR }));
+  await startBattle(page, 'moon', 1);
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Moon · F1');
+  assert.equal(await page.evaluate(() => RPG_BATTLE.force('jp', 'f2n')), true);
+  await battleGuard(page);
+  await page.locator('#bt-q .choice:not([data-a="jp"])').first().click();
+  await page.locator('#bt-reveal').waitFor();
+  assert.equal((await txt(page, '#bt-reveal .rpg-rv-theme')).trim(), 'Japan fits the theme: Island Countries');
+  assert.doesNotMatch(await page.locator('#scr-battle').innerText(), /\bMon\b/);
+  assert.deepEqual(await jaLeft(page), []);
+  // 鏡の地球: 押した国と正解を並べる
+  await writeSave(page, saveWith({ lv: 50, floors: EARTH_CLEAR }));
+  await startBattle(page, 'msamerica', 1);
+  assert.equal(await page.evaluate(() => RPG_BATTLE.force('jp', 'f2n')), true);
+  await battleGuard(page);
+  const picked = await page.locator('#bt-q .choice:not([data-a="jp"])').first().getAttribute('data-a');
+  await page.locator('#bt-q .choice:not([data-a="jp"])').first().click();
+  await page.locator('#bt-reveal').waitFor();
+  const [[pn]] = await enOf(page, [picked]);
+  assert.equal((await txt(page, '#bt-reveal .rpg-rv-pick')).trim(), `You chose “${pn}”`);
+  assert.deepEqual(await page.$$eval('#bt-reveal .rpg-rv-pair figcaption', els => els.map(e => e.textContent)), [pn, 'Japan']);
+  assert.equal(await page.getAttribute('#bt-reveal .rpg-rv-pair img >> nth=1', 'alt'), 'Flag of Japan');
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// ボスを初めて倒した［Share］: 地図喰い（final）と第3章の月のボス。文は英語、URL は英語版
+te('en_boss_share', async page => {
+  const shareText = async () => {
+    await page.evaluate(() => { window.__shared = null; navigator.share = o => { window.__shared = o; return Promise.resolve(); }; });
+    await page.click('#bt-share');
+    return page.evaluate(() => window.__shared);
+  };
+  await writeSave(page, saveWith({ lv: 99, floors: { ...EARTH_CLEAR, world: 4 } }));
+  await startBattle(page, 'world', 5);
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Map Eater’s Lair · Boss');
+  await winBattle(page);
+  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'World: won back!');
+  assert.equal((await txt(page, '#bt-share')).trim(), 'Share');
+  assert.deepEqual(await jaLeft(page), []);
+  let s = await shareText();
+  assert.match(s.text, /^I defeated the Map Eater and won back the world in Flag Quest! Allies: \d+\/195 countries #FlagMaster$/);
+  assert.match(s.url, /\/country-drill\/en\/$/);
+  await writeSave(page, saveWith({ lv: 99, floors: { ...MIRROR_CLEAR, moon: 4 } }));
+  await startBattle(page, 'moon', 5);
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Moon · Boss');
+  await winBattle(page);
+  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'Moon: won back!');
+  s = await shareText();
+  assert.match(s.text, /^I defeated the Great Moon Rabbit King in Flag Quest! Allies: \d+\/195 countries #FlagMaster$/);
+  assert.doesNotMatch(s.text, JA_TEXT);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+const TOWER_OPEN = saveWith({ lv: 30, floors: { world: 5 }, story: ['ch1'] });
+te('en_tower', async page => {
+  // 冒険ホームの塔の札（preflight C2 で Task 5 から移した確かめ）
+  await openHome(page, JA_SAVE);
+  let card = await txt(page, '#rpg-tower');
+  assert.ok(card.includes('Tower of Heroes') && card.includes('Personal best: floor 7'), card);
+  assert.equal((await txt(page, '#rpg-tower-go')).trim(), 'Challenge');
+  assert.deepEqual(await jaLeft(page), []);
+  await openHome(page, saveWith({ lv: 30, floors: { world: 4 } }));
+  card = await txt(page, '#rpg-tower');
+  assert.ok(card.includes('Opens when you defeat the Map Eater'), card);
+  // 1階: 会う画面 → クリア → やめる → 終わり
+  await openHome(page, TOWER_OPEN);
+  await page.click('#rpg-tower-go');
+  await shown(page, '#bt-fight');
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Tower of Heroes · Floor 1');
+  assert.match(await txt(page, '#bt-intro'), /Your HP carries over to the next floor \(you recover \d+% on each new floor, and fully recover when you defeat the mini-boss every \d+ floors\)/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  await winTowerFloor(page);
+  assert.match((await txt(page, '#bt-tclear .rpg-bend-h')).trim(), /^Floor 1 cleared! \+\d+$/);
+  assert.match((await txt(page, '#bt-tclear .rpg-bend-x')).trim(), /^First win on this floor \+\d+$/);
+  assert.match(await txt(page, '#bt-tclear'), /HP [\d,]+\/[\d,]+ \(\d+% recovered\)/);
+  assert.equal((await txt(page, '#bt-tquit')).trim(), 'Quit');
+  assert.equal((await txt(page, '#bt-tnext')).trim(), 'Next floor (floor 2)');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-tquit');
+  await shown(page, '#bt-end');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'Nice work!');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), 'Tower of Heroes: up to floor 1 (Personal best: floor 1)');
+  assert.equal((await txt(page, '#bt-home')).trim(), 'Go to the Adventure');
+  assert.equal((await txt(page, '#bt-tretry')).trim(), 'Try again (from floor 1)');
+  assert.deepEqual(await jaLeft(page), []);
+  // 10階の中ボス
+  assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
+  assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'Tower of Heroes · Floor 10 · mini-boss');
+  assert.match(await txt(page, '#bt-intro'), /Each correct answer wins back one flag/);
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  let msg = '';
+  page.once('dialog', d => { msg = d.message(); d.dismiss(); });
+  await page.click('#bt-flee');
+  assert.equal(msg, 'Run? (No reward for this floor. Your Tower of Heroes run ends here.)');
+  // HP 1 で1階 → まちがえて負け
+  assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(1, 1)), true);
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  const a = await missOnce(page);
+  await page.click('#bt-next');
+  await shown(page, '#bt-end');
+  assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'Defeated…!');
+  assert.match((await txt(page, '#bt-end .rpg-bend-x')).trim(), /^Tower of Heroes: defeated on floor 1 \(Personal best: floor 1\)$/);
+  const [[an, ac]] = await enOf(page, [a]);
+  assert.deepEqual(await page.$$eval('#bt-end .misslist li', els => els.map(e => [e.querySelector('b').textContent, e.querySelector('span').textContent])), [[an, ac]]);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 390px: 長い英語の国名の4択・HP の欄・塔の見出しが横にはみ出さない
+te('en_battle_fit', async page => {
+  const over = () => page.evaluate(() => {
+    const out = [];
+    for (const el of document.querySelectorAll('#scr-battle .choice, #scr-battle .rpg-bwhere, #scr-battle .rpg-hpl, #scr-battle .rpg-hpname, #scr-battle .rpg-bteam, #scr-battle .rpg-bline, #scr-battle .rpg-bend-h, #scr-battle .rpg-bend-x, #scr-battle .btn')) {
+      if (!el.checkVisibility()) continue;
+      const r = el.getBoundingClientRect();
+      if (el.scrollWidth > el.clientWidth + 0.5 || r.right > innerWidth + 0.5 || r.left < -0.5) out.push(`${el.className}: ${el.textContent.trim()} ${el.scrollWidth}/${el.clientWidth}`);
+    }
+    return { out, sw: document.documentElement.scrollWidth, iw: document.documentElement.clientWidth };
+  });
+  const check = async () => { const r = await over(); assert.deepEqual(r.out, []); assert.ok(r.sw <= r.iw, `${r.sw} > ${r.iw}`); };
+  await writeSave(page, saveWith({ ...BR_AR, floors: { samerica: 5, oceania: 5, namerica: 5, europe: 5, asia: 5, africa: 4 } }));
+  await page.evaluate(() => RPG_BATTLE.start('africa', 5));
+  await shown(page, '#bt-fight');
+  await check();
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  for (const a of ['vc', 'ba', 'cf']) {
+    assert.equal(await page.evaluate(a => RPG_BATTLE.force(a, 'f2n'), a), true);
+    assert.ok((await page.locator('#bt-q .choice').allInnerTexts()).some(s => s.length > 15));
+    await check();
+  }
+  await writeSave(page, TOWER_OPEN);
+  assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
+  await shown(page, '#bt-fight');
+  await check();
+}, { viewport: PHONE });
+
+// en_team_custom_name_ugc のバトルの半分（preflight C6）: 自分で付けた編成名は data-ugc、既定の名前は Team 1
+te('en_battle_team_name_ugc', async page => {
+  await writeSave(page, saveWith({ cards: { jp: [1, 0] }, teams: [{ n: '編成1', c: null }, { n: 'あか', c: ['jp'] }], tsel: 1 }));
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 1));
+  await shown(page, '#bt-fight');
+  assert.equal((await txt(page, '#bt-tname [data-ugc]')).trim(), 'あか');
+  assert.equal(await page.getAttribute('#bt-tprev', 'aria-label'), 'Previous team');
+  assert.equal(await page.getAttribute('#bt-tnext', 'aria-label'), 'Next team');
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#bt-tprev');
+  assert.equal((await txt(page, '#bt-tname')).trim(), 'Team 1');
+  assert.equal(await page.locator('#bt-tname [data-ugc]').count(), 0);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 日本語の見張り（preflight C18）: バトルのログの文（会心・援護・旗を取りもどした・反撃）と、負け・塔の終わりの文が今までの日本語と同じ。
+// ja_rpg_unchanged の画面では会心・ボス・負け・塔の終わりが出ないので、ここで決まった形を見る
+test('ja_battle_lines', { timeout: 120_000 }, async () => {
+  const app = await openRpg(browser, { seed: 1, storage: { badges: QUIET_BADGES } });
+  const { page } = app;
+  try {
+    const rightWith = async rnd => {
+      await battleGuard(page);
+      const a = await page.evaluate(() => RPG_BATTLE.cur());
+      await page.evaluate(r => { window.__rnd = Math.random; if (r !== null) Math.random = () => r; }, rnd);
+      await page.locator(`#scr-battle .choice[data-a="${a}"]`).click();
+      await page.evaluate(() => { Math.random = window.__rnd; });
+      const out = [await page.evaluate(a => byA.get(a).n, a), await logLast(page)];
+      await page.waitForFunction(a => RPG_BATTLE.state().phase === 'end' || (RPG_BATTLE.cur() !== null && !document.querySelector(`#scr-battle .choice[data-a="${a}"][disabled]`)), a);
+      return out;
+    };
+    await writeSave(page, saveWith({ lv: 99, cards: { br: [1, 0], ar: [1, 0] }, teams: [{ n: '編成1', c: ['br', 'ar'] }], floors: { samerica: 4 } }));
+    await page.evaluate(() => RPG_BATTLE.start('samerica', 5));
+    assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'ボス アマゾンの密林');
+    assert.equal((await page.locator('.rpg-bteam-b').textContent()).trim(), 'チーム 南アメリカ×2 ＋10%');
+    assert.equal(await page.locator('#bt-tname').textContent(), '編成1');
+    await page.click('#bt-fight');
+    await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+    let [n, log] = await rightWith(0);   // 会心（Lv 99 なので1回で旗を取りもどす）
+    assert.equal(log, `会心！ ${n}！ 旗を取りもどした（ブラジル・アルゼンチンの援護）`);
+    [n, log] = await rightWith(0.99);
+    assert.equal(log, `${n}！ 旗を取りもどした（ブラジル・アルゼンチンの援護）`);
+    // 仲間なし・通常のフロア
+    await writeSave(page, saveWith({ lv: 1 }));
+    await startBattle(page, 'samerica', 1);
+    assert.equal((await txt(page, '.rpg-bwhere')).trim(), 'F1 アマゾンの密林');
+    [n, log] = await rightWith(0);
+    assert.match(log, new RegExp(`^会心！ ${n}！ おしゃべりオウムに\\d+ダメージ$`));
+    [n, log] = await rightWith(0.99);
+    assert.match(log, new RegExp(`^${n}！ おしゃべりオウムに\\d+ダメージ$`));
+    const missed = [];
+    while ((await bstate(page)).phase !== 'end') {
+      missed.push(await missOnce(page));
+      assert.match(await logLast(page), /^おしゃべりオウムの反撃！ \d+ダメージ$/);
+      assert.match(await txt(page, '#bt-reveal .verdict'), /^ざんねん。正解は「.+」$/);
+      await page.click('#bt-next');
+      await page.waitForFunction(() => ['question', 'end'].includes(RPG_BATTLE.state().phase));
+    }
+    assert.equal((await txt(page, '#bt-end .rpg-bend-h')).trim(), 'やられた…！ でも、まちがえた国はもう覚えたはず');
+    assert.match(await txt(page, '#bt-end'), /がんばり賞 \+\d+\n+がんばりゲージ 1\/\d+\n+まちがえた国/);
+    const want = await page.evaluate(as => [...new Set(as)].map(a => [byA.get(a).n, byA.get(a).c]), missed);
+    assert.deepEqual(await page.$$eval('#bt-end .misslist li', els => els.map(e => [e.querySelector('b').textContent, e.querySelector('span').textContent])), want);
+    // 塔: 中ボスの見出し・HP 1 で負けた終わり
+    await writeSave(page, TOWER_OPEN);
+    assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
+    assert.equal((await txt(page, '.rpg-bwhere')).trim(), '英雄の塔 10階 中ボス');
+    assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(1, 1)), true);
+    await page.click('#bt-fight');
+    await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+    await missOnce(page);
+    await page.click('#bt-next');
+    await shown(page, '#bt-end');
+    assert.equal((await txt(page, '#bt-end .rpg-bend-x')).trim(), '英雄の塔 1階でたおれた');
     assert.deepEqual(app.errors.map(String), []);
   } finally { await app.close(); }
 });

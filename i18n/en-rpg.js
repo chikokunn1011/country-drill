@@ -16,6 +16,7 @@
 // rpg.js が使うほかの辞書のキー: '冒険'・'達成'（en-badges.js）、'閉じる'（en-book.js）、'コピー'・'コピーしたよ'（en-profile.js）、'挑戦'（en-core.js）
 // rpg-cards.js の文は en-rpg-cards.js。rpg-cards.js も使うこの辞書のキー: '← 冒険'・'国旗ガチャ'・'あと{coins}'
 // rpg-team.js の文も en-rpg-cards.js。rpg-team.js も使うこの辞書のキー: '← 冒険'・'編成'・'編成{n}'・'仲間 {n}/{total}'・'あと{coins}'・'＋{p}%'
+// rpg-battle.js の文は en-rpg-battle.js。rpg-battle.js も使うこの辞書のキー: '冒険ホームへ'・'編成'・'＋{p}%'（'まちがえた国' は en-quiz.js にあるのでそれを使う）
 Object.assign(window.I18N_EN ??= {}, {
   // ---- 既定の編成名の頭（'編成1' → 表示は Team 1）とコインの単位（データ。英語の画面は shortCoins(n, true) の k） ----
   '編成': 'Team',
@@ -298,6 +299,8 @@ Object.assign(window.I18N_EN ??= {}, {
   // ---- 2つ以上の rpg-*.js が使う文（Task 6〜: 最初に使うファイルが COVER に入るタスクで足す。preflight C4） ----
   // 画面の見出しの左の戻るボタン（rpg-cards.js。あとで rpg-team.js・rpg-rank.js も）
   '← 冒険': '← Adventure',
+  // バトルの終わり・始めていない画面のボタン（rpg-battle.js）
+  '冒険ホームへ': 'Go to Adventure home',
 
   // ---- ストーリー（rpg-core の STORY・STORY_END。子ども向けのやさしい英語・2人称 you, the Traveler・出来事を足さない） ----
   // 「地図喰い（ちずくい）」の（ちずくい）は読みがななので訳さない。「地球の国のなかまたち」は仲間（allies）ではなく friends
