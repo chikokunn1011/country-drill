@@ -106,12 +106,12 @@
 }
 .rpg-chip b { font-weight: 700; font-variant-numeric: tabular-nums; }
 .rpg-chip-l { font-weight: 500; color: var(--muted); }
-/* 360px でもブランド・コイン・図鑑・設定を1行に: 「コイン」の字を足さず、チップがあるときだけトップバーのすき間を少しつめる
+/* 360px でもブランド・コイン・図鑑・設定・言語の切りかえを1行に: 「コイン」の字を足さず、チップがあるときだけトップバーのすき間を少しつめる
    （冒険を OFF にしたときと RPG が無いときの見た目は変えない） */
 @media (max-width: 399.98px) {
   .rpg-chip-l { display: none; }
-  .rpg-chip { gap: 2px; padding: 2px 6px; }
-  body:not(.rpg-off) #topbar:has(#rpg-chip) { gap: 8px; }
+  .rpg-chip { gap: 2px; padding: 2px 5px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) { gap: 6px; }
   body:not(.rpg-off) #topbar:has(#rpg-chip) .row:has(> #to-book) { gap: 4px; }
 }
 /* 設定の「冒険（コイン・RPG）を表示する」が OFF: ボタン・チップ・クイズ中のコインを出さない（コインは裏で貯まる） */

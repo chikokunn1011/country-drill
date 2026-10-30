@@ -92,6 +92,26 @@ test('topbar_height_390', { timeout: 120_000 }, async () => {
   }
 });
 
+// rpg_home.test.mjs の topbar_one_line_360 の英語版。コインのセーブがあっても 360px のトップバーは1行で、切りかえは「JA」と見えて名前は「日本語」
+t('en_topbar_one_line_360', async page => {
+  await page.evaluate(() => show('setup'));
+  const r = await page.evaluate(() => {
+    const els = [...['brand', 'to-book', 'to-settings'].map(id => document.getElementById(id)), document.querySelector('#topbar .langsw a')];
+    const rects = els.map(e => e.getBoundingClientRect());
+    return { tops: rects.map(x => x.top), bottoms: rects.map(x => x.bottom), rights: rects.map(x => x.right),
+      h: document.getElementById('topbar').getBoundingClientRect().height, iw: innerWidth, sw: document.documentElement.scrollWidth,
+      after: getComputedStyle(els[3], '::after').content };
+  });
+  const at = JSON.stringify(r);
+  assert.ok(Math.max(...r.tops) < Math.min(...r.bottoms), `1行になっていない: ${at}`);
+  assert.ok(r.rights.every(x => x <= r.iw), `はみ出している: ${at}`);
+  assert.ok(r.h <= TOPBAR_390, `トップバーが高い: ${at}`);
+  assert.ok(r.sw <= r.iw, `横にスクロールする: ${at}`);
+  assert.match(r.after, /^"JA"/);
+  assert.equal(await page.locator('#topbar').getByRole('link', { name: '日本語', exact: true }).count(), 1);
+  assert.deepEqual(await jaLeft(page), []);
+}, { viewport: { width: 360, height: 640 }, storage: { badges: QUIET_BADGES, rpg: { v: 1, intro: true, coins: 123456 } } });
+
 // ---- モード選択とクイズ（練習・挑戦）。Task 6 ----
 const openSetup = async page => { await page.click('#home-play'); await page.waitForSelector('#scr-setup:not([hidden])'); };
 const texts = (page, sel) => page.$$eval(sel, els => els.map(e => e.textContent.trim()));
