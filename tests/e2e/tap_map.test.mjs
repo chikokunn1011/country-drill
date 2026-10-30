@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint, answerCorrect } from './helpers.mjs';
+import { startServer, openApp, pickSetup, recordEvents, events, settle, answerTap, tapPoint, answerCorrect, PHONE, PC } from './helpers.mjs';
 import { openRpg, writeSave, saveWith, startBattle, battleAnswer } from './rpg_helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -141,7 +141,7 @@ t('tap_outside_globe', async page => {
   // 全世界の地図の左上の角（地球の外。角は丸いので少し内側）
   assert.equal(await page.evaluate(() => tapLonLat([30, 30])), null);
   await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
-  const b = await page.locator('#qcard .tapmap').boundingBox(), k = b.width / 640;
+  const b = await page.locator('#qcard .tapmap').boundingBox(), k = b.width / await page.evaluate(() => W);
   await page.mouse.click(b.x + 30 * k, b.y + 30 * k);
   await page.locator('#qcard .verdict.ng').waitFor();
   assert.equal(await page.locator('#qcard .tapkm').count(), 0);
@@ -212,6 +212,163 @@ t('quiz_only_flag_name_place', async page => {
   v = await q();
   assert.ok(v.flag); assert.ok(!v.text.includes('首都'), v.text); assert.ok(v.text.includes(v.n), '国名表示ありでは国名も出す');
 });
+
+/* ---------- ズームボタンの置き場所 ---------- */
+const ctlAndMap = async page => ({ ctl: await page.locator('#qcard .tapbox .zoomctl').boundingBox(), map: await page.locator('#qcard .tapmap').boundingBox() });
+
+// スマホでは地図の下（地図の端を押すのにボタンがじゃまにならない）
+t('tap_zoom_buttons_outside_on_phone', async page => {
+  await startTap(page);
+  const { ctl, map } = await ctlAndMap(page);
+  assert.ok(ctl.y >= map.y + map.height - 0.5, `ctl ${JSON.stringify(ctl)} map ${JSON.stringify(map)}`);
+  assert.ok(ctl.x + ctl.width <= map.x + map.width + 0.5, '右寄せで地図の幅に収まる');
+}, { viewport: PHONE });
+
+t('tap_zoom_buttons_on_map_on_pc', async page => {
+  await startTap(page);
+  const { ctl, map } = await ctlAndMap(page);
+  assert.ok(ctl.y >= map.y && ctl.y + ctl.height <= map.y + map.height, `ctl ${JSON.stringify(ctl)} map ${JSON.stringify(map)}`);
+}, { viewport: PC });
+
+/* ---------- キーボードで答える（照準） ---------- */
+const tOf = page => page.evaluate(() => { const t = d3.zoomTransform(document.querySelector('#qcard .tapmap')); return { x: t.x, y: t.y, k: t.k }; });
+const waitK = (page, k) => page.waitForFunction(k => Math.abs(d3.zoomTransform(document.querySelector('#qcard .tapmap')).k - k) < 0.01, k);
+const focusMap = page => page.focus('#qcard .tapmap');
+
+t('tap_keys_answer_center', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  await force(page, 'br');
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  // ブラジルの中心が地図の真ん中に来るように動かす
+  await page.evaluate(() => {
+    const c = G.cur.c, [x, y] = G.cur.proj([c.ll[1], c.ll[0]]), k = 2;
+    document.querySelector('#qcard .tapbox').zoomTo(d3.zoomIdentity.translate(W / 2 - k * x, H / 2 - k * y).scale(k));
+  });
+  await focusMap(page);
+  await page.keyboard.press('Enter');
+  await page.locator('#qcard .verdict.ok').waitFor();
+  const a = await answers(page);
+  assert.equal(a.length, 1); assert.equal(a.at(-1).right, true);
+  assert.equal(await page.locator('#next').count(), 1, '答えた Enter で次へ進まない');
+});
+
+t('tap_keys_answer_sea', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  await force(page, 'jp');
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  // 全世界の真ん中はアフリカ（経度 11・緯度 11 あたり）なので、大西洋（経度 -30・緯度 0）を真ん中にする
+  await page.evaluate(() => {
+    const [x, y] = G.cur.proj([-30, 0]), k = 2;
+    document.querySelector('#qcard .tapbox').zoomTo(d3.zoomIdentity.translate(W / 2 - k * x, H / 2 - k * y).scale(k));
+  });
+  await focusMap(page);
+  await page.keyboard.press('Enter');
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.equal((await answers(page)).at(-1).right, false);
+  assert.equal(await page.locator('#qcard .tapmap .tapx').count(), 1);
+});
+
+t('tap_keys_pan_zoom', async page => {
+  await startTap(page);
+  await focusMap(page);
+  await page.keyboard.press('+');
+  await waitK(page, 1.6);
+  await page.waitForTimeout(300);   // 拡大のアニメーションが終わるまで
+  const t0 = await tOf(page), w = (await page.locator('#qcard .tapmap').boundingBox()).width;
+  await page.keyboard.press('ArrowRight');
+  const t1 = await tOf(page), want = -(await page.evaluate(() => TAP.panPx)) * await page.evaluate(() => W) / w;
+  assert.ok(Math.abs(t1.x - t0.x - want) <= 1, `dx ${t1.x - t0.x} want ${want}`);
+  assert.equal(t1.y, t0.y);
+  await page.keyboard.press('-');
+  await waitK(page, 1);
+  await page.keyboard.press('=');
+  await waitK(page, 1.6);
+  await page.keyboard.press('0');
+  await waitK(page, 1);
+  assert.equal(await page.evaluate(() => G.answered), false);
+});
+
+t('tap_keys_only_when_focused', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  await page.click('#qcard .zoomctl button[aria-label="拡大"]');
+  await waitK(page, 1.6);
+  await page.waitForTimeout(300);   // 拡大のアニメーションが終わるまで
+  const t0 = await tOf(page);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(100);
+  assert.deepEqual(await tOf(page), t0);
+  // 答えたあとの Enter は今までどおり［次へ］
+  await focusMap(page);
+  await page.keyboard.press('Enter');
+  await page.locator('#qcard .verdict').waitFor();
+  const n = await page.evaluate(() => G.done);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !G.answered);
+  assert.equal((await answers(page)).length, 1);
+  assert.equal(await page.evaluate(() => G.done), n);
+});
+
+t('tap_aim_visible_only_focused', async page => {
+  const aim = () => page.locator('#qcard .tapmap .aim').isVisible();
+  await startTap(page);
+  // マウスで始めたときは（フォーカスはあっても）出さず、キーを押したら出す（:focus-visible）
+  assert.equal(await aim(), false);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await aim(), true);
+  await page.evaluate(() => document.activeElement?.blur());
+  assert.equal(await aim(), false);
+  await focusMap(page);
+  assert.equal(await aim(), true);
+  // 拡大しても照準は動かない（layer の外）
+  const b0 = await page.locator('#qcard .tapmap .aim').boundingBox();
+  await page.keyboard.press('+');
+  await waitK(page, 1.6);
+  assert.deepEqual(await page.locator('#qcard .tapmap .aim').boundingBox(), b0);
+});
+
+// 答えたあとに地図をタップ・クリックしても（フォーカスは移るが）照準は出さない
+t('tap_aim_hidden_after_click', async page => {
+  await startTap(page);
+  await answerTap(page, { right: false });
+  await page.locator('#qcard .verdict.ng').waitFor();
+  const b = await page.locator('#qcard .tapmap').boundingBox();
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+  assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('#qcard .tapmap')), true);
+  assert.equal(await page.locator('#qcard .tapmap .aim').isVisible(), false);
+});
+
+// 真ん中が何かに隠れていても、真ん中の点を含む国で答える（海の × にしない）
+t('tap_keys_center_covered', async page => {
+  await recordEvents(page);
+  await startTap(page);
+  await force(page, 'jp');
+  await page.locator('#qcard .tapbox').scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const [x, y] = G.cur.proj([byA.get('br').ll[1], byA.get('br').ll[0]]), k = 2;
+    document.querySelector('#qcard .tapbox').zoomTo(d3.zoomIdentity.translate(W / 2 - k * x, H / 2 - k * y).scale(k));
+    const r = document.querySelector('#qcard .tapmap').getBoundingClientRect(), d = document.createElement('div');
+    d.id = 'cover'; d.style.cssText = `position:fixed;left:${r.left + r.width / 2 - 20}px;top:${r.top + r.height / 2 - 20}px;width:40px;height:40px;z-index:99`;
+    document.body.append(d);
+  });
+  await focusMap(page);
+  await page.keyboard.press('Enter');
+  await page.locator('#qcard .verdict.ng').waitFor();
+  assert.equal((await answers(page)).at(-1).a, 'jp');
+  assert.equal(await page.locator('#qcard .tapmap .tapx').count(), 0);
+  assert.ok(await page.locator('#qcard .tapmap path.ngc[data-a="br"]').count() > 0);
+});
+
+// PC では問題を出したら地図にフォーカス（すぐ矢印キーが使える）
+t('tap_keys_focus_on_pc', async page => {
+  await startTap(page);
+  assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('#qcard .tapmap')), true);
+  assert.equal(await page.getAttribute('#qcard .tapmap', 'tabindex'), '0');
+  assert.equal(await page.getAttribute('#qcard .tapmap', 'role'), 'application');
+  assert.match(await page.getAttribute('#qcard .tapmap', 'aria-label'), /矢印キーで動かし、Enter で真ん中の場所を答える$/);
+}, { viewport: PC });
 
 /* ---------- 外れたときの表示・冒険から・道場（Task 4） ---------- */
 const kOf = page => page.evaluate(() => d3.zoomTransform(document.querySelector('#qcard .tapmap')).k);
