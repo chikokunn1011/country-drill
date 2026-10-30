@@ -1,5 +1,5 @@
 // v=1
-// 英語版（PR6）: daily.js の文（今日の難問の画面・ホームの入口・結果のシェアの文）。
+// 英語版（PR6）: daily.js の文（今日の難問の画面・ホームの入口・結果のシェアの文）と streak.js の文（ホームのれんぞく日数）。
 // 日付の区切りは英語版でも日本時間の0時。英語の画面でだけ、その人の時間を I18N.localOf で添える（'（あなたの時間で{t}）'）。
 // en-html.js と同じキー（今日の難問・まだ誰もいない…）は同じ訳（en-html.js はブラウザが読まない）
 Object.assign(window.I18N_EN ??= {}, {
@@ -61,4 +61,25 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // ホームの入口
   '挑戦ずみ': 'Done',
+
+  // れんぞく日数（streak.js）。数は太字にするので、数のほかに数字を入れない
+  'れんぞく日数': 'Day streak',
+  '{n}日れんぞく': { one: '{n}-day streak', other: '{n}-day streak' },
+  '（さいこう{b}日）': ' (best {b})',
+  '・': ' · ',
+  'お休み券{n}枚': { one: '{n} rest pass', other: '{n} rest passes' },
+  '今日あそぶと{n}日に！': 'Play today to reach {n} days!',
+  'きのうはお休み券でつながるよ': 'Yesterday was covered by a rest pass',
+  '今日あそぶと1日目': 'Play today to start a streak',
+  '今週': 'This week',
+  '今週（月〜日）': 'This week (Mon–Sun)',
+  // 7マスの1つ（'{d}' は 'Oct 28'）。曜日と印は data
+  '{d}（{w}）': '{w}, {d}',
+  '{d}（{w}） {m}': '{w}, {d}: {m}',
+  '月': 'Mon', '火': 'Tue', '水': 'Wed', '木': 'Thu', '金': 'Fri', '土': 'Sat', '日': 'Sun',
+  'あそんだ': 'Played',
+  'お休み券': 'Rest pass',
+  'お休み': 'Missed',
+  // 小窓の下（英語の画面でだけ。{t} は I18N.localOf(0, 0)）
+  '日付は日本時間の0時で変わるよ（あなたの時間で{t}）': 'Days change at midnight Japan time ({t} your time).',
 });

@@ -4,11 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { ctxWithI18n } from './i18n-load.mjs';
 
 const read = p => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-const ctx = { window: {}, console };
-ctx.globalThis = ctx;
-vm.createContext(ctx);
+const ctx = ctxWithI18n();   // streak.js は T・I18N を使う（前半の STREAK_CORE は使わないが、本番と同じく i18n.js の後に読む）
 vm.runInContext(read('daily-core.js'), ctx);
 vm.runInContext(read('streak.js'), ctx);
 const D = ctx.DAILY_CORE, K = ctx.STREAK_CORE;

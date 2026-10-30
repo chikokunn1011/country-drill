@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, jaLeft, warned, mapLoaded, pickSetup, clearTimeAttack, answerCorrect, answerWrong, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
+import { startServer, openApp, jaLeft, warned, mapLoaded, pickSetup, clearTimeAttack, clearByAnswering, answerCorrect, answerWrong, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -548,3 +548,96 @@ t('langsw_keeps_daily', async page => {
   await page.locator('#scr-daily:not([hidden])').waitFor();
   assert.equal(await text(page, '#scr-daily h2'), 'Daily Puzzle');
 });
+
+/* ---------- れんぞく日数（Task 8）: 日付は日本時間の0時で変わる（英語の画面でだけ、その人の時間を添える） ---------- */
+// 時計は日本時間 2026-10-28（水）12:00（streak.test.mjs と同じ）。週は 10/26 月〜11/1 日。ニューヨークでは 10/27 23:00
+const SK_NOON = at('2026-10-28T03:00:00Z');
+const SK = (o = {}) => ({ v: 1, cur: 5, best: 12, last: '2026-10-27', played: ['2026-10-27'], rest: [], ...o });
+const skText = page => text(page, '#streak .sk-text');
+const skHint = async page => ((await page.locator('#streak .sk-hint').textContent()) ?? '').trim();
+const skLabels = page => page.$$eval('#streak .sk-day', es => es.map(e => e.getAttribute('aria-label')));
+const skPractice = async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: 'all', count: 5 });
+  await page.click('#start');
+  await clearByAnswering(page);
+  await page.evaluate(() => show('home'));
+};
+// 小窓（.narrow のとき）を開く。広い幅では7マスがはじめから見えている
+const skOpen = async page => {
+  if (await page.isVisible('#streak .sk-open')) await page.click('#streak .sk-open');
+  await page.locator('#streak .sk-week').waitFor();
+};
+
+// 練習5問 → ホーム: 1-day streak・1 rest pass。小窓に英語の曜日と、ニューヨークの時間で何時に日付が変わるか
+// （添え書きがあるときは、幅にかかわらず7マスは［This week］の小窓）
+t('en_streak', async page => {
+  assert.equal(await page.getAttribute('#streak', 'aria-label'), 'Day streak');
+  assert.equal(await skText(page), '🔥 0-day streak · 1 rest pass');
+  assert.equal(await skHint(page), 'Play today to start a streak');
+  await skPractice(page);
+  assert.equal((await stored(page, 'streak')).last, '2026-10-28');   // 日本時間の日付（ニューヨークではまだ 10/27）
+  assert.equal(await skText(page), '🔥 1-day streak · 1 rest pass');
+  assert.equal(await skHint(page), '');
+  assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), true);
+  assert.equal(await text(page, '#streak .sk-open'), 'This week');
+  assert.equal(await page.isVisible('#streak .sk-tz'), false);   // 閉じているときは出さない
+  await skOpen(page);
+  assert.equal(await page.getAttribute('#streak .sk-week', 'aria-label'), 'This week (Mon–Sun)');
+  assert.deepEqual(await skLabels(page), ['Mon, Oct 26: Missed', 'Tue, Oct 27: Missed', 'Wed, Oct 28: Played', 'Thu, Oct 29', 'Fri, Oct 30', 'Sat, Oct 31', 'Sun, Nov 1']);
+  assert.equal(await text(page, '#streak .sk-tz'), 'Days change at midnight Japan time (11:00 AM your time).');
+  const [w, vw] = await page.evaluate(() => [document.querySelector('#streak .sk-pop').getBoundingClientRect().toJSON(), innerWidth]);
+  assert.ok(w.left >= 0 && w.right <= vw, `小窓が画面の外 ${JSON.stringify(w)}`);
+  assert.deepEqual(await jaLeft(page), []);
+  assert.equal(await noHScroll(page), true);
+  await page.click('#streak .sk-open');
+  assert.equal(await page.isVisible('#streak .sk-tz'), false);
+}, { timezoneId: 'America/New_York', init: SK_NOON });
+
+// PC・狭いスマホでも、小窓（7マスと添え書き）は画面の中で、横にスクロールしない
+for (const [vname, viewport] of [['pc', PC], ['320', { width: 320, height: 640 }]]) t(`en_streak_popup_${vname}`, async page => {
+  assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), true);
+  await skOpen(page);
+  assert.equal(await text(page, '#streak .sk-tz'), 'Days change at midnight Japan time (11:00 AM your time).');
+  const [w, vw] = await page.evaluate(() => [document.querySelector('#streak .sk-pop').getBoundingClientRect().toJSON(), innerWidth]);
+  assert.ok(w.left >= 0 && w.right <= vw, `小窓が画面の外 ${JSON.stringify(w)}`);
+  assert.equal(await noHScroll(page), true);
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'America/New_York', init: SK_NOON, viewport, storage: { badges: QUIET_BADGES, streak: SK({ cur: 9999, best: 99999 }) } });
+
+// 東京では添えない（7マスは日本語版と同じく、収まればはじめから見える）
+t('en_streak_tokyo', async page => {
+  assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), false);
+  assert.equal(await page.isVisible('#streak .sk-week'), true);
+  assert.equal(await page.isVisible('#streak .sk-open'), false);
+  assert.equal(await page.isVisible('#streak .sk-tz'), false);
+  assert.equal(((await page.locator('#streak').textContent()) ?? '').includes('your time'), false);
+  assert.deepEqual(await skLabels(page), ['Mon, Oct 26: Missed', 'Tue, Oct 27: Played', 'Wed, Oct 28: Today', 'Thu, Oct 29', 'Fri, Oct 30', 'Sat, Oct 31', 'Sun, Nov 1']);
+  assert.deepEqual(await jaLeft(page), []);
+}, { timezoneId: 'Asia/Tokyo', init: SK_NOON, storage: { badges: QUIET_BADGES, streak: SK() } });
+
+// 今日あそぶと続く・最高・券の印
+t('en_streak_keep', async page => {
+  assert.equal(await skText(page), '🔥 5-day streak (best 12) · 1 rest pass');
+  assert.equal(await skHint(page), 'Play today to reach 6 days!');
+  assert.deepEqual(await page.$$eval('#streak .sk-text b', es => es.map(e => e.textContent)), ['5', '12', '1']);
+  assert.deepEqual(await jaLeft(page), []);
+}, { init: SK_NOON, storage: { badges: QUIET_BADGES, streak: SK() } });
+
+t('en_streak_rest', async page => {
+  assert.equal(await skText(page), '🔥 5-day streak (best 12) · 0 rest passes');
+  assert.equal(await skHint(page), 'Yesterday was covered by a rest pass');
+  await skOpen(page);
+  assert.deepEqual((await skLabels(page)).slice(0, 3), ['Mon, Oct 26: Played', 'Tue, Oct 27: Rest pass', 'Wed, Oct 28: Today']);
+  assert.deepEqual(await jaLeft(page), []);
+}, { init: SK_NOON, storage: { badges: QUIET_BADGES, streak: SK({ last: '2026-10-26', played: ['2026-10-26'] }) } });
+
+// 英語で遊んだ日は、日本語版のれんぞく日数にも出る（同じ localStorage の streak）
+t('en_streak_shared', async page => {
+  await skPractice(page);
+  await page.goto(new URL('./', server.url).href);
+  await mapLoaded(page);
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  assert.match(await text(page, '#streak .sk-text'), /^🔥 1日れんぞく・お休み券1枚$/);
+  assert.equal(await page.getAttribute('#streak', 'aria-label'), 'れんぞく日数');
+  assert.equal(await page.locator('#streak .sk-tz').count() === 0 || !(await page.isVisible('#streak .sk-tz')), true);
+}, { timezoneId: 'America/New_York', init: SK_NOON });
