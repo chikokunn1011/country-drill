@@ -1,4 +1,4 @@
-// 英語版（PR5）: index.html から en/index.html を作る。
+// 英語版（PR5）: index.html から en/index.html を、embed.html から en/embed.html を作る。
 //   ・<html lang="en">・<base href="../">（ファイルはルートのものをそのまま読む）・canonical / og / manifest を英語版に
 //   ・未訳の機能の script（EN_SKIP）を外し、i18n.js のすぐ後に英語の辞書 i18n/en-*.js を入れる
 //   ・HTML の文字を辞書（i18n/en-*.js と、HTML だけの i18n/en-html.js）で置きかえる。訳の無い日本語が残れば止まる
@@ -170,7 +170,10 @@ export function renderEn(inp, used = new Set()) {
   html = once(html, `<meta property="og:url" content="${SITE}">`, `<meta property="og:url" content="${SITE}en/">`);
   html = once(html, '<meta property="og:locale" content="ja_JP">', '<meta property="og:locale" content="en_US">');
   html = once(html, '<link rel="manifest" href="manifest.webmanifest">', '<link rel="manifest" href="en/manifest.webmanifest">');
-  return { 'en/index.html': renderPage(html, 'index.html', inp, used) };
+  // 埋めこみ: 今日の難問（PR6 で訳す）へのリンク #e-daily を外す。noindex はそのまま
+  const embed = inp.embed.replace(/^[ \t]*<a id="e-daily"[^\n]*\n/m, '');
+  if (embed === inp.embed) throw new Error('embed.html に #e-daily の行が無い');
+  return { 'en/index.html': renderPage(html, 'index.html', inp, used), 'en/embed.html': renderPage(embed, 'embed.html', inp, used) };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

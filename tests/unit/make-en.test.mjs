@@ -157,3 +157,23 @@ test('translate_css_alt', () => {
   const css = [...enIndex().matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
   assert.deepEqual([...css.matchAll(/content:[^;}]*/g)].map(m => m[0]).filter(s => JA_RE.test(s)), []);
 });
+
+// 埋めこみの英語版: noindex のまま、今日の難問（PR6）のリンクは外し、「もっと遊ぶ」は英語版のトップへ。日本語が残らない
+test('en_embed', () => {
+  const out = renderEn(readEnInputs(ROOT));
+  assert.ok('en/embed.html' in out, 'renderEn が en/embed.html を作る（en_current で見る）');
+  const html = read('en/embed.html'), h = head(html);
+  assert.match(html, /^<!doctype html>\n<html lang="en">/);
+  const base = h.indexOf('<base href="../">');
+  assert.ok(base > h.indexOf('<meta charset="utf-8">') && base < h.search(/\s(?:href|src)="(?!https?:)[^"]*"/));
+  assert.ok(h.includes('<meta name="robots" content="noindex">'));
+  assert.ok(h.includes('<title>Today’s flag | Flag Master</title>'));
+  assert.doesNotMatch(html, /id="e-daily"/);
+  assert.match(html, /<a id="e-more" href="en\/" target="_blank" rel="noopener">Play more<\/a>/);
+  const srcs = scriptSrcs(html);
+  assert.deepEqual(srcs.map(s => s.split('?')[0]), ['i18n.js', 'i18n/en-embed.js', 'countries.js', 'daily-core.js', 'embed.js']);
+  assert.ok(srcs.includes(`i18n/en-embed.js?v=${read('i18n/en-embed.js').match(/^\/\/ v=(\d+)/)[1]}`));
+  for (const s of scriptSrcs(read('embed.html'))) assert.ok(srcs.includes(s), s);
+  const left = visible(html).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.trim());
+  assert.deepEqual(left, []);
+});

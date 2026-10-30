@@ -76,14 +76,14 @@ test('pages_css_vars_match_index', () => {
   }
 });
 
-// 埋めこみ（embed.html）: daily-core.js の ?v= は index.html と同じ。検索に載せない。読むのは3つの script だけ。端末のデータ・Supabase・広告・フォントを使わない
+// 埋めこみ（embed.html）: daily-core.js の ?v= は index.html と同じ。検索に載せない。読むのは4つの script だけ。端末のデータ・Supabase・広告・フォントを使わない
 test('embed_head', () => {
   const h = read('embed.html'), v = s => s.match(/daily-core\.js\?v=(\d+)/)[1];
   assert.equal(v(h), v(read('index.html')));
   assert.match(h, /<meta name="robots" content="noindex">/);
   assert.ok(h.includes('<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/">'));
   for (const b of BLOCKS) assert.ok(Object.keys(varsOf(h, b)).length > 0, b);   // 3か所ある
-  assert.deepEqual([...h.matchAll(/<script src="([^"]+)"/g)].map(m => m[1].split('?')[0]), ['countries.js', 'daily-core.js', 'embed.js']);
+  assert.deepEqual([...h.matchAll(/<script src="([^"]+)"/g)].map(m => m[1].split('?')[0]), ['i18n.js', 'countries.js', 'daily-core.js', 'embed.js']);
   assert.ok(!/fonts\.googleapis|<link rel="stylesheet"/.test(h));
   assert.ok(!h.includes('footer:start'));
   assert.ok(!read('sitemap.xml').includes('embed'));
@@ -96,7 +96,7 @@ test('no_answer_in_alt', () => {
   for (const s of [read('embed.html'), read('embed.js')]) {
     for (const m of s.matchAll(/alt\s*=\s*["'`]([^"'`]*)["'`]|\.alt\s*=\s*([^;]+);/g)) {
       const alt = m[1] ?? m[2];
-      assert.ok(/^["'`]?(今日の国旗)?["'`]?$/.test(alt.trim()), `alt に国名が入るかもしれない: ${alt}`);
+      assert.ok(/^["'`]?(今日の国旗)?["'`]?$|^T\('今日の国旗'\)$/.test(alt.trim()), `alt に国名が入るかもしれない: ${alt}`);
     }
   }
 });

@@ -1,4 +1,5 @@
 // 埋めこみ「今日の国旗」（embed.html）。DAILY_CORE.oneOfDay が日本時間の日付から決める1日1問を、何回でも答え直せる4択で出す。
+// 文字は T()（i18n.js）、国名は cName。英語版 en/embed.html は tools/make_en.mjs が作る。
 // 端末のデータ・ランキングのサーバー・広告は使わない。img の alt に国名を入れない（答えが分かってしまうので）
 (() => {
   // 国旗は flags/<a>.svg。index.html の FLAG_V と同じ数にする（tests/unit/pages.test.mjs で比べる）
@@ -10,7 +11,7 @@
   function fail(e) {
     console.error('[embed] 読みこめませんでした', e);
     const more = $('e-more'), p = document.createElement('p');
-    p.className = 'e-err'; p.textContent = '読みこめませんでした';
+    p.className = 'e-err'; p.textContent = T('読みこめませんでした');
     root.replaceChildren(p, more);
   }
 
@@ -19,7 +20,7 @@
     const img = document.createElement('img');
     img.onerror = () => {
       const s = document.createElement('span');
-      s.className = 'e-noflag'; s.textContent = '国旗を表示できません';
+      s.className = 'e-noflag'; s.textContent = T('国旗を表示できません');
       img.replaceWith(s);
     };
     img.decoding = 'async';
@@ -34,16 +35,16 @@
     const q = D.oneOfDay(D.jstDay(), C);
     const msg = $('e-msg'), links = $('e-links'), again = $('e-again');
 
-    $('e-q').textContent = q.mode === 'f2n' ? 'この国旗はどこの国？' : 'この国の国旗は？';
+    $('e-q').textContent = q.mode === 'f2n' ? T('この国旗はどこの国？') : T('この国の国旗は？');
     const prompt = $('e-prompt');
-    if (q.mode === 'f2n') { const img = flagImg(q.a); img.alt = '今日の国旗'; prompt.replaceChildren(img); }
-    else prompt.textContent = by.get(q.a).n;
+    if (q.mode === 'f2n') { const img = flagImg(q.a); img.alt = T('今日の国旗'); prompt.replaceChildren(img); }
+    else prompt.textContent = cName(by.get(q.a));
 
     const buttons = q.opts.map((a, i) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'e-opt'; b.dataset.a = a;
-      if (q.mode === 'f2n') b.textContent = by.get(a).n;
-      else { const img = flagImg(a); img.alt = ''; b.setAttribute('aria-label', `選択肢${i + 1}`); b.append(img); }
+      if (q.mode === 'f2n') b.textContent = cName(by.get(a));
+      else { const img = flagImg(a); img.alt = ''; b.setAttribute('aria-label', T('選択肢{k}', { k: i + 1 })); b.append(img); }
       b.addEventListener('click', () => answer(b));
       return b;
     });
@@ -53,11 +54,11 @@
       if (b.dataset.a === q.a) {
         b.classList.add('ok');
         for (const x of buttons) x.disabled = true;
-        msg.textContent = 'せいかい！'; msg.className = 'ok';
+        msg.textContent = T('せいかい！'); msg.className = 'ok';
         again.hidden = false; again.focus();   // キーボードで答えた人のフォーカスを body に落とさない
       } else {
         b.classList.add('ng'); b.disabled = true;
-        msg.textContent = 'ちがうよ。もう一度えらんでね'; msg.className = 'ng';
+        msg.textContent = T('ちがうよ。もう一度えらんでね'); msg.className = 'ng';
         buttons.find(x => !x.disabled)?.focus();
       }
       links.hidden = false;
