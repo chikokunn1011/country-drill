@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { ctxWithI18n } from './i18n-load.mjs';
 
 const read = p => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const SRC = read('ranking.js');
@@ -20,8 +21,16 @@ function load(fetchImpl = () => Promise.reject(new Error('fetch がスタブさ�
     setTimeout: (...a) => setTimeout(...a),
     clearTimeout: (...a) => clearTimeout(...a),
   };
-  vm.runInNewContext(SRC, ctx);
-  return { R: ctx.RANKING, calls, warns };
+  const c = ctxWithI18n(ctx);
+  vm.runInContext(SRC, c, { filename: 'ranking.js' });
+  return { R: c.RANKING, calls, warns };
+}
+// 英語の画面の vm（lang="en"、i18n.js → en-core.js・en-rank.js → ranking.js の順に読む）
+function loadEn() {
+  const ctx = vm.createContext({ console, document: { documentElement: { lang: 'en' } } });
+  ctx.window = ctx;
+  for (const f of ['i18n.js', 'i18n/en-core.js', 'i18n/en-rank.js', 'ranking.js']) vm.runInContext(read(f), ctx, { filename: f });
+  return { R: ctx.RANKING };
 }
 // 決まった JSON を返す fetch スタブ
 const reply = (body, status = 200) => () =>
@@ -91,6 +100,24 @@ test('message', () => {
   assert.equal(R.message('network'), 'ランキングに接続できなかった');
   // 知らない理由でも undefined は出さない
   assert.equal(R.message('???'), 'ランキングに接続できなかった');
+});
+
+test('message_en', () => {
+  const { R } = loadEn();
+  assert.equal(R.message('ng_name'), 'That nickname can’t be used');
+  assert.equal(R.message('bad_name'), 'Nicknames must be 1–12 characters');
+  assert.equal(R.message('old_version'), 'A new version is out. Please reload the page');
+  assert.equal(R.message('network'), 'Couldn’t connect to the leaderboard');
+  // 知らない理由は network の文
+  assert.equal(R.message('???'), 'Couldn’t connect to the leaderboard');
+});
+
+test('format_time_en', () => {
+  const { R } = loadEn();
+  assert.equal(R.formatTime(12345), '12.34s');
+  assert.equal(R.formatTime(61234), '1:01.23');
+  assert.equal(R.formatTime(0), '0.00s');
+  assert.equal(R.formatTime(600000), '10:00.00');
 });
 
 test('message_profile', () => {

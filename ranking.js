@@ -5,11 +5,15 @@
   const SUPABASE_URL = 'https://vgdkklvhtvcamtxwjpke.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_eFVPaD9rNRdqi_1LtXxmGg_yJACIRqV';
   const TIMEOUT = 8000;
-  // supabase/schema.sql の ng_words() と同じ中身にしておくこと
+  // supabase/schema.sql の ng_words() と同じ中身にしておくこと（画面には出さない語なので訳さない）
+  // i18n-ignore:start
   const NG_WORDS = ['死ね', 'しね', 'シネ', '殺す', 'ころす', 'ちんこ', 'ちんぽ', 'まんこ', 'うんこ',
     'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人'];
-  // index.html の REGIONS → board に入れる英字キー
+  // i18n-ignore:end
+  // index.html の REGIONS → board に入れる英字キー（キーは保存値の日本語のまま。英語は i18n/en-core.js）
+  // i18n-data:start
   const REGION_KEY = { 'アジア': 'asia', 'ヨーロッパ': 'europe', 'アフリカ': 'africa', '北・中央アメリカ': 'namerica', '南アメリカ': 'samerica', 'オセアニア': 'oceania' };
+  // 返事の理由 → 文。message() で T() を通す（英語は i18n/en-rank.js）
   const MESSAGES = {
     bad_name: 'ニックネームは1〜12文字で入れてね',
     ng_name: 'そのニックネームは使えないみたい',
@@ -29,6 +33,7 @@
     old_version: '新しい版が出たよ。ページを読み直してね',
     network: 'ランキングに接続できなかった',
   };
+  // i18n-data:end
 
   // RPC を1回呼ぶ。8秒で打ち切り。通信失敗・HTTP エラー・壊れた応答はぜんぶ例外になる
   // HTTP エラーのときは状態と応答本文（PostgREST が原因を書いてくる）をエラーに入れる。状態の数字は e.status にも入れる（404 = 関数がまだ無い）
@@ -154,11 +159,11 @@
     async dailyRankOf({ day, correct, timeMs }) {
       return (await rpc('daily_rank_of', { p_day: day, p_correct: correct, p_time_ms: wholeMs(timeMs) })).rank;
     },
-    message: reason => MESSAGES[reason] ?? MESSAGES.network,
-    // 0.01秒単位で切り捨て。12345 → '12.34秒'、61234 → '1分01.23秒'
+    message: reason => T(MESSAGES[reason] ?? MESSAGES.network),
+    // 0.01秒単位で切り捨て。12345 → '12.34秒'（英語 '12.34s'）、61234 → '1分01.23秒'（英語 '1:01.23'）。index.html の代わりの RANKING と同じキー
     formatTime(ms) {
       const cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = pad2(cs % 100);
-      return m ? `${m}分${pad2(s)}.${c}秒` : `${s}.${c}秒`;
+      return m ? T('{m}分{s}.{c}秒', { m, s: pad2(s), c }) : T('{s}.{c}秒', { s, c });
     },
   };
 })();
