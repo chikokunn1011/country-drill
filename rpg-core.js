@@ -558,10 +558,10 @@
 
   // レシート。内訳と sum はそのゲーム全体（途中の受け取りの分もふくむ）、delta は今回 d.coins に足した額
   const receiptOf = (rc, delta) => {
-    const T = TUNING, row = r => ({ n: r.n, coins: rc.zeroed ? 0 : r.coins });
+    const U = TUNING, row = r => ({ n: r.n, coins: rc.zeroed ? 0 : r.coins });
     const rows = { first: row(rc.first), retry: row(rc.retry), ta: row(rc.ta), fe: row(rc.fe) };
     const sum = Object.values(rows).reduce((s, r) => s + r.coins, 0) + rc.clear + rc.daily
-      + rc.overcome.length * T.overcome + rc.bounty.length * T.bounty + (rc.bountyAll ? T.bountyAll : 0);
+      + rc.overcome.length * U.overcome + rc.bounty.length * U.bounty + (rc.bountyAll ? U.bountyAll : 0);
     return {
       sum, delta, ...rows, clear: rc.clear, daily: rc.daily, free: rc.free, zeroed: rc.zeroed,
       overcome: [...rc.overcome], bounty: [...rc.bounty], bountyAll: rc.bountyAll, joined: [...rc.joined], promoted: [...rc.promoted],
@@ -571,21 +571,21 @@
   // run.pend を d に書いて空にし、レシートを返す。res は drill:result の detail か null（途中の受け取り・バトル）。
   // 何回呼んでも同じ記録・同じコインが二重にならない
   const settleRun = (d, run, res, todayStr) => {
-    const T = TUNING, g = run.game, p = run.pend, rc = g.rc, quiz = run.kind !== 'battle';
+    const U = TUNING, g = run.game, p = run.pend, rc = g.rc, quiz = run.kind !== 'battle';
     const clear = quiz && !!res && res.outcome === 'clear';
     // タイムアタックのクリアが速すぎたら、その回のコインは全部0（一度0になったら、あとの受け取りでも0）
-    rc.zeroed = rc.zeroed || (clear && run.kind === 'ta' && !(+res.timeMs >= res.n * T.quiz.taMinMsPerQ));
+    rc.zeroed = rc.zeroed || (clear && run.kind === 'ta' && !(+res.timeMs >= res.n * U.quiz.taMinMsPerQ));
     const zeroed = rc.zeroed;
     // 学習の記録（0になった回も書く）
-    for (const a of Object.keys(p.fr)) d.fr[a] = Math.min(T.card.frMax, (d.fr[a] || 0) + 1);
+    for (const a of Object.keys(p.fr)) d.fr[a] = Math.min(U.card.frMax, (d.fr[a] || 0) + 1);
     for (const [a, bits] of Object.entries(p.mb)) d.mb[a] = (d.mb[a] | 0) | bits;
     for (const [a, on] of Object.entries(p.wk)) if (on) d.wk[a] = 1; else delete d.wk[a];
     for (const a of Object.keys(p.lc)) d.lc[a] = dayNum(todayStr);
     // なかよし度が frJoin になった国は★1で仲間に。★1 でなかよし度 frMax・4モード全部で正解したら★2に
     const joined = [], promoted = [];
-    for (const a of Object.keys(p.fr)) if (!d.cards[a] && d.fr[a] >= T.card.frJoin) { addCard(d, a, 1); joined.push(a); }
+    for (const a of Object.keys(p.fr)) if (!d.cards[a] && d.fr[a] >= U.card.frJoin) { addCard(d, a, 1); joined.push(a); }
     for (const a of uniq([...Object.keys(p.fr), ...Object.keys(p.mb)])) {
-      if (d.cards[a]?.[0] === 1 && d.fr[a] >= T.card.frMax && (d.mb[a] & QUIZ_BITS) === QUIZ_BITS) { addCard(d, a, 2); promoted.push(a); }
+      if (d.cards[a]?.[0] === 1 && d.fr[a] >= U.card.frMax && (d.mb[a] & QUIZ_BITS) === QUIZ_BITS) { addCard(d, a, 2); promoted.push(a); }
     }
     // 払った印とコイン（0になった回は書かない・払わない）
     let delta = 0, daily = 0, all = false;
@@ -600,7 +600,7 @@
       const s = settleDelta(d.paid, run.sid, zeroed ? 0 : g.coins + (clear ? rc.clear : 0));
       d.paid = s.paid;
       delta += s.delta;
-      if (clear && !zeroed && res.n >= T.clear.dailyMinN && !d.day.first) { daily = T.daily; d.day.first = true; }
+      if (clear && !zeroed && res.n >= U.clear.dailyMinN && !d.day.first) { daily = U.daily; d.day.first = true; }
     }
     if (!zeroed) {
       for (const a of Object.keys(p.ov)) if (!d.ov[a]) { d.ov[a] = 1; d.st.overcome = Math.min(BIG, d.st.overcome + 1); ov.push(a); }
@@ -610,7 +610,7 @@
       all = bo.length > 0 && B.a.length === BOUNTY_N && B.a.every(a => B.done.includes(a));
       if (all) d.st.bountyDays = Math.min(BIG, d.st.bountyDays + 1);
     }
-    delta += daily + ov.length * T.overcome + bo.length * T.bounty + (all ? T.bountyAll : 0);
+    delta += daily + ov.length * U.overcome + bo.length * U.bounty + (all ? U.bountyAll : 0);
     d.coins = Math.min(BIG, d.coins + delta);
     d.earned = Math.min(BIG, d.earned + delta);
     run.pend = pend0();
@@ -658,13 +658,13 @@
   // region は 'all' か地域名、count は 1 か 10 だけ（それ以外と空の地域は []）。d.pity d.pulls を書きかえ、addCard を呼ぶ。
   // コインは引かない（呼ぶ側が引く）。Cs は国の一覧（index.html の C）
   const pull = (d, region, count, rng, Cs) => {
-    const T = TUNING.gacha, pool = list(Cs).filter(c => region === 'all' || c.r === region), out = [];
+    const U = TUNING.gacha, pool = list(Cs).filter(c => region === 'all' || c.r === region), out = [];
     if (!pool.length || (count !== 1 && count !== 10)) return out;
     for (let i = 0; i < count; i++) {
       const r = rng();
-      const star = d.pity >= T.pity - 1 ? 3
-        : count === 10 && i === 9 ? (r < T.r3 ? 3 : 2)
-        : r < T.r3 ? 3 : r < T.r3 + T.r2 ? 2 : 1;
+      const star = d.pity >= U.pity - 1 ? 3
+        : count === 10 && i === 9 ? (r < U.r3 ? 3 : 2)
+        : r < U.r3 ? 3 : r < U.r3 + U.r2 ? 2 : 1;
       d.pity = star === 3 ? 0 : d.pity + 1;
       d.pulls = Math.min(BIG, d.pulls + 1);
       const c = pool[Math.floor(rng() * pool.length)];
@@ -674,16 +674,16 @@
   };
   // ガチャの値段。地域をしぼると regionMul 倍（全世界はそのまま）。count は 1 か 10
   const gachaCost = (region, count) => {
-    const T = TUNING.gacha, base = count === 10 ? T.ten : T.one;
-    return region === 'all' ? base : Math.round(base * T.regionMul);
+    const U = TUNING.gacha, base = count === 10 ? U.ten : U.one;
+    return region === 'all' ? base : Math.round(base * U.regionMul);
   };
   // 画面に出す確率（%の数）。eff3 は天井込みの★3の率 = 100 / ★3 1枚あたりの平均回数（Σ_{k<天井} (1−r3)^k）
   const pct = x => Math.round(x * 1e4) / 100;
   const gachaRates = () => {
-    const T = TUNING.gacha;
+    const U = TUNING.gacha;
     let per = 0;
-    for (let k = 0; k < T.pity; k++) per += (1 - T.r3) ** k;
-    return { r3: pct(T.r3), r2: pct(T.r2), r1: pct(1 - T.r3 - T.r2), tenR3: pct(T.r3), tenR2: pct(1 - T.r3), pity: T.pity, eff3: 100 / per };
+    for (let k = 0; k < U.pity; k++) per += (1 - U.r3) ** k;
+    return { r3: pct(U.r3), r2: pct(U.r2), r1: pct(1 - U.r3 - U.r2), tenR3: pct(U.r3), tenR2: pct(1 - U.r3), pity: U.pity, eff3: 100 / per };
   };
 
   // ---- バトルの出題（設計書 §7.3・§7.4） ----
@@ -790,7 +790,7 @@
   const towerOpen = d => ((d && d.floors || {}).world || 0) >= 5;
   const towerRecLv = f => 1 + Math.floor((f - 1) * TUNING.tower.recStep);
   const towerIsBoss = f => f % TUNING.tower.bossEvery === 0;
-  const towerBossFlagsN = f => { const T = TUNING.tower; return Math.min(T.bossFlagsMax, T.bossFlags0 + Math.floor(f / T.bossEvery)); };
+  const towerBossFlagsN = f => { const U = TUNING.tower; return Math.min(U.bossFlagsMax, U.bossFlags0 + Math.floor(f / U.bossEvery)); };
   const towerMonster = f => towerIsBoss(f) ? TOWER_MONSTERS.boss : TOWER_MONSTERS.normal[(f - 1) % TOWER_MONSTERS.normal.length];
   const towerEnemy = f => { const boss = towerIsBoss(f); return { s: f, ...enemyAt(towerRecLv(f), boss, boss ? towerBossFlagsN(f) : undefined) }; };
   // clearedFloor を勝ったあとの HP。中ボスの階なら全回復、ほかは最大 HP の healPct（切り上げ）を足して最大まで
@@ -815,7 +815,7 @@
   };
   const towerFlags = (d, m, f, rng) => flagsOf(d, m, allCodes(), towerBossFlagsN(f), rng);
   // f 階を勝ったときのコイン。best は勝つ前の最高記録（勝った階）。はじめて勝った階だけボーナス
-  const towerReward = (f, best) => { const T = TUNING.tower; return { coins: T.coinBase + f, bonus: f > best ? T.bestBonus : 0 }; };
+  const towerReward = (f, best) => { const U = TUNING.tower; return { coins: U.coinBase + f, bonus: f > best ? U.bestBonus : 0 }; };
   // 塔の強さ: 全世界ダンジョンと同じ（全員に地域ボーナス）、がんばりゲージは使わない
   const towerStats = (d, t = d.tsel) => ({ ...battleStats(d, 'world', 0, t), gauge: 0 });
 
