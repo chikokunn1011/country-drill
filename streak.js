@@ -103,7 +103,8 @@
     el = document.createElement('div');
     el.id = 'streak'; el.className = 'home-streak';   // .streak はクイズの連続正解（#pstreak）が使っている
     el.setAttribute('role', 'group'); el.setAttribute('aria-label', T('れんぞく日数'));
-    // .sk-pop は7マスと、英語の画面でだけ出す「日付は日本時間の0時で変わる（あなたの時間で…）」（.sk-tz。小窓を開いたときだけ）
+    // .sk-pop は7マス（と、小窓のときは .sk-tz）。.sk-tz は英語の画面でだけ出す「日付は日本時間の0時で変わる（あなたの時間で…）」:
+    // 7マスが行に見えているときは行の下の1行、小窓のときは小窓の7マスの下（開いたときだけ）。置き場所は fit() が決める
     el.innerHTML = '<p class="sk-text"></p><div class="sk-sub">' +
       `<button type="button" class="sk-open" aria-expanded="false" aria-controls="sk-week">${T('今週')}</button>` +
       `<span class="sk-pop"><span id="sk-week" class="sk-week" role="list" aria-label="${T('今週（月〜日）')}"></span><span class="sk-tz" hidden></span></span>` +
@@ -113,21 +114,29 @@
   function setOpen(on) {
     el.classList.toggle('open', on);
     el.querySelector('.sk-open').setAttribute('aria-expanded', String(on));
-    const tz = el.querySelector('.sk-tz');
-    tz.hidden = !(on && tz.textContent);
+    showTz();
+  }
+  function showTz() {
+    const tz = el.querySelector('.sk-tz'), narrow = el.classList.contains('narrow');
+    tz.hidden = !tz.textContent || (narrow && !el.classList.contains('open'));
+    el.classList.toggle('tzline', !narrow && !tz.hidden);
   }
   // 幅は CSS で決めうちせず、実際にはみ出すかで決める: 横1行に収まれば .oneline、2行（本文／7マスと今日あそぶと…）なら何も付けず、
   // それでも収まらなければ .narrow（7マスを隠して［今週］で小窓を開く）。
-  // 英語の画面で日付の変わる時刻を添えるとき（.sk-tz に文がある）は、幅にかかわらず .narrow（添え書きは小窓の7マスの下に出す）
+  // .sk-tz（添え書き）は測るあいだ隠し、決まったあとで置き場所（行の下／小窓の中）に入れる
   function fit() {
     if (!el) return;
     const over = () => el.scrollWidth > el.clientWidth;
-    if (el.querySelector('.sk-tz').textContent) { el.classList.remove('oneline'); el.classList.add('narrow'); return; }
+    const tz = el.querySelector('.sk-tz');
+    tz.hidden = true; el.classList.remove('tzline');
     el.classList.remove('narrow');
     el.classList.add('oneline');
-    if (!over()) return;
-    el.classList.remove('oneline');
-    if (over()) el.classList.add('narrow');
+    if (over()) {
+      el.classList.remove('oneline');
+      if (over()) el.classList.add('narrow');
+    }
+    if (el.classList.contains('narrow')) el.querySelector('.sk-pop').append(tz); else el.append(tz);
+    showTz();
   }
   function render() {
     const v = K.view(load(), today());

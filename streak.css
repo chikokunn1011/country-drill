@@ -6,9 +6,12 @@
 .sk-sub { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; white-space: nowrap; }
 .sk-hint:empty { display: none; }
 .sk-week { display: flex; gap: 3px; }
-/* 7マスと、英語の画面でだけ出す日付の変わる時刻（.sk-tz。小窓を開いたときだけ hidden を外す）。小窓でないときは .sk-pop は箱を作らない */
+/* .sk-pop は7マス（小窓のときは、英語の画面でだけ出す日付の変わる時刻 .sk-tz も。streak.js の fit() が置き場所を決める）。小窓でないときは箱を作らない */
 .sk-pop { display: contents; }
-.sk-tz { white-space: normal; text-align: center; font-size: .78rem; }
+.sk-tz { white-space: normal; text-align: center; font-size: .74rem; color: var(--muted); }
+/* 7マスが行に見えているとき（英語・日本時間でない人）: 添え書きは行の下の1行。横1行（.oneline）でも折り返して下へ */
+.home-streak.tzline.oneline { flex-wrap: wrap; }
+.home-streak.tzline.oneline > .sk-tz { flex-basis: 100%; }
 .sk-day { display: block; width: 12px; height: 12px; border-radius: 3px; border: 1.5px solid var(--line); background: var(--surface); }
 .sk-day[data-mark="play"] { background: var(--ok); border-color: var(--ok); }
 .sk-day[data-mark="rest"] { border-color: var(--accent); }

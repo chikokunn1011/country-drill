@@ -3,6 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { settleLayout, measureFit } from './layout.mjs';
 import { startServer, openApp, jaLeft, warned, mapLoaded, pickSetup, clearTimeAttack, clearByAnswering, answerCorrect, answerWrong, QUIET_BADGES, PHONE, PC } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -568,9 +569,10 @@ const skOpen = async page => {
   await page.locator('#streak .sk-week').waitFor();
 };
 
-// 練習5問 → ホーム: 1-day streak・1 rest pass。小窓に英語の曜日と、ニューヨークの時間で何時に日付が変わるか
-// （添え書きがあるときは、幅にかかわらず7マスは［This week］の小窓）
-t('en_streak', async page => {
+// 練習5問 → ホーム: 1-day streak・1 rest pass。7マスは行に見えていて（英語の曜日）、その下の1行に
+// ニューヨークの時間で何時に日付が変わるか（押さなくても見える）
+const TZ_NOTE = 'Days change at midnight Japan time (11:00 AM your time).';
+t('en_streak_ny', async page => {
   assert.equal(await page.getAttribute('#streak', 'aria-label'), 'Day streak');
   assert.equal(await skText(page), '🔥 0-day streak · 1 rest pass');
   assert.equal(await skHint(page), 'Play today to start a streak');
@@ -578,31 +580,54 @@ t('en_streak', async page => {
   assert.equal((await stored(page, 'streak')).last, '2026-10-28');   // 日本時間の日付（ニューヨークではまだ 10/27）
   assert.equal(await skText(page), '🔥 1-day streak · 1 rest pass');
   assert.equal(await skHint(page), '');
-  assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), true);
-  assert.equal(await text(page, '#streak .sk-open'), 'This week');
-  assert.equal(await page.isVisible('#streak .sk-tz'), false);   // 閉じているときは出さない
-  await skOpen(page);
+  assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), false);
+  assert.equal(await page.isVisible('#streak .sk-open'), false);
+  assert.equal(await page.isVisible('#streak .sk-week'), true);
   assert.equal(await page.getAttribute('#streak .sk-week', 'aria-label'), 'This week (Mon–Sun)');
   assert.deepEqual(await skLabels(page), ['Mon, Oct 26: Missed', 'Tue, Oct 27: Missed', 'Wed, Oct 28: Played', 'Thu, Oct 29', 'Fri, Oct 30', 'Sat, Oct 31', 'Sun, Nov 1']);
-  assert.equal(await text(page, '#streak .sk-tz'), 'Days change at midnight Japan time (11:00 AM your time).');
-  const [w, vw] = await page.evaluate(() => [document.querySelector('#streak .sk-pop').getBoundingClientRect().toJSON(), innerWidth]);
-  assert.ok(w.left >= 0 && w.right <= vw, `小窓が画面の外 ${JSON.stringify(w)}`);
+  assert.equal(await page.isVisible('#streak .sk-tz'), true);
+  assert.equal(await text(page, '#streak .sk-tz'), TZ_NOTE);
+  // 行（7マス）の下の1行
+  const [sub, tz] = await page.evaluate(() => ['.sk-sub', '.sk-tz'].map(s => document.querySelector('#streak ' + s).getBoundingClientRect().toJSON()));
+  assert.ok(tz.top >= sub.bottom - 1, `添え書きが行の下に無い ${JSON.stringify({ sub, tz })}`);
   assert.deepEqual(await jaLeft(page), []);
   assert.equal(await noHScroll(page), true);
-  await page.click('#streak .sk-open');
-  assert.equal(await page.isVisible('#streak .sk-tz'), false);
 }, { timezoneId: 'America/New_York', init: SK_NOON });
 
-// PC・狭いスマホでも、小窓（7マスと添え書き）は画面の中で、横にスクロールしない
-for (const [vname, viewport] of [['pc', PC], ['320', { width: 320, height: 640 }]]) t(`en_streak_popup_${vname}`, async page => {
+// ニューヨークの時間で、スマホ・PC のどの幅でも、添え書きの行ははみ出さず、ホームを横にも（PC では縦にも）スクロールさせない
+t('en_streak_note_fits', async page => {
+  for (const [width, height] of [[320, 640], [390, 844], [1024, 768], [1280, 800], [1366, 657], [1280, 577]]) {
+    await page.setViewportSize({ width, height });
+    await settleLayout(page);
+    const f = await page.$eval('#streak', e => ({ narrow: e.classList.contains('narrow'), over: e.scrollWidth > e.clientWidth,
+      tz: e.querySelector('.sk-tz').checkVisibility(), right: e.querySelector('.sk-tz').getBoundingClientRect().right }));
+    const at = `${width}x${height}: ${JSON.stringify(f)}`;
+    assert.equal(f.narrow, false, at);
+    assert.equal(f.over, false, at);
+    assert.equal(f.tz, true, at);
+    assert.ok(f.right <= width, at);
+    const fit = await measureFit(page);
+    assert.equal(fit.hscroll, false, at);
+    if (width >= 1024) assert.ok(fit.docH <= fit.ih, `${at}: 縦にスクロールする ${fit.docH}/${fit.ih}`);
+  }
+}, { timezoneId: 'America/New_York', init: SK_NOON, storage: { badges: QUIET_BADGES, streak: SK() } });
+
+// 収まらない（大きな数・320）ときは小窓: 添え書きは閉じているあいだは出さず、開くと7マスの下
+t('en_streak_popup_320', async page => {
   assert.equal(await page.$eval('#streak', e => e.classList.contains('narrow')), true);
+  assert.equal(await page.isVisible('#streak .sk-tz'), false);
+  assert.equal(await text(page, '#streak .sk-open'), 'This week');
   await skOpen(page);
-  assert.equal(await text(page, '#streak .sk-tz'), 'Days change at midnight Japan time (11:00 AM your time).');
+  assert.equal(await page.isVisible('#streak .sk-tz'), true);
+  assert.equal(await text(page, '#streak .sk-tz'), TZ_NOTE);
+  assert.equal(await page.$eval('#streak .sk-tz', e => e.parentElement.classList.contains('sk-pop')), true);
   const [w, vw] = await page.evaluate(() => [document.querySelector('#streak .sk-pop').getBoundingClientRect().toJSON(), innerWidth]);
   assert.ok(w.left >= 0 && w.right <= vw, `小窓が画面の外 ${JSON.stringify(w)}`);
   assert.equal(await noHScroll(page), true);
   assert.deepEqual(await jaLeft(page), []);
-}, { timezoneId: 'America/New_York', init: SK_NOON, viewport, storage: { badges: QUIET_BADGES, streak: SK({ cur: 9999, best: 99999 }) } });
+  await page.click('#streak .sk-open');
+  assert.equal(await page.isVisible('#streak .sk-tz'), false);
+}, { timezoneId: 'America/New_York', init: SK_NOON, viewport: { width: 320, height: 640 }, storage: { badges: QUIET_BADGES, streak: SK({ cur: 9999, best: 99999 }) } });
 
 // 東京では添えない（7マスは日本語版と同じく、収まればはじめから見える）
 t('en_streak_tokyo', async page => {
