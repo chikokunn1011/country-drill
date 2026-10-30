@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy | Flag Master</title>
+<meta name="description" content="What information Flag Master collects, what is saved on your device, what is sent to the leaderboard, ads and analytics, and how to contact us.">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/en/privacy.html">
+<link rel="alternate" hreflang="ja" href="https://chikokunn1011.github.io/country-drill/privacy.html">
+<link rel="alternate" hreflang="en" href="https://chikokunn1011.github.io/country-drill/en/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://chikokunn1011.github.io/country-drill/privacy.html">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="../pages.css?v=2">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← Play Flag Master</a><span class="langsw"><a href="../privacy.html" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>
+  <h1>Privacy policy</h1>
+  <p>What information Flag Master (this site) handles.</p>
+
+  <h2 id="collect">What we collect and what we don’t</h2>
+  <p>This site has no member accounts. Everything works without signing up.</p>
+  <p>To play, you never give us your real name, email address, home address, or phone number.</p>
+  <p>What you send through the contact form (and your email address, if you include it) is used only to reply to you. The form is a Google Form.</p>
+  <p>Only when you put a record on the leaderboard do we send the name you chose and your record (see “<a href="#ranking">What is sent to the leaderboard</a>”).</p>
+
+  <h2 id="device">What is saved only on your device</h2>
+  <p>What you do while playing is normally saved only on your device (the browser on your phone or computer). It leaves your device only when you use a transfer yourself (see “<a href="#transfer">Transfer</a>”).</p>
+  <ul>
+    <li>Settings (sound, color theme, question type, and so on)</li>
+    <li>Results (countries you missed, Daily Puzzle results, and so on)</li>
+    <li>Adventure progress</li>
+    <li>Badges</li>
+    <li>Error log (notes on when something didn’t work; this is not included in a transfer and is never sent off your device)</li>
+    <li>Site files (screens, flags, and maps). They are saved on your device so the site opens quickly and you can play even offline. They contain no personal information.</li>
+  </ul>
+  <p>If you clear the browser’s site data, these are cleared too.</p>
+
+  <h2 id="ranking">What is sent to the leaderboard</h2>
+  <p>Only when you decide to put a record on the leaderboard do we send the following. It goes to Supabase, a database service.</p>
+  <h3>Profile</h3>
+  <ul>
+    <li>Your name, whether your profile is public, your current title, your decoration, and the number of badges you have earned are sent.</li>
+    <li>To link your profile to your device, your device creates a “passphrase.” The site never keeps the passphrase itself. It stores only a form of it that cannot be turned back (a hash).</li>
+  </ul>
+  <h3>Records</h3>
+  <p>Three kinds of records can go on the leaderboard: Time Attack, Daily Puzzle, and Adventure. Your name and the numbers used for ranking, such as your time, number of right answers, and level, are sent.</p>
+  <h3>If your profile is private</h3>
+  <p>If you make your profile private, your profile card shows only your name, your decoration, and a short note saying the profile is private. The card does not show your title, number of badges, or a summary of your records.</p>
+  <p>Even if your profile is private, the leaderboard tables show your name and records (such as times).</p>
+  <h3 id="transfer">Transfer</h3>
+  <p>To move to another device, the data on your current device (settings, results, Adventure, badges, and so on, but not the error log) is stored with us, and you get a transfer code. The code stops working after 24 hours. The stored data is deleted in a later cleanup.</p>
+  <h3>About Supabase</h3>
+  <p>When your browser communicates with Supabase, the IP address of your connection may be kept in Supabase’s logs.</p>
+
+  <h2 id="names">Rules for names</h2>
+  <p>Do not use your real name or your school’s name as a leaderboard name. Names that would upset other people are not allowed either.</p>
+  <p>If a name breaks these rules or a record looks wrong, the operator may delete or change the name or record.</p>
+
+  <h2 id="delete">Asking for deletion</h2>
+  <p>To have a leaderboard name or record deleted, please send a request through the <a href="about.html#contact">contact form</a>.</p>
+  <p>Deleted records may remain for a while in a backup kept in case something is deleted by mistake.</p>
+
+  <h2 id="external">Outside services we use</h2>
+  <p>This site uses the following services to show its pages. When you open a page, your browser communicates with these services.</p>
+  <ul>
+    <li>GitHub Pages (where this site is hosted)</li>
+    <li>Google Fonts (fonts)</li>
+    <li>Google Forms (contact, only when you send something)</li>
+  </ul>
+  <p>The map code (d3 and topojson-client) is served from this site itself. So drawing the map does not involve any outside service.</p>
+
+  <h2 id="ads">Ads</h2>
+  <p>This site may use ad services such as Google’s.</p>
+  <p>Ad services may use cookies to show ads that match your interests. Cookies do not contain information that identifies you, such as your name or email address.</p>
+  <p>To stop personalized ads, change your <a href="https://adssettings.google.com">Google ad settings</a>. How Google uses cookies is explained in <a href="https://policies.google.com/technologies/ads">Google’s Privacy &amp; Terms (Advertising)</a>.</p>
+
+  <h2 id="analytics">Analytics</h2>
+  <p>This site does not use any analytics service (a tool that tracks things like how many people visit).</p>
+
+  <h2 id="changes">Changes to this page</h2>
+  <p>The contents of this page may change as needed. If they change, we will announce it on this page.</p>
+  <p>Last updated: October 29, 2026</p>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="Site links"><a href="howto.html">How to play</a><a href="about.html">About</a><a href="about.html#contact">Contact</a><a href="privacy.html">Privacy policy</a><a href="country/">All countries</a><a href="themes/">Flag collections</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>

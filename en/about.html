@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About | Flag Master</title>
+<meta name="description" content="Who runs Flag Master, what the site is for, how country names are written, and how to get in touch.">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/en/about.html">
+<link rel="alternate" hreflang="ja" href="https://chikokunn1011.github.io/country-drill/about.html">
+<link rel="alternate" hreflang="en" href="https://chikokunn1011.github.io/country-drill/en/about.html">
+<link rel="alternate" hreflang="x-default" href="https://chikokunn1011.github.io/country-drill/about.html">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="../pages.css?v=2">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← Play Flag Master</a><span class="langsw"><a href="../about.html" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>
+  <h1>About</h1>
+  <p>Who makes Flag Master (this site), and the rules the site follows.</p>
+
+  <h2 id="purpose">What this site is for</h2>
+  <p>Flag Master is a site for learning the flags, names, and locations of the world’s countries (the 193 UN member states plus Vatican City and Kosovo, 195 in all) in a fun way with a 4-choice quiz. Everything works without signing up.</p>
+
+  <h2 id="operator">Who runs it</h2>
+  <p>Flag Master is run by Chiko, a university student, as a personal project, and built with <a href="https://claude.ai/">Claude</a>, an AI by Anthropic. It is not the site of a company or organization.</p>
+
+  <h2 id="rules">What the quiz asks</h2>
+  <p>Questions only use flags, country names, and locations. Capitals are shown in the explanation after each answer and in the Gallery (no question asks for a capital).</p>
+
+  <h2 id="country-names">How country names are written</h2>
+  <p>In the English version, country names follow the titles of the articles on English Wikipedia. Notes in parentheses that tell articles apart are left off (for example, “Georgia (country)” is shown as Georgia). Ireland is shown as Ireland, not by its article title, “Republic of Ireland.”</p>
+
+  <h2 id="borders">About the borders on the map</h2>
+  <p>The borders on the map are drawn from Natural Earth map data. The border lines do not represent the position of the Japanese government.</p>
+
+  <h2 id="credits">Materials and licenses</h2>
+  <ul>
+    <li>Flags: <a href="https://github.com/lipis/flag-icons">flag-icons</a> (MIT)</li>
+    <li>Maps: <a href="https://github.com/topojson/world-atlas">world-atlas</a> (Natural Earth data, ISC)</li>
+    <li>Country data: <a href="https://github.com/mledoze/countries">world-countries</a> (ODbL)</li>
+    <li>Map drawing code: <a href="https://d3js.org/">d3</a> (ISC) and <a href="https://github.com/topojson/topojson-client">topojson-client</a> (ISC)</li>
+    <li>Fonts: Zen Maru Gothic, Noto Sans JP, and IBM Plex Mono (Google Fonts, SIL Open Font License)</li>
+    <li>Paper, contour line, and sea patterns (textures): made by the operator</li>
+  </ul>
+
+  <h2 id="contact">Contact</h2>
+  <p>If you find a mistake, want a leaderboard name or record deleted, or have any other concern, please send it through the contact form. Include your email address only if you’d like a reply.</p>
+  <p>The form is in Japanese, but you’re welcome to write in English.</p>
+  <p><a id="contact-form" href="https://forms.gle/66hqFeGYF47CggGS7" target="_blank" rel="noopener">Open the contact form</a></p>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="Site links"><a href="howto.html">How to play</a><a href="about.html">About</a><a href="about.html#contact">Contact</a><a href="privacy.html">Privacy policy</a><a href="country/">All countries</a><a href="themes/">Flag collections</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>
