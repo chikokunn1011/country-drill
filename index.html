@@ -126,6 +126,9 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .switch { display: inline-flex; align-items: center; gap: 8px; font-size: .95rem; cursor: pointer; }
 .switch input { width: 18px; height: 18px; accent-color: var(--accent); }
 .field > label.switch { font-size: .95rem; letter-spacing: 0; color: var(--ink); font-weight: 500; }
+/* テーマのクイズ（#theme=）: 地域選びの代わりのテーマ名と［テーマをやめる］ */
+.theme-name { margin: 0; font-weight: 700; }
+#theme-leave { align-self: flex-start; min-height: 44px; padding-left: 0; }
 .vol-row { gap: 10px; margin-top: 8px; }
 .vol-row input[type=range] { flex: 1; max-width: 240px; accent-color: var(--accent); }
 .vol-row input:disabled { opacity: .4; }
@@ -519,7 +522,12 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="col">
       <div class="rmap" id="rmap"></div>
       <div class="opts">
-      <div class="field">
+      <div class="field" id="theme-field" hidden>
+        <span class="lbl">テーマ</span>
+        <p class="theme-name" id="theme-name"></p>
+        <button class="linkbtn" id="theme-leave">テーマをやめる</button>
+      </div>
+      <div class="field" id="regions-field">
         <span class="lbl">出題する地域</span>
         <div class="rgroups" id="regions"></div>
         <p class="hint" id="regions-hint"></p>
@@ -604,6 +612,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 <dialog id="detail"><div class="inner" id="detail-inner"></div></dialog>
 
 <script src="countries.js"></script>
+<script src="themes.js?v=1"></script>
 <script src="ranking.js?v=5"></script>
 <script src="daily-core.js?v=2"></script>
 <script src="trivia.js"></script>
@@ -683,8 +692,15 @@ const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { c
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 const fmt = n => n.toLocaleString('ja-JP');
 const $ = id => document.getElementById(id);
-const regionLabel = r => r === 'all' ? '全世界' : r;
-const poolFor = r => r === 'all' ? C : SUBREGIONS[r] ? C.filter(c => SUBREGIONS[r].set.has(c.a)) : C.filter(c => c.r === r);
+// まとめページの［このテーマでクイズ］（#theme=<id>）で選んだテーマ。null か { id, n, a: Set }。保存しない（再読み込みで消える）
+// テーマ中の地域（G.region・イベントの region）は 'theme:<id>'。地図には 'all' を渡す（mapRegion）
+let THEME = null;
+const THEME_PRE = 'theme:';
+const themeKey = () => THEME ? THEME_PRE + THEME.id : S.region;
+const mapRegion = r => String(r).startsWith(THEME_PRE) ? 'all' : r;
+const regionLabel = r => r === 'all' ? '全世界' : String(r).startsWith(THEME_PRE) ? `テーマ: ${window.THEMES_DATA?.[r.slice(THEME_PRE.length)]?.n ?? ''}` : r;
+const poolFor = r => r === 'all' ? C : THEME && r === THEME_PRE + THEME.id ? C.filter(c => THEME.a.has(c.a))
+  : SUBREGIONS[r] ? C.filter(c => SUBREGIONS[r].set.has(c.a)) : C.filter(c => c.r === r);
 const modeOf = k => MODES.find(m => m.k === k);
 
 /* ---------- 地図 ---------- */
@@ -1192,17 +1208,29 @@ function renderRegionMap(region) {
   } else frame.setAttribute('d', '');
   rmap.s.setAttribute('aria-label', `世界地図。${regionLabel(region)}（${pool.size}か国）に色がついている`);
 }
+// いまのあそび方。テーマ中はタイムアタックを選べないので練習として扱う（P.kind は書きかえない。テーマをやめたら元に戻る）
+const kindNow = () => THEME && P.kind === 'ta' ? 'practice' : P.kind;
 function renderSetup() {
   // タイムアタックで遊べないモード（白地図タップ）でタイムアタックを選んでいたら（引き継ぎ・古い端末の保存も）練習にする
-  const noTa = !!modeOf(P.mode)?.noTa;
-  if (noTa && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
+  const modeNoTa = !!modeOf(P.mode)?.noTa, noTa = modeNoTa || !!THEME;
+  if (modeNoTa && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
+  const kind = kindNow(), region = themeKey();
   $('modes').innerHTML = MODES.map(m => `<button class="modecard" aria-pressed="${m.k === P.mode}" data-k="${m.k}"><b>${m.label}</b><span>${m.desc}</span></button>`).join('');
   // タイムアタックは国名表示ありだと不公平なので隠す（P.name はそのまま残して、練習/挑戦に戻したら復活）
-  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || P.kind === 'ta';
+  $('nameopt-field').hidden = !modeOf(P.mode).nameOpt || kind === 'ta';
   $('nameopt').checked = P.name;
   $('kinds').innerHTML = KINDS.map(k => noTa && k.k === 'ta'
-    ? `<button class="modecard" aria-pressed="false" data-k="ta" disabled aria-disabled="true"><b>${k.label}</b><span>${esc(modeOf(P.mode).label)}では遊べない</span></button>`
-    : `<button class="modecard" aria-pressed="${k.k === P.kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
+    ? `<button class="modecard" aria-pressed="false" data-k="ta" disabled aria-disabled="true"><b>${k.label}</b><span>${THEME ? 'テーマ' : esc(modeOf(P.mode).label)}では遊べない</span></button>`
+    : `<button class="modecard" aria-pressed="${k.k === kind}" data-k="${k.k}"><b>${k.label}</b><span>${k.desc}</span></button>`).join('');
+  // テーマ中は地域の地図とボタンの代わりにテーマ名と［テーマをやめる］を出す（S.region はさわらない）
+  $('theme-field').hidden = !THEME;
+  $('regions-field').hidden = $('rmap').hidden = !!THEME;
+  if (THEME) {
+    $('theme-name').textContent = `テーマ: ${THEME.n}（${THEME.a.size}か国）`;
+    P.count = fitCount(P.want ?? P.count, region);
+    $('counts').innerHTML = countChips(region, P.count);
+    return;
+  }
   // タイムアタック中は細かい地域を選べない（ランキングの区分は6地域）。選んでいたら親の地域にする
   // 練習・挑戦に戻ったら、親の地域のままなら前の細かい地域に戻す
   if (P.kind === 'ta' && SUBREGIONS[S.region]) { S.sub = S.region; S.region = parentRegion(S.region); store.set('settings', S); }
@@ -1228,6 +1256,9 @@ $('rmap').onclick = e => {
 $('counts').onclick = e => { const b = e.target.closest('.chip'); if (!b || b.disabled) return; P.count = P.want = b.dataset.c === 'all' ? 'all' : +b.dataset.c; store.set('setup', P); renderSetup(); };
 $('nameopt').onchange = e => { P.name = e.target.checked; store.set('setup', P); };
 $('start').onclick = () => startGame();
+// ［テーマをやめる］: テーマを消して #theme= も URL から外し、いつもの地域選びに戻る
+function leaveTheme() { THEME = null; if (location.hash.startsWith('#theme=')) history.replaceState(null, '', location.pathname + location.search); }
+$('theme-leave').onclick = () => { leaveTheme(); renderSetup(); };
 // 今日の難問の途中でページを閉じた・再読み込みした: その時点のタイムで終わりにする（むずかしい問題で考えた時間も入れる）
 addEventListener('pagehide', () => { if (G?.kind === 'daily' && !G.ended) endGame('quit'); });
 $('quit').onclick = () => {
@@ -1271,15 +1302,15 @@ async function prepThenStart(codes) {
 async function startGame() {
   if (G && !G.ended) endGame('quit');
   $('quit').textContent = QUIT_LABEL;
-  const pool = poolFor(S.region);
+  const region = themeKey(), pool = poolFor(region);
   const n = P.count === 'all' ? pool.length : Math.min(P.count, pool.length);
   const set = shuffle(pool).slice(0, n);
   // t0/timeMs/failed/shownAt はタイムアタック用（1問目を出した時刻・クリアタイム・失格したか・いまの問題を出した時刻）
-  G = { mode: modeOf(P.mode), kind: modeOf(P.mode)?.noTa && P.kind === 'ta' ? 'practice' : P.kind, region: S.region, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0 };
+  G = { mode: modeOf(P.mode), kind: modeOf(P.mode)?.noTa && P.kind === 'ta' ? 'practice' : kindNow(), region, optPool: THEME ? pool : null, set, queue: set.slice(), done: 0, firstTry: 0, wrongs: 0, attempts: 1, streak: 0, best: 0, pts: 0, seen: new Set(), missed: new Set(), cur: null, answered: false, t0: 0, timeMs: null, failed: false, shownAt: 0 };
   // sid の乱数は Math.random から取らない（テストで Math.random を固定したとき、出題の並びが変わらないように）
   G.sid = Date.now().toString(36) + crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 4);
   G.hint = !!(G.mode.nameOpt && P.name && G.kind !== 'ta');
-  emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: S.region, n: set.length, hint: G.hint });
+  emit('drill:start', { sid: G.sid, mode: G.mode.k, kind: G.kind, region: G.region, n: set.length, hint: G.hint });
   $('ptime').textContent = G.kind === 'ta' ? RANKING.formatTime(0) : '';
   show('quiz');
   // タイムアタック: 国名→国旗・場所→国旗は選択肢が世界中から出るので195か国、ほかは出る国だけ
@@ -1314,9 +1345,10 @@ function startDojo({ seq, group, mode, sid }) {
   show('quiz');
   nextQuestion();
 }
-// region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）
-function makeQuestion(c, region) {
-  const inSub = SUBREGIONS[region] ? poolFor(region) : [];
+// region を渡すと、まずその地域の国から選択肢をとる（細かい地域の地図からはみ出す国を選択肢にしない）。
+// pool を渡すと、その国の一覧から先にとる（テーマ中はテーマの国）
+function makeQuestion(c, region, pool = SUBREGIONS[region] ? poolFor(region) : []) {
+  const inSub = pool;
   const sub = shuffle(inSub.filter(x => x !== c));
   const near = shuffle(C.filter(x => x !== c && x.r === c.r && !inSub.includes(x)));
   const far = shuffle(C.filter(x => x !== c && x.r !== c.r));
@@ -1336,7 +1368,7 @@ function nextQuestion() {
     G.mode = modeOf(q.mode); G.cur = { c, opts: q.opts.map(a => byA.get(a)) };
   } else if (G.kind === 'dojo') G.cur = { c, opts: shuffle([c, ...shuffle(G.group.filter(a => a !== c.a)).slice(0, 3).map(a => byA.get(a))]) };
   else if (G.mode.a === 'tap') G.cur = { c, opts: [c] };   // 白地図タップは選択肢なし
-  else G.cur = makeQuestion(c, G.region);
+  else G.cur = makeQuestion(c, G.region, G.optPool ?? undefined);
   G.answered = false;
   const m = G.mode, box = $('qcard');
   box.innerHTML = ''; box.className = `qcard q-${m.q} a-${m.a}`;
@@ -1348,9 +1380,9 @@ function nextQuestion() {
   if (m.q === 'flag') main.insertAdjacentHTML('beforeend', `<img class="qflag" src="${flag(c.a)}" alt="国旗">`);
   if (m.a === 'tap' && G.hint) main.insertAdjacentHTML('beforeend', `<p class="qsub">${esc(c.n)}</p>`);   // 白地図タップは国名表示ありなら問題に国名も出す
   if (m.q === 'name') main.insertAdjacentHTML('beforeend', `<p class="qbig">${esc(c.n)}</p><p class="qsub">${esc(c.r)}</p>`);
-  if (m.q === 'map') main.append(zoomableMap(c, '出題中の国の位置', { region: G.region }));
+  if (m.q === 'map') main.append(zoomableMap(c, '出題中の国の位置', { region: mapRegion(G.region) }));
   if (m.a === 'tap') {
-    box.append(tapMap(c, G.region));
+    box.append(tapMap(c, mapRegion(G.region)));
     if (matchMedia('(hover: hover) and (pointer: fine)').matches) box.querySelector('.tapmap').focus({ preventScroll: true });   // PC はすぐ矢印キーが使えるように
   }
   else {
@@ -1360,7 +1392,7 @@ function nextQuestion() {
       const b = document.createElement('button'); b.className = 'choice'; b.dataset.a = o.a;
       if (m.a === 'name') b.innerHTML = `<kbd>${k + 1}</kbd><span>${esc(o.n)}</span>`;
       if (m.a === 'flag') { b.classList.add('flagc'); b.innerHTML = `<kbd>${k + 1}</kbd><img src="${flag(o.a)}" alt="選択肢${k + 1}の国旗">`; }
-      if (m.a === 'map') { b.classList.add('mapc'); b.innerHTML = `<kbd>${k + 1}</kbd>`; b.append(mapSvg(o, `選択肢${k + 1}の地図`, { region: G.region, w: 640, h: 480 })); }
+      if (m.a === 'map') { b.classList.add('mapc'); b.innerHTML = `<kbd>${k + 1}</kbd>`; b.append(mapSvg(o, `選択肢${k + 1}の地図`, { region: mapRegion(G.region), w: 640, h: 480 })); }
       if (showName) b.insertAdjacentHTML('beforeend', `<span class="cname">${esc(o.n)}</span>`);
       ch.append(b);
     });
@@ -1435,7 +1467,7 @@ function answer(a, isRight) {
   } else {
     store.set('misses', misses);
     emit('drill:answer', { sid: G.sid, a: c.a, right, first, missesBefore: mb, missesAfter: misses[c.a] || 0,
-      mode: G.mode.k, kind: G.kind, region: S.region, hint: G.hint, streak: G.streak });
+      mode: G.mode.k, kind: G.kind, region: G.region, hint: G.hint, streak: G.streak });
     if (S.dopa) dopaAnswer(right);
     else SND.play(right ? 'correct' : G.kind === 'ta' ? 'fail' : 'wrong', { combo: G.streak });
     // タイムアタック: 正解なら解説を出さずにすぐ次へ、最後の問題ならタイム確定。不正解はその場で失格
@@ -1459,7 +1491,7 @@ function answer(a, isRight) {
   } else {
     const km = !right && G.mode.a === 'tap' && G.cur.km != null ? `<p class="tapkm">タップした所から約${fmt(G.cur.km)} km</p>` : '';
     r.innerHTML = `<p class="verdict ${right ? 'ok' : 'ng'}">${verdict}</p>${km}${factsHTML(c)}${right ? triviaHTML([pickTrivia(c.a)].filter(Boolean)) : ''}`;
-    if (G.mode.q !== 'map' && G.mode.a !== 'map' && G.mode.a !== 'tap') r.append(mapSvg(c, `${c.n}の位置`, { region: G.region }));
+    if (G.mode.q !== 'map' && G.mode.a !== 'map' && G.mode.a !== 'tap') r.append(mapSvg(c, `${c.n}の位置`, { region: mapRegion(G.region) }));
   }
   const nx = document.createElement('button');
   nx.className = 'btn next'; nx.id = 'next';
@@ -1559,7 +1591,7 @@ function endGame(outcome) {            // 1回のゲームにつき必ず1回だ
     if (outcome === 'quit') G.endMs = G.t0 ? performance.now() - G.t0 : 0;
     return emit('drill:daily', { sid: G.sid, phase: 'end', outcome, done: G.done, timeMs: G.endMs });
   }
-  emit('drill:result', { sid: G.sid, outcome, mode: G.mode.k, kind: G.kind, region: S.region,
+  emit('drill:result', { sid: G.sid, outcome, mode: G.mode.k, kind: G.kind, region: G.region,
     n: G.set.length, done: G.done, firstTry: G.firstTry, wrongs: G.wrongs, attempts: G.attempts,
     best: G.best, timeMs: G.timeMs ?? null, hint: G.hint, missed: [...G.missed] });
 }
@@ -1568,7 +1600,7 @@ let resultAt = 0;
 function showResult() {
   if (G.kind === 'dojo') { endGame('clear'); return show('dojo'); }   // 道場は結果画面を使わず、道場の画面に結果を1行出す
   const n = G.set.length, missed = [...G.missed].map(a => byA.get(a));
-  let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(S.region)}`;
+  let head, big, stats, cond = `${G.mode.label}／${KINDS.find(k => k.k === G.kind).label}／${regionLabel(G.region)}`;
   if (G.kind === 'practice') {
     head = G.wrongs === 0 ? 'パーフェクト！' : G.firstTry >= n * .7 ? 'いい感じ！' : '次はもっといけるはず';
     big = `${G.firstTry}<small> / ${n} 一発正解</small>`;
@@ -1719,6 +1751,7 @@ $('rk-retry').onclick = () => loadRanking();
 $('rk-play').onclick = () => {
   Object.assign(P, { mode: RK.mode, kind: 'ta', count: RK.count }); S.region = RK.region;
   store.set('setup', P); store.set('settings', S);
+  leaveTheme();   // ランキングの条件（タイムアタック・地域）で遊ぶので、テーマ中ならやめる
   show('setup');
 };
 
@@ -1823,6 +1856,12 @@ function playRegionOf(hash) {
   let r; try { r = decodeURIComponent(hash.slice(6)); } catch { return null; }
   return r === 'all' || REGIONS.includes(r) || Object.hasOwn(SUBREGIONS, r) ? r : null;
 }
+// '#theme=<id>'（まとめページの［このテーマでクイズ］）のテーマ id。THEMES_DATA に無い・こわれた % は null
+function themeOf(hash) {
+  if (!hash.startsWith('#theme=')) return null;
+  let id; try { id = decodeURIComponent(hash.slice(7)); } catch { return null; }
+  return window.THEMES_DATA && Object.hasOwn(window.THEMES_DATA, id) ? id : null;
+}
 applyTheme();
 applyA11y();
 applyDopa();
@@ -1834,7 +1873,10 @@ if (playR) {
   S.region = playR; delete S.sub; store.set('settings', S);
   if (SUBREGIONS[playR] && P.kind === 'ta') { P.kind = 'practice'; store.set('setup', P); }
 }
-const start = playR ? 'setup' : { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
+// #theme=<id> はそのテーマでモード選択を開く（保存しない）。知らない値は無視してホーム
+const themeId = playR ? null : themeOf(location.hash);
+if (themeId) { const d = THEMES_DATA[themeId]; THEME = { id: themeId, n: d.n, a: new Set(d.a) }; }
+const start = playR || themeId ? 'setup' : { '#play': 'setup', '#settings': 'settings', '#book': 'book' }[location.hash] || 'home';
 // #ranking はランキング（前回の条件）を直接開く（管理ページの D11 から）。#daily は daily.js が画面を作ったあとで開く。
 // 地図を使う画面を直接開いたときは、地図を待つあいだ真っ白にならないよう先にホームを出す
 if (location.hash === '#ranking' && RANKING.enabled) openRanking();
