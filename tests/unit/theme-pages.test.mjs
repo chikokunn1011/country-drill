@@ -148,7 +148,7 @@ test('stops_without_rpg_lists', async () => {   // rpg-core.js に島国・内�
   const { tmpdir } = await import('node:os');
   const dir = mkdtempSync(join(tmpdir(), 'themes-'));
   try {
-    for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'rpg-core.js', 'world.js', 'themes.js']) cpSync(join(ROOT, f), join(dir, f));
+    for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'rpg-core.js', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
     mkdirSync(join(dir, 'data'));
     for (const f of ['flag_features.json', 'similar_tips.json', 'neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
     assert.doesNotThrow(() => readThemeInputs(dir));

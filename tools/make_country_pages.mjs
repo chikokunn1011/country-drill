@@ -2,7 +2,7 @@
 // 使い方: node tools/make_country_pages.mjs [--root DIR] [--out DIR]（どちらも既定はリポジトリの根）
 // 読むもの: countries.js・trivia.js・daily-core.js の SIMILAR・index.html（REGIONS・SUBREGIONS・フッター・FLAG_V・テーマの先読み・フォント）・
 // privacy.html の pages.css?v=・flags/*.svg・sitemap.xml・world.js（となりの国）・data/neighbors_fix.json・
-// data/flag_meanings.json（国旗の意味）・themes.js（まとめの題と国。tools/make_theme_pages.mjs が作る）。日付と乱数は使わない（同じ入力からはいつも同じ出力）。作ったファイルはコミットする
+// data/flag_meanings.json（国旗の意味）・themes/*.html（まとめの題と国。tools/make_theme_pages.mjs が作るので、先にそちらを動かす）。日付と乱数は使わない（同じ入力からはいつも同じ出力）。作ったファイルはコミットする
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,9 +62,16 @@ export function readInputs(root) {
   const NEIGHBORS_FIX = JSON.parse(read('data/neighbors_fix.json'));
   // 国旗の意味: コード → 文（note は出さない）
   const MEANINGS = Object.fromEntries(JSON.parse(read('data/flag_meanings.json')).map(m => [m.a, m.t]));
-  // まとめ: themes.js のテーマ（10か国以上で、ページのあるもの）→ { n: 題, a: 国 }
-  const THEMES_DATA = JSON.parse(JSON.stringify(win('themes.js').THEMES_DATA));
-  return { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles, featCodes, featNb, NEIGHBORS_FIX, MEANINGS, THEMES_DATA };
+  // まとめ: 作ってあるまとめページ（themes/<id>.html）を、入口 themes/index.html のカードの順（THEME_IDS の順）に読む →
+  // [{ id, n: h1 の題, a: ページにリンクがある国 }]。まとめページがまだ無い（初めて作る）ときは空
+  const themesDir = join(root, 'themes'), unesc = t => t.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const THEME_PAGES = existsSync(join(themesDir, 'index.html'))
+    ? [...read('themes/index.html').matchAll(/<a class="ccard" href="([\w-]+)\.html">/g)].map(([, id]) => {
+      const h = read(`themes/${id}.html`);
+      return { id, n: unesc(/<h1>([^<]*)<\/h1>/.exec(h)?.[1] ?? id), a: new Set([...h.matchAll(/href="\.\.\/country\/([a-z]{2})\.html"/g)].map(m => m[1])) };
+    })
+    : [];
+  return { C, TRIVIA, SIMILAR, REGIONS, SUBREGIONS, footer, FLAG_V, PAGES_V, themeScript, fontLink, sitemap, flagFiles, featCodes, featNb, NEIGHBORS_FIX, MEANINGS, THEME_PAGES };
 }
 
 // 地図の形がとなり合う国の組（a-b と b-a の両方）。国に当たらない形（西サハラ・パレスチナなど）は飛ばす
@@ -192,17 +199,17 @@ function countryPage(inp, byA, nbs, c) {
 ${sims.map(s => `    <li><a href="${s.a}.html">${flagImg(inp, s.a, '', true)}<span>${esc(s.n)}</span></a></li>`).join('\n')}
   </ul>
 ` : '';
-  // となりの国（同じフォルダのページへ）。無ければ一文。島国は themes.js の island で見る（オーストラリアは島国にしない）
+  // となりの国（同じフォルダのページへ）。無ければ一文。島国はまとめページ island で見る（オーストラリアは島国にしない）
   const nb = nbs.get(c.a).map(b => byA.get(b));
   const neighbors = nb.length ? `  <ul class="neighbors">
 ${nb.map(b => `    <li><a href="${b.a}.html">${flagImg(inp, b.a, '', true)}<span>${esc(b.n)}</span></a></li>`).join('\n')}
-  </ul>` : `  <p class="noneighbor">陸で接している国はない${inp.THEMES_DATA.island?.a.includes(c.a) ? '（島国）' : ''}</p>`;
-  // この国旗が出てくるまとめ（themes.js の並び）。無ければ節ごと出さない
-  const themes = Object.entries(inp.THEMES_DATA).filter(([, t]) => t.a.includes(c.a));
+  </ul>` : `  <p class="noneighbor">陸で接している国はない${inp.THEME_PAGES.find(t => t.id === 'island')?.a.has(c.a) ? '（島国）' : ''}</p>`;
+  // この国旗が出てくるまとめ（その国のリンクがあるまとめページ。入口の並び）。無ければ節ごと出さない
+  const themes = inp.THEME_PAGES.filter(t => t.a.has(c.a));
   const themeList = themes.length ? `
   <h2>この国旗が出てくるまとめ</h2>
   <ul class="cthemes">
-${themes.map(([id, t]) => `    <li><a href="../themes/${id}.html">${esc(t.n)}</a></li>`).join('\n')}
+${themes.map(t => `    <li><a href="../themes/${t.id}.html">${esc(t.n)}</a></li>`).join('\n')}
   </ul>
 ` : '';
   const [prev, next] = prevNextOf(inp, c);

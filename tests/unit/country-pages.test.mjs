@@ -52,8 +52,8 @@ function withTmp(fn) {
 }
 // 生成スクリプトが読むものを一時の root に写す
 const copyInputs = dir => {
-  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js', 'themes.js']) cpSync(join(ROOT, f), join(dir, f));
-  cpSync(join(ROOT, 'flags'), join(dir, 'flags'), { recursive: true });
+  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
+  for (const d of ['flags', 'themes']) cpSync(join(ROOT, d), join(dir, d), { recursive: true });
   mkdirSync(join(dir, 'data'), { recursive: true });
   for (const f of ['neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
 };
@@ -260,7 +260,9 @@ test('neighbors_fix_checked', () => {      // 直しに知らないコード・�
 
 // 国のページの読み物: 国旗の意味・となりの国・この国旗が出てくるまとめ・前の国・次の国
 const MEANING = new Map(JSON.parse(read('data/flag_meanings.json')).map(m => [m.a, m.t]));
-const THEMES_DATA = load('themes.js', 'THEMES_DATA');
+// まとめページ（入口の順）と、そこにリンクがある国
+const THEME_IDS_IN_INDEX = [...read('themes/index.html').matchAll(/<a class="ccard" href="([\w-]+)\.html">/g)].map(m => m[1]);
+const themeHas = (id, a) => read(`themes/${id}.html`).includes(`href="../country/${a}.html"`);
 const prevnext = h => { const m = /<nav class="prevnext"[^>]*>([\s\S]*?)<\/nav>/.exec(h); return m ? m[1] : null; };
 
 test('country_page_meaning', () => {
@@ -314,8 +316,12 @@ test('country_page_themes', () => {
   assert.ok(tr.includes('<h2>この国旗が出てくるまとめ</h2>'));
   assert.ok(tr.includes('href="../themes/crescent.html"'));
   assert.ok(tr.includes('href="../themes/stars.html"'));
+  // 10か国未満でクイズの無いまとめ（ユニオンジャック）にもリンクする
+  for (const a of ['gb', 'au', 'nz', 'fj', 'tv']) assert.ok(hrefsIn(read(`country/${a}.html`), 'ul.cthemes').includes('../themes/unionjack.html'), a);
+  assert.ok(read('country/gb.html').includes('<a href="../themes/unionjack.html">ユニオンジャックが入った国旗</a>'));
+  assert.equal(THEME_IDS_IN_INDEX.length, 14);
   for (const c of C) {
-    const h = read(`country/${c.a}.html`), want = Object.entries(THEMES_DATA).filter(([, t]) => t.a.includes(c.a)).map(([id]) => `../themes/${id}.html`);
+    const h = read(`country/${c.a}.html`), want = THEME_IDS_IN_INDEX.filter(id => themeHas(id, c.a)).map(id => `../themes/${id}.html`);
     assert.deepEqual(hrefsIn(h, 'ul.cthemes'), want, c.a);
     assert.equal(h.includes('この国旗が出てくるまとめ'), want.length > 0, c.a);
   }

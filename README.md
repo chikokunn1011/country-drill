@@ -77,8 +77,9 @@
 ## 国ごとのページ
 
 - `country/<コード>.html`（195枚）と一覧の `country/index.html` は、`node tools/make_country_pages.mjs` で作る。作ったファイルはコミットする（JS を使わない静的なページ。地図はまだ入れない）
-- 読むもの: `countries.js`・`trivia.js`・`daily-core.js` の `SIMILAR`・`index.html` の `REGIONS`・`SUBREGIONS`・フッター・`FLAG_V`・テーマの先読み・`privacy.html` の `pages.css?v=`。どれかを変えたら流し直す（流し忘れると unit の `regenerate_same` が落ちて知らせる）
+- 読むもの: `countries.js`・`trivia.js`・`daily-core.js` の `SIMILAR`・`index.html` の `REGIONS`・`SUBREGIONS`・フッター・`FLAG_V`・テーマの先読み・`privacy.html` の `pages.css?v=`・`world.js` と `data/neighbors_fix.json`（となりの国）・`data/flag_meanings.json`（国旗の意味）・`themes/*.html`（この国旗が出てくるまとめ）。どれかを変えたら流し直す（流し忘れると unit の `regenerate_same` が落ちて知らせる）
 - `sitemap.xml` は目印のあいだだけを書きかえる。国のページに `lastmod` は付けない
+- まとめページも作り直すときは、先に `node tools/make_theme_pages.mjs`、そのあと `node tools/make_country_pages.mjs`（国のページは作ってあるまとめページを読んで、その国が出てくるまとめにリンクする）
 - SIMILAR に知らないコード・豆知識が0件の国・`flags/<コード>.svg` が無い国・フッターの目印が無いときは、何も書かずに終了コード1で止まる
 - 国のページの［この地域で遊ぶ］は `index.html#play=<地域>`（細かい地域があればそれ）を開き、その地域を選んだモード選択の画面になる。知らない値は無視してホームを出す
 - 本編の図鑑（一覧のくわしい窓と地図の情報欄）に「この国のページ ›」を出す。クイズの答えの欄には出さない
