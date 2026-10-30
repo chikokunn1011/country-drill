@@ -186,5 +186,5 @@ test('theme_index_rep_flags', () => {        // 入口のカードの国旗は�
     assert.match(idx, new RegExp(`<a class="ccard" href="${id}\\.html"><img src="\\.\\./flags/${rep}\\.svg\\?`), id);
   }
   assert.ok(read('themes/similar.html').includes('<h2>インドネシア、モナコ、ポーランド、シンガポール</h2>'), '見出しは「、」でつなぐ');
-  assert.ok(read('themes/landlocked.html').includes('カスピ海は湖として数えている。'));
+  assert.ok(read('themes/landlocked.html').includes('カスピ海は湖として数えています。'));
 });
