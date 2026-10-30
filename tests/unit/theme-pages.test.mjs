@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { readThemeInputs, renderThemes, THEME_IDS, THEME_REP } from '../../tools/make_theme_pages.mjs';
 import { KANA, yomi } from '../../tools/make_country_pages.mjs';
+import { JA_RE } from '../../tools/i18n_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SITE = 'https://chikokunn1011.github.io/country-drill/';
@@ -24,8 +25,22 @@ const TITLES = {
   similar: '似ている国旗の見分け方', island: '島国の一覧', landlocked: '内陸国の一覧', bigarea: '面積が大きい国ランキング', smallarea: '面積が小さい国ランキング',
 };
 const fmt = n => n.toLocaleString('en-US');
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const unesc = s => s.replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 const pages = () => ['themes/index.html', ...THEME_IDS.map(id => `themes/${id}.html`)];
+const enPages = () => ['en/themes/index.html', ...THEME_IDS.map(id => `en/themes/${id}.html`)];
+const EN_TITLES = {
+  stars: 'Flags with stars', cross: 'Flags with a cross', crescent: 'Flags with a crescent moon', sun: 'Flags with a sun',
+  animal: 'Flags with animals or birds', unionjack: 'Flags with the Union Jack', vtricolor: 'Vertical tricolor flags',
+  htricolor: 'Horizontal tricolor flags', redwhite: 'Red and white flags', similar: 'How to tell look-alike flags apart',
+  island: 'Island countries', landlocked: 'Landlocked countries', bigarea: 'Largest countries by area', smallarea: 'Smallest countries by area',
+};
+const RULES_EN = JSON.parse(read('data/en/feature_rules.json'));
+const TIPS_EN = JSON.parse(read('data/en/similar_tips.json'));
+// script・style・コメント・lang="ja" の要素を除く
+const visible = html => html
+  .replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/<(\w+)\b[^>]*\slang="ja"[^>]*>[\s\S]*?<\/\1>/g, '');
 const themesData = () => load('themes.js', 'THEMES_DATA');
 const between = (s, a, b) => { const i = s.indexOf(a), j = s.indexOf(b); assert.ok(i >= 0 && j > i, `${a}〜${b} が無い`); return s.slice(i + a.length, j); };
 const locs = s => [...s.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
@@ -37,7 +52,7 @@ const themeCodes = id => {
 
 test('theme_pages_current', () => {            // 作り直すと同じ
   const files = renderThemes(readThemeInputs(ROOT));
-  assert.deepEqual(Object.keys(files).sort(), [...pages(), 'sitemap.xml', 'themes.js'].sort());
+  assert.deepEqual(Object.keys(files).sort(), [...pages(), ...enPages(), 'sitemap.xml', 'themes.js'].sort());
   for (const [p, s] of Object.entries(files)) assert.equal(s, read(p), p);
 });
 
@@ -126,10 +141,18 @@ test('theme_no_capital', () => {
 
 test('themes_css_no_color_vars', () => assert.ok(!/--[\w-]+\s*:/.test(read('themes/themes.css'))));
 
+test('sitemap_has_en_themes', () => {          // theme の目印のあいだに日本語15・英語15
+  const inside = locs(between(read('sitemap.xml'), '<!-- theme:start -->', '<!-- theme:end -->'));
+  assert.equal(inside.length, 30);
+  assert.equal(new Set(inside).size, 30);
+  for (const p of enPages()) assert.ok(inside.includes(SITE + p.replace(/index\.html$/, '')), p);
+});
+
 test('sitemap_has_themes', () => {
   const s = read('sitemap.xml'), inside = locs(between(s, '<!-- theme:start -->', '<!-- theme:end -->'));
-  assert.equal(inside.length, 15);
-  assert.deepEqual(inside, [`${SITE}themes/`, ...THEME_IDS.map(id => `${SITE}themes/${id}.html`)]);
+  assert.equal(inside.length, 30);
+  assert.deepEqual(inside, [`${SITE}themes/`, ...THEME_IDS.map(id => `${SITE}themes/${id}.html`),
+    `${SITE}en/themes/`, ...THEME_IDS.map(id => `${SITE}en/themes/${id}.html`)]);
   const i = readThemeInputs(ROOT), once = renderThemes(i)['sitemap.xml'];
   assert.equal(renderThemes({ ...i, sitemap: once })['sitemap.xml'], once);   // 2回目も同じ
 });
@@ -151,6 +174,9 @@ test('stops_without_rpg_lists', async () => {   // rpg-core.js に島国・内�
     for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'rpg-core.js', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
     mkdirSync(join(dir, 'data'));
     for (const f of ['flag_features.json', 'similar_tips.json', 'neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
+    cpSync(join(ROOT, 'data', 'en'), join(dir, 'data', 'en'), { recursive: true });
+    mkdirSync(join(dir, 'en'));
+    cpSync(join(ROOT, 'en', 'index.html'), join(dir, 'en', 'index.html'));
     assert.doesNotThrow(() => readThemeInputs(dir));
     writeFileSync(join(dir, 'rpg-core.js'), read('rpg-core.js').replace("island: { n: '島国'", "island: { n: 'しま'"));
     assert.throws(() => readThemeInputs(dir), /島国/);
@@ -187,4 +213,106 @@ test('theme_index_rep_flags', () => {        // 入口のカードの国旗は�
   }
   assert.ok(read('themes/similar.html').includes('<h2>インドネシア、モナコ、ポーランド、シンガポール</h2>'), '見出しは「、」でつなぐ');
   assert.ok(read('themes/landlocked.html').includes('カスピ海は湖として数えています。'));
+});
+
+// ---- 英語のまとめページ（en/themes/） ----
+const enOrder = h => [...h.matchAll(/<a class="ccard" href="\.\.\/country\/([a-z]{2})\.html">/g)].map(m => m[1]);
+
+test('en_theme_pages_list', () => {            // 15枚、lang・title・canonical・description・日本語なし
+  assert.deepEqual(Object.keys(EN_TITLES), THEME_IDS);
+  for (const p of enPages()) {
+    const h = read(p), id = p.split('/').pop().replace('.html', '');
+    assert.match(h, /^<!doctype html>\n<html lang="en">/, p);
+    const url = id === 'index' ? `${SITE}en/themes/` : `${SITE}en/themes/${id}.html`;
+    assert.ok(h.includes(`<link rel="canonical" href="${url}">`), p);
+    assert.ok(h.includes(`<meta property="og:url" content="${url}">`), p);
+    assert.ok(h.includes('<meta property="og:locale" content="en_US">'), p);
+    assert.ok(h.includes('<meta property="og:site_name" content="Flag Master">'), p);
+    if (id !== 'index') {
+      assert.ok(h.includes(`<title>${EN_TITLES[id]} | Flag Master</title>`), p);
+      assert.ok(h.includes(`<h1>${EN_TITLES[id]}</h1>`), p);
+    }
+    const d = unesc(/<meta name="description" content="([^"]*)">/.exec(h)?.[1] ?? '');
+    assert.ok(d.length >= 20 && d.length <= 160, `${p} の description ${d.length}字`);
+    assert.doesNotMatch(d, JA_RE, p);
+    const left = visible(h).match(new RegExp(JA_RE.source, 'gu'));
+    assert.equal(left, null, `${p} に日本語: ${left?.join('')}`);
+    const ld = JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(h)[1]);
+    assert.doesNotMatch(JSON.stringify(ld), JA_RE, p);
+    assert.ok(h.includes('<span class="langsw"><a href="../../themes/' + (id === 'index' ? '' : id + '.html') + '" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>'), `${p} の切りかえ`);
+    // 相対リンクの先（これから作る英語のページ en/country/・en/howto.html などは除く）
+    for (const m of h.matchAll(/(?:href|src)="([^"]*)"/g)) {
+      const u = m[1];
+      if (/^(?:[a-z]+:|#|\/\/)/.test(u)) continue;
+      const r = posix.normalize(posix.join(posix.dirname(p), u.split('#')[0].split('?')[0]));
+      if (/^en\/(?:country\/|howto|about|privacy)/.test(r)) continue;
+      assert.ok(existsSync(join(ROOT, r.endsWith('/') ? r + 'index.html' : r)), `${p}: ${u}`);
+    }
+  }
+  const idx = read('en/themes/index.html');
+  for (const id of THEME_IDS) assert.ok(idx.includes(`href="${id}.html"`), `入口に ${id}`);
+});
+
+test('en_theme_content', () => {
+  const s = read('en/themes/stars.html');
+  const stars = themeCodes('stars');
+  assert.ok(s.includes(esc(RULES_EN.stars)), 'stars の数え方');
+  assert.deepEqual(enOrder(s), [...stars].sort((x, y) => byA.get(x).e.localeCompare(byA.get(y).e, 'en')), '国名の ABC 順');
+  for (const a of stars) assert.ok(s.includes(`<span>${esc(byA.get(a).e)}</span>`), a);
+  assert.ok(s.includes(`href="../#theme=stars"`));
+  assert.ok(s.includes(`${stars.length} countries`));
+  assert.ok(!s.includes('index.html#theme='));
+  for (const id of Object.keys(RULES_EN)) assert.ok(read(`en/themes/${id}.html`).includes(esc(RULES_EN[id])), id);
+
+  const big = read('en/themes/bigarea.html');
+  const rows = [...between(big, '<tbody>', '</tbody>').matchAll(/<tr>([\s\S]*?)<\/tr>/g)].map(m => m[1]);
+  assert.equal(rows.length, 20);
+  assert.ok(rows[0].includes('<a href="../country/ru.html">Russia</a>'), '1位は Russia');
+  assert.ok(rows[0].includes('17,098,242 km²'));
+  assert.ok(big.includes('<th scope="col">Rank</th><th scope="col">Flag</th><th scope="col">Country</th><th scope="col">Area</th>'));
+
+  const sim = read('en/themes/similar.html');
+  assert.equal(TIPS_EN.length, SIMILAR.length);
+  assert.deepEqual(TIPS_EN.map(t => t.g), SIMILAR);
+  assert.equal((sim.match(/<section class="sgroup">/g) ?? []).length, 25, '25組');
+  for (const tip of TIPS_EN) assert.ok(sim.includes(`<p class="stip">${esc(tip.t)}</p>`), `見分け方: ${tip.g.join(' ')}`);
+  assert.ok(sim.includes(`<h2>${SIMILAR[1].map(a => byA.get(a).e).join(', ')}</h2>`));
+
+  // 島国などもリンクは en/country/、国名は e
+  const isl = read('en/themes/island.html');
+  for (const a of themesData().island.a) assert.ok(isl.includes(`href="../country/${a}.html"`), a);
+  const idx = read('en/themes/index.html');
+  assert.ok(idx.includes('25 groups'));
+  assert.ok(!sim.includes('pairs') && !idx.includes('pairs'));
+  assert.ok(sim.includes('How to tell look-alike flags apart: 25 groups,'));
+  for (const id of THEME_IDS) assert.ok(idx.includes(`<span>${esc(EN_TITLES[id])}<br>`), id);
+});
+
+test('hreflang_both_ways', () => {             // 日本語と英語のページが互いを指す（x-default は日本語）
+  for (const id of ['index', ...THEME_IDS]) {
+    const tail = id === 'index' ? '' : `${id}.html`;
+    const ja = `${SITE}themes/${tail}`, en = `${SITE}en/themes/${tail}`;
+    const lines = [`<link rel="alternate" hreflang="ja" href="${ja}">`, `<link rel="alternate" hreflang="en" href="${en}">`,
+      `<link rel="alternate" hreflang="x-default" href="${ja}">`].join('\n');
+    for (const p of [`themes/${id}.html`, `en/themes/${id}.html`]) {
+      const h = read(p);
+      assert.ok(h.slice(0, h.indexOf('</head>')).includes(lines), p);
+    }
+    assert.ok(read(`themes/${id}.html`).includes(`<span class="langsw"><b>日本語</b> / <a href="../en/themes/${tail}" hreflang="en" lang="en">English</a></span>`), id);
+  }
+});
+
+test('themes_js_en', () => {                   // themes.js のテーマに英語の題 e
+  const data = themesData();
+  for (const [id, d] of Object.entries(data)) {
+    assert.deepEqual(Object.keys(d), ['n', 'e', 'a'], id);
+    assert.equal(d.e, EN_TITLES[id], id);
+  }
+});
+
+test('pages_css_same_version', () => {         // 読み物のページの pages.css?v= はみな同じ
+  const files = ['privacy.html', 'about.html', 'howto.html', 'country/index.html', 'country/jp.html', ...pages(), ...enPages()];
+  const vs = new Set(files.map(p => /pages\.css\?v=(\d+)/.exec(read(p))?.[1]));
+  assert.equal(vs.size, 1, [...vs].join(' '));
+  assert.ok(read('pages.css').includes('.langsw'));
 });

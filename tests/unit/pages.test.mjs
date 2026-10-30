@@ -76,14 +76,14 @@ test('pages_css_vars_match_index', () => {
   }
 });
 
-// 埋めこみ（embed.html）: daily-core.js の ?v= は index.html と同じ。検索に載せない。読むのは3つの script だけ。端末のデータ・Supabase・広告・フォントを使わない
+// 埋めこみ（embed.html）: daily-core.js の ?v= は index.html と同じ。検索に載せない。読むのは4つの script だけ。端末のデータ・Supabase・広告・フォントを使わない
 test('embed_head', () => {
   const h = read('embed.html'), v = s => s.match(/daily-core\.js\?v=(\d+)/)[1];
   assert.equal(v(h), v(read('index.html')));
   assert.match(h, /<meta name="robots" content="noindex">/);
   assert.ok(h.includes('<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/">'));
   for (const b of BLOCKS) assert.ok(Object.keys(varsOf(h, b)).length > 0, b);   // 3か所ある
-  assert.deepEqual([...h.matchAll(/<script src="([^"]+)"/g)].map(m => m[1].split('?')[0]), ['countries.js', 'daily-core.js', 'embed.js']);
+  assert.deepEqual([...h.matchAll(/<script src="([^"]+)"/g)].map(m => m[1].split('?')[0]), ['i18n.js', 'countries.js', 'daily-core.js', 'embed.js']);
   assert.ok(!/fonts\.googleapis|<link rel="stylesheet"/.test(h));
   assert.ok(!h.includes('footer:start'));
   assert.ok(!read('sitemap.xml').includes('embed'));
@@ -96,7 +96,7 @@ test('no_answer_in_alt', () => {
   for (const s of [read('embed.html'), read('embed.js')]) {
     for (const m of s.matchAll(/alt\s*=\s*["'`]([^"'`]*)["'`]|\.alt\s*=\s*([^;]+);/g)) {
       const alt = m[1] ?? m[2];
-      assert.ok(/^["'`]?(今日の国旗)?["'`]?$/.test(alt.trim()), `alt に国名が入るかもしれない: ${alt}`);
+      assert.ok(/^["'`]?(今日の国旗)?["'`]?$|^T\('今日の国旗'\)$/.test(alt.trim()), `alt に国名が入るかもしれない: ${alt}`);
     }
   }
 });
@@ -205,7 +205,7 @@ test('howto_embed', () => {
 });
 test('sitemap_lists_pages', () => {
   const locs = [...read('sitemap.xml').matchAll(/<loc>([^<]+)<\/loc>/g)].map(m => m[1]);
-  for (const p of ['privacy.html', 'about.html', 'howto.html']) assert.ok(locs.includes(`https://chikokunn1011.github.io/country-drill/${p}`), p);
+  for (const p of ['privacy.html', 'about.html', 'howto.html', 'en/', 'en/howto.html', 'en/about.html', 'en/privacy.html']) assert.ok(locs.includes(`https://chikokunn1011.github.io/country-drill/${p}`), p);
 });
 test('profile_name_note', () => assert.equal(read('profile.js').match(/本名や学校名は使わないでね/g)?.length, 1));   // 1つの定数を3か所で使う
 
@@ -222,4 +222,92 @@ test('howto_tap', () => {
   assert.ok(s.includes('白地図タップ'));
   assert.match(s, /練習と挑戦/);
   assert.ok(!/4つの出し方/.test(read('howto.html')));
+});
+
+// 英語版（PR5 Task 14）: 手で書いた en/howto.html・en/about.html・en/privacy.html
+const SITE_URL = 'https://chikokunn1011.github.io/country-drill/';
+const EN_PAGES = { 'en/howto.html': ['howto.html', 'How to play | Flag Master'], 'en/about.html': ['about.html', 'About | Flag Master'], 'en/privacy.html': ['privacy.html', 'Privacy policy | Flag Master'] };
+const JA_CHARS = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}　-〿・ー！-｠]/u;   // tools/i18n_scan.mjs の JA_RE と同じ（下で確かめる）
+// フッターの href を、ページの URL（<base href> があればそれ）から絶対 URL にする
+const footerAbs = (p, html) => {
+  const m = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/.exec(html);
+  if (!m) return [];
+  const base = new URL(/<base href="([^"]+)">/.exec(html)?.[1] ?? '.', SITE_URL + p);
+  return [...m[1].matchAll(/href="([^"]*)"/g)].map(x => new URL(x[1], base).href);
+};
+
+test('en_pages_head', async () => {
+  const { JA_RE } = await import('../../tools/i18n_scan.mjs');
+  assert.equal(JA_CHARS.source, JA_RE.source);
+  const indexTheme = themeScript(read('index.html'));
+  for (const [p, [ja, title]] of Object.entries(EN_PAGES)) {
+    const h = read(p), jh = read(ja);
+    assert.match(h, /^<!doctype html>\n<html lang="en">/, p);
+    assert.ok(h.includes(`<title>${title}</title>`), p);
+    assert.match(h, /<meta name="description" content="[^"]{20,}">/, p);
+    assert.ok(h.includes(`<link rel="canonical" href="${SITE_URL}${p}">`), p);
+    for (const [doc] of [[h], [jh]]) {
+      assert.ok(doc.includes(`<link rel="alternate" hreflang="ja" href="${SITE_URL}${ja}">`), `${p} / ${ja} ja`);
+      assert.ok(doc.includes(`<link rel="alternate" hreflang="en" href="${SITE_URL}${p}">`), `${p} / ${ja} en`);
+      assert.ok(doc.includes(`<link rel="alternate" hreflang="x-default" href="${SITE_URL}${ja}">`), `${p} / ${ja} x-default`);
+    }
+    assert.equal(h.match(/href="\.\.\/pages\.css\?v=(\d+)"/)?.[1], jh.match(/href="pages\.css\?v=(\d+)"/)[1], p);
+    assert.equal(themeScript(h), indexTheme, p);
+    assert.ok(h.includes('<a class="back" href="./">← Play Flag Master</a>'), p);
+    // 言語の切りかえ: 英語版は日本語のページへ、日本語版は英語のページへ
+    assert.ok(h.includes(`<span class="langsw"><a href="../${ja}" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>`), p);
+    assert.ok(jh.includes(`<span class="langsw"><b>日本語</b> / <a href="${p}" hreflang="en" lang="en">English</a></span>`), ja);
+  }
+});
+
+test('en_footer_links_same', () => {
+  const want = footerAbs('en/index.html', read('en/index.html'));
+  assert.deepEqual(want, ['howto.html', 'about.html', 'about.html#contact', 'privacy.html', 'country/', 'themes/'].map(x => SITE_URL + 'en/' + x));
+  const pages = [...Object.keys(EN_PAGES), ...readdirSync(new URL('en/country/', root)).filter(f => f.endsWith('.html')).map(f => `en/country/${f}`)];
+  for (const p of pages) assert.deepEqual(footerAbs(p, read(p)), want, p);
+  for (const p of Object.keys(EN_PAGES)) for (const u of want) {   // 行き先がある
+    const [path, id] = u.slice(SITE_URL.length).split('#'), file = path.endsWith('/') ? path + 'index.html' : path;
+    assert.ok(existsSync(new URL(file, root)), `${p}: ${file}`);
+    if (id) assert.ok(read(file).includes(`id="${id}"`), `${p}: ${file} #${id}`);
+  }
+});
+
+test('en_pages_no_japanese', () => {
+  for (const p of Object.keys(EN_PAGES)) {
+    const body = read(p).replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<(\w+)\b[^>]*\slang="ja"[^>]*>[\s\S]*?<\/\1>/g, '');
+    assert.deepEqual(body.split('\n').filter(l => JA_CHARS.test(l)), [], p);
+  }
+});
+
+test('en_howto_only_available', () => {
+  const h = read('en/howto.html');
+  for (const w of ['Time Attack', 'Ranking', 'Leaderboard', 'Daily', 'Adventure', 'Badges', 'Profile']) assert.ok(!h.includes(w), w);
+  for (const id of ['start', 'modes', 'kinds', 'book', 'embed', 'faq']) assert.match(h, new RegExp(`<h2 id="${id}"`), id);
+  // 用語は辞書（i18n/en-*.js）と同じ
+  for (const w of ['Play the quiz', 'Choose a mode', 'Flag → Name', 'Name → Flag', 'Location → Flag', 'Flag → Location', 'Tap the map', 'Practice', 'Challenge', 'Answer style', 'Gallery', 'Settings', 'Look-alike Flags Dojo', 'Add to home screen']) assert.ok(h.includes(w), w);
+  assert.ok(h.includes('&lt;iframe src="https://chikokunn1011.github.io/country-drill/en/embed.html"'));
+  assert.ok(h.includes('en/embed.html?theme=dark') || h.includes('embed.html?theme=dark'));
+  assert.ok(!/<iframe\b/.test(h) && !/<img\b/.test(h));
+  assert.ok(!/(guess|name|answer|quiz(zes)? on)( the)? capitals?\b/i.test(h.replace(/no questions? (that )?asks? (for|about) capitals/gi, '')));
+});
+
+test('en_about_text', () => {
+  const h = read('en/about.html');
+  for (const id of ['purpose', 'operator', 'rules', 'country-names', 'borders', 'credits', 'contact']) assert.match(h, new RegExp(`<h2 id="${id}"`), id);
+  assert.match(h, /<a id="contact-form" href="https:\/\/forms\.gle\/66hqFeGYF47CggGS7"/);
+  for (const s of ['Chiko', 'university student', 'Claude', 'Anthropic', 'English Wikipedia', 'Natural Earth', 'flag-icons', 'world-atlas', 'world-countries', 'ODbL', 'in English']) assert.ok(h.includes(s), s);
+  assert.ok(!h.includes('<table'));   // 日本語の国名の例外の表は訳さない
+});
+
+test('en_privacy_sections', () => {
+  const h = read('en/privacy.html'), ja = read('privacy.html');
+  const ids = s => [...s.matchAll(/<h2 id="([^"]+)"/g)].map(m => m[1]);
+  assert.equal((h.match(/<h2\b/g) ?? []).length, (ja.match(/<h2\b/g) ?? []).length);
+  assert.deepEqual(ids(h), ids(ja));
+  assert.equal((h.match(/<h3\b/g) ?? []).length, (ja.match(/<h3\b/g) ?? []).length);
+  assert.match(h, /<h3 id="transfer">/);
+  assert.ok(h.includes('offline'));   // サイトのファイルを端末に保存する（PWA）の1行
+  for (const s of ['Supabase', 'IP address', 'GitHub Pages', 'Google Fonts', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', 'may use', 'analytics']) assert.ok(h.includes(s), s);
+  assert.match(h, /Last updated: October 29, 2026/);
 });

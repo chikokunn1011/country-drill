@@ -264,9 +264,9 @@
   // 国の一覧（countries.js の COUNTRIES）からカタログを作る。並びは設計書 §2.1→§2.7 の表の順
   function makeCatalog(list) {
     const xt = makeX(list);
-    const T = (goal, title, desc, more) => ({ goal, title, desc, ...more });
+    const Tr = (goal, title, desc, more) => ({ goal, title, desc, ...more });
     // 3段のバッジ。titles は設計書の表の「銅 / 銀 / 金」をそのまま
-    const T3 = (goals, titles, desc) => { const ts = titles.split(' / '); return goals.map((g, i) => T(g, ts[i], desc(g))); };
+    const T3 = (goals, titles, desc) => { const ts = titles.split(' / '); return goals.map((g, i) => Tr(g, ts[i], desc(g))); };
     const num = n => n.toLocaleString('ja-JP');
     const modeBadge = (mode, icon, name, sub, titles) => ({
       id: 'mode-' + mode, cat: 'mode', icon, name, sub, mode, unit: 'か国', skill: true,
@@ -276,13 +276,13 @@
     const regionBadge = (rk, icon, name, titles) => {
       const ts = titles.split(' / '), label = xt.label(rk);
       return { id: 'reg-' + rk, cat: 'region', icon, name, rk, skill: true, tiers: [   // 地域は段ごとに v がちがう
-        T(1, ts[0], `${label}で10問以上のゲームをクリア`, { v: s => s.rc[rk] & 1 ? 1 : 0 }),
-        T(1, ts[1], `${label}の「全部」をヒントなしでクリア`, { v: s => s.rc[rk] & 2 ? 1 : 0 }),
-        T(xt.pools[rk].length * 4, ts[2], `${label}の国すべてを4モードで正解`,
+        Tr(1, ts[0], `${label}で10問以上のゲームをクリア`, { v: s => s.rc[rk] & 1 ? 1 : 0 }),
+        Tr(1, ts[1], `${label}の「全部」をヒントなしでクリア`, { v: s => s.rc[rk] & 2 ? 1 : 0 }),
+        Tr(xt.pools[rk].length * 4, ts[2], `${label}の国すべてを4モードで正解`,
           { v: (s, x) => x.pools[rk].reduce((t, a) => t + pop4(s.m[a]), 0), color: rk === 'world' ? 4 : 3 }),
       ] };
     };
-    const one = (title, desc, color = 1) => [T(1, title, desc, { color })];   // 1段だけのバッジ
+    const one = (title, desc, color = 1) => [Tr(1, title, desc, { color })];   // 1段だけのバッジ
     const badges = [
       // 2.1 クイズ
       { id: 'first-clear', cat: 'quiz', icon: '🌱', name: 'はじめの一歩', v: s => s.clears,
@@ -296,7 +296,7 @@
         tiers: T3([1, 10, 50], 'リベンジャー / 苦手つぶし / にがて知らず', g => `苦手な国を ${g}か国克服（別のゲームでヒントなしの一発正解）`) },
       { id: 'micro', cat: 'quiz', icon: '🔬', name: 'ちっちゃい国探検隊', unit: 'か国', skill: true,
         v: (s, x) => x.micro.filter(a => s.m[a] > 0).length,
-        tiers: [T(xt.micro.length, 'ミクロの探検家', `面積 1,000km² 未満の国（${xt.micro.length}か国）すべてに、どれかのモードでヒントなしで正解`, { color: 2 })] },
+        tiers: [Tr(xt.micro.length, 'ミクロの探検家', `面積 1,000km² 未満の国（${xt.micro.length}か国）すべてに、どれかのモードでヒントなしで正解`, { color: 2 })] },
       // 2.2 あそび方
       { id: 'prac-perfect', cat: 'kind', icon: '✨', name: 'ノーミス練習', unit: '問', skill: true, v: s => s.perf,
         tiers: T3([10, 20, 40], 'ていねい派 / ノーミス職人 / 完璧主義者', g => `${g}問以上の練習を、まちがえ0でクリア（ヒントなし）`) },

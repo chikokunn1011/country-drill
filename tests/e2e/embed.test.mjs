@@ -1,11 +1,11 @@
 // 埋めこみ「今日の国旗」（embed.html）。1日1問（国旗→国名か国名→国旗）、答え直せる、リンクは新しいタブ、色は ?theme=、
-// 読むのは3つの script と国旗だけ、狭い枠・貼り付けコードの枠に収まる、読めないときの表示、alt で答えがバレない
+// 読むのは4つの script と国旗だけ（英語版 en/embed.html は辞書も）、狭い枠・貼り付けコードの枠に収まる、読めないときの表示、alt で答えがバレない
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { startServer, openApp } from './helpers.mjs';
+import { startServer, openApp, jaLeft, warned } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -29,8 +29,8 @@ const at = iso => `{ const off = Date.parse('${iso}') - Date.now(), D = Date;
   globalThis.Date = class extends D { constructor(...a) { super(...(a.length ? a : [D.now() + off])); } static now() { return D.now() + off; } }; }`;
 const LIGHT = 'rgb(238, 242, 241)', DARK = 'rgb(15, 23, 28)';
 
-const open = async ({ mode = 'f2n', qs = '', ...opts }, fn) => {
-  const app = await openApp(browser, { url: server.url, path: 'embed.html' + qs, init: at(DAYS[mode] + 'T03:00:00Z'), ...opts });
+const open = async ({ mode = 'f2n', qs = '', path = 'embed.html', ...opts }, fn) => {
+  const app = await openApp(browser, { url: server.url, path: path + qs, init: at(DAYS[mode] + 'T03:00:00Z'), ...opts });
   try {
     await fn(app.page, app);
     assert.deepEqual(app.errors.map(String), []);
@@ -82,7 +82,7 @@ t('files_read', async () => {
     assert.deepEqual(outside, [], mode);
     const paths = reqs.map(u => new URL(u).pathname.slice(1)).filter(p => p !== 'embed.html');
     const flags = [...new Set(paths.filter(p => /^flags\/[a-z]{2}\.svg$/.test(p)))].map(p => p.slice(6, 8)).sort();
-    assert.deepEqual(paths.filter(p => !p.startsWith('flags/')).sort(), ['countries.js', 'daily-core.js', 'embed.js'], mode);
+    assert.deepEqual(paths.filter(p => !p.startsWith('flags/')).sort(), ['countries.js', 'daily-core.js', 'embed.js', 'i18n.js'], mode);
     assert.deepEqual(flags, mode === 'f2n' ? [Q(mode).a] : Q(mode).opts.slice().sort(), mode);
   });
 });
@@ -144,5 +144,50 @@ t('no_answer_in_alt', async () => {
     for (const b of await page.$$eval('.e-opt', bs => bs.map(b => b.getAttribute('aria-label') ?? ''))) assert.ok(!names.some(n => b.includes(n)), `${mode} aria-label: ${b}`);
     const cap = byA.get(Q(mode).a).c, body = await text(page, '#embed');
     if (cap && !names.includes(cap)) assert.ok(!body.includes(cap), `${mode} 首都 ${cap} が出ている`);
+  });
+});
+
+// 英語版（en/embed.html）: 問題・選択肢・答えの文が英語、見えている日本語が無い、辞書に無いキーの warn が無い。
+// alt・aria-label に国名（英語の名前も）が入らない。今日の難問のリンクは無く、「もっと遊ぶ」は英語版のトップへ
+t('embed_en', async () => {
+  const names = C.flatMap(c => [c.n, c.e]);
+  for (const mode of ['f2n', 'n2f']) await open({ mode, path: 'en/embed.html', locale: 'en-US' }, async (page, app) => {
+    const q = Q(mode);
+    assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+    assert.equal(await page.title(), 'Today’s flag | Flag Master');
+    assert.equal(await text(page, 'h1'), 'Today’s flag');
+    assert.equal(await text(page, '#e-q'), mode === 'f2n' ? 'Which country has this flag?' : 'Which flag belongs to this country?', mode);
+    if (mode === 'f2n') assert.deepEqual(await page.$$eval('.e-opt', bs => bs.map(b => b.textContent)), q.opts.map(a => byA.get(a).e));
+    else {
+      assert.equal(await text(page, '#e-prompt'), byA.get(q.a).e);
+      assert.deepEqual(await page.$$eval('.e-opt', bs => bs.map(b => b.getAttribute('aria-label'))), ['Choice 1', 'Choice 2', 'Choice 3', 'Choice 4']);
+    }
+    const alts = await page.$$eval('#embed img', is => is.map(i => i.alt));
+    for (const alt of alts) assert.ok(!names.some(n => alt.includes(n)), `${mode} alt: ${alt}`);
+    if (mode === 'f2n') assert.deepEqual(alts, ['Today’s flag']);
+    assert.deepEqual(await jaLeft(page), [], mode);
+    await page.click(`.e-opt[data-a="${wrongOf(mode)}"]`);
+    assert.equal(await text(page, '#e-msg'), 'Not quite. Pick again.');
+    assert.equal(await page.locator('#e-daily').count(), 0);
+    assert.equal(await text(page, '#e-more'), 'Play more');
+    assert.equal(await page.$eval('#e-more', a => new URL(a.href).pathname), '/en/');
+    assert.deepEqual(await jaLeft(page), [], mode);
+    await page.click(`.e-opt[data-a="${q.a}"]`);
+    assert.equal(await text(page, '#e-msg'), 'Correct!');
+    assert.equal(await text(page, '#e-again'), 'Try again');
+    assert.deepEqual(await jaLeft(page), [], mode);
+    assert.equal(await warned(app.warnings, /\[i18n\]/), false, app.warnings.join('\n'));
+  });
+});
+
+t('embed_en_fallbacks', async () => {
+  await open({ path: 'en/embed.html', blockScripts: ['countries.js'] }, async page => {
+    assert.equal(await text(page, '.e-err'), 'Couldn’t load');
+    assert.equal(await page.$eval('#e-more', a => new URL(a.href).pathname), '/en/');
+  });
+  await open({ path: 'en/embed.html', routes: [['**/flags/*.svg*', r => r.abort()]] }, async page => {
+    await page.locator('#e-prompt .e-noflag').waitFor();
+    assert.equal(await text(page, '.e-noflag >> nth=0'), 'Can’t show the flag');
+    assert.deepEqual(await jaLeft(page), []);
   });
 });

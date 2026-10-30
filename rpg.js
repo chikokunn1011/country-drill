@@ -18,7 +18,7 @@
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
   if (missing.length) { console.error(`[rpg] 必要なものが読み込めなかったので、冒険はお休み: ${missing.join(' ')}`); return; }
 
-  const K = RPG_CORE, T = K.TUNING;
+  const K = RPG_CORE, U = K.TUNING;
   const KEY = 'rpg', BROKEN = 'rpg-broken-';
   const KEEP_BROKEN = 3;      // 壊れたセーブの写しは新しいものから3つ（設計書 §9）
   const KEEP_BADGES = 500;    // badgesPaid は最新500件
@@ -207,8 +207,8 @@
     if (!rc) return;
     const { d } = ctx;
     // この受け取りで新しく払った分だけ（途中の受け取りで払った分は入れない）
-    const daily = rc.daily - ctx.daily, overcome = (rc.overcome.length - ctx.ov) * T.overcome;
-    const bounty = (rc.bounty.length - ctx.bo) * T.bounty + (rc.bountyAll && !ctx.all ? T.bountyAll : 0);
+    const daily = rc.daily - ctx.daily, overcome = (rc.overcome.length - ctx.ov) * U.overcome;
+    const bounty = (rc.bounty.length - ctx.bo) * U.bounty + (rc.bountyAll && !ctx.all ? U.bountyAll : 0);
     emitCoins(d, Math.max(0, rc.delta - daily - overcome - bounty), 'drill');
     emitCoins(d, daily, 'daily');
     emitCoins(d, overcome, 'overcome');
@@ -245,10 +245,10 @@
       + row(`正解 ${rc.ta.n}問`, rc.ta.coins) + row('クリアボーナス', rc.clear) + row(`はじめて正解 ${rc.fe.n}か国`, rc.fe.coins);
     const lines = [
       rc.daily > 0 && `🎁 今日はじめてのクリア +${fmt(rc.daily)} ／ 無料ガチャ1回ゲット`,
-      rc.joined.length && `🤝 ${joinedText(rc.joined)}が仲間になった！（${T.card.frJoin}回正解した国は仲間になるよ）`,
+      rc.joined.length && `🤝 ${joinedText(rc.joined)}が仲間になった！（${U.card.frJoin}回正解した国は仲間になるよ）`,
       rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
-      rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(T.overcome * rc.overcome.length)}`,
-      rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(T.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(T.bountyAll)}）` : ''}`,
+      rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(U.overcome * rc.overcome.length)}`,
+      rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(U.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(U.bountyAll)}）` : ''}`,
       rc.zeroed && 'タイムが速すぎたので、この回のコインはなし',
     ].filter(Boolean);
     // 仲間の数・地域の国を全部、に届いたらシェア（この回で仲間になった国をのぞいたのが、始める前の仲間）
@@ -258,7 +258,7 @@
       + (rows ? `<ul class="rpg-res-rows">${rows}</ul>` : '')
       + lines.map(l => `<p class="rpg-res-x">${l}</p>`).join('')
       + (shares.length ? '<div class="rpg-shares" id="rpg-res-share"></div>' : '')
-      + `<button class="btn ghost" id="rpg-res-go">冒険へ →${d.intro ? '' : `（はじめてなら <span class="rpg-nowrap">${COIN}${fmt(T.start)}</span> のお祝いつき）`}</button></div>`;
+      + `<button class="btn ghost" id="rpg-res-go">冒険へ →${d.intro ? '' : `（はじめてなら <span class="rpg-nowrap">${COIN}${fmt(U.start)}</span> のお祝いつき）`}</button></div>`;
     RPG.drawShares($('rpg-res-share'), shares);
     $('rpg-res-go').onclick = () => { if (SCREENS.includes('rpg')) show('rpg'); };   // 冒険の画面ができるまでは何もしない
     RPG.fx('count', ext.querySelector('.rpg-res-n'), rc.sum);
@@ -282,11 +282,11 @@
       let d = null;
       const paid = tx(x => {
         if (x.badgesPaid.includes(det.id)) return 0;
-        x.coins = Math.min(K.BIG, x.coins + T.badge);
-        x.earned = Math.min(K.BIG, x.earned + T.badge);
+        x.coins = Math.min(K.BIG, x.coins + U.badge);
+        x.earned = Math.min(K.BIG, x.earned + U.badge);
         x.badgesPaid = [...x.badgesPaid, det.id].slice(-KEEP_BADGES);
         d = x;
-        return T.badge;
+        return U.badge;
       });
       det.paid = paid === null ? false : paid === 0 ? 0 : wrote ? paid : false;
       if (det.paid > 0) {
@@ -508,7 +508,7 @@
   const DEBUG_GIVE = 10000;   // ●+10,000（設計書 §5.4）
   const debugHTML = d => !DEBUG ? '' : '<div class="rpg-debug" id="rpg-debug"><p class="rpg-lbl">開発用パネル（?rpgdebug=1）</p><div class="rpg-debug-row">'
     + `<button class="btn ghost" id="rpg-dbg-give">${COIN}+${fmt(DEBUG_GIVE)}</button>`
-    + `<span class="rpg-debug-lv"><label for="rpg-dbg-lv">Lv</label><input type="number" id="rpg-dbg-lv" min="1" max="${T.hero.maxLv}" value="${d.lv}">`
+    + `<span class="rpg-debug-lv"><label for="rpg-dbg-lv">Lv</label><input type="number" id="rpg-dbg-lv" min="1" max="${U.hero.maxLv}" value="${d.lv}">`
     + '<button class="btn ghost" id="rpg-dbg-setlv">Lv にする</button></span>'
     + '<button class="btn ghost" id="rpg-dbg-unlock">全部のフロアを開く</button>'
     + '<span class="rpg-debug-lv"><label for="rpg-dbg-tf">塔</label><input type="number" id="rpg-dbg-tf" min="1" value="10">'
@@ -553,11 +553,11 @@
       tx(s => {
         if (s.intro) return;   // 別のタブで先に旅に出ていたら、お祝いは二重に出さない
         s.intro = true; s.av = av;
-        s.coins = Math.min(K.BIG, s.coins + T.start);
-        s.earned = Math.min(K.BIG, s.earned + T.start);
+        s.coins = Math.min(K.BIG, s.coins + U.start);
+        s.earned = Math.min(K.BIG, s.earned + U.start);
         x = s;
       });
-      if (x && wrote) emitCoins(x, T.start, 'start');
+      if (x && wrote) emitCoins(x, U.start, 'start');
       renderHome();
     };
   };
@@ -566,7 +566,7 @@
   // つぎにやること（上から最初に当てはまるもの）
   const nextAction = (d, nf) => {
     const gacha = hasCards();   // ガチャの画面が無ければ（rpg-cards.js が読み込めなかった）ガチャはすすめない
-    if (gacha && d.pulls === 0 && d.coins >= T.gacha.ten)
+    if (gacha && d.pulls === 0 && d.coins >= U.gacha.ten)
       return { text: 'まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）', go: () => open('gacha', { region: 'all' }) };
     if (gacha && d.day.first && !d.day.free) return { text: '今日の無料ガチャが引けるよ', go: () => open('gacha') };
     const en = nf && K.enemy(nf.id, nf.floor);
@@ -719,7 +719,7 @@
       + `<ul class="rpg-wanted">${b.a.map(li).join('')}</ul><p class="hint">ゲームでヒントなしの一発正解！</p></div>`;
   };
   const earnHTML = () => '<details class="rpg-earn" id="rpg-earn"><summary>コインのかせぎ方</summary>'
-    + `<table class="rpg-earn-t"><caption>クイズ1回の例（はじめて正解した国は、さらに +${T.quiz.firstEver}）</caption>`
+    + `<table class="rpg-earn-t"><caption>クイズ1回の例（はじめて正解した国は、さらに +${U.quiz.firstEver}）</caption>`
     + '<thead><tr><th scope="col">ゲーム</th><th scope="col">コイン</th></tr></thead>'
     + `<tbody>${EARN.map(([g, c]) => `<tr><td>${g}</td><td>${c}</td></tr>`).join('')}</tbody></table>`
     + '<button class="btn ghost" id="rpg-earn-go">クイズで稼ぐ</button></details>';
@@ -832,7 +832,7 @@
     const sel = list.some(g => g.id === dgSel) ? dgSel : list.some(g => g.id === nf?.id) ? nf.id : list[list.length - 1].id;
     // 名前はサイト共通のプロフィールのもの（無ければ前に使った nickname）
     const nick = window.PROFILE?.get?.()?.name ?? store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
-    const max = d.lv >= T.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
+    const max = d.lv >= U.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
     const lvup = max ? 'MAX' : `レベルアップ ${COIN}${fmt(cost)}${can ? '' : ` <small class="rpg-short">あと${COIN}${fmt(cost - d.coins)}</small>`}`;
     return `<div class="rpg-side">${warnHTML()}`
       + '<div class="rpg-hero" id="rpg-hero">'
@@ -1053,7 +1053,7 @@
         return delta;
       },
       // Lv を n にする（1..上限の Lv99 におさめる。コインは変わらない）。書いた Lv を返す
-      setLv: n => tx(x => { x.lv = Math.max(1, Math.min(T.hero.maxLv, Math.round(+n) || 1)); return x.lv; }),
+      setLv: n => tx(x => { x.lv = Math.max(1, Math.min(U.hero.maxLv, Math.round(+n) || 1)); return x.lv; }),
       // ダンジョン id のクリアした最高フロアを floor にする（0..5。4 でボスまで全部のフロアに行ける、5 でボスを倒したことになる）。
       // 書いた値を返す。知らない id は何もせず null
       unlock: (id, floor) => DG.some(g => g.id === id)

@@ -124,6 +124,11 @@ t('topbar_one_line_360', async page => {
   assert.equal(r.h, r.h0, `チップで折り返している: ${at}`);
   assert.equal(r.chip, '12.3万');
   assert.ok(r.sw <= r.iw, `横にスクロールする: ${at}`);
+  // 言語の切りかえも同じ行に「EN」と見えて、読み上げの名前は「English」のまま
+  const sw = page.locator('#topbar').getByRole('link', { name: 'English', exact: true });
+  const b = await sw.boundingBox();
+  assert.ok(b.y < Math.min(...r.bottoms) && b.x + b.width <= r.iw, `切りかえが折り返している: ${JSON.stringify(b)}`);
+  assert.match(await sw.evaluate(e => getComputedStyle(e, '::after').content), /^"EN"/);
 }, { viewport: { width: 360, height: 640 } });
 
 t('settings_switch', async page => {

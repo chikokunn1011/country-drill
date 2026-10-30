@@ -80,6 +80,7 @@
 - 読むもの: `countries.js`・`trivia.js`・`daily-core.js` の `SIMILAR`・`index.html` の `REGIONS`・`SUBREGIONS`・フッター・`FLAG_V`・テーマの先読み・`privacy.html` の `pages.css?v=`・`world.js` と `data/neighbors_fix.json`（となりの国）・`data/flag_meanings.json`（国旗の意味）・`themes/*.html`（この国旗が出てくるまとめ）。どれかを変えたら流し直す（流し忘れると unit の `regenerate_same` が落ちて知らせる）
 - `sitemap.xml` は目印のあいだだけを書きかえる。国のページに `lastmod` は付けない
 - まとめページも作り直すときは、先に `node tools/make_theme_pages.mjs`、そのあと `node tools/make_country_pages.mjs`（国のページは作ってあるまとめページを読んで、その国が出てくるまとめにリンクする）
+- 全部を作り直す順番（`index.html`・`embed.html`・`i18n/`・`data/`・`countries.js` などを変えたとき。あとのものが前のものの出力を読むので、順番を変えない）: `node tools/make_en.mjs && node tools/make_theme_pages.mjs && node tools/make_country_pages.mjs && node tools/make_sw.mjs`（英語版の `en/index.html`・`en/embed.html` → まとめページ → 国のページ → `sw.js`）
 - SIMILAR に知らないコード・豆知識が0件の国・`flags/<コード>.svg` が無い国・フッターの目印が無い・国旗の意味（`data/flag_meanings.json`）が無い国や最初の文が長すぎる国がある・`themes/index.html` が無い・`data/neighbors_fix.json` に知らないコードや地図と同じになる直しがあるときは、何も書かずに終了コード1で止まる
 - 国のページの［この地域で遊ぶ］は `index.html#play=<地域>`（細かい地域があればそれ）を開き、その地域を選んだモード選択の画面になる。知らない値は無視してホームを出す
 - 本編の図鑑（一覧のくわしい窓と地図の情報欄）に「この国のページ ›」を出す。クイズの答えの欄には出さない
@@ -87,8 +88,9 @@
 
 ## アプリ化（service worker）
 
-- `sw.js`（service worker）は `pwa.js` が登録する。オフラインでも遊べるように、`index.html` が読むファイル・地図・国旗195枚などを端末に保存する（precache）
-  - ページと `?v=` の無いファイル（`countries.js`・`trivia.js`・textures など）はネット優先（3秒で返らない・つながらない・500番台なら保存したもの）。`?v=` 付きと `vendor/` は保存したもの優先
+- `sw.js`（service worker）は `pwa.js` が登録する。オフラインでも遊べるように、`index.html` と英語版の `en/index.html` が読むファイル・地図・国旗195枚などを端末に保存する（precache）
+  - オフラインで本編を出すのは、根（`./`・`index.html`）→ `index.html` と、`en/`・`en/index.html` → `en/index.html` だけ。国のページ・テーマのページ（`country/`・`themes/`・`en/country/`・`en/themes/`）は保存しない
+  - ページと `?v=` の無いファイル（`trivia.js`・textures など）はネット優先（3秒で返らない・つながらない・500番台なら保存したもの）。`?v=` 付きと `vendor/` は保存したもの優先
   - 外のサイト（Supabase・Google Fonts など）と管理ページ（`admin*`）にはさわらない／保存しない
 - `sw.js` の一覧（`PRECACHE`）と版（`VERSION`）は `node tools/make_sw.mjs` で作る。手で書かない
   - precache に入るファイルの中身を変えたとき・`index.html` の `?v=` を上げたとき・読むファイルを足したときは流し直してコミットする（流し忘れると unit の `sw_is_current` が落ちて知らせる）

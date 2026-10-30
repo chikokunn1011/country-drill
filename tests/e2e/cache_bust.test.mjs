@@ -1,4 +1,4 @@
-// キャッシュよけ: このブランチで中身を変えた js/css は、index.html の ?v= を origin/main のものより上げる
+// キャッシュよけ: このブランチで中身を変えた js/css は、ページ（index.html・en/index.html・embed.html）の ?v= を origin/main のものより上げる
 // （同じ ?v= のままだと、前の版を開いた人のブラウザに古いファイルが残り、新しいファイルと混ざって動かない）。ブラウザは使わない
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,16 +9,21 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-// index.html の「ファイル名 → ?v= の数」
-const versions = html => Object.fromEntries([...html.matchAll(/(?:src|href)="([\w.-]+\.(?:js|css))\?v=(\d+)"/g)].map(m => [m[1], +m[2]]));
+// ?v= を付けて読むページ（英語版の en/index.html は <base href="../"> なので、パスはルートから）
+const PAGES = ['index.html', 'en/index.html', 'embed.html'];
+// ページの「ファイルのパス → ?v= の数」
+const versions = html => Object.fromEntries([...html.matchAll(/(?:src|href)="([\w./-]+\.(?:js|css))\?v=(\d+)"/g)].map(m => [m[1], +m[2]]));
+// 全部のページを合わせたもの。read(page) が投げたら（そのころ無いページ）飛ばす
+const allVersions = read => Object.assign({}, ...PAGES.map(p => { try { return versions(read(p)); } catch { return {}; } }));
+const readNow = p => readFileSync(join(ROOT, p), 'utf8');
 
 test('changed_files_bump_version', t => {
-  let base, mainHtml;
-  try { base = git('merge-base', 'origin/main', 'HEAD').trim(); mainHtml = git('show', 'origin/main:index.html'); } catch {
+  let base;
+  try { base = git('merge-base', 'origin/main', 'HEAD').trim(); git('show', 'origin/main:index.html'); } catch {
     t.diagnostic('origin/main が無いので比べない');
     return;
   }
-  const mine = versions(readFileSync(join(ROOT, 'index.html'), 'utf8')), main = versions(mainHtml);
+  const mine = allVersions(readNow), main = allVersions(p => git('show', `origin/main:${p}`));
   const problems = [];
   for (const [file, v] of Object.entries(mine)) {
     if (!(file in main)) continue;   // このブランチで足したファイル
@@ -37,12 +42,11 @@ test('same_version_same_content', t => {
     t.diagnostic('origin/main が無いので比べない');
     return;
   }
-  const mine = versions(readFileSync(join(ROOT, 'index.html'), 'utf8'));
+  const mine = allVersions(readNow);
   const now = Object.fromEntries(Object.keys(mine).map(file => [file, git('hash-object', file).trim()]));
   const problems = new Map();   // ファイル → 最初に見つけた（いちばん新しい）食いちがい
   for (const c of commits) {
-    let old;
-    try { old = versions(git('show', `${c}:index.html`)); } catch { continue; }   // index.html が無いころ
+    const old = allVersions(p => git('show', `${c}:${p}`));   // そのころ無いページは飛ばす
     for (const [file, v] of Object.entries(mine)) {
       if (old[file] !== v) continue;
       let blob;

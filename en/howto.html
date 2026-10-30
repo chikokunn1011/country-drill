@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to play | Flag Master</title>
+<meta name="description" content="How to play Flag Master: the 4-choice quiz on flags, country names, and locations; Practice and Challenge; the Look-alike Flags Dojo; and the Gallery.">
+<link rel="canonical" href="https://chikokunn1011.github.io/country-drill/en/howto.html">
+<link rel="alternate" hreflang="ja" href="https://chikokunn1011.github.io/country-drill/howto.html">
+<link rel="alternate" hreflang="en" href="https://chikokunn1011.github.io/country-drill/en/howto.html">
+<link rel="alternate" hreflang="x-default" href="https://chikokunn1011.github.io/country-drill/howto.html">
+<link rel="icon" href="../favicon.ico" sizes="32x32">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+// 画面の色はアプリ（index.html）と同じ文で当てる（設定の theme、未設定はライト。'auto' なら端末に合わせる）
+try { const t = (JSON.parse(localStorage.getItem('settings')) || {}).theme ?? 'light'; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}
+</script>
+<link rel="stylesheet" href="../pages.css?v=2">
+</head>
+<body>
+<main class="page">
+  <a class="back" href="./">← Play Flag Master</a><span class="langsw"><a href="../howto.html" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>
+  <h1>How to play</h1>
+  <p>Flag Master is a site for learning the flags, names, and locations of the world’s 195 countries with quizzes. Everything works without signing up.</p>
+
+  <h2 id="start">Getting started</h2>
+  <ol>
+    <li>Select the big <b>Play the quiz</b> card at the top of the home screen.</li>
+    <li>On the <b>Choose a mode</b> screen, pick the question type, answer style, regions, and number of questions.</li>
+    <li>Select <b>Start</b> to begin the quiz. Choose one of the four answers (in Tap the map, you tap on the map instead).</li>
+  </ol>
+  <p>The row of small icons below the card has <b>Gallery</b> and <b>Settings</b>. In <b>Settings</b> on the home screen, you can change the sound, color theme, text size, colorblind-friendly colors (right answers turn blue and wrong answers turn orange), “Go straight to the next question after a right answer,” and more.</p>
+
+  <h2 id="modes">Five question types</h2>
+  <p>Questions combine flags, country names, and locations.</p>
+  <ul>
+    <li><b>Flag → Name</b>: See a flag and choose the country’s name.</li>
+    <li><b>Name → Flag</b>: See a country’s name and choose its flag.</li>
+    <li><b>Location → Flag</b>: See a location marked on the map and choose that country’s flag.</li>
+    <li><b>Flag → Location</b>: See a flag and choose where that country is on the map.</li>
+    <li><b>Tap the map</b>: See a flag and tap where that country is on a blank map with no answer choices. You can zoom in and out and drag to move the map.</li>
+  </ul>
+  <p>In the three types that use locations, turn on “Also show the country name (hint)” to see the country’s name too.</p>
+
+  <h2 id="kinds">Practice and Challenge</h2>
+  <p>Choose one of these under <b>Answer style</b>.</p>
+  <ul>
+    <li><b>Practice</b>: Questions you miss come back later. It ends when you get them all right.</li>
+    <li><b>Challenge</b>: One mistake sends you back to the start. Aim for a perfect run.</li>
+  </ul>
+  <p>The countries you miss are recorded, and you can review them together when the quiz ends. You can clear this record with <b>Clear mistake history</b> in <b>Settings</b> on the home screen.</p>
+
+  <h2 id="dojo">Look-alike Flags Dojo</h2>
+  <p>On the <b>Choose a mode</b> screen, select <b>Look-alike Flags Dojo →</b>. Pick a group of look-alike flags to get questions on just those countries. Any you miss come back later.</p>
+
+  <h2 id="book">Gallery</h2>
+  <p>Select <b>Gallery</b> on the home screen to see the flags of all 195 countries as a list or on a map. Select a country to see its capital, region, and area.</p>
+  <p>The quiz never asks for capitals. You can see them in the explanation after each answer and in the Gallery.</p>
+
+  <h2 id="app">Add to home screen</h2>
+  <p>If your browser supports it, select <b>Add to home screen</b> in <b>Settings</b>. Once added, it opens instantly like an app and works even offline. On an iPhone, tap the Share button in Safari (the square with an up arrow), then choose “Add to Home Screen.”</p>
+
+  <h2 id="embed">Put it on your blog or website</h2>
+  <p>You can put “Today’s flag,” a one-question-a-day flag quiz, on your own blog or website. Copy the code below and paste it in.</p>
+  <pre style="overflow-x: auto; max-width: 100%; margin: 0 0 16px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-mono); font-size: .8rem; line-height: 1.5;"><code>&lt;iframe src="https://chikokunn1011.github.io/country-drill/en/embed.html" title="Today’s flag (Flag Master)" width="100%" height="460" style="max-width:400px;border:0" loading="lazy"&gt;&lt;/iframe&gt;</code></pre>
+  <p>The colors start out light. For dark colors, change <code>embed.html</code> to <code>embed.html?theme=dark</code>. To match the viewer’s device, change it to <code>embed.html?theme=auto</code>.</p>
+  <p>Each question either shows a flag and asks for the country’s name, or shows a country’s name and asks for its flag. There are no questions about capitals. The question changes every day (at midnight Japan time).</p>
+
+  <h2 id="faq">FAQ</h2>
+  <details>
+    <summary>Does it cost anything?</summary>
+    <p>No. Everything is free.</p>
+  </details>
+  <details>
+    <summary>Do I need to sign up?</summary>
+    <p>No.</p>
+  </details>
+  <details>
+    <summary>Are there questions that ask for capitals?</summary>
+    <p>No. Questions only use flags, country names, and locations. You can see capitals in the explanation after each answer and in the Gallery.</p>
+  </details>
+  <details>
+    <summary>My records disappeared.</summary>
+    <p>Your records are saved in the browser on your device. If you clear the browser’s site data, your records are cleared too.</p>
+  </details>
+  <details>
+    <summary>Country names are written differently than elsewhere.</summary>
+    <p>Country names follow the article titles on English Wikipedia. See the <a href="about.html#country-names">About page</a> for details.</p>
+  </details>
+  <details>
+    <summary>I found a mistake.</summary>
+    <p>Please report it through the <a href="about.html#contact">contact form</a>.</p>
+  </details>
+</main>
+<footer>
+  <!-- footer:start -->
+  <nav class="foot-links" aria-label="Site links"><a href="howto.html">How to play</a><a href="about.html">About</a><a href="about.html#contact">Contact</a><a href="privacy.html">Privacy policy</a><a href="country/">All countries</a><a href="themes/">Flag collections</a></nav>
+  <!-- footer:end -->
+</footer>
+</body>
+</html>

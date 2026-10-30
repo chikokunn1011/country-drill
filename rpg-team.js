@@ -8,7 +8,7 @@
   const RPG = window.RPG;
   if (typeof RPG?.tx !== 'function' || typeof RPG.cardHTML !== 'function') return;
 
-  const K = RPG_CORE, T = K.TUNING, TM = T.team, DG = K.DUNGEONS, COIN = RPG.COIN, TOTAL = C.length, BOSS = 5;
+  const K = RPG_CORE, U = K.TUNING, TM = U.team, DG = K.DUNGEONS, COIN = RPG.COIN, TOTAL = C.length, BOSS = 5;
   const AREAS = ['all', ...K.REGION_DUNGEONS.map(g => g.r)];
   const inArea = (a, r) => r === 'all' || byA.get(a)?.r === r;
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -27,7 +27,7 @@
     + '<p class="hint">同じグループの仲間が2枚で＋10%、3枚で＋25%（こうげき・HP）</p></div>'
     + '<div class="tm-main" id="tm-main"><p class="rpg-lbl" id="tm-count"></p>'
     + `<div class="chips" id="tm-regions" role="group" aria-label="地域でしぼりこむ">${AREAS.map(r => `<button type="button" class="chip" aria-pressed="false" data-r="${r}">${r === 'all' ? 'すべて' : r}</button>`).join('')}</div>`
-    + `<div class="tm-none" id="tm-none" hidden><p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p><button type="button" class="btn" id="tm-gacha">国旗ガチャへ</button></div>`
+    + `<div class="tm-none" id="tm-none" hidden><p class="hint">仲間がいると強くなるよ（国旗ガチャ・${U.card.frJoin}回正解）</p><button type="button" class="btn" id="tm-gacha">国旗ガチャへ</button></div>`
     + '<div class="rpg-cd-grid tm-grid" id="tm-grid"></div></div>';
 
   // dg: 強さを見るダンジョン（保存しない。開くたびに次に挑むダンジョン）。region: 一覧のしぼりこみ。back: バトルの登場画面から来たとき { id, floor }

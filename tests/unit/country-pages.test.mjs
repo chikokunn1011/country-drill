@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { readInputs, check, render, neighborsOf, byJa } from '../../tools/make_country_pages.mjs';
+import { readInputs, check, render, neighborsOf, byJa, theName, THE_NAMES } from '../../tools/make_country_pages.mjs';
+import { JA_RE } from '../../tools/i18n_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SITE = 'https://chikokunn1011.github.io/country-drill/';
@@ -53,8 +54,8 @@ function withTmp(fn) {
 // 生成スクリプトが読むものを一時の root に写す
 const copyInputs = dir => {
   for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
-  for (const d of ['flags', 'themes']) cpSync(join(ROOT, d), join(dir, d), { recursive: true });
-  mkdirSync(join(dir, 'data'), { recursive: true });
+  for (const d of ['flags', 'themes', 'en/themes']) cpSync(join(ROOT, d), join(dir, d), { recursive: true });
+  for (const f of ['en/index.html', 'i18n/en-core.js', 'data/en/flag_meanings.json']) { mkdirSync(dirname(join(dir, f)), { recursive: true }); cpSync(join(ROOT, f), join(dir, f)); }
   for (const f of ['neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
 };
 const edit = (dir, f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
@@ -64,13 +65,16 @@ const triviaEmpty = a => dir => setTrivia(dir, a, []);
 const rmFlag = a => dir => rmSync(join(dir, 'flags', `${a}.svg`));
 const noFooterMarks = dir => edit(dir, 'index.html', s => s.replace('<!-- footer:start -->', ''));
 const noThemes = dir => rmSync(join(dir, 'themes'), { recursive: true, force: true });
+const noEnMeaning = a => dir => edit(dir, 'data/en/flag_meanings.json', s => JSON.stringify(JSON.parse(s).filter(m => m.a !== a)));
+const noEnFooter = dir => edit(dir, 'en/index.html', s => s.replace('<!-- footer:start -->', ''));
+const noEnThemes = dir => rmSync(join(dir, 'en/themes'), { recursive: true, force: true });
 
 test('regenerate_same', () => {            // 作り直すと同じ（コミット済みと1文字もちがわない）
   const out = render(readInputs(ROOT));
-  assert.equal(Object.keys(out).filter(p => p.startsWith('country/')).length, 196);
+  for (const d of ['country/', 'en/country/']) assert.equal(Object.keys(out).filter(p => p.startsWith(d)).length, 196, d);
   for (const [p, s] of Object.entries(out)) assert.equal(read(p), s, p);
-  assert.deepEqual(readdirSync(join(ROOT, 'country')).filter(f => f.endsWith('.html')).sort(),
-    Object.keys(out).filter(p => p.startsWith('country/')).map(p => p.slice(8)).sort());
+  for (const d of ['country/', 'en/country/']) assert.deepEqual(readdirSync(join(ROOT, d)).filter(f => f.endsWith('.html')).sort(),
+    Object.keys(out).filter(p => p.startsWith(d)).map(p => p.slice(d.length)).sort(), d);
 });
 
 test('inputs_ok', () => assert.deepEqual(check(readInputs(ROOT)), []));
@@ -163,7 +167,7 @@ test('no_color_vars_in_country_css', () => assert.ok(!/--[\w-]+\s*:/.test(read('
 
 test('sitemap_markers', () => {
   const s = read('sitemap.xml'), inside = between(s, '<!-- country:start -->', '<!-- country:end -->');
-  assert.deepEqual(locs(inside), [SITE + 'country/', ...C.map(c => c.a).sort().map(a => `${SITE}country/${a}.html`)]);
+  assert.deepEqual(locs(inside), ['country/', 'en/country/'].flatMap(d => [SITE + d, ...C.map(c => c.a).sort().map(a => `${SITE}${d}${a}.html`)]));
   assert.ok(!inside.includes('<lastmod>'));
   for (const p of ['', 'privacy.html', 'about.html', 'howto.html']) assert.ok(locs(outside(s)).includes(SITE + p), p);
   const i = readInputs(ROOT), once = render(i)['sitemap.xml'];
@@ -174,7 +178,8 @@ test('sitemap_markers', () => {
 test('cli_stops_on_bad_input', () => {      // 一時の root に入力を写し、1つずつこわす。終了コード1・stderr・何も書かない
   for (const [break_, re] of [[similarAdd('zz'), /SIMILAR に知らないコード: zz/], [triviaEmpty('fr'), /豆知識が0件: fr/],
                               [rmFlag('fr'), /flags\/fr\.svg が無い/], [noFooterMarks, /フッターの目印が無い/],
-                              [noThemes, /themes\/index\.html が無い/]])
+                              [noThemes, /themes\/index\.html が無い/], [noEnMeaning('fr'), /英語の国旗の意味が無い: fr/],
+                              [noEnFooter, /en\/index\.html のフッターの目印が無い/], [noEnThemes, /en\/themes\/index\.html が無い/]])
     withTmp(dir => {
       copyInputs(dir); break_(dir);
       const r = spawnSync('node', ['tools/make_country_pages.mjs', '--root', dir, '--out', dir], { cwd: ROOT, encoding: 'utf8' });
@@ -188,7 +193,7 @@ test('cli_writes', () => withTmp(dir => {   // こわれていなければ --out
   copyInputs(dir);
   const r = spawnSync('node', ['tools/make_country_pages.mjs', '--root', dir, '--out', dir], { cwd: ROOT, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  for (const p of ['country/index.html', 'country/fr.html', 'sitemap.xml']) assert.equal(readFileSync(join(dir, p), 'utf8'), read(p), p);
+  for (const p of ['country/index.html', 'country/fr.html', 'en/country/index.html', 'en/country/fr.html', 'sitemap.xml']) assert.equal(readFileSync(join(dir, p), 'utf8'), read(p), p);
 }));
 
 test('escapes_text', () => withTmp(dir => {   // 豆知識に `<b>&"` → ページには &lt;b&gt;&amp;&quot;、<b> タグは無い
@@ -337,4 +342,135 @@ test('country_desc_starts_with_meaning', () => {
     assert.ok(d.startsWith(`${c.n}の国旗の意味: ${first}`), c.a);
     assert.ok(d.length <= 120, `${c.a} ${d.length}`);
   }
+});
+
+// ---- 英語のページ（en/country/） ----
+const enPages = () => ['en/country/index.html', ...C.map(c => `en/country/${c.a}.html`)];
+const EN_URL = p => SITE + (p === 'en/country/index.html' ? 'en/country/' : p);
+const JA_OF = p => p.slice(3);
+const MEANING_EN = new Map(JSON.parse(read('data/en/flag_meanings.json')).map(m => [m.a, m.t]));
+const byEn = (x, y) => x.e.localeCompare(y.e, 'en') || (x.a < y.a ? -1 : 1);
+// 見える文字（script・style・コメントと、lang="ja" の要素を除く）
+const visible = html => html
+  .replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/<(\w+)\b[^>]*\slang="ja"[^>]*>[\s\S]*?<\/\1>/g, '');
+
+test('en_country_head', () => {            // 196枚。lang・title・canonical・description・hreflang（日本語のページと互いに）
+  for (const p of enPages()) {
+    const h = read(p), url = EN_URL(p), ja = URL_OF(JA_OF(p));
+    assert.match(h, /<html lang="en">/, p);
+    assert.ok(h.includes(`<link rel="canonical" href="${url}">`), p);
+    assert.ok(h.includes(`<meta property="og:url" content="${url}">`), p);
+    assert.ok(h.includes('<meta property="og:site_name" content="Flag Master">'), p);
+    assert.ok(h.includes('<meta property="og:locale" content="en_US">'), p);
+    const d = desc(h);
+    assert.ok(d.length >= 20 && d.length <= 160, `${p} ${d.length}`);
+    const lines = [`<link rel="alternate" hreflang="ja" href="${ja}">`, `<link rel="alternate" hreflang="en" href="${url}">`,
+      `<link rel="alternate" hreflang="x-default" href="${ja}">`].join('\n');
+    for (const q of [p, JA_OF(p)]) { const x = read(q); assert.ok(x.slice(0, x.indexOf('</head>')).includes(lines), q); }
+    const tail = p === 'en/country/index.html' ? '' : p.slice(11);
+    assert.ok(h.includes(`<span class="langsw"><a href="../../country/${tail}" hreflang="ja" lang="ja">日本語</a> / <b lang="en">English</b></span>`), p);
+    assert.ok(read(JA_OF(p)).includes(`<span class="langsw"><b>日本語</b> / <a href="../en/country/${tail}" hreflang="en" lang="en">English</a></span>`), JA_OF(p));
+    assert.equal(ldJson(h).itemListElement.at(-1).item, url, p);
+    assert.match(h, /<link rel="stylesheet" href="\.\.\/\.\.\/pages\.css\?v=\d+">/, p);
+    assert.ok(!/<script[^>]* src=/.test(h), p);
+    for (const u of relLinks(h)) {
+      const r = posix.normalize(posix.join(posix.dirname(p), u));
+      if (/^en\/(?:howto|about|privacy)/.test(r)) continue;   // これから作る英語のページ
+      assert.ok(existsSync(resolveFrom(p, u)), `${p} → ${u}`);
+    }
+  }
+  for (const c of C) {
+    const h = read(`en/country/${c.a}.html`);
+    assert.equal(unesc(attr(h, /<title>([^<]*)<\/title>/)), `Flag of ${theName(c.e)}: meaning and neighbors | Flag Master`, c.a);
+    const first = /^[\s\S]*?[.!?]["”)]?(?=\s+[A-Z"“(]|$)/.exec(MEANING_EN.get(c.a))[0];
+    const d = desc(h), head = `Flag of ${theName(c.e)}: ${first}`;
+    assert.ok(head.length <= 160 ? d.startsWith(head) : d.endsWith('…') && head.startsWith(d.slice(0, -1)), c.a);
+  }
+  assert.equal(desc(read('en/country/fr.html')), `Flag of France: ${MEANING_EN.get('fr').split('. ')[0]}. France (Europe): flag, capital, area, and neighbors. Look-alike flags: Netherlands, Luxembourg, Paraguay.`);
+});
+
+test('en_country_content', () => {
+  const h = read('en/country/fr.html');
+  assert.ok(h.includes('<h1>France</h1>'));
+  assert.ok(h.includes(`<img src="../../flags/fr.svg?v=${FLAG_V}" alt="Flag of France" width="640" height="480">`));
+  assert.ok(h.includes('<dt>Region</dt><dd>Europe</dd>'));
+  assert.ok(h.includes('<dt>Capital</dt><dd>Paris</dd>'));
+  assert.ok(h.includes('<dt>Area</dt><dd>551,695 km²</dd>'));
+  assert.ok(h.includes('<h2>What the flag means</h2>'));
+  assert.ok(h.includes(`<p class="meaning">${MEANING_EN.get('fr').replace(/&/g, '&amp;').replace(/"/g, '&quot;')}</p>`));
+  assert.ok(h.includes('<h2>Neighboring countries</h2>'));
+  const nb = hrefsIn(h, 'ul.neighbors');
+  assert.ok(nb.includes('de.html') && h.includes('<span>Germany</span>'));
+  assert.deepEqual(nb, NB.get('fr').map(b => byA.get(b)).sort(byEn).map(b => `${b.a}.html`));
+  assert.deepEqual(hrefsIn(h, 'ul.similar'), ['nl.html', 'lu.html', 'py.html']);
+  assert.ok(h.includes(`<a class="play-region" href="../#play=${encodeURIComponent('西ヨーロッパ')}">Play this region: Western Europe</a>`));
+  assert.ok(h.includes('<a href="../">Play Flag Master</a>') && h.includes('<a href="../#book">See it in the Gallery</a>'));
+  assert.ok(!h.includes('index.html#'));
+  assert.ok(!/豆知識|Trivia/i.test(h) && !h.includes('class="trivia"'));
+  // 並び: 国旗 → 地域など → 意味 → となり → 似ている → まとめ → 遊ぶ → 前後 → フッター
+  const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, s); return i; };
+  const order = ['class="cflag"', 'class="cfacts"', '<h2>What the flag means</h2>', '<h2>Neighboring countries</h2>', '<h2>Look-alike flags</h2>',
+    '<h2>Flag collections with this flag</h2>', 'class="cplay"', 'class="prevnext"', '<footer>'].map(at);
+  assert.deepEqual(order, [...order].sort((x, y) => x - y));
+  assert.ok(hrefsIn(h, 'ul.cthemes').includes('../themes/vtricolor.html'));
+  assert.ok(h.includes('<a href="../themes/vtricolor.html">Vertical tricolor flags</a>'));
+  assert.ok(read('en/country/jp.html').includes('<p class="noneighbor">No land borders (island country)</p>'));
+  const au = read('en/country/au.html');
+  assert.ok(au.includes('<p class="noneighbor">No land borders</p>'));
+  assert.ok(au.includes(`href="../#play=${encodeURIComponent('オセアニア')}">Play this region: Oceania</a>`));
+  // フッターは en/index.html のもの（../../ を付ける）
+  const foot = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/;
+  const want = foot.exec(read('en/index.html'))[1].trim().replace(/href="(?!https?:|#)([^"]*)"/g, 'href="../../$1"');
+  for (const p of enPages()) assert.equal(foot.exec(read(p))?.[1].trim(), want, p);
+  // 一覧: 6地域、e の ABC 順
+  const idx = read('en/country/index.html');
+  assert.deepEqual([...idx.matchAll(/<section><h2>([^<]+)<\/h2>/g)].map(m => unesc(m[1])),
+    ['Asia', 'Europe', 'Africa', 'North & Central America', 'South America', 'Oceania']);
+  const { REGIONS } = readInputs(ROOT);
+  for (const r of REGIONS) {
+    const sec = idx.split('<section>')[REGIONS.indexOf(r) + 1];
+    assert.deepEqual([...sec.matchAll(/class="ccard" href="([a-z]{2})\.html"/g)].map(m => m[1]), [...C.filter(c => c.r === r).sort(byEn).map(c => c.a)], r);
+    assert.ok(sec.includes(`href="../#play=${encodeURIComponent(r)}"`), r);
+  }
+});
+
+test('en_prevnext_edges', () => {          // 同じ6地域の中で e の ABC 順。端に前・次は無い
+  const { REGIONS } = readInputs(ROOT);
+  for (const r of REGIONS) {
+    const list = C.filter(c => c.r === r).sort(byEn);
+    list.forEach((c, i) => {
+      const nav = prevnext(read(`en/country/${c.a}.html`));
+      assert.ok(nav != null, c.a);
+      const prev = /<a class="prev" href="([a-z]{2})\.html">← ([^<]+)<\/a>/.exec(nav), next = /<a class="next" href="([a-z]{2})\.html">([^<]+) →<\/a>/.exec(nav);
+      if (i === 0) assert.equal(prev, null, `${c.a} は ${r} の最初`);
+      else assert.deepEqual([prev?.[1], unesc(prev?.[2] ?? '')], [list[i - 1].a, list[i - 1].e], c.a);
+      if (i === list.length - 1) assert.equal(next, null, `${c.a} は ${r} の最後`);
+      else assert.deepEqual([next?.[1], unesc(next?.[2] ?? '')], [list[i + 1].a, list[i + 1].e], c.a);
+    });
+  }
+});
+
+test('en_country_no_japanese', () => {     // 見える文字に日本語が無い（lang="ja" の切りかえだけ）。head の文字・ld+json も
+  for (const p of enPages()) {
+    const h = read(p), left = visible(h).match(new RegExp(JA_RE.source, 'gu'));
+    assert.equal(left, null, `${p} に日本語: ${left?.join('')}`);
+    assert.doesNotMatch(desc(h), JA_RE, p);
+    assert.doesNotMatch(JSON.stringify(ldJson(h)), JA_RE, p);
+  }
+});
+
+test('en_the_name', () => {                // 「Flag of」のあとは the を付ける国がある。h1・一覧は e のまま
+  const us = read('en/country/us.html');
+  assert.ok(us.includes('<title>Flag of the United States: meaning and neighbors | Flag Master</title>'));
+  assert.ok(us.includes('alt="Flag of the United States"') && us.includes('<h1>United States</h1>'));
+  assert.ok(desc(us).startsWith('Flag of the United States: '));
+  const bs = read('en/country/bs.html');
+  assert.ok(bs.includes('<title>Flag of the Bahamas: meaning and neighbors | Flag Master</title>') && bs.includes('<h1>The Bahamas</h1>'));
+  assert.equal(theName('The Gambia'), 'the Gambia');
+  assert.equal(theName('France'), 'France');
+  // 名前に Republic・Islands・United・States のある国は、みな THE_NAMES に入っている。THE_NAMES は e にある名前だけ
+  const es = new Set(C.map(c => c.e));
+  for (const e of es) if (/Republic|Islands|United|States/.test(e)) assert.ok(THE_NAMES.has(e), e);
+  for (const e of THE_NAMES) assert.ok(es.has(e), e);
 });

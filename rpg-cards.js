@@ -10,7 +10,7 @@
   const RPG = window.RPG;
   if (typeof RPG?.tx !== 'function') return;
 
-  const K = RPG_CORE, T = K.TUNING, REGION_DG = K.REGION_DUNGEONS, TOTAL = C.length, COIN = RPG.COIN, owned = K.owned;
+  const K = RPG_CORE, U = K.TUNING, REGION_DG = K.REGION_DUNGEONS, TOTAL = C.length, COIN = RPG.COIN, owned = K.owned;
   const restHint = rest => `あと${rest}回正解で仲間に（1回のゲームで1回ぶん）`;
 
   /* ---------- 仲間のカード・国旗ガチャ（#scr-gacha）・仲間の一覧（#scr-cards） ---------- */
@@ -20,7 +20,7 @@
   const AREA_N = Object.fromEntries(AREAS.map(r => [r, r === 'all' ? TOTAL : C.filter(c => c.r === r).length]));
   const inArea = (a, r) => r === 'all' || byA.get(a)?.r === r;
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const dots = n => '●'.repeat(n) + '○'.repeat(T.card.stackMax - n);   // かさね ●●○○
+  const dots = n => '●'.repeat(n) + '○'.repeat(U.card.stackMax - n);   // かさね ●●○○
   const backBtn = '<button type="button" class="linkbtn rpg-back">← 冒険</button>';
   // チップは1回だけ作り、押した状態と「持っている数/国の数」だけ描き直す（押したチップのフォーカスが外れない）
   const chipsHTML = allLabel => AREAS.map(r => `<button type="button" class="chip" aria-pressed="false" data-r="${r}">${r === 'all' ? allLabel : r}<span class="mono"></span></button>`).join('');
@@ -67,13 +67,13 @@
   const cardHTML = (a, d, { face = 'up', label = '', lazy = false } = {}) => {
     const c = byA.get(a);
     if (!c) return '';
-    const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = T.card.frJoin - fr, back = face === 'back', nm = foldName(c.n);
+    const card = d.cards?.[a], fr = d.fr?.[a] || 0, star = card ? card[0] : 0, rest = U.card.frJoin - fr, back = face === 'back', nm = foldName(c.n);
     const mid = card
-      ? `<span class="rpg-card-star">${'★'.repeat(star)}</span><span class="rpg-card-stack" title="かさね ${card[1]}/${T.card.stackMax}">${dots(card[1])}</span>`
+      ? `<span class="rpg-card-star">${'★'.repeat(star)}</span><span class="rpg-card-stack" title="かさね ${card[1]}/${U.card.stackMax}">${dots(card[1])}</span>`
       : rest > 0 ? `<span class="rpg-card-hint">${restHint(rest)}</span>` : '';
     return `<button type="button" class="rpg-card rpg-s${star}${card ? '' : ' is-none'}${back ? ' is-back' : ''}" data-a="${a}" data-star="${star}"${back ? ' aria-label="裏向きのカード"' : ''}>`
       + `<span class="rpg-card-face">${label ? `<span class="rpg-lab">${label}</span>` : ''}<img class="rpg-card-flag" src="${flag(a)}" alt=""${lazy ? ' loading="lazy"' : ''}>`
-      + `<b class="rpg-card-name" style="--n:${nm.n};--l:${nm.l}">${nm.html}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${T.card.frMax}</span></span>`
+      + `<b class="rpg-card-name" style="--n:${nm.n};--l:${nm.l}">${nm.html}</b>${mid}<span class="rpg-card-fr" title="なかよし度">♥${fr}/${U.card.frMax}</span></span>`
       + '<span class="rpg-card-back" aria-hidden="true"><span>🧭</span></span></button>';
   };
   // #detail に国の情報とカードの強さ。id があればそのダンジョンでの値（地域ボーナス ×1.5 が付くか）
@@ -85,12 +85,12 @@
     if (card) {
       const bonus = !!g && K.inDungeon(g, a), atk = K.cardAtk(card, fr, bonus);
       const nw = s => `<span class="rpg-nowrap">${s}</span>`;
-      info = `<p>${nw(`★${card[0]} ${STAR_NAME[card[0]]}`)}・${nw(`かさね ${dots(card[1])}`)}・${nw(`なかよし度 ♥${fr}/${T.card.frMax}`)}</p>`
-        + `<p class="rpg-cd-pow">${nw(`こうげき ${atk.toFixed(1)}`)}${nw(`（地域ボーナス ${bonus ? 'あり' : 'なし'}）`)}・${nw(`HP ${(atk * T.card.hpMul).toFixed(1)}`)}</p>`
-        + (g ? '' : `<p class="hint">${esc(c.r)}のダンジョンと地図喰いの巣では、地域ボーナスで ×${T.card.regionMul}</p>`);
+      info = `<p>${nw(`★${card[0]} ${STAR_NAME[card[0]]}`)}・${nw(`かさね ${dots(card[1])}`)}・${nw(`なかよし度 ♥${fr}/${U.card.frMax}`)}</p>`
+        + `<p class="rpg-cd-pow">${nw(`こうげき ${atk.toFixed(1)}`)}${nw(`（地域ボーナス ${bonus ? 'あり' : 'なし'}）`)}・${nw(`HP ${(atk * U.card.hpMul).toFixed(1)}`)}</p>`
+        + (g ? '' : `<p class="hint">${esc(c.r)}のダンジョンと地図喰いの巣では、地域ボーナスで ×${U.card.regionMul}</p>`);
     } else {
-      info = `<p class="rpg-cd-pow">まだ仲間じゃない（なかよし度 ♥${fr}/${T.card.frMax}）</p>`
-        + (fr < T.card.frJoin ? `<p class="hint">${restHint(T.card.frJoin - fr)}</p>` : '');
+      info = `<p class="rpg-cd-pow">まだ仲間じゃない（なかよし度 ♥${fr}/${U.card.frMax}）</p>`
+        + (fr < U.card.frJoin ? `<p class="hint">${restHint(U.card.frJoin - fr)}</p>` : '');
     }
     inner.innerHTML = `<button class="close">閉じる</button>${factsHTML(c)}<div class="rpg-cd-info">${info}</div>`;
     inner.querySelector('.close').onclick = () => dlg.close();
@@ -99,11 +99,11 @@
 
   // ---- 国旗ガチャ ----
   const GA_NOTE = '※コインはクイズで集めるゲームの中のコインだけ。お金はかからないし、買うこともできないよ。';
-  const GA_LABEL = { new: () => 'NEW', up: () => 'ランクアップ', stack: () => 'かさね+1', refund: star => `おかえし ${COIN}${fmt(T.gacha.refund[star])}` };
+  const GA_LABEL = { new: () => 'NEW', up: () => 'ランクアップ', stack: () => 'かさね+1', refund: star => `おかえし ${COIN}${fmt(U.gacha.refund[star])}` };
   const GACHA_HTML = `<div class="rpg-head">${backBtn}<h2 class="rpg-h2">国旗ガチャ</h2><span class="rpg-hcoin" id="ga-coins"></span></div>`
     + '<div class="rpg-ga-side"><p class="rpg-warn" id="ga-warn" role="status" hidden></p><p class="rpg-lbl" id="ga-q">どこの国と出会う？</p>'
     + `<div class="chips" id="ga-regions" role="group" aria-labelledby="ga-q">${chipsHTML('全世界')}</div>`
-    + `<p class="hint" id="ga-hint">地域をしぼると値段が ×${T.gacha.regionMul}。そのかわり、その地域のダンジョンでは仲間が ×${T.card.regionMul} で強い</p>`
+    + `<p class="hint" id="ga-hint">地域をしぼると値段が ×${U.gacha.regionMul}。そのかわり、その地域のダンジョンでは仲間が ×${U.card.regionMul} で強い</p>`
     + '<div class="rpg-pack-slot" id="ga-pack"></div>'
     + '<div class="rpg-ga-btns"><button class="btn ghost" id="ga-free"></button><button class="btn" id="ga-1"></button><button class="btn" id="ga-10"></button></div>'
     + '<p class="rpg-ga-need" id="ga-need" hidden></p><p class="rpg-ga-msg" id="ga-msg" role="status"></p><p class="rpg-ga-pity" id="ga-pity"></p>'
@@ -143,7 +143,7 @@
       + `<span class="rpg-pack-name">${esc(name)}</span>`
       + `<span class="rpg-pack-sub">${rest > 0 ? `まだ会っていない国 ${rest}/${n}` : `${n}か国コンプリート！`}</span></span>`
       + `<span class="rpg-pack-tag" aria-hidden="true">★3 ${K.gachaRates().r3}%</span>`
-      + (r === 'all' ? '' : `<span class="rpg-pack-tag is-mul" aria-hidden="true">地域しぼり ×${T.gacha.regionMul}</span>`)
+      + (r === 'all' ? '' : `<span class="rpg-pack-tag is-mul" aria-hidden="true">地域しぼり ×${U.gacha.regionMul}</span>`)
       + '<i class="rpg-spark s1"></i><i class="rpg-spark s2"></i><i class="rpg-spark s3"></i><i class="rpg-spark s4"></i></div>';
   };
   let packKey = '';
@@ -163,7 +163,7 @@
   // ボタン・チップ・天井・提供割合・コイン（結果はそのまま）。新しい版のデータのあいだは引けない（書けないので）
   const drawGacha = (d = RPG.get()) => {
     if (!$('ga-regions')) return;
-    const { pity } = T.gacha, one = K.gachaCost(gaRegion, 1), ten = K.gachaCost(gaRegion, 10), free = $('ga-free'), need = $('ga-need'), warn = $('ga-warn'), stop = gaBusy || RPG.status === 'readOnly';
+    const { pity } = U.gacha, one = K.gachaCost(gaRegion, 1), ten = K.gachaCost(gaRegion, 10), free = $('ga-free'), need = $('ga-need'), warn = $('ga-warn'), stop = gaBusy || RPG.status === 'readOnly';
     warn.textContent = RPG.warn;
     warn.hidden = !RPG.warn;
     $('ga-coins').innerHTML = RPG.coinHTML(d.coins);
@@ -240,7 +240,7 @@
       + `<ol class="rpg-gst-got" aria-hidden="true">${n > 1 ? thumbsHTML(i) : ''}</ol>`;
     $('ga-stage-in').querySelector('.rpg-card').dataset.out = c.out;   // NEW などのラベルの色（一覧と同じ）
     clearTimeout(stageTimer);
-    stageTimer = setTimeout(turnCard, T.gacha.turnMs);
+    stageTimer = setTimeout(turnCard, U.gacha.turnMs);
   };
   const turnCard = () => {
     const el = $('ga-stage-in').querySelector('.rpg-card');
@@ -253,7 +253,7 @@
     SND.play('flip');
     if (star === 3) fx('gold', el);
     clearTimeout(stageTimer);
-    stageTimer = setTimeout(nextCard, T.gacha.holdMs[star] ?? T.gacha.holdMs[1]);
+    stageTimer = setTimeout(nextCard, U.gacha.holdMs[star] ?? U.gacha.holdMs[1]);
   };
   // 押したとき・時間がたったとき。パックなら1枚目、めくる前ならめくる、めくってあれば次（最後なら終わり）
   const nextCard = () => {
@@ -269,7 +269,7 @@
     stageDone = done;
     stage = { cards, i: -1 };
     st.className = `rpg-gstage is-s${best}${best === 3 ? ' is-promo' : ''}${count === 10 ? ' is-ten' : ''}`;
-    st.style.setProperty('--show', `${T.gacha.showMs}ms`);
+    st.style.setProperty('--show', `${U.gacha.showMs}ms`);
     $('ga-stage-in').innerHTML = packHTML(region, { cards: before }, { big: true })
       + `<p class="rpg-gstage-say" aria-live="polite">${best === 3 ? '…金色に光った！' : best === 2 ? 'きらっ！' : 'どの国かな？'}</p>`;
     st.hidden = false;
@@ -277,7 +277,7 @@
     $('ga-skip').focus({ preventScroll: true });
     if (best === 3 && S.dopa) FX.sfx('fanfare');
     else SND.play(best === 3 ? 'promo' : 'pull');
-    stageTimer = setTimeout(nextCard, T.gacha.showMs + (best === 3 ? 500 : 0));
+    stageTimer = setTimeout(nextCard, U.gacha.showMs + (best === 3 ? 500 : 0));
   };
   // 結果を裏向きで並べ、演出（1枚ずつ見せる）が終わったら全部表にする（reduced motion でも。そのときは回さずに表になる）。カードは1枚ずつ足していったときの★とかさね
   const drawResults = (res, before, d, region) => {
@@ -346,7 +346,7 @@
       if (r.out === 'up') emit('rpg:promote', { a: r.a, star: r.star, via: 'gacha' });
     }
     RPG.emitCoins(d, -cost, 'gacha');
-    RPG.emitCoins(d, res.reduce((s, r) => s + (r.out === 'refund' ? T.gacha.refund[r.star] : 0), 0), 'refund');
+    RPG.emitCoins(d, res.reduce((s, r) => s + (r.out === 'refund' ? U.gacha.refund[r.star] : 0), 0), 'refund');
     drawResults(res, before, d, region);
     drawGacha();
   };
@@ -456,7 +456,7 @@
   // シェア: 押した処理の中で（await の前に）navigator.share。閉じただけ（AbortError）なら何もしない。
   // share が無いときと、AbortError 以外で失敗したときだけ X の投稿画面を新しいタブで開く。勝手には開かない
   const share = (kind, text) => {
-    const { url } = T.share;
+    const { url } = U.share;
     const tweet = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'noopener');
     const failed = e => { if (e?.name !== 'AbortError') tweet(); };
     if (typeof navigator.share === 'function') {
@@ -472,7 +472,7 @@
   };
   // 仲間の数（TUNING.share.cards）と、地域の国を全部仲間にした、に届いたもの。before / after は持っている国コードの配列。ユーザーが入れた文字は入れない
   const milestones = (before, after) => {
-    const { cards, tag } = T.share, n0 = before.length, n1 = after.length, out = [];
+    const { cards, tag } = U.share, n0 = before.length, n1 = after.length, out = [];
     for (const n of cards) if (n0 < n && n1 >= n) out.push({ kind: `cards-${n}`, msg: `仲間が${n}か国になった！`, text: `国旗クエストで仲間が${n}か国になった！ ${tag}` });
     for (const g of REGION_DG) {
       const k0 = before.filter(a => inArea(a, g.r)).length, k1 = after.filter(a => inArea(a, g.r)).length;

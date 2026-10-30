@@ -69,6 +69,57 @@ t('offline_play', async (page, { context }) => {
   assert.ok(await page.locator('#qcard svg.map path').count() > 50);
 }, { seed: 1 });
 
+// 英語版（PR5）: en/ を開いて SW が入ったら、オフラインでも英語のホーム・図鑑（#book）が出て、国旗→国名を5問遊べる
+t('sw_en_shell', async (page, { context }) => {
+  await swReady(page);
+  await context.setOffline(true);
+  const en = (path = '') => new URL(`en/${path}`, server.url).href;
+  const isEn = async () => assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+  await page.reload();
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  assert.equal((await page.innerText('#home-book .hi-label')).trim(), 'Gallery');
+  assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller));
+  // 日本語の本編を開いてから、別のページとして en/#book を開く（同じページの hash だけの移動にしない）
+  await page.goto(server.url);
+  await page.locator('#scr-home').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  await page.goto(en('#book'));
+  await page.waitForSelector('#scr-book:not([hidden])');
+  await isEn();
+  assert.equal((await page.innerText('#to-book')).trim(), 'Gallery');
+  assert.equal((await page.innerText('#bview button[data-v="list"]')).trim(), 'List');
+  // index.html も en/ の本編として出る
+  await page.goto(en('index.html'));
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  // キャッシュに無い en/ の URL（? 付き）は、ネットが落ちたら en/index.html を出す（日本語の index.html ではない）
+  await page.goto(en('?from=pwa'));
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
+  await page.goto(en());
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  await pickSetup(page, { mode: 'f2n', region: 'all', count: 5 });
+  assert.match(await page.innerText('#modes .modecard[data-k="f2n"]'), /Flag → Name/);
+  await page.click('#start');
+  for (let i = 0; i < 5; i++) {
+    await answerCorrect(page);
+    assert.ok(await page.evaluate(() => (l => l.length > 0 && l.every(i => i.complete && i.naturalWidth > 0))([...document.querySelectorAll('#qcard img')])));
+    if (await page.isVisible('#next')) await page.click('#next');
+  }
+  await page.locator('#scr-result').waitFor();
+  assert.equal(await page.evaluate(() => G.set.length), 5);
+  await isEn();
+  // 開いたことのない英語のページ（国のページ・遊び方）には本編を出さない
+  for (const path of ['country/jp.html', 'howto.html']) {
+    await page.goto(en(path)).catch(() => {});
+    assert.equal(await page.locator('#scr-home').count(), 0, path);
+    assert.equal(await page.evaluate(() => typeof G), 'undefined', path);
+  }
+}, { path: 'en/', locale: 'en-US', seed: 1 });
+
 // オフラインで、開いたことのないページ（国のページ・遊び方）には本編（index.html）を出さず、ブラウザのふつうのオフラインの画面にする
 t('offline_unvisited_pages', async (page, { context }) => {
   await swReady(page);
@@ -97,18 +148,18 @@ t('sw_skips_admin', async page => {
   assert.deepEqual(keys.filter(k => k.includes('admin')), []);
 });
 
-// ?v= の無いファイル（countries.js）はネット優先: 書きかえたら次に開いたとき新しい中身
+// ?v= の無いファイル（trivia.js）はネット優先: 書きかえたら次に開いたとき新しい中身
 test('sw_update_unversioned', { timeout: 90_000 }, async () => {
   const dir = tempRepo();
   const srv = await startServer({ root: dir });
   const app = await openApp(browser, { serviceWorkers: 'allow', url: srv.url });
   try {
     await swReady(app.page);
-    assert.equal(await app.page.evaluate(() => window.COUNTRIES.__mark), undefined);
-    const p = join(dir, 'countries.js');
-    writeFileSync(p, `${readFileSync(p, 'utf8')}\nwindow.COUNTRIES.__mark = 'new';\n`);
+    assert.equal(await app.page.evaluate(() => window.TRIVIA.__mark), undefined);
+    const p = join(dir, 'trivia.js');
+    writeFileSync(p, `${readFileSync(p, 'utf8')}\nwindow.TRIVIA.__mark = 'new';\n`);
     await app.page.reload();
-    assert.equal(await app.page.evaluate(() => window.COUNTRIES.__mark), 'new');
+    assert.equal(await app.page.evaluate(() => window.TRIVIA.__mark), 'new');
     assert.deepEqual(app.errors.map(String), []);
   } finally { await app.close(); await srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });
@@ -128,23 +179,25 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     await swReady(page);
     const [oldName] = await cacheNames(page);
     assert.match(oldName, /^drill-[0-9a-f]{12}$/);
-    // pc.css の中身と ?v=、countries.js（?v= 無し）を変えて sw.js を作り直す
+    // pc.css の中身と ?v=、trivia.js（?v= 無し）を変えて sw.js を作り直す
     const n = +readFileSync(join(dir, 'index.html'), 'utf8').match(/pc\.css\?v=(\d+)/)[1];
     const edit = (f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
     edit('pc.css', s => `${s}\n.pwa-test-mark { order: 7; }\n`);
-    edit('index.html', s => s.replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
-    edit('countries.js', s => `${s}\nwindow.COUNTRIES.__mark = 'new';\n`);
+    // en/index.html は make_en が index.html から作るので、?v= もいっしょに上がる
+    for (const f of ['index.html', 'en/index.html']) edit(f, s => s.replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    edit('trivia.js', s => `${s}\nwindow.TRIVIA.__mark = 'new';\n`);
     writeFileSync(join(dir, 'sw.js'), render(dir));
     const newName = `drill-${readFileSync(join(dir, 'sw.js'), 'utf8').match(/const VERSION = '(\w+)'/)[1]}`;
     assert.notEqual(newName, oldName);
-    // 再読み込みせずに新しい SW を入れる（install は HTTP キャッシュに古い countries.js・index.html があっても取り直す）。
+    // 再読み込みせずに新しい SW を入れる（install は HTTP キャッシュに古い trivia.js・index.html があっても取り直す）。
     // ?v= 付き・vendor/ は前の版のキャッシュから写すので、ネットに取りに行くのは上げた pc.css だけ
     requests.length = 0;
     await page.evaluate(() => navigator.serviceWorker.getRegistration().then(r => r.update()));
     await until(page, () => navigator.serviceWorker.getRegistration().then(r => r.waiting?.state === 'installed'));
-    assert.match(await cached(page, newName, 'countries.js'), /__mark = 'new'/);
+    assert.match(await cached(page, newName, 'trivia.js'), /__mark = 'new'/);
     assert.match(await cached(page, newName, 'index.html'), new RegExp(`pc\\.css\\?v=${n + 1}`));
     assert.match(await cached(page, newName, `pc.css?v=${n + 1}`), /pwa-test-mark/);
+    assert.equal(await cached(page, newName, `pc.css?v=${n}`), null);   // 古い ?v= は新しい版に入れない
     assert.deepEqual(requests.filter(u => /[?&]v=|\/vendor\//.test(u)), [`/pc.css?v=${n + 1}`]);
     // 開いているページは古い SW のまま（入れかえない）。閉じて開き直すと新しい版
     assert.deepEqual((await cacheNames(page)).sort(), [newName, oldName].sort());
@@ -154,7 +207,7 @@ test('sw_version_change', { timeout: 90_000 }, async () => {
     await page.goto(srv.url);
     await until(page, name => caches.keys().then(k => k.length === 1 && k[0] === name), newName);
     assert.ok(await page.evaluate(n => [...document.styleSheets].some(x => x.href?.endsWith(`pc.css?v=${n}`) && [...x.cssRules].some(r => r.cssText.includes('pwa-test-mark'))), n + 1));
-    assert.equal(await page.evaluate(() => window.COUNTRIES.__mark), 'new');
+    assert.equal(await page.evaluate(() => window.TRIVIA.__mark), 'new');
     assert.deepEqual(errors.map(String), []);
   } finally { await context.close(); await b2.close(); await srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });
@@ -169,8 +222,10 @@ test('sw_install_copies_fixed', { timeout: 90_000 }, async () => {
     const { page, context } = app;
     await swReady(page);
     const n = +readFileSync(join(dir, 'index.html'), 'utf8').match(/pc\.css\?v=(\d+)/)[1];
-    const p = join(dir, 'index.html');
-    writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    for (const f of ['index.html', 'en/index.html']) {   // en/index.html も（make_en が index.html から作る）
+      const p = join(dir, f);
+      writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    }
     writeFileSync(join(dir, 'sw.js'), render(dir));
     const got = [];
     await context.route(u => u.searchParams.has('v') || u.pathname.includes('/vendor/'), route => {

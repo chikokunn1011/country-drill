@@ -449,9 +449,10 @@ async function supabaseRoute(route, db) {
 // waitMap: 開いたあと、地図（world.js・d3・topojson をうしろで読む）が読み終わるまで待つ。mapReady が無いページ・古いコミットでは待たない
 // routes: 開く前に context.route に渡す [url のパターン, ハンドラ] の並び（国旗・world.js を遅らせる・止めるときなど）
 // serviceWorkers: newContext にそのまま渡す。既定は 'block'（sw.js が動くと、SW が取りに行く通信は context.route を通らない）。pwa.test.mjs だけ 'allow'
-export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [], serviceWorkers = 'block' } = {}) {
+// locale: newContext にそのまま渡す（navigator.language）。既定は 'ja-JP'（日本語の端末。'en-US' などにするとホームに英語版への案内が出る）
+export async function openApp(browser, { viewport = PHONE, supabase = 'fake', url = lastUrl, path = '', seed, reducedMotion, colorScheme, hasTouch, storage, blockScripts = [], init, waitMap = true, routes = [], serviceWorkers = 'block', locale = 'ja-JP' } = {}) {
   if (!url) throw new Error('startServer() を先に呼ぶか url を渡してね');
-  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch, serviceWorkers });
+  const context = await browser.newContext({ viewport, reducedMotion, colorScheme, hasTouch, serviceWorkers, locale });
   context.setDefaultTimeout(5000); // 要素が出ないときは早めに落とす
   if (seed !== undefined) await context.addInitScript(seed => {
     let t = seed;
@@ -528,29 +529,54 @@ export async function answerWrong(page) {
   await page.locator(`.choice:not([data-a="${a}"])`).first().click();
 }
 
-// 白地図タップ（mode: 'tap'）の地図で、正解（right）か外れの点の画面の座標 { x, y }。ページの中で動かす（page.evaluate(tapPoint, right)）。
-// 正解は国の中の点（c.ll、国の形の重心、国の範囲の格子の点の順。丸印の国は丸印のまわり）、外れはその地域の国の ll を c.ll から遠い順に。
-// どれも、その点で押せるもの（ズームのボタンなどが上に無い）を選ぶ
+// 白地図タップ（mode: 'tap'）の地図で、正解（right）か外れの点の画面の座標 { x, y }（整数）。ページの中で動かす（page.evaluate(tapPoint, right)）。
+// Chromium のクリックの clientX/Y は整数なので、候補は画面の整数ピクセルに丸め、その点を layer.getScreenCTM() の逆で地図の座標に戻して
+// （アプリの d3.pointer と同じ計算）、アプリと同じ r で tapJudge を見る。正解はその点と上下左右 1px の4点がどれも正解になる点だけ。
+// 候補: c.ll・国の形の重心・国の範囲の 16×16 の格子、小さい国は国の画面の範囲を nearPx だけ広げた所の全ピクセル。無ければ国を真ん中に拡大してやり直す。
+// 外れはその地域の国の ll を c.ll から遠い順に（その点と4点で 2r でも正解にならないもの）。どれも、その点で地図が押せる（上に何も無い）ものを選ぶ
 export const tapPoint = right => {
   const c = G.cur.c, proj = G.cur.proj, ll = x => [x.ll[1], x.ll[0]], svg = document.querySelector('#qcard .tapmap');
-  const m = svg.querySelector('.layer').getScreenCTM(), r = TAP.nearPx * W / svg.getBoundingClientRect().width / d3.zoomTransform(svg).k;
-  const screen = ([x, y]) => ({ x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f });
-  const free = p => { const { x, y } = screen(p), el = document.elementFromPoint(x, y); return !!el && svg.contains(el); };
-  let pts;
-  if (right) {
-    const f = featOf(c), q = proj(ll(c));
-    pts = [q, ...[0, 1, 2, 3, 4, 5, 6, 7].map(i => [q[0] + r / 2 * Math.cos(i * Math.PI / 4), q[1] + r / 2 * Math.sin(i * Math.PI / 4)])];
-    if (f) {
-      pts.push(proj(d3.geoCentroid(f)));
-      const [[x0, y0], [x1, y1]] = d3.geoPath(proj).bounds(f);
-      for (let i = 1; i < 16; i++) for (let j = 1; j < 16; j++) pts.push([x0 + (x1 - x0) * i / 16, y0 + (y1 - y0) * j / 16]);
+  const box = svg.closest('.tapbox'), layer = svg.querySelector('.layer'), f = featOf(c);
+  const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const find = () => {
+    const m = layer.getScreenCTM(), inv = m.inverse();
+    const R = TAP.nearPx * W / svg.getBoundingClientRect().width / d3.zoomTransform(svg).k;   // アプリと同じ r
+    const screen = ([x, y]) => [Math.round(m.a * x + m.c * y + m.e), Math.round(m.b * x + m.d * y + m.f)];
+    const toLayer = (X, Y) => [inv.a * X + inv.c * Y + inv.e, inv.b * X + inv.d * Y + inv.f];
+    const hit = (X, Y) => { const el = document.elementFromPoint(X, Y); return el && svg.contains(el) ? el : null; };
+    if (right) {
+      const okAt = (X, Y) => tapJudge(c, toLayer(X, Y), R);
+      const q = proj(ll(c)), cand = [];
+      if (q) cand.push(q);
+      let bounds = q ? [q, q] : null;
+      if (f) {
+        cand.push(proj(d3.geoCentroid(f)));
+        bounds = d3.geoPath(proj).bounds(f);
+        const [[x0, y0], [x1, y1]] = bounds;
+        for (let i = 1; i < 16; i++) for (let j = 1; j < 16; j++) cand.push([x0 + (x1 - x0) * i / 16, y0 + (y1 - y0) * j / 16]);
+      }
+      const pix = cand.filter(Boolean).map(screen);
+      if (bounds) {
+        const [a0, b0] = screen(bounds[0]), [a1, b1] = screen(bounds[1]), e = TAP.nearPx;
+        if ((a1 - a0) * (b1 - b0) <= 40 * 40)
+          for (let X = a0 - e; X <= a1 + e; X++) for (let Y = b0 - e; Y <= b1 + e; Y++) pix.push([X, Y]);
+      }
+      return pix.find(([X, Y]) => hit(X, Y) && okAt(X, Y) && N4.every(([dx, dy]) => okAt(X + dx, Y + dy))) ?? null;
     }
-    pts = pts.filter(p => p && tapJudge(c, p, r / 2));
-  } else {
     const far = poolFor(G.region).filter(x => x !== c).sort((a, b) => d3.geoDistance(ll(b), ll(c)) - d3.geoDistance(ll(a), ll(c)));
-    pts = far.map(x => proj(ll(x))).filter(p => p && !tapJudge(c, p, r * 2));
+    const miss = (X, Y) => !tapJudge(c, toLayer(X, Y), R * 2);
+    const pts = far.map(x => proj(ll(x))).filter(Boolean).map(screen).filter(([X, Y]) => miss(X, Y) && N4.every(([dx, dy]) => miss(X + dx, Y + dy)));
+    return pts.find(([X, Y]) => hit(X, Y)?.closest('[data-a]')?.dataset.a !== c.a && hit(X, Y)) ?? pts[0] ?? null;
+  };
+  let p = find();
+  // 正解の点が無い（小さい国・島々）ときは、国を真ん中にして拡大してやり直す（zoomTo はアニメーションなしで、すぐ変わる）
+  for (let k = d3.zoomTransform(svg).k * 2; !p && right && k <= 24; k *= 2) {
+    const q = f ? d3.geoPath(proj).centroid(f) : proj(ll(c));
+    box.zoomTo(d3.zoomIdentity.translate(W / 2, H / 2).scale(k).translate(-q[0], -q[1]));
+    p = find();
   }
-  return screen(pts.find(free) ?? pts[0]);
+  if (!p) throw new Error(`tapPoint: ${right ? '正解' : '外れ'}の点が無い（${c.a}）`);
+  return { x: p[0], y: p[1] };
 };
 // いまの白地図タップの問題に、正解（right）か外れの所をタップして答える
 export async function answerTap(page, { right = true } = {}) {
@@ -589,3 +615,22 @@ export const recordEvents = page => page.evaluate(types => {
 }, EVENTS);
 // 積んだイベント。type を渡せばその種類だけ
 export const events = (page, type) => page.evaluate(type => window.__ev.filter(e => !type || e.type === type), type);
+
+// 英語版（PR5）: 見えている日本語の一覧。見えている要素（checkVisibility()）の文字と、aria-label・title・alt・placeholder・
+// value（ボタン）、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）の中は除く
+export const jaLeft = async page => {
+  const { JA_RE } = await import('../../tools/i18n_scan.mjs');
+  return page.evaluate(([src, flags]) => {
+    const re = new RegExp(src, flags), out = [];
+    const shown = el => el && el.checkVisibility({ visibilityProperty: true }) && !el.closest('[lang="ja"]');
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n; (n = walk.nextNode());) if (re.test(n.data) && shown(n.parentElement)) out.push(n.data.trim());
+    for (const el of document.body.querySelectorAll('*')) {
+      if (!shown(el)) continue;
+      for (const a of ['aria-label', 'title', 'alt', 'placeholder']) { const v = el.getAttribute(a); if (v && re.test(v)) out.push(`[${a}] ${v}`); }
+      if ((el.tagName === 'BUTTON' || (el.tagName === 'INPUT' && /^(button|submit|reset)$/.test(el.type))) && re.test(el.value ?? '')) out.push(`[value] ${el.value}`);
+    }
+    if (re.test(document.title)) out.push(`[title] ${document.title}`);
+    return out;
+  }, [JA_RE.source, JA_RE.flags]);
+};

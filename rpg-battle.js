@@ -18,7 +18,7 @@
   const wrap = document.querySelector('body > .wrap');
   if (!wrap) { console.error('[rpg] body > .wrap が無いので、バトルはお休み'); return; }
 
-  const K = RPG_CORE, T = K.TUNING, TB = T.battle, DG = K.DUNGEONS, RPG = window.RPG;
+  const K = RPG_CORE, U = K.TUNING, TB = U.battle, DG = K.DUNGEONS, RPG = window.RPG;
   const BOSS = 5;             // フロアは F1〜F4 とボス（5）
   const LOG_LINES = 3;        // ログは直近3行
   const ASSIST_MS = 600;      // 正解の援護で仲間に .rpg-assist を付けておく時間
@@ -28,7 +28,7 @@
   const ONGOING = new Set(['question', 'reveal']);   // バトルが続いている（にげたら数える）
   const FLEE_ASK = 'にげる？（報酬はなし）';
   const FLEE_ASK_TOWER = 'にげる？（この階の報酬はなし。塔はここで終わり）';
-  const TT = T.tower;
+  const TT = U.tower;
   const todayStr = () => K.today(new Date());
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
   const missesNow = () => (misses && typeof misses === 'object') ? misses : {};
@@ -67,7 +67,7 @@
     return `<ul class="rpg-party">${B.stats.party.filter(({ a }) => byA.has(a)).map(({ a }, i) => {
       const star = B.d.cards[a]?.[0] || 1, bonus = K.inDungeon(B.dg, a);
       return `<li class="rpg-pc" style="--i:${i}"><img src="${flag(a)}" alt="${esc(nameOf(a))}"><span class="rpg-stars" role="img" aria-label="★${star}">${'★'.repeat(star)}</span>`
-        + `${tags && bonus ? `<span class="rpg-tag">地域ボーナス ×${T.card.regionMul}</span>` : ''}</li>`;
+        + `${tags && bonus ? `<span class="rpg-tag">地域ボーナス ×${U.card.regionMul}</span>` : ''}</li>`;
     }).join('')}${!tags && tb ? `<li class="rpg-team-tag"><span role="img" aria-label="チームボーナス ＋${Math.round(tb * 100)}%">＋${Math.round(tb * 100)}%</span></li>` : ''}</ul>`;
   };
   // 上の列の仲間を描き直す（登場画面で編成を切り替えたとき）。仲間0枚なら列ごと無くす
@@ -146,7 +146,7 @@
       + (hasCards ? teamRowHTML() : '')
       + (stats.party.length ? partyHTML(true)
         : hasCards && !tm.auto ? '<p class="hint">この編成には仲間がいないよ</p>'
-          : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${T.card.frJoin}回正解）</p>`)
+          : `<p class="hint">仲間がいると強くなるよ（国旗ガチャ・${U.card.frJoin}回正解）</p>`)
       + `<p class="rpg-bline">倒すのに必要な正解: 約${K.hitsNeeded(stats, en)}回 ／ まちがえてOK: ${K.missesAllowed({ hp: B.hp }, en)}回まで</p>`
       + (B.tower ? `<p class="rpg-bline">HP はつぎの階に持ちこし（階を上がると${Math.round(TT.healPct * 100)}%回復、${TT.bossEvery}階ごとの中ボスをたおすと全回復）</p>` : '')
       + (g ? `<p class="rpg-bline">がんばりゲージ +${Math.round(TB.gaugeStep * 100 * g)}%</p>` : '')
@@ -452,8 +452,8 @@
         gauge: res.gauge, maxCombo: b.maxCombo, lv: d.lv, recLv: b.en.recLv });
       if (b.boss && res.first) emit('rpg:clear', { dungeon: b.id });
       RPG.emitCoins(d, res.coins, 'battle');
-      RPG.emitCoins(d, rc.overcome.length * T.overcome, 'overcome');
-      RPG.emitCoins(d, rc.bounty.length * T.bounty + (rc.bountyAll ? T.bountyAll : 0), 'bounty');
+      RPG.emitCoins(d, rc.overcome.length * U.overcome, 'overcome');
+      RPG.emitCoins(d, rc.bounty.length * U.bounty + (rc.bountyAll ? U.bountyAll : 0), 'bounty');
       RPG.announce(rc, d);
     }
     if (B !== b) return;   // イベントを受けた側が画面を変えた
@@ -461,7 +461,7 @@
   };
   // ボスを初めて倒したときのシェアの文（仲間の数はバトルのあとのセーブ。ユーザーが入れた文字は入れない）
   const bossShareText = (dg, d) => {
-    const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${T.share.tag}`;
+    const mates = `仲間 ${K.owned(d)}/${C.length}か国 ${U.share.tag}`;
     if (dg.id === 'blackhole') return `国旗クエストで星喰いをたおして、宇宙を取りもどした！ ${mates}`;
     if (dg.ch === 3) { const n = K.MONSTERS[dg.id][4].n; return `国旗クエストで${n.startsWith(dg.land) ? n : `${dg.land}の${n}`}をたおした！ ${mates}`; }   // 月のウサギ大王・金星の炎は星の名前を重ねない
     if (dg.id === 'mworld') return `国旗クエストで鏡の地図喰いをたおして、ふたつの地球を守った！ ${mates}`;
@@ -476,8 +476,8 @@
     const lines = rc ? [
       rc.joined.length && `🤝 ${names(rc.joined)}が仲間になった！`,
       rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
-      rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(T.overcome * rc.overcome.length)}`,
-      rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(T.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(T.bountyAll)}）` : ''}`,
+      rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(U.overcome * rc.overcome.length)}`,
+      rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(U.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(U.bountyAll)}）` : ''}`,
     ].filter(Boolean) : [];
     let html = '<div class="rpg-bend" id="bt-end">';
     if (win) {
@@ -605,8 +605,8 @@
       emit('rpg:battle', { dungeon: b.id, floor: f, boss: b.boss, win, first: res.newBest, mistakes,
         gauge: 0, maxCombo: b.maxCombo, lv: d.lv, recLv: b.en.recLv });
       RPG.emitCoins(d, res.coins, 'tower');
-      RPG.emitCoins(d, rc.overcome.length * T.overcome, 'overcome');
-      RPG.emitCoins(d, rc.bounty.length * T.bounty + (rc.bountyAll ? T.bountyAll : 0), 'bounty');
+      RPG.emitCoins(d, rc.overcome.length * U.overcome, 'overcome');
+      RPG.emitCoins(d, rc.bounty.length * U.bounty + (rc.bountyAll ? U.bountyAll : 0), 'bounty');
       RPG.announce(rc, d);
       emit('rpg:tower', { floor: f, win, best: d.tower.best, newBest: res.newBest, coins: res.coins });
     }
@@ -619,8 +619,8 @@
   const receiptLines = rc => rc ? [
     rc.joined.length && `🤝 ${names(rc.joined)}が仲間になった！`,
     rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
-    rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(T.overcome * rc.overcome.length)}`,
-    rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(T.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(T.bountyAll)}）` : ''}`,
+    rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(U.overcome * rc.overcome.length)}`,
+    rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(U.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(U.bountyAll)}）` : ''}`,
   ].filter(Boolean) : [];
   // 階クリアの画面（phase 'tclear'）: もらったコイン・はじめて勝った階のボーナス・回復したあとの HP。［やめる］［つぎの階へ］
   const drawTowerClear = ({ receipt: rc, base, bonus, shares }) => {

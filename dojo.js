@@ -8,7 +8,9 @@
 
   const ROUND = 10;                 // 1回の問題数
   const MODES = ['f2n', 'n2f'];     // 国旗→国名・国名→国旗（場所と首都は出さない）
-  // グループの id（最初の国コード）→ 短い説明。daily-core.js の SIMILAR の各行のコメントと同じ
+  // グループの id（最初の国コード）→ 短い説明。daily-core.js の SIMILAR の各行のコメントと同じ。
+  // 表示するときに T() で訳す（英語は i18n/en-dojo.js。unit テストの vm には T が無いので、ここでは包まない）
+  // i18n-data:start
   const LABEL = {
     td: '青・黄・赤のたて3色', id: '赤と白', ie: '緑・白・オレンジ/赤のたて3色', ru: '白・青・赤のよこ3色', au: '青地にユニオンジャック',
     ml: '緑・黄・赤のたて3色', ve: '黄・青・赤', sv: '青・白・青', eg: '赤・白・黒', jo: '赤・白・黒・緑',
@@ -16,6 +18,7 @@
     us: '赤白のしま＋青', jp: 'まんなかに丸', tr: '赤地に三日月', cn: '赤地に黄色', nl: '赤・白・青',
     cz: '左に三角', bj: '緑・黄・赤と帯', sl: '緑・黄/白・青', tt: 'ななめの帯', qa: 'ギザギザの白',
   };
+  // i18n-data:end
   const isObj = x => !!x && typeof x === 'object' && !Array.isArray(x);
 
   // 10問の並び: ROUND をグループの国にできるだけ均等に配り（あまりは rand で選んだ国に1つずつ）、
@@ -74,7 +77,7 @@
   'use strict';
   if (typeof document === 'undefined') return;
   const NEED = {
-    C: typeof C, byA: typeof byA, flag: typeof flag, esc: typeof esc, $: typeof $, store: typeof store, show: typeof show,
+    C: typeof C, byA: typeof byA, T: typeof T, cName: typeof cName, flag: typeof flag, esc: typeof esc, $: typeof $, store: typeof store, show: typeof show,
     registerScreen: typeof registerScreen, startDojo: typeof startDojo, DAILY_CORE: typeof DAILY_CORE, DOJO: typeof DOJO,
   };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
@@ -103,7 +106,8 @@
     }
     if (d.phase === 'end') {
       if (d.outcome === 'clear') {
-        last = `${D.LABEL[mine.id]}：一発正解 ${d.firstTry} / ${d.n}${d.wrongs === 0 ? '・ノーミス！' : ''}`;
+        const v = { g: T(D.LABEL[mine.id]), f: d.firstTry, n: d.n };
+        last = d.wrongs === 0 ? T('{g}：一発正解 {f} / {n}・ノーミス！', v) : T('{g}：一発正解 {f} / {n}', v);
         if (d.wrongs === 0) { st.clear[mine.id] = 1; save(st); }
       }
       mine = null;
@@ -114,11 +118,11 @@
   const sec = document.createElement('section');
   sec.id = 'scr-dojo'; sec.className = 'wrap'; sec.hidden = true;
   sec.innerHTML = `<div class="panel dojo">
-    <h2>似た国旗の道場</h2>
-    <p class="hint">にている国旗のグループを選ぶと、そのグループの国だけで${D.ROUND}問。まちがえた問題はあとでもう一度出るよ。</p>
-    <div class="seg" id="dj-mode" role="group" aria-label="出し方"><button type="button" data-m="f2n">国旗 → 国名</button><button type="button" data-m="n2f">国名 → 国旗</button></div>
+    <h2>${esc(T('似た国旗の道場'))}</h2>
+    <p class="hint">${esc(T('にている国旗のグループを選ぶと、そのグループの国だけで{n}問。まちがえた問題はあとでもう一度出るよ。', { n: D.ROUND }))}</p>
+    <div class="seg" id="dj-mode" role="group" aria-label="${esc(T('出し方'))}"><button type="button" data-m="f2n">${esc(T('国旗 → 国名'))}</button><button type="button" data-m="n2f">${esc(T('国名 → 国旗'))}</button></div>
     <p class="dj-last" id="dj-last" role="status"></p>
-    <div class="dj-pairs" id="dj-pairs" hidden><h3>よく取りちがえるペア</h3><ol></ol></div>
+    <div class="dj-pairs" id="dj-pairs" hidden><h3>${esc(T('よく取りちがえるペア'))}</h3><ol></ol></div>
     <div class="dj-groups" id="dj-groups"></div>
   </div>`;
   const wrap = document.querySelector('body > .wrap'), foot = wrap?.querySelector(':scope > footer');
@@ -133,12 +137,12 @@
     box.hidden = !pairs.length;
     box.querySelector('ol').innerHTML = pairs.map(p => {
       const x = byA.get(p.a), y = byA.get(p.b);
-      return `<li><span class="dj-pf"><img src="${flag(x.a)}" alt=""><img src="${flag(y.a)}" alt=""></span><span class="dj-pn">${esc(x.n)}・${esc(y.n)}</span><b class="mono">${p.k}回</b></li>`;
+      return `<li><span class="dj-pf"><img src="${flag(x.a)}" alt=""><img src="${flag(y.a)}" alt=""></span><span class="dj-pn">${esc(T('{a}・{b}', { a: cName(x), b: cName(y) }))}</span><b class="mono">${esc(T('{n}回', { n: p.k }))}</b></li>`;
     }).join('');
     $('dj-groups').innerHTML = GROUPS.map(g => {
       const id = g[0], ok = st.clear[id] === 1;
-      return `<button type="button" class="dj-card" data-g="${id}"><span class="dj-flags">${g.map(a => `<img src="${flag(a)}" alt="${esc(byA.get(a).n)}の国旗" loading="lazy">`).join('')}</span>` +
-        `<span class="dj-label">${esc(D.LABEL[id])}</span>${ok ? '<span class="dj-ok" aria-label="ノーミスでクリアずみ">✓</span>' : ''}</button>`;
+      return `<button type="button" class="dj-card" data-g="${id}"><span class="dj-flags">${g.map(a => `<img src="${flag(a)}" alt="${esc(T('{n}の国旗', { n: cName(byA.get(a)) }))}" loading="lazy">`).join('')}</span>` +
+        `<span class="dj-label">${esc(T(D.LABEL[id]))}</span>${ok ? `<span class="dj-ok" aria-label="${esc(T('ノーミスでクリアずみ'))}">✓</span>` : ''}</button>`;
     }).join('');
   }
   $('dj-mode').addEventListener('click', e => {
@@ -159,7 +163,7 @@
   if (panel) {
     const band = document.createElement('div');
     band.className = 'dj-band';
-    band.innerHTML = '<button type="button" class="linkbtn" id="to-dojo">🔍 似た国旗の道場 →</button>';
+    band.innerHTML = `<button type="button" class="linkbtn" id="to-dojo">${esc(T('🔍 似た国旗の道場 →'))}</button>`;
     band.querySelector('button').onclick = () => show('dojo');
     const h2 = panel.querySelector(':scope > h2');
     if (h2) { const head = document.createElement('div'); head.className = 'dj-head'; h2.before(head); head.append(h2, band); }
