@@ -145,3 +145,15 @@ test('langsw', () => {
   assert.match(ja, /<p class="home-en" id="home-en" hidden><a href="en\/" hreflang="en" lang="en">English version →<\/a><\/p>/);
   assert.doesNotMatch(en, /id="home-en"/);
 });
+
+// CSS の content の代わりの文（content: "✓" / "正解"）は、読み上げで聞こえるので訳す。訳が無ければ止まる
+test('translate_css_alt', () => {
+  const used = new Set();
+  assert.equal(translateHtml('<style>a::after { content: "✓"; content: "✓" / "正解"; } /* 正解 */</style>', { 正解: 'Correct' }, used),
+    '<style>a::after { content: "✓"; content: "✓" / "Correct"; } /* 正解 */</style>');
+  assert.deepEqual([...used], ['正解']);
+  assert.throws(() => translateHtml('<style>a::after { content: "✗" / "まちがい"; }</style>', {}), /まちがい/);
+  // en/index.html の style の content に日本語が残っていない
+  const css = [...enIndex().matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1].replace(/\/\*[\s\S]*?\*\//g, '')).join('\n');
+  assert.deepEqual([...css.matchAll(/content:[^;}]*/g)].map(m => m[0]).filter(s => JA_RE.test(s)), []);
+});

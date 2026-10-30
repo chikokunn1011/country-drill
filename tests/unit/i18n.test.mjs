@@ -3,7 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
-import { JA_RE, scanJs, inlineSections } from '../../tools/i18n_scan.mjs';
+import { fileURLToPath } from 'node:url';
+import { JA_RE, scanJs, inlineSections, tKeys } from '../../tools/i18n_scan.mjs';
+import { readEnInputs, renderEn } from '../../tools/make_en.mjs';
 
 const root = new URL('../../', import.meta.url);
 const read = p => readFileSync(new URL(p, root), 'utf8');
@@ -22,7 +24,8 @@ const load = ({ lang, dict } = {}) => {
 
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
-const COVER = { 'i18n.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all' };
+const COVER = { 'i18n.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all',
+  'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', '起動'] };
 // まだ訳さないファイル（PR6: ranking・daily・profile・streak・share-card、PR7: badges・trivia、PR8: rpg-*）
 // dojo・embed は PR5 のあとのタスクで COVER へ移す
 const NOT_YET = ['ranking.js', 'daily.js', 'profile.js', 'streak.js', 'share-card.js', 'badges.js', 'trivia.js',
@@ -169,5 +172,63 @@ test('i18n_globals_unique', () => {
     assert.deepEqual(globalDecls(s), [], s);
   const files = [...readdirSync(root).filter(f => f.endsWith('.js') && f !== 'i18n.js'), 'index.html'];
   const bad = files.flatMap(f => globalDecls(read(f)).map(m => `${f}: ${m}`));
+  assert.deepEqual(bad, []);
+});
+
+// ---- 英語の辞書（i18n/en-*.js を合わせたもの） ----
+// COVER のコード（index.html は節ごと）
+const coverSources = () => {
+  const sections = inlineSections(read('index.html'));
+  return Object.entries(COVER).flatMap(([f, what]) => f === 'index.html' ? what.map(sec => sections[sec]) : [read(f)]);
+};
+// 辞書ファイルごとの中身 { 'en-core.js': {…}, … }
+const dictFiles = () => Object.fromEntries(readdirSync(new URL('i18n/', root)).filter(f => /^en-[\w-]+\.js$/.test(f)).sort().map(f => {
+  const ctx = { window: {} };
+  vm.createContext(ctx);
+  vm.runInContext(read('i18n/' + f), ctx, { filename: f });
+  return [f, { ...ctx.window.I18N_EN }];
+}));
+const I18N_EN = () => Object.assign({}, ...Object.values(dictFiles()));
+const codeKeys = () => coverSources().flatMap(tKeys);
+const dataStrings = () => coverSources().flatMap(src => scanJs(src).filter(e => e.data).map(e => e.text));
+const values = v => typeof v === 'object' ? [v.one, v.other] : [v];
+const holes = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
+
+test('dict_has_all_keys', () => {
+  const dict = I18N_EN();
+  const missing = [...new Set([...codeKeys(), ...dataStrings()])].filter(k => !Object.hasOwn(dict, k));
+  assert.deepEqual(missing, []);
+});
+
+test('dict_values_english', () => {
+  const bad = Object.entries(I18N_EN()).filter(([, v]) => values(v).some(x => typeof x !== 'string' || JA_RE.test(x)));
+  assert.deepEqual(bad, []);
+});
+
+test('dict_placeholders_match', () => {
+  const bad = [];
+  for (const [k, v] of Object.entries(I18N_EN())) {
+    if (typeof v === 'object') {
+      const ks = Object.keys(v).sort().join(',');
+      if (ks !== 'one,other' || !/\{n\}/.test(k)) bad.push(`${k}: { one, other } は {n} のあるキーだけ・one と other だけ（${ks}）`);
+    }
+    for (const x of values(v)) if (holes(x) !== holes(k)) bad.push(`${k} → ${x}`);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test('dict_no_unused', () => {
+  const used = new Set();
+  renderEn(readEnInputs(fileURLToPath(root)), used);
+  const known = new Set([...codeKeys(), ...dataStrings(), ...used]);
+  assert.deepEqual(Object.keys(I18N_EN()).filter(k => !known.has(k)), []);
+});
+
+test('dict_no_conflict', () => {
+  const seen = new Map(), bad = [];
+  for (const [f, d] of Object.entries(dictFiles())) for (const [k, v] of Object.entries(d)) {
+    if (seen.has(k) && JSON.stringify(seen.get(k).v) !== JSON.stringify(v)) bad.push(`${k}: ${seen.get(k).f} と ${f}`);
+    if (!seen.has(k)) seen.set(k, { f, v });
+  }
   assert.deepEqual(bad, []);
 });

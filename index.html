@@ -657,7 +657,7 @@ window.RANKING ??= {
   formatTime(ms) {
     const pad2 = n => String(n).padStart(2, '0');
     const cs = Math.floor(ms / 10), m = Math.floor(cs / 6000), s = Math.floor(cs / 100) % 60, c = pad2(cs % 100);
-    return m ? `${m}分${pad2(s)}.${c}秒` : `${s}.${c}秒`;
+    return m ? T('{m}分{s}.{c}秒', { m, s: pad2(s), c }) : T('{s}.{c}秒', { s, c });
   },
 };
 const C = window.COUNTRIES;
@@ -673,6 +673,8 @@ const isSmall = c => c.ar < 25000 || !featOf(c);
 // 国旗は flags/<a>.svg（1枚ずつのファイル）。中身を変えたら FLAG_V を上げる（ページからの相対 URL）
 const FLAG_V = 1;
 const flag = a => `flags/${a}.svg?v=${FLAG_V}`;
+// 地域の名前はデータのキー（c.r・S.region・#play=・保存値）。日本語のまま持ち、表示するときだけ T(r)。辞書には全部の地域名を入れる
+// i18n-data:start
 const REGIONS = ['アジア', 'ヨーロッパ', 'アフリカ', '北・中央アメリカ', '南アメリカ', 'オセアニア'];
 // 地域ごとの地図の切り出し範囲 [西経度, 南緯度, 東経度, 北緯度]（オセアニアは日付変更線をまたぐので180を超える）
 const REGION_BOX = {
@@ -693,20 +695,21 @@ const SUBREGIONS = {
   'アフリカ北側': { p: 'アフリカ', box: [-26, -6, 55, 38], a: 'dz bj bf cv cm cf td ci dj eg gq er et gm gh gn gw ke lr ly ml mr ma ne ng st sn sl so ss sd tg tn ug' },
   'アフリカ南側': { p: 'アフリカ', box: [8, -36, 60, 6], a: 'ao bw bi km cg cd sz ga ls mg mw mu mz na rw sc za tz zm zw' },
 };
+// i18n-data:end
 for (const [r, o] of Object.entries(SUBREGIONS)) { o.set = new Set(o.a.split(' ')); REGION_BOX[r] = o.box; }
 const parentRegion = r => SUBREGIONS[r]?.p ?? r;   // ランキングなど6地域しか知らない所へ渡すとき
 const MODES = [
-  { k: 'f2n', label: '国旗 → 国名', desc: '国旗を見て国名を選ぶ', q: 'flag', a: 'name' },
-  { k: 'n2f', label: '国名 → 国旗', desc: '国名を見て国旗を選ぶ', q: 'name', a: 'flag' },
-  { k: 'm2f', label: '場所 → 国旗', desc: '地図の場所から国旗を選ぶ', q: 'map', a: 'flag', nameOpt: true },
-  { k: 'f2m', label: '国旗 → 場所', desc: '国旗を見て地図の場所を選ぶ', q: 'flag', a: 'map', nameOpt: true },
+  { k: 'f2n', label: T('国旗 → 国名'), desc: T('国旗を見て国名を選ぶ'), q: 'flag', a: 'name' },
+  { k: 'n2f', label: T('国名 → 国旗'), desc: T('国名を見て国旗を選ぶ'), q: 'name', a: 'flag' },
+  { k: 'm2f', label: T('場所 → 国旗'), desc: T('地図の場所から国旗を選ぶ'), q: 'map', a: 'flag', nameOpt: true },
+  { k: 'f2m', label: T('国旗 → 場所'), desc: T('国旗を見て地図の場所を選ぶ'), q: 'flag', a: 'map', nameOpt: true },
   // 白地図タップ: 選択肢なしで白地図をタップして答える。練習と挑戦だけ（noTa: タイムアタック・ランキングには出さない）
-  { k: 'tap', label: '白地図タップ', desc: '国旗を見て白地図をタップ', q: 'flag', a: 'tap', nameOpt: true, noTa: true },
+  { k: 'tap', label: T('白地図タップ'), desc: T('国旗を見て白地図をタップ'), q: 'flag', a: 'tap', nameOpt: true, noTa: true },
 ];
 const KINDS = [
-  { k: 'practice', label: '練習', desc: 'まちがえた問題は後半にもう一度出る。全部正解したら終了' },
-  { k: 'challenge', label: '挑戦', desc: 'まちがえたら最初からやり直し。ノーミスでクリアを目指す' },
-  { k: 'ta', label: 'タイムアタック', desc: '1ミスで失格。クリアタイムでランキングに挑戦' },
+  { k: 'practice', label: T('練習'), desc: T('まちがえた問題は後半にもう一度出る。全部正解したら終了') },
+  { k: 'challenge', label: T('挑戦'), desc: T('まちがえたら最初からやり直し。ノーミスでクリアを目指す') },
+  { k: 'ta', label: T('タイムアタック'), desc: T('1ミスで失格。クリアタイムでランキングに挑戦') },
 ];
 const COUNTS = [5, 10, 20, 'all'];
 const store = {
@@ -719,7 +722,7 @@ const P = Object.assign({ mode: 'f2n', name: false, kind: 'practice', count: 10 
 let misses = store.get('misses', {});
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-const fmt = n => n.toLocaleString('ja-JP');
+const fmt = n => n.toLocaleString(I18N.locale);
 const $ = id => document.getElementById(id);
 // まとめページの［このテーマでクイズ］（#theme=<id>）で選んだテーマ。null か { id, n, a: Set }。保存しない（再読み込みで消える）
 // テーマ中の地域（G.region・イベントの region）は 'theme:<id>'。地図には 'all' を渡す（mapRegion）
@@ -727,7 +730,9 @@ let THEME = null;
 const THEME_PRE = 'theme:';
 const themeKey = () => THEME ? THEME_PRE + THEME.id : S.region;
 const mapRegion = r => String(r).startsWith(THEME_PRE) ? 'all' : r;
-const regionLabel = r => r === 'all' ? '全世界' : String(r).startsWith(THEME_PRE) ? `テーマ: ${window.THEMES_DATA?.[r.slice(THEME_PRE.length)]?.n ?? ''}` : r;
+// テーマの題は英語のページなら e（まだ無いテーマは n のまま）
+const themeTitle = d => (I18N.lang === 'en' && d?.e) || d?.n || '';
+const regionLabel = r => r === 'all' ? T('全世界') : String(r).startsWith(THEME_PRE) ? T('テーマ: {n}', { n: themeTitle(window.THEMES_DATA?.[r.slice(THEME_PRE.length)]) }) : T(r);
 const poolFor = r => r === 'all' ? C : THEME && r === THEME_PRE + THEME.id ? C.filter(c => THEME.a.has(c.a))
   : SUBREGIONS[r] ? C.filter(c => SUBREGIONS[r].set.has(c.a)) : C.filter(c => c.r === r);
 const modeOf = k => MODES.find(m => m.k === k);
@@ -877,7 +882,7 @@ function zoomableMap(c, label, opts = {}) {
     });
   const sel = d3.select(s).call(zoom);
   const ctl = document.createElement('div'); ctl.className = 'zoomctl';
-  ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset" data-z="world">全体</button><button type="button" class="reset" data-z="back">戻す</button>';
+  ctl.innerHTML = `<button type="button" aria-label="${T('縮小')}">−</button><button type="button" aria-label="${T('拡大')}">${T('＋')}</button><button type="button" class="reset" data-z="world">${T('全体')}</button><button type="button" class="reset" data-z="back">${T('戻す')}</button>`;
   const [minus, plus, world, reset] = ctl.children;
   minus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1 / 1.6);
   plus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1.6);
@@ -896,7 +901,7 @@ function tapMap(c, region) {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.classList.add('map', 'zoomable', 'tapmap'); s.setAttribute('viewBox', `0 0 ${W} ${H}`);
   s.setAttribute('role', 'application'); s.setAttribute('tabindex', '0');
-  s.setAttribute('aria-label', `${regionLabel(region)}の白地図。国旗の国をタップ。矢印キーで動かし、Enter で真ん中の場所を答える`);
+  s.setAttribute('aria-label', T('{r}の白地図。国旗の国をタップ。矢印キーで動かし、Enter で真ん中の場所を答える', { r: regionLabel(region) }));
   const proj = boxProjection(REGION_BOX[region] || WORLD_BOX, W, H), path = d3.geoPath(proj);
   if (G?.cur?.c === c) G.cur.proj = proj;
   let out = `<path class="graticule" d="${path(graticule)}"></path>`;
@@ -919,7 +924,7 @@ function tapMap(c, region) {
   box.zoomTo = t => sel.call(zoom.transform, t);
   requestAnimationFrame(() => sizeDots(d3.zoomTransform(s).k));
   const ctl = document.createElement('div'); ctl.className = 'zoomctl';
-  ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset">戻す</button>';
+  ctl.innerHTML = `<button type="button" aria-label="${T('縮小')}">−</button><button type="button" aria-label="${T('拡大')}">${T('＋')}</button><button type="button" class="reset">${T('戻す')}</button>`;
   const [minus, plus, reset] = ctl.children;
   minus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1 / 1.6);
   plus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1.6);
@@ -1072,7 +1077,7 @@ const FX = {
     el.onanimationend = () => el.remove(); document.body.append(el);
   },
 };
-const PRAISE = ['正解！！', 'ナイス！', '天才！？', 'すごすぎ！', 'さすが！', '神！', 'つよい！', '完璧！'];
+const PRAISE = [T('正解！！'), T('ナイス！'), T('天才！？'), T('すごすぎ！'), T('さすが！'), T('神！'), T('つよい！'), T('完璧！')];
 const comboText = n => n >= 20 ? `👑 ${n} COMBO 👑` : n >= 10 ? `⚡${n} COMBO⚡` : n >= 5 ? `🔥${n} COMBO🔥` : `${n} COMBO!`;
 
 /* ---------- 画面切り替え ---------- */
@@ -1137,12 +1142,12 @@ function waitMap(name) {
   const w = mapWait = { name }, box = $('mapwait'), msg = $('mapwait-msg'), retry = $('mapwait-retry');
   mapWaitTimer = setTimeout(() => {
     if (mapWait !== w) return;
-    msg.textContent = '地図を読みこみ中…'; retry.hidden = true; box.hidden = false;
+    msg.textContent = T('地図を読みこみ中…'); retry.hidden = true; box.hidden = false;
   }, MAP_WAIT_MS);
   loadMap().then(() => { if (mapWait === w) show(name); }, () => {
     if (mapWait !== w) return;
     clearTimeout(mapWaitTimer);
-    msg.textContent = '地図を読みこめなかった'; retry.hidden = false; box.hidden = false;
+    msg.textContent = T('地図を読みこめなかった'); retry.hidden = false; box.hidden = false;
     retry.onclick = () => show(name);
   });
 }
@@ -1159,8 +1164,8 @@ if ($('home-en')) $('home-en').hidden = /^ja/i.test(navigator.languages?.[0] || 
 $('home-flags').innerHTML = shuffle(C).slice(0, 30).map(c => `<img src="${flag(c.a)}" alt="" loading="lazy">`).join('');
 
 /* ---------- 設定 ---------- */
-const THEMES = [['light', 'ライト'], ['dark', 'ダーク'], ['auto', '端末に合わせる']];
-const FONT_SIZES = [['m', 'ふつう'], ['l', '大きめ'], ['xl', 'とても大きい']];
+const THEMES = [['light', T('ライト')], ['dark', T('ダーク')], ['auto', T('端末に合わせる')]];
+const FONT_SIZES = [['m', T('ふつう')], ['l', T('大きめ')], ['xl', T('とても大きい')]];
 function renderSettings() {
   $('set-theme').innerHTML = THEMES.map(([v, l]) => `<button class="chip" aria-pressed="${v === S.theme}" data-th="${v}">${l}</button>`).join('');
   const fs = S.fs === 'l' || S.fs === 'xl' ? S.fs : 'm';
@@ -1171,9 +1176,9 @@ function renderSettings() {
   $('set-sound').checked = S.sound;
   $('set-vol').value = S.vol ?? 70;
   $('set-vol').disabled = !S.sound;
-  $('set-vol-n').textContent = S.sound ? `${S.vol ?? 70}` : 'オフ';
+  $('set-vol-n').textContent = S.sound ? `${S.vol ?? 70}` : T('オフ');
   const n = Object.values(misses).filter(v => v > 0).length;
-  $('set-record').textContent = n ? `まちがえた記録: ${n}か国` : 'まちがえた記録はまだない';
+  $('set-record').textContent = n ? T('まちがえた記録: {n}か国', { n }) : T('まちがえた記録はまだない');
   $('set-reset').hidden = !n;
 }
 // 'light' / 'dark' は <html data-theme> で色を固定、'auto' は外して prefers-color-scheme に任せる（head の先読みと同じ）
@@ -1197,7 +1202,7 @@ $('set-quick').onchange = e => { S.quick = e.target.checked; store.set('settings
 const applyDopa = () => document.body.classList.toggle('dopa', S.dopa);
 $('set-dopa').onchange = e => {
   S.dopa = e.target.checked; store.set('settings', S); applyDopa(); renderSettings();
-  if (S.dopa) { FX.sfx('correct', 3); FX.confetti(e.target.getBoundingClientRect(), 80); FX.pop('ドパミン全開！'); }
+  if (S.dopa) { FX.sfx('correct', 3); FX.confetti(e.target.getBoundingClientRect(), 80); FX.pop(T('ドパミン全開！')); }
 };
 $('set-sound').onchange = e => { S.sound = e.target.checked; store.set('settings', S); renderSettings(); SND.play('correct'); };
 $('set-vol').oninput = e => { S.vol = +e.target.value; $('set-vol-n').textContent = `${S.vol}`; };

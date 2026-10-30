@@ -94,10 +94,22 @@ function mapTokens(html, each) {
   });
 }
 
+// CSS の content の代わりの文（content: "✓" / "正解"）は読み上げで聞こえるので訳す。コメントの中は見ない。
+// 訳の無いものは残り、translateHtml の最後のチェックで止まる
+const CSS_ALT = /(\/\*[\s\S]*?\*\/)|(content:[^;}]*?\/\s*")([^"]*)(")/g;
+const translateCss = (css, dict, used) => css.replace(CSS_ALT, (m, cmt, a, v, z) => {
+  if (cmt) return m;
+  const t = look(v, dict, used);
+  return t === null ? m : a + t.replace(/["\\]/g, '\\$&') + z;
+});
+const cssAltLeft = html => [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+  .flatMap(m => [...m[1].replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/content:[^;}]*/g)].map(c => c[0]).filter(c => JA_RE.test(c)));
+
 export function translateHtml(html, dict, used = new Set()) {
   // lang="ja" の要素の中は訳さない（言語の切りかえの「日本語」など）
   const out = mapTokens(html, (tok, inJa) => {
-    if (inJa || tok.startsWith('<!--') || /^<style\b/.test(tok)) return tok;
+    if (inJa || tok.startsWith('<!--')) return tok;
+    if (/^<style\b/.test(tok)) return translateCss(tok, dict, used);
     if (/^<script\b/.test(tok)) {
       const m = tok.match(/^(<script\b[^>]*type="application\/ld\+json"[^>]*>)([\s\S]*?)(<\/script>)$/);
       return m ? m[1] + '\n' + translateLd(m[2], dict, used) + '\n' + m[3] : tok;
@@ -108,7 +120,8 @@ export function translateHtml(html, dict, used = new Set()) {
     return t === null ? tok : pre + escText(t) + post;
   });
   // 全角の空白も日本語の文字なので、trim する前に見る
-  const left = [...new Set(visibleText(out).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '')))];
+  const left = [...new Set([...visibleText(out).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '')),
+    ...cssAltLeft(out)])];
   if (left.length) throw new Error('英語の訳が無い文:\n' + left.join('\n'));
   return out;
 }

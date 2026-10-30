@@ -590,3 +590,22 @@ export const recordEvents = page => page.evaluate(types => {
 }, EVENTS);
 // 積んだイベント。type を渡せばその種類だけ
 export const events = (page, type) => page.evaluate(type => window.__ev.filter(e => !type || e.type === type), type);
+
+// 英語版（PR5）: 見えている日本語の一覧。見えている要素（checkVisibility()）の文字と、aria-label・title・alt・placeholder・
+// value（ボタン）、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）の中は除く
+export const jaLeft = async page => {
+  const { JA_RE } = await import('../../tools/i18n_scan.mjs');
+  return page.evaluate(([src, flags]) => {
+    const re = new RegExp(src, flags), out = [];
+    const shown = el => el && el.checkVisibility({ visibilityProperty: true }) && !el.closest('[lang="ja"]');
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (let n; (n = walk.nextNode());) if (re.test(n.data) && shown(n.parentElement)) out.push(n.data.trim());
+    for (const el of document.body.querySelectorAll('*')) {
+      if (!shown(el)) continue;
+      for (const a of ['aria-label', 'title', 'alt', 'placeholder']) { const v = el.getAttribute(a); if (v && re.test(v)) out.push(`[${a}] ${v}`); }
+      if ((el.tagName === 'BUTTON' || (el.tagName === 'INPUT' && /^(button|submit|reset)$/.test(el.type))) && re.test(el.value ?? '')) out.push(`[value] ${el.value}`);
+    }
+    if (re.test(document.title)) out.push(`[title] ${document.title}`);
+    return out;
+  }, [JA_RE.source, JA_RE.flags]);
+};

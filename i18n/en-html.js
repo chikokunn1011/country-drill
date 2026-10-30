@@ -1,6 +1,10 @@
 // 英語版（PR5）: index.html の HTML だけの文（tools/make_en.mjs だけが読む。ブラウザは読まない）。
-// キーは index.html の文（前後の空白を取ったもの）か属性の値。js の T() の文は i18n/en-*.js に書く
+// キーは index.html の文（前後の空白を取ったもの）か属性の値か、<style> の content の代わりの文。js の T() の文は i18n/en-*.js に書く
 Object.assign(window.I18N_EN ??= {}, {
+  // <style> の content の読み上げの文（content: "✓" / "正解"。選択肢の正解・まちがいの印）
+  '正解': 'Correct',
+  'まちがい': 'Wrong',
+
   // head
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。地域しぼり、タイムアタックとランキング、国旗図鑑、冒険RPGも。登録なしでスマホ・PCからすぐ遊べる。':
     'A free 4-choice quiz to learn the flags, names and locations of all 195 countries. Narrow it down by region and browse the flag gallery. No sign-up: play right away on your phone or computer.',
