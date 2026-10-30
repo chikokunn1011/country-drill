@@ -15,6 +15,7 @@
 // '#国旗マスター'（en-rank.js）、'・'（en-daily.js）、'〈{title}〉'（en-profile.js）、'すべて'・'シェア'・'まだ'（en-badges.js）
 // rpg.js が使うほかの辞書のキー: '冒険'・'達成'（en-badges.js）、'閉じる'（en-book.js）、'コピー'・'コピーしたよ'（en-profile.js）、'挑戦'（en-core.js）
 // rpg-cards.js の文は en-rpg-cards.js。rpg-cards.js も使うこの辞書のキー: '← 冒険'・'国旗ガチャ'・'あと{coins}'
+// rpg-team.js の文も en-rpg-cards.js。rpg-team.js も使うこの辞書のキー: '← 冒険'・'編成'・'編成{n}'・'仲間 {n}/{total}'・'あと{coins}'・'＋{p}%'
 Object.assign(window.I18N_EN ??= {}, {
   // ---- 既定の編成名の頭（'編成1' → 表示は Team 1）とコインの単位（データ。英語の画面は shortCoins(n, true) の k） ----
   '編成': 'Team',
@@ -203,6 +204,8 @@ Object.assign(window.I18N_EN ??= {}, {
   '仲間 {n}/{total}': 'Allies {n}/{total}',
   'レベルアップ {coins}': 'Level up {coins}',
   'あと{coins}': 'Need {coins} more',
+  // 割合の上乗せ（全角の＋。rpg-team.js のチームボーナス。rpg-battle.js の編成の行も Task 8 で使う）
+  '＋{p}%': '+{p}%',
   '上げられるだけ上げる': 'Level up as far as you can',
   'Lv{lv} まで ●{coins} 使う？': 'Spend ●{coins} to reach Lv {lv}?',
   // つぎにやること

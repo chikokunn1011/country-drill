@@ -1,5 +1,5 @@
 // v=1
-// 英語版（PR8）: 冒険の仲間のカード・国旗ガチャ（Flag Draw）・仲間の一覧・仲間の世界地図・シェア（rpg-cards.js）。あとのタスクで rpg-team.js の文を足す。
+// 英語版（PR8）: 冒険の仲間のカード・国旗ガチャ（Flag Draw）・仲間の一覧・仲間の世界地図・シェア（rpg-cards.js）と編成（rpg-team.js）。
 // 冒険の語は en-rpg.js の頭と tools/dict_sheet.mjs の GLOSSARY のとおり（仲間 ally／allies・なかよし度 Friendship・かさね Stack・
 // おかえし coins back・ランクアップ Rank up・こうげき Attack・地域ボーナス Region bonus・国旗パック Flag Pack・
 // ガチャ Flag Draw（Draw 1・Draw 10・Free draw・guaranteed ★3）・ブロンズ／シルバー／ゴールド Bronze／Silver／Gold）。
@@ -83,4 +83,31 @@ Object.assign(window.I18N_EN ??= {}, {
   '国旗クエストで仲間が{n}か国になった！ {tag}': { one: 'I now have {n} ally in Flag Quest! {tag}', other: 'I now have {n} allies in Flag Quest! {tag}' },
   '{land}の国を全部仲間にした！': 'Every country in {land} is now your ally!',
   '国旗クエストで{land}の国を全部仲間にした！ 仲間 {n}/{total}か国 {tag}': 'Every country in {land} is now my ally in Flag Quest! Allies: {n}/{total} countries {tag}',
+
+  // ---- 編成（#scr-team、rpg-team.js）。'← 冒険'・'編成'・'編成{n}'（既定の名前 Team {n}）・'仲間 {n}/{total}'・'あと{coins}' は en-rpg.js、
+  // '地域でしぼりこむ' はこの辞書の上、'すべて' は en-badges.js。✏️ の aria-label は en-profile.js の '名前を変える'（Change nickname）と意味が
+  // ちがうので、英語のページだけ '編成の名前を変える' を使う ----
+  '編成の枠': 'Team slots',
+  '編成の名前': 'Team name',
+  '編成の名前を変える': 'Rename team',
+  'まだ組んでないよ（強い順の3枚で戦う）': 'Not set up yet (your 3 strongest allies will fight)',
+  'ダンジョン:': 'Dungeon:',
+  'おまかせ': 'Auto',
+  '同じグループの仲間が2枚で＋10%、3枚で＋25%（こうげき・HP）': 'Team bonus: +10% with 2 allies from the same group, +25% with 3 (Attack and HP)',
+  '仲間がいると強くなるよ（国旗ガチャ・{n}回正解）': {
+    one: 'Allies make you stronger (find them in the Flag Draw or with {n} correct answer)',
+    other: 'Allies make you stronger (find them in the Flag Draw or with {n} correct answers)',
+  },
+  '国旗ガチャへ': 'Go to the Flag Draw',
+  '枠を買う {cost}コイン': 'Buy a team slot for {cost} coins',
+  '枠を買う {cost}コイン（あと{short}）': 'Buy a team slot for {cost} coins (need {short} more)',
+  'まだ買えない枠': 'Team slot not available yet',
+  '{name}（外す）': 'Remove {name}',
+  '空き': 'Empty',
+  'チーム {group}×{n} {pct}': 'Team bonus {group}×{n} {pct}',
+  'チームボーナスなし': 'No Team bonus',
+  '✓ 編成中': '✓ In team',
+  '← バトルにもどる': '← Back to battle',
+  '入れ替えたいカードを先に外してね': 'Remove the card you want to replace first',
+  '●{cost} で編成の枠を1つ増やす？': 'Spend ●{cost} to add a team slot?',
 });
