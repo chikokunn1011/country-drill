@@ -69,6 +69,51 @@ t('offline_play', async (page, { context }) => {
   assert.ok(await page.locator('#qcard svg.map path').count() > 50);
 }, { seed: 1 });
 
+// 英語版（PR5）: en/ を開いて SW が入ったら、オフラインでも英語のホーム・図鑑（#book）が出て、国旗→国名を5問遊べる
+t('sw_en_shell', async (page, { context }) => {
+  await swReady(page);
+  await context.setOffline(true);
+  const en = (path = '') => new URL(`en/${path}`, server.url).href;
+  const isEn = async () => assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
+  await page.reload();
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  assert.equal((await page.innerText('#home-book .hi-label')).trim(), 'Gallery');
+  assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller));
+  // 日本語の本編を開いてから、別のページとして en/#book を開く（同じページの hash だけの移動にしない）
+  await page.goto(server.url);
+  await page.locator('#scr-home').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.lang), 'ja');
+  await page.goto(en('#book'));
+  await page.waitForSelector('#scr-book:not([hidden])');
+  await isEn();
+  assert.equal((await page.innerText('#to-book')).trim(), 'Gallery');
+  assert.equal((await page.innerText('#bview button[data-v="list"]')).trim(), 'List');
+  // index.html も en/ の本編として出る
+  await page.goto(en('index.html'));
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  await page.goto(en());
+  await page.locator('#scr-home').waitFor();
+  await isEn();
+  await pickSetup(page, { mode: 'f2n', region: 'all', count: 5 });
+  assert.match(await page.innerText('#modes .modecard[data-k="f2n"]'), /Flag → Name/);
+  await page.click('#start');
+  for (let i = 0; i < 5; i++) {
+    await answerCorrect(page);
+    assert.ok(await page.evaluate(() => (l => l.length > 0 && l.every(i => i.complete && i.naturalWidth > 0))([...document.querySelectorAll('#qcard img')])));
+    if (await page.isVisible('#next')) await page.click('#next');
+  }
+  await page.locator('#scr-result').waitFor();
+  assert.equal(await page.evaluate(() => G.set.length), 5);
+  await isEn();
+  // 開いたことのない英語のページ（国のページ・遊び方）には本編を出さない
+  for (const path of ['country/jp.html', 'howto.html']) {
+    await page.goto(en(path)).catch(() => {});
+    assert.equal(await page.locator('#scr-home').count(), 0, path);
+  }
+}, { path: 'en/', locale: 'en-US', seed: 1 });
+
 // オフラインで、開いたことのないページ（国のページ・遊び方）には本編（index.html）を出さず、ブラウザのふつうのオフラインの画面にする
 t('offline_unvisited_pages', async (page, { context }) => {
   await swReady(page);

@@ -1,10 +1,12 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = 'f3f2c7639c84';
+const VERSION = 'e9af32038edc';
 const PRECACHE = [
   "./",
   "index.html",
+  "en/",
+  "en/index.html",
   "favicon.ico",
   "icons/icon.svg",
   "icons/apple-touch-icon.png",
@@ -36,6 +38,12 @@ const PRECACHE = [
   "streak.js?v=2",
   "dojo.js?v=2",
   "pwa.js?v=2",
+  "en/manifest.webmanifest",
+  "i18n/en-core.js?v=1",
+  "i18n/en-quiz.js?v=1",
+  "i18n/en-rank.js?v=1",
+  "i18n/en-book.js?v=1",
+  "i18n/en-dojo.js?v=1",
   "vendor/d3-7.9.0.min.js",
   "vendor/topojson-client-3.1.0.min.js",
   "world.js?v=1",
@@ -251,8 +259,12 @@ const abs = u => new URL(u, location.href);
 const isFixed = url => url.searchParams.has('v') || url.pathname.startsWith(`${SCOPE}vendor/`);
 // 管理ページ（admin.html・admin*.js）は取っておかない
 const isAdmin = url => url.pathname.slice(SCOPE.length).startsWith('admin');
-// index.html の代わりに出してよいのは、根（./・index.html。? 付きも）を開いたときだけ
-const isShell = url => url.pathname === SCOPE || url.pathname === `${SCOPE}index.html`;
+// 本編の代わりを出してよいのは、根（./・index.html。? 付きも）→ index.html と、英語版の en/・en/index.html → en/index.html だけ
+const shellFor = url => {
+  const p = url.pathname.slice(SCOPE.length);
+  return url.pathname.startsWith(SCOPE) && (p === '' || p === 'index.html') ? 'index.html'
+    : url.pathname.startsWith(SCOPE) && (p === 'en/' || p === 'en/index.html') ? 'en/index.html' : null;
+};
 
 // precache に1つ入れる。中身が変わらないものは前の版のキャッシュにあれば写す。
 // それ以外はブラウザの HTTP キャッシュを確かめてから取る（no-cache。古い index.html と新しい ?v= が混ざらないように）
@@ -307,13 +319,13 @@ const race = (req, alt) => new Promise(ok => {
     if (!done) { done = true; clearTimeout(timer); ok(res); }
   }, fail);
 });
-const shell = () => caches.open(CACHE).then(c => c.match('index.html'));
+const shell = name => () => caches.open(CACHE).then(c => c.match(abs(name).href));
 
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (req.method !== 'GET' || url.origin !== location.origin) return;   // 外のサイト（Supabase など）はさわらない
-  // ページ: 根だけは無ければ index.html。ほかのページ（国のページなど）に本編は出さない
-  if (req.mode === 'navigate') return e.respondWith(race(req, isShell(url) ? shell : null));
+  // ページ: 根・en/ だけは無ければ本編（index.html・en/index.html）。ほかのページ（国のページなど）に本編は出さない
+  if (req.mode === 'navigate') { const s = shellFor(url); return e.respondWith(race(req, s ? shell(s) : null)); }
   // ?v= 付き・vendor/ はキャッシュ優先
   if (isFixed(url)) return e.respondWith(fromCache(req).then(r => r || fetch(req).then(res => keep(req, res))));
   // それ以外（countries.js・trivia.js・textures など）はページと同じ

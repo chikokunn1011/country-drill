@@ -1,35 +1,39 @@
 // D2 アプリ化: sw.js の precache の一覧（PRECACHE）と版（VERSION）を作る。
-// index.html が読むファイル（?v= 付きのまま）・地図・国旗・CSS の textures・manifest のアイコンを拾う。
+// index.html と en/index.html（英語版。<base href="../"> なので URL は根からの相対）が読むファイル（?v= 付きのまま）・地図・国旗・
+// CSS の textures・manifest のアイコン（manifest のある場所から解決する）を拾う。
 // 使い方: node tools/make_sw.mjs（sw.js の // precache:start 〜 // precache:end を書きかえる）
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const START = '// precache:start', END = '// precache:end';
-// 先に入れないもの: 外のサイト・管理ページ・国のページ・ページ内のリンク・data:
-const skip = u => /^([a-z][\w+.-]*:|\/\/|#)/i.test(u) || /^admin/.test(u) || u.startsWith('country/');
-const file = u => (u === './' ? 'index.html' : u.split('?')[0]);
+// 先に入れないもの: 外のサイト・管理ページ・国のページ・テーマのページ（英語版も）・ページ内のリンク・data:
+const skip = u => /^([a-z][\w+.-]*:|\/\/|#)/i.test(u) || /^admin/.test(u) || /^(en\/)?(country|themes)\//.test(u);
+const file = u => (u === './' ? 'index.html' : u === 'en/' ? 'en/index.html' : u.split('?')[0]);
 
 // precache の URL（ページからの相対。?v= 付きはそのまま）
 export function swList(root) {
   const read = p => readFileSync(join(root, p), 'utf8');
-  const html = read('index.html'), out = new Set(['./', 'index.html']);
+  const html = read('index.html'), en = read('en/index.html'), out = new Set(['./', 'index.html', 'en/', 'en/index.html']);
   const add = u => { if (!skip(u)) out.add(u); };
-  // <script src> と <link href>（canonical・preconnect は外のサイトなので skip で落ちる）
-  for (const m of html.matchAll(/<(?:script|link)\b[^>]*?\b(?:src|href)="([^"]+)"/g)) add(m[1]);
+  // <script src> と <link href>（canonical・preconnect・hreflang は外のサイトなので skip で落ちる）
+  for (const m of (html + en).matchAll(/<(?:script|link)\b[^>]*?\b(?:src|href)="([^"]+)"/g)) add(m[1]);
   // 地図はあとから読む（mapScript('...')）
-  for (const m of html.matchAll(/mapScript\('([^']+)'\)/g)) add(m[1]);
+  for (const m of (html + en).matchAll(/mapScript\('([^']+)'\)/g)) add(m[1]);
   // 国旗（const flag = a => `flags/${a}.svg?v=${FLAG_V}` を countries.js の全部で）
-  const fv = html.match(/const FLAG_V = (\d+);/)[1], tpl = html.match(/const flag = a => `([^`]+)`/)[1];
   const ctx = { window: {} }; vm.runInNewContext(read('countries.js'), ctx);
-  for (const c of ctx.window.COUNTRIES) add(tpl.replace('${a}', c.a).replace('${FLAG_V}', fv));
-  // CSS の url(...)（index.html の中の style と、読む .css）
-  const css = [html, ...[...out].filter(u => /\.css(\?|$)/.test(u)).map(u => read(file(u)))].join('\n');
+  for (const page of [html, en]) {
+    const fv = page.match(/const FLAG_V = (\d+);/)[1], tpl = page.match(/const flag = a => `([^`]+)`/)[1];
+    for (const c of ctx.window.COUNTRIES) add(tpl.replace('${a}', c.a).replace('${FLAG_V}', fv));
+  }
+  // CSS の url(...)（index.html・en/index.html の中の style と、読む .css）
+  const css = [html, en, ...[...out].filter(u => /\.css(\?|$)/.test(u)).map(u => read(file(u)))].join('\n');
   for (const m of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) add(m[1]);
-  // manifest のアイコン
-  for (const m of [...out].filter(u => /\.webmanifest$/.test(u))) for (const i of JSON.parse(read(m)).icons ?? []) add(i.src);
+  // manifest のアイコン（manifest のある場所からの相対。en/ の ../icons/… は icons/…）
+  for (const m of [...out].filter(u => /\.webmanifest$/.test(u)))
+    for (const i of JSON.parse(read(m)).icons ?? []) if (!skip(i.src)) add(posix.normalize(posix.join(posix.dirname(m), i.src)));
   return [...out];
 }
 

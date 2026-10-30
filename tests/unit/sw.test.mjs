@@ -60,11 +60,28 @@ test('sw_version_follows_v', () => {
   const dir = copyRepo();
   try {
     const a = render(dir), n = +read('index.html').match(/pc\.css\?v=(\d+)/)[1];
-    const p = join(dir, 'index.html');
-    writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    // en/index.html は make_en が index.html から作るので、?v= もいっしょに上がる
+    for (const f of ['index.html', 'en/index.html']) {
+      const p = join(dir, f);
+      writeFileSync(p, readFileSync(p, 'utf8').replace(`pc.css?v=${n}`, `pc.css?v=${n + 1}`));
+    }
     const b = render(dir);
     assert.ok(precache(a).includes(`pc.css?v=${n}`));
     assert.ok(precache(b).includes(`pc.css?v=${n + 1}`) && !precache(b).includes(`pc.css?v=${n}`));
     assert.notEqual(version(a), version(b));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// 英語版（PR5）: en/index.html（<base href="../"> なので URL は根からの相対）が読むもの・en/ の manifest とそのアイコンも入れる
+test('sw_list_en', () => {
+  const list = swList(ROOT), en = read('en/index.html');
+  const has = u => assert.ok(list.includes(u), u);
+  for (const u of ['en/', 'en/index.html', 'en/manifest.webmanifest', 'icons/icon-512.png', 'icons/icon-maskable-512.png']) has(u);
+  const dict = [...en.matchAll(/src="(i18n\/en-[\w-]+\.js\?v=\d+)"/g)].map(m => m[1]);
+  assert.ok(dict.includes('i18n/en-core.js?v=1'), dict.join());
+  dict.forEach(has);
+  // ブラウザが読まない辞書（make_en が使う en-html.js）は入れない
+  assert.ok(!list.some(u => u.startsWith('i18n/en-html.js')));
+  for (const u of list) assert.ok(!u.startsWith('en/country/') && !u.startsWith('en/themes/') && !u.startsWith('../'), u);
+  assert.equal(new Set(list).size, list.length);
 });
