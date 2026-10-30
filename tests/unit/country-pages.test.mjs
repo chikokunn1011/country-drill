@@ -2,13 +2,13 @@
 // 作ったページはコミットするので、作り直すと1文字もちがわないことを確かめる
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync, cpSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, mkdtempSync, rmSync, cpSync, mkdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { readInputs, check, render } from '../../tools/make_country_pages.mjs';
+import { readInputs, check, render, neighborsOf, byJa } from '../../tools/make_country_pages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SITE = 'https://chikokunn1011.github.io/country-drill/';
@@ -52,8 +52,10 @@ function withTmp(fn) {
 }
 // 生成スクリプトが読むものを一時の root に写す
 const copyInputs = dir => {
-  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml']) cpSync(join(ROOT, f), join(dir, f));
+  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
   cpSync(join(ROOT, 'flags'), join(dir, 'flags'), { recursive: true });
+  mkdirSync(join(dir, 'data'), { recursive: true });
+  cpSync(join(ROOT, 'data', 'neighbors_fix.json'), join(dir, 'data', 'neighbors_fix.json'));
 };
 const edit = (dir, f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
 const setTrivia = (dir, a, list) => edit(dir, 'trivia.js', () => `window.TRIVIA = ${JSON.stringify({ ...TRIVIA, [a]: list })};\n`);
@@ -192,3 +194,66 @@ test('escapes_text', () => withTmp(dir => {   // 豆知識に `<b>&"` → ペー
   const h = render(readInputs(dir))['country/fr.html'];
   assert.ok(h.includes('&lt;b&gt;&amp;&quot;テスト')); assert.ok(!h.includes('<b>&'));
 }));
+
+// となりの国（world.js の地図から計算し、data/neighbors_fix.json で直す）
+const INP = readInputs(ROOT), NB = neighborsOf(INP);
+const FIX = JSON.parse(read('data/neighbors_fix.json'));
+const byA = new Map(C.map(c => [c.a, c]));
+
+test('neighbors_list', t => {             // 一覧を出す（確かめるため）。全部の国があり、自分はふくまず、五十音順
+  assert.deepEqual([...NB.keys()].sort(), [...C.map(c => c.a)].sort());
+  for (const c of [...C].sort(byJa)) {
+    const list = NB.get(c.a);
+    t.diagnostic(`${c.a} ${c.n}: ${list.map(b => byA.get(b).n).join('・') || '（なし）'}`);
+    assert.ok(!list.includes(c.a), c.a);
+    assert.equal(new Set(list).size, list.length, c.a);
+    assert.deepEqual(list, [...list].sort((x, y) => byJa(byA.get(x), byA.get(y))), c.a);
+  }
+});
+
+test('neighbors_known', () => {
+  const has = (a, list) => { for (const b of list) assert.ok(NB.get(a).includes(b), `${a} のとなりに ${b}`); };
+  has('fr', ['de', 'es', 'be', 'ch', 'it', 'lu', 'ad', 'mc']);
+  has('es', ['pt', 'fr', 'ad']);
+  has('cn', ['in', 'np', 'ru', 'kp', 'mn']);
+  assert.equal(NB.get('cn').length, 14);
+  assert.deepEqual(NB.get('kr'), ['kp']);
+  assert.deepEqual(NB.get('sm'), ['it']);
+  assert.deepEqual(NB.get('va'), ['it']);
+  // 小さい国
+  const eq = (a, list) => assert.deepEqual([...NB.get(a)].sort(), [...list].sort(), a);
+  eq('ad', ['es', 'fr']); eq('mc', ['fr']); eq('li', ['at', 'ch']); eq('lu', ['be', 'de', 'fr']);
+  eq('bn', ['my']); eq('tl', ['id']); eq('gm', ['sn']); eq('ls', ['za']); eq('sz', ['mz', 'za']);
+});
+
+test('neighbors_island', () => {           // 島国（rpg-core.js の THEMES.island）はとなりの国なし
+  const isl = /island: \{ n: '島国', a: '([^']*)'\.split\(' '\) \}/.exec(read('rpg-core.js'))[1].split(' ');
+  assert.ok(isl.length > 30);
+  for (const a of isl) assert.deepEqual(NB.get(a), [], a);
+});
+
+test('neighbors_symmetric', () => {
+  for (const [a, list] of NB) for (const b of list) assert.ok(NB.get(b).includes(a), `${a}-${b}`);
+});
+
+test('neighbors_fix_applied', () => {
+  assert.deepEqual(Object.keys(FIX).sort(), ['add', 'note', 'remove']);
+  const pairs = [...FIX.add, ...FIX.remove];
+  assert.ok(FIX.add.length > 0);
+  for (const [a, b] of FIX.add) { assert.ok(NB.get(a).includes(b) && NB.get(b).includes(a), `add ${a}-${b}`); }
+  for (const [a, b] of FIX.remove) { assert.ok(!NB.get(a).includes(b) && !NB.get(b).includes(a), `remove ${a}-${b}`); }
+  for (const [a, b] of pairs) assert.ok(typeof FIX.note[`${a}-${b}`] === 'string' && FIX.note[`${a}-${b}`].trim(), `note ${a}-${b}`);
+  assert.deepEqual(Object.keys(FIX.note).sort(), pairs.map(([a, b]) => `${a}-${b}`).sort());
+  // 直しが無いと地図だけの結果になる（add は地図に無い、remove は地図にある）
+  const raw = neighborsOf({ ...INP, NEIGHBORS_FIX: { add: [], remove: [], note: {} } });
+  for (const [a, b] of FIX.add) assert.ok(!raw.get(a).includes(b), `add ${a}-${b} は地図に無いはず`);
+  for (const [a, b] of FIX.remove) assert.ok(raw.get(a).includes(b), `remove ${a}-${b} は地図にあるはず`);
+});
+
+test('neighbors_fix_checked', () => {      // 直しに知らないコード・地図とかさなる直しがあれば check が言う
+  const bad = { add: [['fr', 'zz'], ['fr', 'de']], remove: [['jp', 'kr']], note: {} };
+  const p = check({ ...INP, NEIGHBORS_FIX: bad });
+  assert.ok(p.some(x => x.includes('zz')), p.join('\n'));
+  assert.ok(p.some(x => x.includes('fr-de')), p.join('\n'));
+  assert.ok(p.some(x => x.includes('jp-kr')), p.join('\n'));
+});
