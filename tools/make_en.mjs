@@ -70,9 +70,33 @@ const translateLd = (json, dict, used) => {
   return JSON.stringify(o);
 };
 
+// 中身を持たない要素（lang="ja" を付けても閉じタグが無い）
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+// html を字句に切り、each(tok, inJa) の返り値でつなぐ。inJa は lang="ja" の要素（<html> は除く）の開きタグから
+// 閉じタグまで（同じ名前の入れ子は数える）
+function mapTokens(html, each) {
+  let jaTag = null, jaDepth = 0;
+  return html.replace(TOKENS, tok => {
+    if (jaDepth) {
+      const m = tok.match(/^<(\/?)(\w+)\b[^>]*?(\/?)>$/);
+      if (m && m[2].toLowerCase() === jaTag && !m[3]) jaDepth += m[1] ? -1 : 1;
+      return each(tok, true);
+    }
+    const open = tok.match(/^<(\w+)\b[^>]*\slang="ja"[^>]*>$/);
+    if (open && open[1].toLowerCase() !== 'html') {
+      const name = open[1].toLowerCase();
+      if (!VOID.has(name) && !tok.endsWith('/>')) { jaTag = name; jaDepth = 1; }
+      return each(tok, true);
+    }
+    return each(tok, false);
+  });
+}
+
 export function translateHtml(html, dict, used = new Set()) {
-  const out = html.replace(TOKENS, tok => {
-    if (tok.startsWith('<!--') || /^<style\b/.test(tok)) return tok;
+  // lang="ja" の要素の中は訳さない（言語の切りかえの「日本語」など）
+  const out = mapTokens(html, (tok, inJa) => {
+    if (inJa || tok.startsWith('<!--') || /^<style\b/.test(tok)) return tok;
     if (/^<script\b/.test(tok)) {
       const m = tok.match(/^(<script\b[^>]*type="application\/ld\+json"[^>]*>)([\s\S]*?)(<\/script>)$/);
       return m ? m[1] + '\n' + translateLd(m[2], dict, used) + '\n' + m[3] : tok;
@@ -82,24 +106,23 @@ export function translateHtml(html, dict, used = new Set()) {
     const t = look(core, dict, used);
     return t === null ? tok : pre + escText(t) + post;
   });
-  const left = [...new Set(visibleText(out).split(/[<>"]/).map(s => s.trim()).filter(s => JA_RE.test(s)))];
+  // 全角の空白も日本語の文字なので、trim する前に見る
+  const left = [...new Set(visibleText(out).split(/[<>"]/).filter(s => JA_RE.test(s)).map(s => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '')))];
   if (left.length) throw new Error('英語の訳が無い文:\n' + left.join('\n'));
   return out;
 }
 
 // script・style・コメント・lang="ja" の要素（<html> は除く）を外したもの
 function visibleText(html) {
-  return html
-    .replace(/<script\b[\s\S]*?<\/script>/g, '').replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(?!html\b)(\w+)\b[^>]*\slang="ja"[^>]*>[\s\S]*?<\/\1>/g, '');
+  return mapTokens(html, (tok, inJa) => inJa || /^<(?:!--|script\b|style\b)/.test(tok) ? '' : tok);
 }
 
-// <a href> の行き先を英語版に（EN_PAGES のものだけ）
-const enLinks = html => html.replace(/(<a\b[^>]*?\shref=")([^"]*)(")/g, (m, a, href, z) => {
+// <a href> の行き先を英語版に（EN_PAGES のものだけ）。script・style・コメントの中の文字は変えない
+const enLinks = html => html.replace(TOKENS, tok => !/^<a\b/.test(tok) ? tok : tok.replace(/^(<a\b[^>]*?\shref=")([^"]*)(")/, (m, a, href, z) => {
   const [path, ...hash] = href.split('#');
   if (!EN_PAGES.includes(path)) return m;
   return a + (path === './' ? 'en/' : 'en/' + path) + (hash.length ? '#' + hash.join('#') : '') + z;
-});
+}));
 
 // 1か所だけのはずの置きかえ（無ければ止まる）
 const once = (html, from, to) => {

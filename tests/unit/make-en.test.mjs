@@ -93,6 +93,30 @@ test('translate_throws_on_missing', () => {
   assert.deepEqual([...used].sort(), ['文', '題'].sort());
 });
 
+test('translate_skips_lang_ja', () => {
+  // lang="ja" の要素の中は文字も属性も訳さない（同じ名前の入れ子も）。外は訳す
+  const dict = { 日本語: 'Japanese', 題: 'Title', 文: 'Text' };
+  assert.equal(translateHtml('<a lang="ja" href="./" title="題">日本語</a> / <b>文</b>', dict),
+    '<a lang="ja" href="./" title="題">日本語</a> / <b>Text</b>');
+  assert.equal(translateHtml('<span lang="ja"><span>日本語</span>日本語</span><span>文</span>', dict),
+    '<span lang="ja"><span>日本語</span>日本語</span><span>Text</span>');
+  assert.equal(translateHtml('<p><img lang="ja" alt="題">文</p>', dict), '<p><img lang="ja" alt="題">Text</p>');
+});
+
+test('translate_catches_fullwidth_space', () => {
+  // 前後の全角の空白は訳した文の外に残るので、チェックで止まる
+  assert.throws(() => translateHtml('<p>文\u3000</p>', { 文: 'Text' }), /英語の訳が無い文/);
+});
+
+test('en_links_outside_script_only', () => {
+  const inp = readEnInputs(ROOT);
+  inp.index = inp.index.replace('</body>', `<script>const x = '<a href="howto.html">';</script>\n<!-- <a href="about.html"> -->\n</body>`);
+  const html = renderEn(inp)['en/index.html'];
+  assert.ok(html.includes(`<script>const x = '<a href="howto.html">';</script>`));
+  assert.ok(html.includes('<!-- <a href="about.html"> -->'));
+  assert.ok(html.includes('<a href="en/howto.html">'));
+});
+
 test('en_manifest', () => {
   const m = JSON.parse(read('en/manifest.webmanifest')), ja = JSON.parse(read('manifest.webmanifest'));
   assert.equal(m.name, 'Flag Master');

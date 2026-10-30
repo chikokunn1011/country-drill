@@ -463,7 +463,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
     <!-- 入口は全部ここに置く。本体以外のファイルが使う入口は hidden で始め、そのファイルが homeEntry() で出す -->
     <div class="home-big" id="home-big">
       <button class="hbig main" id="home-play"><b class="hb-title">Play quiz</b><span class="hb-desc">Guess the flag, name or location</span><span class="hb-note"></span></button>
-      <button class="hbig" id="home-daily" hidden><b class="hb-title">Daily Puzzle</b><span class="hb-desc">New questions every day. Compete with everyone</span><span class="hb-note"></span></button>
+      <button class="hbig" id="home-daily" hidden><b class="hb-title">Daily Puzzle</b><span class="hb-desc">A new puzzle every day. Compete with everyone.</span><span class="hb-note"></span></button>
       <button class="hbig" id="home-rpg" hidden><b class="hb-title">Adventure</b><span class="hb-desc">Recruit allies with coins and head into dungeons</span><span class="hb-note"></span></button>
     </div>
     <div class="home-icons" id="home-icons">
@@ -488,7 +488,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="field">
         <span class="lbl">Accessibility</span>
         <div class="chips" id="set-fs" role="group" aria-label="Text size"></div>
-        <label class="switch"><input type="checkbox" id="set-cvd"> Color-blind friendly colors</label>
+        <label class="switch"><input type="checkbox" id="set-cvd"> Colorblind-friendly colors</label>
         <p class="hint">Right answers turn blue and wrong answers turn orange.</p>
       </div>
       <div class="field">
@@ -531,7 +531,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
         <label class="switch"><input type="checkbox" id="nameopt"> Also show the country name (hint)</label>
       </div>
       <div class="field" id="kinds-field">
-        <span class="lbl">How to play</span>
+        <span class="lbl">Answer style</span>
         <div class="kind" id="kinds"></div>
       </div>
       </div>
@@ -539,9 +539,9 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
       <div class="rmap" id="rmap"></div>
       <div class="opts">
       <div class="field" id="theme-field" hidden>
-        <span class="lbl">Theme</span>
+        <span class="lbl">Collection</span>
         <p class="theme-name" id="theme-name"></p>
-        <button class="linkbtn" id="theme-leave">Leave theme</button>
+        <button class="linkbtn" id="theme-leave">Exit collection</button>
       </div>
       <div class="field" id="regions-field">
         <span class="lbl">Regions</span>
@@ -626,7 +626,7 @@ body.dopa .result .pts { display: block; font-size: 1.6rem; margin: 0; }
 </div>
 
 <dialog id="detail"><div class="inner" id="detail-inner"></div></dialog>
-<dialog id="pwa-ios" aria-label="Add to Home Screen"><div class="inner"><p>Tap the Share button in Safari (the square with an up arrow), then choose “Add to Home Screen.”</p><button class="btn" id="pwa-ios-ok">OK</button></div></dialog>
+<dialog id="pwa-ios" aria-label="Add to home screen"><div class="inner"><p>Tap the Share button in Safari (the square with an up arrow), then choose “Add to Home Screen.”</p><button class="btn" id="pwa-ios-ok">OK</button></div></dialog>
 
 <script src="i18n.js?v=1"></script>
 <script src="countries.js"></script>

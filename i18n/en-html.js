@@ -22,7 +22,7 @@ Object.assign(window.I18N_EN ??= {}, {
   'クイズで遊ぶ': 'Play quiz',
   '国旗・国名・場所を当てる': 'Guess the flag, name or location',
   '今日の難問': 'Daily Puzzle',
-  '毎日かわる問題で、みんなと競う': 'New questions every day. Compete with everyone',
+  '毎日かわる問題で、みんなと競う': 'A new puzzle every day. Compete with everyone.',
   '冒険': 'Adventure',
   'コインで仲間を集めてダンジョンへ': 'Recruit allies with coins and head into dungeons',
   'ランキング': 'Leaderboard',
@@ -37,7 +37,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '「端末に合わせる」は、スマホやPCのライト／ダークの設定と同じ色になるよ。': '“Match device” follows the light/dark setting on your phone or computer.',
   '見やすさ': 'Accessibility',
   '文字の大きさ': 'Text size',
-  '色の見分けやすさ': 'Color-blind friendly colors',
+  '色の見分けやすさ': 'Colorblind-friendly colors',
   '正解は青、まちがいはオレンジになります。': 'Right answers turn blue and wrong answers turn orange.',
   '音': 'Sound',
   '効果音を鳴らす': 'Play sound effects',
@@ -59,9 +59,9 @@ Object.assign(window.I18N_EN ??= {}, {
   // モード選択
   'モードを選ぶ': 'Choose a mode',
   '国名も表示する（ヒントあり）': 'Also show the country name (hint)',
-  'あそび方': 'How to play',
-  'テーマ': 'Theme',
-  'テーマをやめる': 'Leave theme',
+  'あそび方': 'Answer style',
+  'テーマ': 'Collection',
+  'テーマをやめる': 'Exit collection',
   '出題する地域': 'Regions',
   '問題数': 'Questions',
   'スタート': 'Start',
@@ -100,7 +100,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '国の一覧': 'All countries',
   '国旗のまとめ': 'Flag collections',
 
-  // iPhone の「ホーム画面に追加」の案内
-  'ホーム画面に追加': 'Add to Home Screen',
+  // iPhone の「ホーム画面に追加」の案内（Safari のメニューの名前を引くときだけ Add to Home Screen と大文字）
+  'ホーム画面に追加': 'Add to home screen',
   'Safari の共有ボタン（□に↑）を押して、「ホーム画面に追加」を選んでね。': 'Tap the Share button in Safari (the square with an up arrow), then choose “Add to Home Screen.”',
 });
