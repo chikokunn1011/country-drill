@@ -206,6 +206,9 @@ select { font: inherit; font-size: .92rem; color: var(--ink); background: var(--
 .tapmap path.ngc, .tapmap .dot.ngc { fill: var(--ng); }
 .tapmap .tapx { fill: none; stroke: var(--ng); stroke-width: 3; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .tapmap .tapline { stroke: var(--ng); stroke-width: 2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+/* 照準（キーボードで答える点）。地図にフォーカスがあるときだけ出す */
+.tapmap .aim { display: none; fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+.tapmap:focus .aim { display: inline; }
 .tapkm { margin: 0; font-weight: 700; }
 .zoomctl { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
 .zoomctl button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 700 1rem var(--font-mono); cursor: pointer; }
@@ -815,13 +818,15 @@ function zoomableMap(c, label, opts = {}) {
 }
 /* 白地図タップ（mode: 'tap'）。選択肢の無い白地図で、国旗の国をタップして答える */
 // nearPx: 小さい国の丸印・国の形から、ここまでずれても正解にする幅（画面の上の px。拡大すると地図の上ではそのぶん狭くなる）
-const TAP = { nearPx: 12 };
+// panPx・panBigPx: 矢印キー・Shift＋矢印キー1回で地図を動かす幅（画面の上の px）
+const TAP = { nearPx: 12, panPx: 40, panBigPx: 160 };
 // 出題の白地図。投影は G.cur.proj に入れる（答えの判定 tapJudge と外れたときの表示 tapMiss が使う）。正解の国に印は付けない
 function tapMap(c, region) {
   const box = document.createElement('div'); box.className = 'mapbox tapbox';
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   s.classList.add('map', 'zoomable', 'tapmap'); s.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  s.setAttribute('role', 'img'); s.setAttribute('aria-label', `${regionLabel(region)}の白地図。国旗の国をタップ`);
+  s.setAttribute('role', 'img'); s.setAttribute('tabindex', '0');
+  s.setAttribute('aria-label', `${regionLabel(region)}の白地図。国旗の国をタップ。矢印キーで動かし、Enter で真ん中の場所を答える`);
   const proj = boxProjection(REGION_BOX[region] || WORLD_BOX, W, H), path = d3.geoPath(proj);
   if (G?.cur?.c === c) G.cur.proj = proj;
   let out = `<path class="graticule" d="${path(graticule)}"></path>`;
@@ -831,7 +836,8 @@ function tapMap(c, region) {
     const q = proj([x.ll[1], x.ll[0]]);
     if (q && q[0] >= 0 && q[0] <= W && q[1] >= 0 && q[1] <= H) out += `<circle class="dot" data-a="${x.a}" cx="${q[0]}" cy="${q[1]}" r="5"></circle>`;
   }
-  s.innerHTML = `<g class="layer">${out}</g>`;
+  // 照準は layer の外（拡大・移動しても真ん中のまま）
+  s.innerHTML = `<g class="layer">${out}</g><path class="aim" d="M${W / 2 - 12},${H / 2}H${W / 2 + 12}M${W / 2},${H / 2 - 12}V${H / 2 + 12}"></path>`;
   box.append(s);
   const layer = s.querySelector('.layer');
   const sizeDots = k => { const u = W / (s.clientWidth || W) / k; s.querySelectorAll('.dot').forEach(el => el.setAttribute('r', 5 * u)); };
@@ -840,6 +846,7 @@ function tapMap(c, region) {
     .on('zoom', e => { layer.setAttribute('transform', e.transform); sizeDots(e.transform.k); });
   const sel = d3.select(s).call(zoom).on('dblclick.zoom', null);
   box.zoomReset = () => sel.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+  box.zoomTo = t => sel.call(zoom.transform, t);
   requestAnimationFrame(() => sizeDots(d3.zoomTransform(s).k));
   const ctl = document.createElement('div'); ctl.className = 'zoomctl';
   ctl.innerHTML = '<button type="button" aria-label="縮小">−</button><button type="button" aria-label="拡大">＋</button><button type="button" class="reset">戻す</button>';
@@ -848,14 +855,33 @@ function tapMap(c, region) {
   plus.onclick = () => sel.transition().duration(200).call(zoom.scaleBy, 1.6);
   reset.onclick = box.zoomReset;
   box.append(ctl);
-  s.addEventListener('click', e => {
+  // p（layer の座標）で答える。at は押した国（海なら ''）。クリックとキーの両方から呼ぶ
+  const tryAnswer = (p, at) => {
     if (!G || G.answered || G.cur?.c !== c) return;   // 答えたあとの2回目・ダブルタップは何もしない
     if (quick() && performance.now() - G.shownAt < TA_GUARD_MS) return;
-    const p = d3.pointer(e, layer), r = TAP.nearPx * W / s.getBoundingClientRect().width / d3.zoomTransform(s).k;
-    const at = e.target.closest('[data-a]')?.dataset.a ?? '', right = at === c.a || tapJudge(c, p, r);
+    const r = TAP.nearPx * W / s.getBoundingClientRect().width / d3.zoomTransform(s).k, right = at === c.a || tapJudge(c, p, r);
     if (!right) tapMiss(c, p, at);
     else for (const el of layer.querySelectorAll(`[data-a="${c.a}"]`)) el.classList.add('on');   // 正解でも本当の場所を見せる（となりの国の近くで正解になったとき用）
     answer(at, right);
+  };
+  s.addEventListener('click', e => tryAnswer(d3.pointer(e, layer), e.target.closest('[data-a]')?.dataset.a ?? ''));
+  // キー（地図にフォーカスがあるときだけ）: 矢印で動かす・＋−で拡大縮小・0 で戻す・Enter／スペースで照準（真ん中）の場所を答える
+  s.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;   // ブラウザの拡大（Ctrl＋＋ など）はそのまま
+    const u = W / (s.getBoundingClientRect().width || W) / d3.zoomTransform(s).k, d = (e.shiftKey ? TAP.panBigPx : TAP.panPx) * u;
+    const pan = { ArrowLeft: [d, 0], ArrowRight: [-d, 0], ArrowUp: [0, d], ArrowDown: [0, -d] }[e.key];
+    if (pan) sel.interrupt().call(zoom.translateBy, ...pan);   // 拡大のアニメーション中でも動かしたぶんを消さない
+    else if (e.key === '+' || e.key === '=') sel.transition().duration(200).call(zoom.scaleBy, 1.6);
+    else if (e.key === '-') sel.transition().duration(200).call(zoom.scaleBy, 1 / 1.6);
+    else if (e.key === '0') box.zoomReset();
+    else if ((e.key === 'Enter' || e.key === ' ') && !G?.answered) {
+      e.stopPropagation();   // 答えた Enter で document の［次へ］まで進まない
+      if (!e.repeat) {
+        const b = s.getBoundingClientRect(), el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+        tryAnswer(d3.zoomTransform(s).invert([W / 2, H / 2]), (s.contains(el) && el.closest('[data-a]')?.dataset.a) || '');
+      }
+    } else return;
+    e.preventDefault();
   });
   return box;
 }
@@ -1280,7 +1306,10 @@ function nextQuestion() {
   if (m.a === 'tap' && G.hint) main.insertAdjacentHTML('beforeend', `<p class="qsub">${esc(c.n)}</p>`);   // 白地図タップは国名表示ありなら問題に国名も出す
   if (m.q === 'name') main.insertAdjacentHTML('beforeend', `<p class="qbig">${esc(c.n)}</p><p class="qsub">${esc(c.r)}</p>`);
   if (m.q === 'map') main.append(zoomableMap(c, '出題中の国の位置', { region: G.region }));
-  if (m.a === 'tap') box.append(tapMap(c, G.region));
+  if (m.a === 'tap') {
+    box.append(tapMap(c, G.region));
+    if (matchMedia('(hover: hover) and (pointer: fine)').matches) box.querySelector('.tapmap').focus({ preventScroll: true });   // PC はすぐ矢印キーが使えるように
+  }
   else {
     const ch = document.createElement('div');
     ch.className = 'choices' + (m.a === 'name' ? ' textc' : '');
@@ -1298,7 +1327,7 @@ function nextQuestion() {
   }
   // すぐ次へ進むときは正解だと答えを出さないので、ここに出るのはまちがえたときの正解だけ
   const slotHint = quick() ? 'まちがえたら、ここに正解が出るよ' : G.kind === 'dojo' ? '答えたら、ここで国旗をくらべるよ' : '答えたら、ここに国のプロフィールが出るよ';
-  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys">${m.a === 'tap' ? 'ピンチ・ホイールで拡大、ドラッグで移動' : '<kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる'} ・ <kbd>Enter</kbd> で次へ</p></div>`);
+  box.insertAdjacentHTML('beforeend', `<div class="rslot" aria-hidden="true"><p class="rslot-hint">${slotHint}</p><p class="rslot-keys">${m.a === 'tap' ? '矢印キーで動かし <kbd>Enter</kbd> で真ん中を答える・＋−で拡大' : '<kbd>1</kbd>〜<kbd>4</kbd> キーでも答えられる'} ・ <kbd>Enter</kbd> で次へ</p></div>`);
   G.shownAt = performance.now();
   updateProgress();
   if (timed() && G.done === 0) startTimer();
