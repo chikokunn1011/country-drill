@@ -56,7 +56,8 @@ test('countries_same_otherwise', (t) => {
     main = execFileSync('git', ['show', 'origin/main:countries.js'], { cwd: new URL('.', root), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { t.skip('origin/main が無い'); return; }
   const strip = list => list.map(({ e, ec, ...rest }) => rest);
-  assert.deepEqual(JSON.parse(JSON.stringify(strip(C))), JSON.parse(JSON.stringify(load(main))));
+  // PR5 のマージ後は origin/main にも e・ec があるので、両方から外して比べる（ほかの欄が変わらないこと）
+  assert.deepEqual(JSON.parse(JSON.stringify(strip(C))), JSON.parse(JSON.stringify(strip(load(main)))));
   // 1行のまま
   assert.equal(SRC.trimEnd().split('\n').length, 1);
 });
