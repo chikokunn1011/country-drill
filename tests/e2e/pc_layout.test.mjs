@@ -437,7 +437,7 @@ test('short_window_scrolls', async () => {
 // 1920×1080 を 150% で表示したノート（ホームはボタンが3つ）
 test('laptop_150pct_fits', { timeout: 120_000 }, async () => {
   const problems = [];
-  for (const scene of ['home', 'wrong_f2n', 'named_f2m', 'ta_fail', 'result_miss', 'ta_result']) await checkFit(problems, scene, { width: 1280, height: 577 });
+  for (const scene of ['home', 'wrong_f2n', 'named_f2m', 'ta_fail', 'result_miss', 'ta_result', 'settings']) await checkFit(problems, scene, { width: 1280, height: 577 });
   assert.deepEqual(problems, []);
 });
 

@@ -63,7 +63,9 @@ body[data-screen="home"] #scr-home { flex: 1 0 auto; justify-content: center; }
 #scr-settings.narrow { max-width: 720px; }
 /* settings: fields side by side (2 columns at 900–1279, 3 at 1280+) */
 #scr-settings .panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: var(--col-gap); align-items: start; }
-#scr-settings .panel > h2, #scr-settings .panel > .row { grid-column: 1 / -1; }
+#scr-settings .panel > h2 { grid-column: 1 / -1; }
+/* ［ホームへ］は最後の欄と同じ段の右端の列に置く（1段ぶん低くして、1280×577 でも縦スクロールを出さない） */
+#scr-settings .panel > .row.end { grid-column: -2 / -1; align-self: end; }
 body[data-screen="settings"] #scr-settings { flex: 1 0 auto; justify-content: center; }
 
 /* ---------- quiz: a stage that fills the rest of the viewport ---------- */
