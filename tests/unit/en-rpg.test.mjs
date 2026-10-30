@@ -111,3 +111,17 @@ test('dict_sheet_modes', () => {
   for (const r of RULES_EN) assert.ok(en.includes(r), r);
   for (const g of GLOSSARY) assert.ok(en.includes(`- ${g.term}`), g.term);
 });
+
+// 月（天体）は曜日の「月」（en-daily の Mon）と同じキーなので、表示は key（天体の月）を通す。どの名前・land も曜日にならない
+test('rpg_names_not_weekday', () => {
+  const K = loadCore();
+  const { dict, T } = enDict();
+  const WEEK = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+  const bad = [];
+  for (const d of [...K.DUNGEONS, K.TOWER]) for (const ja of [d.key ?? d.name, d.key ?? d.land]) {
+    if (!Object.hasOwn(dict, ja)) bad.push(`辞書に無い: ${ja}`);
+    else if (WEEK.has(T(ja))) bad.push(`${ja} → ${T(ja)}`);
+  }
+  assert.deepEqual(bad, []);
+  assert.equal(T(K.dungeonOf('moon').key), 'Moon');
+});

@@ -18,7 +18,9 @@
               autoNextMs: 650, guardMs: 250, gaugeMax: 5, gaugeStep: 0.05, weakMax: 2, bossWeakPct: 0.7 },
     card: { base: [0, 1, 3, 6], stack: 0.2, fr: 0.03, regionMul: 1.5, hpMul: 3, frJoin: 5, frMax: 10, stackMax: 4 },
     gacha: { r3: 0.03, r2: 0.17, pity: 50, one: 100, ten: 1000, regionMul: 1.5, refund: [0, 10, 30, 100], showMs: 1700, turnMs: 300, holdMs: [0, 650, 950, 1600] },
+    // i18n-data:start
     share: { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', cards: [50, 100, 195] },
+    // i18n-data:end
     // 編成: 枠は最大 slots 個。slotCost[i] は i+2 枠目の値段。bonus[n] は同じグループ n 枚のときのチームボーナス
     team: { slots: 5, slotCost: [2000, 3000, 4000, 5000], bonus: [0, 0, 0.10, 0.25], nameMax: 8 },
     // 宇宙のテーマ: 小さい国・大きい国の数（面積の順）、赤道の国の緯度（±度）
@@ -30,7 +32,18 @@
   };
   const BIG = 1e9;                                   // コイン・回数の上限（sanitize と、rpg.js / rpg-battle.js の足し算が使う）
 
+  // 日本語の名前・文はここからの // i18n-data:start 〜 end の中だけ（データ。セーブ・管理・テストは日本語のまま使う）。
+  // コアは T を呼ばない。英語版は rpg.js などが表示のときに T() を通す（辞書は i18n/en-rpg.js と、地域名は en-core.js）
+  // i18n-data:start
+  const TEAM_PREFIX = '編成';   // 既定の編成名の頭（'編成1'…）。英語の表示は Team {n}
+  const UNIT_MAN = '万';        // shortCoins の単位（日本語）。英語は k
+  // i18n-data:end
+  // 型の文の {name} を v の値に置きかえる（badges.js の fillJa と同じ。1回だけ・v に無い名前は残す）
+  const fillJa = (s, v) => s.replace(/\{(\w+)\}/g, (m, k) => v && Object.prototype.hasOwnProperty.call(v, k) ? String(v[k]) : m);
+
+  // i18n-data:start
   // 国の数が少ない地域から順に開く。r は S.region と同じ日本語名（全世界は 'all'）。英字 id と日本語名の変換はここだけ
+  // key は表示の辞書のキー（name・land の代わり）。月は曜日の「月」と同じキーになるので、天体の月 を使う
   const DUNGEONS = [
     { id: 'samerica', ch: 1, r: '南アメリカ', name: 'アマゾンの密林', plate: 'PLATE 01 · SOUTH AMERICA', color: '#6fa86a', flags: 6, land: '南アメリカ' },
     { id: 'oceania', ch: 1, r: 'オセアニア', name: 'サンゴ礁の海', plate: 'PLATE 02 · OCEANIA', color: '#4fa3c7', flags: 7, land: 'オセアニア' },
@@ -48,7 +61,7 @@
     { id: 'mafrica', base: 'africa', ch: 2, r: 'アフリカ', name: '鏡のサバンナ', plate: 'PLATE 13 · MIRROR AFRICA', color: '#766019', flags: 10, land: '鏡のアフリカ' },
     { id: 'mworld', base: 'world', ch: 2, r: 'all', name: '鏡の地図喰いの巣', plate: 'PLATE 14 · MIRROR WORLD', color: '#374045', flags: 12, land: '鏡の世界' },
     // 第3章 宇宙: 地域ではなくテーマ（t は THEMES のキー）で国をしぼる。r は全部 'all'（ガチャ・セーブの地域と同じ値のまま）。e は太陽系の地図に出す星
-    { id: 'moon', ch: 3, r: 'all', t: 'island', e: '🌕', name: '月', plate: 'PLATE 15 · MOON', color: '#9aa6bd', flags: 9, land: '月' },
+    { id: 'moon', ch: 3, r: 'all', t: 'island', e: '🌕', name: '月', key: '天体の月', plate: 'PLATE 15 · MOON', color: '#9aa6bd', flags: 9, land: '月' },
     { id: 'mercury', ch: 3, r: 'all', t: 'small', e: '☿', name: '水星', plate: 'PLATE 16 · MERCURY', color: '#9a8c80', flags: 9, land: '水星' },
     { id: 'venus', ch: 3, r: 'all', t: 'equator', e: '♀', name: '金星', plate: 'PLATE 17 · VENUS', color: '#d6a144', flags: 10, land: '金星' },
     { id: 'mars', ch: 3, r: 'all', t: 'landlocked', e: '🔴', name: '火星', plate: 'PLATE 18 · MARS', color: '#c4553a', flags: 10, land: '火星' },
@@ -72,9 +85,13 @@
     world: [{ e: '🌫️', n: '白紙の霧' }, { e: '🗺️', n: 'やぶれた地図' }, { e: '🧭', n: 'くるった方位磁針' }, { e: '👻', n: '地図喰いの影' }, { e: '👾', n: '地図喰い' }],
   };
   // 鏡の地球の手下 F1〜F4 は元の絵文字のまま、名前に「鏡の」「さかさ」を交互に付ける。ボスは別の名前
+  // 手下は { e, n, nk, nb }: n は日本語の名前（セーブ・テスト・管理はこれ）、nk は型の文、nb は元の名前（n === fillJa(nk, { name: nb })）
   const MIRROR_BOSS = { samerica: { e: '🐆', n: 'うつしジャガー' }, oceania: { e: '🌋', n: 'さかさ火山' }, namerica: { e: '🌪️', n: 'さかさ竜巻' }, europe: { e: '🐉', n: '白い竜' }, asia: { e: '🐲', n: '金の竜' }, africa: { e: '🦁', n: '影の百獣の王' }, world: { e: '🪞', n: '鏡の地図喰い' } };
   for (const g of dungeonsOf(2)) {
-    MONSTERS[g.id] = [...MONSTERS[g.base].slice(0, 4).map((m, i) => ({ e: m.e, n: (i % 2 ? 'さかさ' : '鏡の') + m.n })), MIRROR_BOSS[g.base]];
+    MONSTERS[g.id] = [...MONSTERS[g.base].slice(0, 4).map((m, i) => {
+      const nk = i % 2 ? 'さかさ{name}' : '鏡の{name}';
+      return { e: m.e, n: fillJa(nk, { name: m.n }), nk, nb: m.n };
+    }), MIRROR_BOSS[g.base]];
   }
   // 宇宙の F1〜F4 とボス
   Object.assign(MONSTERS, {
@@ -97,6 +114,7 @@
     big: { n: '大きい国', a: byArea.slice(-SP.big).reverse() },
     south: { n: '南半球の国', a: C.filter(c => c.ll[0] < 0).map(c => c.a) },
   };
+  // i18n-data:end
   const AVATARS = ['🧙', '🧝', '🦸', '🤠', '🦊', '🐱', '🐶', '🐧'];
   // mb（ヒントなしで正解したモード）のビット
   const MODE_BIT = { f2n: 1, n2f: 2, m2f: 4, f2m: 8, cap: 16 };
@@ -182,6 +200,7 @@
   };
   // ---- 編成とチームボーナス（13グループ） ----
   // 最初の10個は index.html の SUBREGIONS の文字列をそのまま写す（同じことを単体テストで確かめる）。残り3つは6地域から作る
+  // i18n-data:start
   const SUB = [
     ['東アジア', 'cn jp kp kr mn'],
     ['東南アジア', 'bn kh id la my mm ph sg th tl vn'],
@@ -199,6 +218,7 @@
     ...SUB,
     ...['南アメリカ', 'オセアニア', '北・中央アメリカ'].map(r => ({ k: r, a: C.filter(c => c.r === r && !CARIB.has(c.a)).map(c => c.a) })),
   ];
+  // i18n-data:end
   const GROUP_OF = new Map(GROUPS.flatMap(g => g.a.map(a => [a, g.k])));
   const groupOf = a => GROUP_OF.get(a) ?? null;
   // いちばん多いグループの枚数 n（同数なら list で先に出たほう）。2枚 +10%、3枚 +25%
@@ -241,7 +261,7 @@
     const cost = slotCost(d);
     if (cost == null || !(d.coins >= cost)) return 0;
     d.coins -= cost;
-    d.teams.push({ n: '編成' + (d.teams.length + 1), c: null });
+    d.teams.push({ n: TEAM_PREFIX + (d.teams.length + 1), c: null });
     d.tsel = d.teams.length - 1;
     return cost;
   };
@@ -289,8 +309,13 @@
   const today = now => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   // 'YYYY-MM-DD' の通し日数（整数）。日の差を数えるのに使う
   const dayNum = s => { const [y, m, d] = s.split('-').map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
-  // 1万未満はそのまま（9,999）、1万から「1.2万」（小数1桁で切り捨て、.0 は付けない）
-  const shortCoins = n => n < 10000 ? n.toLocaleString('ja-JP') : `${Math.floor(n / 1000) / 10}万`;
+  // 1万未満はそのまま（9,999）、1万から「1.2万」（小数1桁で切り捨て、.0 は付けない）。
+  // en（英語のページ）は1万未満が 9,999、1万から千の単位の k（10k・12.3k・123.4k。小数1桁で切り捨て）
+  const shortCoins = (n, en = false) => en
+    ? (n < 10000 ? n.toLocaleString('en-US') : Math.floor(n / 100) / 10 + 'k')
+    : (n < 10000 ? n.toLocaleString('ja-JP') : Math.floor(n / 1000) / 10 + UNIT_MAN);
+  // 既定の編成名（i 番目の枠の「編成{i+1}」）か。英語の表示は既定の名前だけ Team {n} にする（セーブは日本語のまま）
+  const isDefaultTeamName = (n, i) => n === TEAM_PREFIX + (i + 1);
 
   // ---- セーブの形・移行・掃除（設計書 §9） ----
   const VERSION = 1;
@@ -310,7 +335,7 @@
     paid: [],
     st: { win: 0, lose: 0, flee: 0, combo: 0, nodmg: 0, bossWins: 0, overcome: 0, bountyDays: 0 },
     badgesPaid: [], gr: '',
-    teams: [{ n: '編成1', c: null }], tsel: 0, deco: [],
+    teams: [{ n: TEAM_PREFIX + 1, c: null }], tsel: 0, deco: [],
     tower: { best: 0 },   // best = これまでに勝ったいちばん上の階
   });
   const KNOWN = new Set(Object.keys(fresh('')));
@@ -338,12 +363,12 @@
   // 持っていない国は消さない（使うときに teamParty がしぼる）
   const sanitizeTeams = v => {
     const a = list(v).slice(0, TUNING.team.slots).map((t, i) => {
-      const def = '編成' + (i + 1);
+      const def = TEAM_PREFIX + (i + 1);
       if (!isObj(t)) return { n: def, c: null };
       const n = typeof t.n === 'string' ? [...t.n.trim()].slice(0, TUNING.team.nameMax).join('') : '';   // 絵文字を半分に切らない
       return { n: n || def, c: Array.isArray(t.c) ? uniq(t.c.filter(isCode)).slice(0, 3) : null };
     });
-    return a.length ? a : [{ n: '編成1', c: null }];
+    return a.length ? a : [{ n: TEAM_PREFIX + 1, c: null }];
   };
 
   // 入力が何でも例外を出さずに fresh の形にそろえる。知らない最上位の項目は残す（新しい版から戻ったときに消さない）
@@ -783,9 +808,11 @@
   const bossMode = (k, ch) => { const cy = modeCycle(5, ch); return cy[k % cy.length]; };
 
   // ---- 英雄の塔（設計書 §6）。DUNGEONS には入れない。t は持たない（地域ボーナスは全員） ----
+  // i18n-data:start
   const TOWER = { id: 'tower', ch: 0, r: 'all', name: '英雄の塔', land: '英雄の塔', color: '#8a6fc4', flags: 12 };
   // 通常の階の敵: 地球の7ダンジョンの F1〜F4 を順に並べたもの。中ボスは塔の番人
   const TOWER_MONSTERS = { normal: dungeonsOf(1).flatMap(g => MONSTERS[g.id].slice(0, 4)), boss: { e: '🗼', n: '塔の番人' } };
+  // i18n-data:end
   // 地図喰い（world のボス）を倒すと開く
   const towerOpen = d => ((d && d.floors || {}).world || 0) >= 5;
   const towerRecLv = f => 1 + Math.floor((f - 1) * TUNING.tower.recStep);
@@ -827,7 +854,7 @@
     cardAtk, inDungeon, party, battleStats, GROUPS, groupOf, teamBonus, teamParty, slotCost, buySlot,
     hitsNeeded, missesAllowed, judge,
     floorsOf, poolOf,
-    today, dayNum, shortCoins,
+    today, dayNum, shortCoins, fillJa, isDefaultTeamName,
     VERSION, MIGRATE, fresh, sanitize, migrate,
     encodeCode, decodeCode, sanitizeMisses,
     isWeak, answerCoins, clearBonus, addCard, settleDelta,
