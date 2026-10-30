@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { readThemeInputs, renderThemes, THEME_IDS } from '../../tools/make_theme_pages.mjs';
+import { readThemeInputs, renderThemes, THEME_IDS, THEME_REP } from '../../tools/make_theme_pages.mjs';
 import { KANA, yomi } from '../../tools/make_country_pages.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -174,4 +174,17 @@ test('kanji_names_by_reading', () => {        // 漢字の国名も読みの五�
     for (let i = 1; i < list.length; i++) assert.ok(yomi(list[i - 1]).localeCompare(yomi(list[i]), 'ja') <= 0, `${id}: ${list[i - 1].n} → ${list[i].n}`);
     if (firstKanji >= 0) assert.ok(firstKanji < lastKatakana, `${id}: 漢字の国名がカタカナのあとにまとまっている`);
   }
+});
+
+test('theme_index_rep_flags', () => {        // 入口のカードの国旗は、手で選んだ代表の国（そのテーマの国）
+  const data = themesData(), idx = read('themes/index.html');
+  assert.deepEqual(Object.keys(THEME_REP), THEME_IDS);
+  for (const id of THEME_IDS) {
+    const rep = THEME_REP[id];
+    const members = data[id]?.a ?? themeCodes(id);
+    assert.ok(members.includes(rep), `${id} の代表 ${rep}`);
+    assert.match(idx, new RegExp(`<a class="ccard" href="${id}\\.html"><img src="\\.\\./flags/${rep}\\.svg\\?`), id);
+  }
+  assert.ok(read('themes/similar.html').includes('<h2>インドネシア、モナコ、ポーランド、シンガポール</h2>'), '見出しは「、」でつなぐ');
+  assert.ok(read('themes/landlocked.html').includes('カスピ海は湖として数えている。'));
 });

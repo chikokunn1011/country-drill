@@ -11,6 +11,9 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MARK_START = '<!-- theme:start -->', MARK_END = '<!-- theme:end -->';
 const FEATURES = ['stars', 'cross', 'crescent', 'sun', 'animal', 'unionjack', 'vtricolor', 'htricolor', 'redwhite'];
 export const THEME_IDS = [...FEATURES, 'similar', 'island', 'landlocked', 'bigarea', 'smallarea'];
+// 入口（themes/index.html）のカードに出す、テーマを代表する国旗（どれもそのテーマの国。tests/unit/theme-pages.test.mjs）
+export const THEME_REP = { stars: 'us', cross: 'dk', crescent: 'tr', sun: 'jp', animal: 'mx', unionjack: 'au', vtricolor: 'fr', htricolor: 'de',
+  redwhite: 'ca', similar: 'id', island: 'mg', landlocked: 'ch', bigarea: 'ru', smallarea: 'va' };
 const QUIZ_MIN = 10;   // これより少ないテーマはクイズのボタンを出さず、themes.js にも入れない
 const RANK_N = 20;
 const CSS = ['../country/country.css?v=1', 'themes.css?v=1'];
@@ -28,7 +31,7 @@ const THEMES = {
   redwhite: { n: '赤と白だけの国旗', lead: '赤と白の2色だけでできた国旗の一覧です。' },
   similar: { n: '似ている国旗の見分け方', lead: '色や形がよく似ていて、まちがえやすい国旗の組です。組ごとに、見分けるところを一言で書いています。' },
   island: { n: '島国の一覧', lead: 'ほかの国と陸で国境を接していない島国の一覧です。' },
-  landlocked: { n: '内陸国の一覧', lead: '海に面していない内陸国の一覧です。' },
+  landlocked: { n: '内陸国の一覧', lead: '海に面していない内陸国の一覧です。カスピ海は湖として数えている。' },
   bigarea: { n: '面積が大きい国ランキング', lead: `面積が大きい国の上位${RANK_N}か国です。面積は国旗マスターのデータ（km²）です。` },
   smallarea: { n: '面積が小さい国ランキング', lead: `面積が小さい国の${RANK_N}か国を、いちばん小さい国から並べました。面積は国旗マスターのデータ（km²）です。` },
 };
@@ -84,7 +87,7 @@ ${cards(inp, list)}`;
   if (id === 'island' || id === 'landlocked') return `  <h2>${list.length}か国</h2>
 ${cards(inp, list)}`;
   if (id === 'similar') return inp.SIMILAR.map((g, i) => `  <section class="sgroup">
-    <h2>${esc(g.map(a => byA.get(a).n).join('・'))}</h2>
+    <h2>${esc(g.map(a => byA.get(a).n).join('、'))}</h2>
     <div class="ccards">
 ${g.map(a => card(inp, byA.get(a))).join('\n')}
     </div>
@@ -140,8 +143,9 @@ ${footerHTML(inp)}
 function indexPage(inp, byA) {
   const url = `${SITE}themes/`;
   const items = THEME_IDS.map(id => {
-    const list = themeCountries(inp, id), first = id === 'bigarea' || id === 'smallarea' ? rankOrder(list, id)[0] : [...list].sort(byJa)[0];
-    return `      <a class="ccard" href="${id}.html">${flagImg(inp, first.a, '', true)}<span>${esc(THEMES[id].n)}<br><small>${countLabel(inp, id, list)}</small></span></a>`;
+    const list = themeCountries(inp, id), rep = THEME_REP[id];
+    if (!list.some(c => c.a === rep)) throw new Error(`THEME_REP の ${id}: ${rep} はこのテーマの国ではない`);
+    return `      <a class="ccard" href="${id}.html">${flagImg(inp, rep, '', true)}<span>${esc(THEMES[id].n)}<br><small>${countLabel(inp, id, list)}</small></span></a>`;
   }).join('\n');
   return head(inp, { title: '国旗のまとめ（テーマ別）｜国旗マスター',
     description: '星・十字・三日月がある国旗、よく似た国旗の見分け方、島国・内陸国、面積のランキングなど、テーマ別に国旗をまとめたページの一覧です。',

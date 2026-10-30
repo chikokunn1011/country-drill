@@ -43,6 +43,10 @@ test('features_rules_examples', () => {
   has('ca', 'redwhite');
   has('ch', 'cross', 'redwhite');
   assert.ok(!flags.pt.includes('cross'), 'pt に cross（紋章の中だけ）');
+  // 確認で決めたこと（2026-10-30）: af は光の線だけで円が無い・jm と bi はななめの十字・il のダビデの星・lv は赤（公式）・qa はえんじ色
+  assert.ok(!flags.af.includes('sun'), 'af に sun');
+  has('jm', 'cross'); has('bi', 'cross'); has('il', 'stars'); has('lv', 'redwhite');
+  assert.ok(!flags.qa.includes('redwhite'), 'qa に redwhite');
   has('np', 'sun', 'crescent');
 });
 
