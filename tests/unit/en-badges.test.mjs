@@ -79,3 +79,12 @@ test('desc_vars_ja_same', () => {
   assert.deepEqual({ ...K.descVars({ region: 'アジア' }, tr) }, { region: '<アジア>' });
   assert.deepEqual({ ...K.descVars({ sub: '国旗→国名', g: '30' }, tr) }, { sub: '<国旗→国名>', g: '30' });
 });
+
+// 詳細の「◯◯のバッジ」（badges.js の後半の catBadgeOf）は、分類（CAT_LABEL）を全部持つ（無い分類は空の行になるので）
+test('cat_badge_keys', () => {
+  const { K } = enCtx();
+  const src = read('badges.js'), m = src.match(/const catBadgeOf = c => \(\{([\s\S]*?)\}\)\[c\]/);
+  assert.ok(m, 'catBadgeOf が見つからない');
+  const keys = [...m[1].matchAll(/(\w+): T\(/g)].map(x => x[1]);
+  assert.deepEqual(keys.sort(), Object.keys(K.CAT_LABEL).sort());
+});

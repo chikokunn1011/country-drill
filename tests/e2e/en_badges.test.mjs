@@ -75,7 +75,7 @@ t('en_badges_screen', async page => {
   const conds = await page.locator('#detail-inner .bdg-cond').allInnerTexts();
   assert.deepEqual(conds, ['Reach 100 correct answers in total', 'Reach 1,000 correct answers in total', 'Reach 5,000 correct answers in total']);
   const ttl = await page.locator('#detail-inner .bdg-ttl').allInnerTexts();
-  assert.deepEqual(ttl, ['Title: “Steady Learner”', 'Title: “Hard Worker”', 'Title: “Drill Demon”']);
+  assert.deepEqual(ttl, ['Title: “Steady Learner”', 'Title: “Hard Worker”', 'Title: “Drill Machine”']);
   assert.equal(await text(page, '#detail-inner .bdg-when'), `✓ ${await page.evaluate(() => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(1))}`);
   assert.equal(await count(page, '#detail-inner [data-bdg-equip="answers@1"]'), 1);
   assert.equal(await text(page, '#detail-inner [data-bdg-equip="answers@1"]'), 'Equip');
@@ -95,7 +95,7 @@ t('en_badges_screen', async page => {
   assert.match(await page.getAttribute(tile('chal-grit'), 'aria-label'), /^Secret badge\. [^　-鿿]+$/);
   await page.click(tile('chal-grit'));
   assert.equal(await text(page, '#detail-inner .bdg-dname'), '???');
-  assert.equal(await text(page, '#detail-inner .bdg-hint'), 'Try a Challenge that tripped you up once more, and…');
+  assert.equal(await text(page, '#detail-inner .bdg-hint'), 'Take another shot at a Challenge that tripped you up, and…');
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#detail-inner [data-bdg-close]');
   // もうすぐ取れそう・最近とったバッジ
@@ -266,5 +266,21 @@ t('en_toast_fit', async page => {
   const over = await page.evaluate(() => [...document.querySelectorAll('#toasts .toast, #toasts .toast *')].filter(el => el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().right > innerWidth + 0.5).map(el => el.className));
   assert.deepEqual(over, []);
   assert.equal(await noHScroll(page), true);
+  assert.deepEqual(await jaLeft(page), []);
+}, { viewport: PHONE, storage: { badges: { v: 1, eq: '' } } });
+
+// いちばん長い名前と称号（南米アドベンチャーの銅: South America Adventure・South America Traveler）の結果のパネルの行も 390px からはみ出さない
+t('en_longest_row_fit', async page => {
+  await pickSetup(page, { mode: 'f2n', kind: 'practice', region: '南アメリカ', count: 10 });
+  await page.click('#start');
+  await clearByAnswering(page);
+  const row = page.locator('#r-badges .bdg-row[data-key="reg-samerica@1"]');
+  await row.waitFor();
+  assert.equal(await row.locator('.bdg-l1').innerText(), 'South America Adventure Bronze');
+  assert.equal(await row.locator('.bdg-l2').innerText(), 'Title: “South America Traveler”');
+  assert.equal(await row.locator('[data-bdg-equip]').innerText(), 'Equip');
+  assert.equal(await noHScroll(page), true);
+  const over = await page.evaluate(() => [...document.querySelectorAll('#r-badges, #r-badges *')].filter(el => el.scrollWidth > el.clientWidth + 1 || el.getBoundingClientRect().right > innerWidth + 0.5).map(el => el.className));
+  assert.deepEqual(over, []);
   assert.deepEqual(await jaLeft(page), []);
 }, { viewport: PHONE, storage: { badges: { v: 1, eq: '' } } });

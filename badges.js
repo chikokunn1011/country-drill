@@ -249,6 +249,8 @@
   // ---------- カタログ（設計書 §2、§3.1） ----------
   // 日本語の文はここから i18n-data:end までのデータ。英語版はブラウザの後半で表示のときに T() を通す（コアは T を呼ばない）
   // i18n-data:start
+  // 分類と段の日本語。ブラウザでは tierOf・catOf だけで表示する（金・あそび方・モード・地域は辞書のほかの意味と同じキーなので、
+  // T(TIER_LABEL[3])・T(CAT_LABEL.mode) と直接書くと英語版で Fri・Mode などになり、[i18n] の warn も出ない）
   const CAT_LABEL = { quiz: 'クイズ', kind: 'あそび方', mode: 'モード', region: '地域', daily: '図鑑・毎日', dopa: 'ドパガキ', rpg: '冒険' };
   const TIER_LABEL = ['', '銅', '銀', '金', '虹'];
   const n0 = v => typeof v === 'number' && Number.isFinite(v) ? v : 0;      // snapshot の数（数でなければ 0）
