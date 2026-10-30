@@ -280,14 +280,17 @@ test('en_pages_no_japanese', () => {
   }
 });
 
-test('en_howto_only_available', () => {
+test('en_howto_all', () => {
   const h = read('en/howto.html');
-  // 冒険・コインは PR8 まで英語版に無い。バッジ・称号・豆知識は PR7 で足した
-  for (const w of ['Adventure', 'coins', 'Ranking']) assert.ok(!h.includes(w), w);
+  // 冒険（PR8 Task 10）。日本語の howto と同じ中身
+  for (const w of ['Adventure', 'coins', 'Flag Draw']) assert.ok(h.includes(w), w);
+  assert.match(h, /Adventure leaderboards?/);
+  assert.ok(!/companion|gacha/i.test(h));
+  assert.ok(h.match(/<meta name="description" content="([^"]*)"/)[1].length <= 160);
   for (const w of ['Time Attack', 'Leaderboard', 'Daily Puzzle', 'Profile', 'Transfer code', 'midnight Japan time', 'Badges', 'fun facts']) assert.ok(h.includes(w), w);
   assert.match(h, /[Tt]itle/);
   const ids = [...h.matchAll(/<h2 id="([^"]+)"/g)].map(m => m[1]);
-  assert.deepEqual(ids, ['start', 'modes', 'kinds', 'daily', 'dojo', 'book', 'badges', 'profile', 'app', 'embed', 'faq']);
+  assert.deepEqual(ids, ['start', 'modes', 'kinds', 'daily', 'rpg', 'dojo', 'book', 'badges', 'profile', 'app', 'embed', 'faq']);
   // 足した節の順番は日本語の howto と同じ
   const ja = [...read('howto.html').matchAll(/<h2 id="([^"]+)"/g)].map(m => m[1]).filter(id => ids.includes(id));
   assert.deepEqual(ids.filter(id => ja.includes(id)), ja);
