@@ -90,7 +90,7 @@
 
   const R = { sort: 'lv', seq: 0 };
   // 日付は日本時間で（タイムアタックのランキングとそろえる）。日本語は '10/30'、英語は I18N.dayLabel の 'Oct 30'
-  const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return LANG === 'en' ? I18N.dayLabel(j.toISOString().slice(0, 10)) : `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
+  const jstDay = d => { const j = new Date(d.getTime() + 9 * 3600e3); return I18N.lang === 'en' ? I18N.dayLabel(j.toISOString().slice(0, 10)) : `${j.getUTCMonth() + 1}/${j.getUTCDate()}`; };
   const recText = r => T('ダンジョン {d}/{all}（フロア {f}/{fall}）', { d: r.dungeons, all: DG.length, f: r.floors, fall: MAX_FLOORS });
   // 名前のセル: ふだんは PROFILE.nameHTML（かざり付き・押すと窓）。profile.js が無いときは名前と知っている国のかざりだけ
   const nameOf = r => {

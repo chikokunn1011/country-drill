@@ -9,9 +9,9 @@ Object.assign(window.I18N_EN ??= {}, {
   // 並べ方のタブ（'ダンジョン'・'英雄の塔' はほかの辞書）
   '並べ方': 'Sort by',
   'レベル': 'Level',
-  '上位50人まで。レベル → クリアしたダンジョン → フロアの順': 'Top 50 players. Level → dungeons cleared → floors.',
-  '上位50人まで。クリアしたダンジョン → フロア → レベルの順': 'Top 50 players. Dungeons cleared → floors → level.',
-  '上位50人まで。最高記録の階 → レベルの順': 'Top 50 players. Highest floor → level.',
+  '上位50人まで。レベル → クリアしたダンジョン → フロアの順': 'Top 50 players, ranked by level → dungeons cleared → floors',
+  '上位50人まで。クリアしたダンジョン → フロア → レベルの順': 'Top 50 players, ranked by dungeons cleared → floors → level',
+  '上位50人まで。最高記録の階 → レベルの順': 'Top 50 players, ranked by highest floor → level',
   // きみの記録（Lv の後ろ）と英雄の塔のタブの自己ベスト
   'きみの記録': 'Your record',
   'ダンジョン {d}/{all}（フロア {f}/{fall}）': 'Dungeons {d}/{all} (floors {f}/{fall})',
@@ -21,7 +21,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '冒険を始めると、レベルとクリアしたダンジョンでランキングに載せられる': 'Once you start the Adventure, you can post your level and cleared dungeons to the leaderboard',
   // 何位相当（'{r} 相当' = Would rank {r}）と、載せたあと（'載せたよ！ {r}' = Posted! {r}）の {r}
   'レベル順 {lv}位・ダンジョン順 {dg}位': '#{lv} by level · #{dg} by dungeons',
-  '英雄の塔 {n}位': '#{n} on the Tower of Heroes',
+  '英雄の塔 {n}位': '#{n} in the Tower of Heroes',
   // 載せる欄（{name} はプロフィールの名前の <b data-ugc>）
   '{name} で載ってるよ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなる':
     'You’re listed as {name}. Your record updates automatically whenever you level up or clear a dungeon.',
@@ -30,7 +30,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '冒険ランキングに載せる': 'Post to the Adventure leaderboard',
   'プロフィールが読みこめなかった。ページを読み直してね': 'Couldn’t load your profile. Please reload the page.',
   // 表が出せないとき
-  '英雄の塔のランキングは準備中だよ。もう少し待ってね': 'The Tower of Heroes leaderboard is coming soon. Please check back later.',
+  '英雄の塔のランキングは準備中だよ。もう少し待ってね': 'The Tower of Heroes leaderboard isn’t ready yet. Please check back soon.',
   // タイムアタックのランキング画面からの入口（頭に 🏆）
-  '冒険のランキングはこちら': 'See the Adventure leaderboard',
+  '冒険のランキングはこちら': 'View the Adventure leaderboard',
 });

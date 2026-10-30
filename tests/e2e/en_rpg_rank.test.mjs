@@ -25,8 +25,8 @@ const te = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () =>
 const text = async (page, sel) => (await page.locator(sel).innerText()).trim();
 const rows = page => page.$$eval('#rr-list li', ls => ls.map(l => l.innerText.replace(/\s+/g, ' ').trim()));
 const ago = s => new Date(Date.now() - s * 1000).toISOString();
-// 行の日付（日本時間の今日。英語は 'Oct 30'）
-const today = page => page.evaluate(() => I18N.dayLabel(new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10)));
+// 行の日付は決まった時刻。日本時間では 10月31日 0時台（UTC ではまだ 10月30日）なので、英語は日本時間の 'Oct 31'
+const AT1 = '2026-10-30T15:10:00.000Z', AT2 = '2026-10-30T15:20:00.000Z', DAY = 'Oct 31';
 const T0 = '00000000-0000-4000-8000-0000000000a1', PID = 'chikopid0001';
 const withProfile = async (page, app, { name = 'チコ', auto = true } = {}) => {
   app.db.profiles.push({ id: 1, token: T0, nickname: name, pid: PID });
@@ -36,8 +36,8 @@ const withProfile = async (page, app, { name = 'チコ', auto = true } = {}) => 
 const ROWS = app => {
   app.db.profiles.push({ id: 2, token: 't-chiko', nickname: 'チコ', pid: 'chikopid0002', deco: ['jp'] });
   app.db.rpgRows.push(
-    { token: 't-chiko', profile_id: 2, nickname: 'チコ', lv: 30, dungeons: 3, floors: 16, tower: 12, tower_at: ago(60), created_at: ago(90), at: ago(60) },
-    { token: 't-en', nickname: 'Chiko', lv: 8, dungeons: 1, floors: 7, tower: 1, tower_at: ago(50), created_at: ago(80), at: ago(50) },
+    { token: 't-chiko', profile_id: 2, nickname: 'チコ', lv: 30, dungeons: 3, floors: 16, tower: 12, tower_at: AT1, created_at: AT1, at: AT1 },
+    { token: 't-en', nickname: 'Chiko', lv: 8, dungeons: 1, floors: 7, tower: 1, tower_at: AT2, created_at: AT2, at: AT2 },
   );
 };
 const TOWER_SAVE = f => saveWith({ lv: 12, floors: { samerica: 5, oceania: 3 }, ...f });
@@ -52,39 +52,37 @@ te('en_rpg_rank', async (page, app) => {
   assert.equal(await text(page, '#scr-rpgrank .rpg-back'), '← Adventure');
   assert.deepEqual((await page.locator('#rr-tabs button').allInnerTexts()).map(s => s.trim()), ['Level', 'Dungeons', 'Tower of Heroes']);
   assert.equal(await page.getAttribute('#rr-tabs', 'aria-label'), 'Sort by');
-  assert.equal(await text(page, '#rr-how'), 'Top 50 players. Level → dungeons cleared → floors.');
+  assert.equal(await text(page, '#rr-how'), 'Top 50 players, ranked by level → dungeons cleared → floors');
   const me = await text(page, '#rr-me');
   assert.ok(me.startsWith('Your record') && me.includes('Lv 12') && me.includes('Dungeons 1/21 (floors 8/105)'), me);
   await page.waitForFunction(() => $('rr-rank').textContent.startsWith('Would rank'));
   assert.equal(await text(page, '#rr-rank'), 'Would rank #2 by level · #2 by dungeons');
   await page.waitForFunction(() => document.querySelectorAll('#rr-list li').length === 2);
-  const day = await today(page);
-  assert.deepEqual(await rows(page), [`1 チコ Lv 30 🏰3 · F16 ${day}`, `2 Chiko Lv 8 🏰1 · F7 ${day}`]);
-  assert.match(day, /^[A-Z][a-z]{2} \d{1,2}$/);
+  assert.deepEqual(await rows(page), [`1 チコ Lv 30 🏰3 · F16 ${DAY}`, `2 Chiko Lv 8 🏰1 · F7 ${DAY}`]);
   assert.equal(await page.locator('#rr-list li').first().locator('.nick [data-ugc]').innerText(), 'チコ');
   assert.deepEqual(await page.locator('#rr-list li .rr-deco img').evaluateAll(els => els.map(e => [e.alt, e.title])), [['Japan', 'Japan']]);
   assert.deepEqual(await jaLeft(page), []);
   // ダンジョン順
   await page.click('#rr-tabs button[data-s="dg"]');
-  assert.equal(await text(page, '#rr-how'), 'Top 50 players. Dungeons cleared → floors → level.');
+  assert.equal(await text(page, '#rr-how'), 'Top 50 players, ranked by dungeons cleared → floors → level');
   await page.waitForFunction(() => document.querySelector('#rr-list li .rpg-rr-dg + .rpg-rr-lv'));
-  assert.deepEqual(await rows(page), [`1 チコ 🏰3 · F16 Lv 30 ${day}`, `2 Chiko 🏰1 · F7 Lv 8 ${day}`]);
+  assert.deepEqual(await rows(page), [`1 チコ 🏰3 · F16 Lv 30 ${DAY}`, `2 Chiko 🏰1 · F7 Lv 8 ${DAY}`]);
   assert.deepEqual(await jaLeft(page), []);
   // 英雄の塔: きみの記録に自己ベスト、行は 🗼… floors（1階は floor）
   await page.click('#rr-tabs button[data-s="tower"]');
-  assert.equal(await text(page, '#rr-how'), 'Top 50 players. Highest floor → level.');
+  assert.equal(await text(page, '#rr-how'), 'Top 50 players, ranked by highest floor → level');
   await page.waitForFunction(() => document.querySelector('#rr-list li .rpg-rr-tw'));
-  assert.deepEqual(await rows(page), [`1 チコ 🗼12 floors Lv 30 ${day}`, `2 Chiko 🗼1 floor Lv 8 ${day}`]);
+  assert.deepEqual(await rows(page), [`1 チコ 🗼12 floors Lv 30 ${DAY}`, `2 Chiko 🗼1 floor Lv 8 ${DAY}`]);
   assert.equal(await text(page, '#rr-me .rpg-rr-tw'), '🗼 Tower of Heroes · Personal best: floor 7');
   await page.waitForFunction(() => $('rr-rank').textContent.startsWith('Would rank'));
-  assert.equal(await text(page, '#rr-rank'), 'Would rank #2 on the Tower of Heroes');
+  assert.equal(await text(page, '#rr-rank'), 'Would rank #2 in the Tower of Heroes');
   assert.deepEqual(await jaLeft(page), []);
   // 塔の記録が無いとき
   await writeSave(page, TOWER_SAVE());
   await page.evaluate(() => RPG.open('rpgrank', { sort: 'tower' }));
   assert.equal(await text(page, '#rr-me .rpg-rr-tw'), '🗼 Tower of Heroes · No record yet');
   // タイムアタックのランキングからの入口
-  assert.equal((await page.locator('#rk-to-rpg').textContent()).trim(), '🏆 See the Adventure leaderboard');
+  assert.equal((await page.locator('#rk-to-rpg').textContent()).trim(), '🏆 View the Adventure leaderboard');
 });
 
 te('en_rpg_rank_ugc', async (page, app) => {
@@ -154,7 +152,7 @@ te('en_rpg_rank_tower_soon', async (page, app) => {
   await writeSave(page, TOWER_SAVE({ tower: { best: 3 } }));
   await page.evaluate(() => RPG.open('rpgrank', { sort: 'tower' }));
   await page.waitForFunction(() => !$('rr-soon').hidden);
-  assert.equal(await text(page, '#rr-soon'), 'The Tower of Heroes leaderboard is coming soon. Please check back later.');
+  assert.equal(await text(page, '#rr-soon'), 'The Tower of Heroes leaderboard isn’t ready yet. Please check back soon.');
   assert.deepEqual(await jaLeft(page), []);
 });
 
