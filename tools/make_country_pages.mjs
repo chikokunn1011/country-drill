@@ -323,8 +323,8 @@ ${footerHTML(inp)}
 // 「of」のあとに置く英語の国名（the を付ける）。e が "The " で始まれば小文字に、THE_NAMES にあれば "the " を付ける。
 // 見出し・一覧・リンクの文字は e のまま。THE_NAMES は countries.js の e から選んだもの（複数形・Republic・Islands・United など）
 export const THE_NAMES = new Set(['Central African Republic', 'Comoros', 'Czech Republic', 'Democratic Republic of the Congo', 'Dominican Republic',
-  'Federated States of Micronesia', 'Maldives', 'Marshall Islands', 'Netherlands', 'Philippines', 'Republic of the Congo', 'Seychelles',
-  'Solomon Islands', 'United Arab Emirates', 'United Kingdom', 'United States', 'Vatican City']);
+  'Federated States of Micronesia', 'Maldives', 'Marshall Islands', 'Netherlands', 'Philippines', 'Republic of the Congo',
+  'Solomon Islands', 'United Arab Emirates', 'United Kingdom', 'United States']);
 export const theName = e => (e.startsWith('The ') ? 'the ' + e.slice(4) : THE_NAMES.has(e) ? 'the ' + e : e);
 export const EN = {
   site: 'Flag Master',
