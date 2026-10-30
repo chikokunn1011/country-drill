@@ -8,7 +8,10 @@
   // supabase/schema.sql の ng_words() と同じ中身にしておくこと（画面には出さない語なので訳さない）
   // i18n-ignore:start
   const NG_WORDS = ['死ね', 'しね', 'シネ', '殺す', 'ころす', 'ちんこ', 'ちんぽ', 'まんこ', 'うんこ',
-    'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人'];
+    'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人',
+    // PR6: 英語の悪い言葉（部分一致でふつうの英単語・名前に当たらないものだけ。ass・cock・cum・anal・dick などの短い語は入れない）
+    'nigger', 'nigga', 'faggot', 'cunt', 'whore', 'slut', 'bastard', 'asshole', 'wanker', 'twat', 'bollocks', 'retard', 'porn',
+    'penis', 'vagina', 'pussy', 'dildo', 'blowjob', 'jizz', 'hentai', 'milf', 'boobs', 'piss', 'hitler', 'tranny', 'chink', 'kike', 'gook', 'moderator'];
   // i18n-ignore:end
   // index.html の REGIONS → board に入れる英字キー（キーは保存値の日本語のまま。英語は i18n/en-core.js）
   // i18n-data:start
