@@ -51,7 +51,9 @@ te('en_team', async page => {
   assert.match(await buy.locator('.rpg-short').innerText(), /^Need .*1,500 more$/);
   assert.equal(await buy.getAttribute('aria-label'), 'Buy a team slot for 2,000 coins (need 1,500 more)');
   assert.equal((await page.locator('#tm-auto').innerText()).trim(), 'Auto');
-  assert.match(await page.locator('#tm-stats').innerText(), /Team bonus South America×2 \+10%/);
+  // ✏️ は英語では Rename team（en-profile の '名前を変える' = Change nickname ではない）
+  assert.equal(await page.getAttribute('#tm-rename', 'aria-label'), 'Rename team');
+  assert.match(await page.locator('#tm-stats').innerText(), /Team bonus: South America×2 \+10%/);
   assert.match(await page.locator('#tm-side .hint').innerText(), /^Team bonus: /);
   assert.equal((await page.locator('#tm-count').innerText()).trim(), 'Allies 4/195');
   const chips = await page.locator('#tm-regions .chip').allInnerTexts();
@@ -70,7 +72,7 @@ te('en_team', async page => {
   // 4枚目を入れようとすると英語のトースト。3枚目までは入る
   await page.click('#tm-grid .rpg-card[data-a="jp"]');
   await page.click('#tm-grid .rpg-card[data-a="fr"]');
-  await page.locator('.toast').filter({ hasText: 'Remove the card you want to replace first' }).waitFor();
+  await page.locator('.toast').filter({ hasText: 'First remove the card you want to swap out' }).waitFor();
   assert.deepEqual(await jaLeft(page), []);
   // まだ組んでいない枠・仲間がいないとき
   await openTeam(page, saveWith({ coins: 0 }));
@@ -140,4 +142,34 @@ te('en_team_custom_name_ugc', async page => {
   assert.equal(await page.inputValue('#tm-name'), 'あか');
   await page.press('#tm-name', 'Escape');
   assert.equal((await readSave(page)).teams[1].n, 'あか');
+});
+
+// 日本語のページの ✏️ の aria-label は今のまま「名前を変える」（英語だけ別のキー '編成の名前を変える'）
+test('ja_team_rename_label', { timeout: 120_000 }, async () => {
+  const app = await openRpg(browser, { seed: 1, storage: { badges: QUIET_BADGES } });
+  try {
+    await openTeam(app.page, saveWith({ ...CARDS }));
+    assert.equal(await app.page.getAttribute('#tm-rename', 'aria-label'), '名前を変える');
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
+});
+
+// 自分で付けた名前の < > & は文字のまま（data-ugc の中で esc）。打って保存しても、セーブから読んでも
+te('en_team_name_escaped', async page => {
+  const NAME = '<b>&</b>';   // nameMax（8文字）ちょうど
+  const check = async () => {
+    assert.equal(await page.locator('#tm-title [data-ugc]').innerText(), NAME);
+    assert.equal(await page.locator('#tm-tabs button[data-t="0"] [data-ugc]').innerText(), NAME);
+    assert.equal(await page.locator('#tm-title b, #tm-tabs b').count(), 0);
+  };
+  await openTeam(page, saveWith({ ...CARDS }));
+  await page.click('#tm-rename');
+  await page.fill('#tm-name', NAME);
+  await page.press('#tm-name', 'Enter');
+  assert.equal((await readSave(page)).teams[0].n, NAME);
+  await check();
+  await openTeam(page, saveWith({ ...CARDS, teams: [{ n: NAME, c: null }] }));
+  await check();
+  await page.click('#tm-rename');
+  assert.equal(await page.inputValue('#tm-name'), NAME);
 });
