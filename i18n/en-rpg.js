@@ -13,6 +13,7 @@
 // Personal best・Transfer code・Restore from code・Decorations（一覧は tools/dict_sheet.mjs の GLOSSARY）。
 // ほかの辞書のキーをそのまま使う（ここに書かない）: '英雄の塔'・'{n}階'（en-badges.js）、地域名・細かい地域名・'全世界'（en-core.js）、
 // '#国旗マスター'（en-rank.js）、'・'（en-daily.js）、'〈{title}〉'（en-profile.js）、'すべて'・'シェア'・'まだ'（en-badges.js）
+// rpg.js が使うほかの辞書のキー: '冒険'・'達成'（en-badges.js）、'閉じる'（en-book.js）、'コピー'・'コピーしたよ'（en-profile.js）、'挑戦'（en-core.js）
 Object.assign(window.I18N_EN ??= {}, {
   // ---- 既定の編成名の頭（'編成1' → 表示は Team 1）とコインの単位（データ。英語の画面は shortCoins(n, true) の k） ----
   '編成': 'Team',
@@ -149,6 +150,146 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // ---- 英雄の塔（'英雄の塔' は en-badges.js） ----
   '塔の番人': 'Tower Guardian',
+
+  // ---- rpg.js（Task 5: 冒険ホーム・はじめての画面・入口・コインの表示・データ・開発用パネル） ----
+  // 既定の編成名の表示（RPG.teamLabel。セーブは '編成1' のまま）
+  '編成{n}': 'Team {n}',
+  // 保存の注意（トースト・冒険ホームの注意）
+  'データを読めなかったので最初からになったよ': 'Couldn’t read your Adventure data, so it started over',
+  '新しいバージョンのデータが見つかったよ。ページを再読み込みしてね': 'Found data from a newer version. Please reload the page',
+  '保存できなかった…': 'Couldn’t save…',
+  'この端末では保存できないみたい。閉じると消えるよ': 'Can’t save on this device. Your data will be lost when you close the page',
+  // クイズのコイン（#pcoin・トースト・結果のコインの欄）
+  'コイン': 'coins',
+  'コイン（冒険で使える）': 'Coins (to use in the Adventure)',
+  'はじめて！+{coins}': 'First! +{coins}',
+  'コインがたまったよ！ 冒険でレベルアップやガチャに使えるよ': 'You earned coins! Use them in the Adventure to level up and draw flags',
+  '+{coins} コイン': '+{coins} coins',
+  'いま {coins}': 'Now {coins}',
+  '一発正解 {n}問': { one: 'Right on the first try: {n} question', other: 'Right on the first try: {n} questions' },
+  'やり直しで正解 {n}問': { one: 'Right after a retry: {n} question', other: 'Right after a retry: {n} questions' },
+  '正解 {n}問': { one: 'Correct: {n} question', other: 'Correct: {n} questions' },
+  'クリアボーナス': 'Clear bonus',
+  'はじめて正解 {n}か国': { one: 'Right for the first time: {n} country', other: 'Right for the first time: {n} countries' },
+  '🎁 今日はじめてのクリア +{coins} ／ 無料ガチャ1回ゲット': '🎁 First clear today +{coins} / Free draw earned',
+  'タイムが速すぎたので、この回のコインはなし': 'Your time was too fast, so no coins this round',
+  '冒険へ →': 'To the Adventure →',
+  '冒険へ →（はじめてなら {coins} のお祝いつき）': 'To the Adventure → (first-time bonus: {coins})',
+  'バッジのごほうび {coins}': 'Badge reward {coins}',
+  // 仲間・シルバー・克服・手配書の行（RPG.gainLines。結果のコインの欄・トースト。あとのタスクでバトルも使う）
+  '{names}ほか{n}か国': { one: '{names} and {n} more country', other: '{names} and {n} more countries' },
+  '🤝 {names}が仲間になった！': '🤝 New allies: {names}',
+  '🤝 {names}が仲間になった！（{n}回正解した国は仲間になるよ）': {
+    one: '🤝 New allies: {names} (a country becomes your ally after {n} correct answer)',
+    other: '🤝 New allies: {names} (a country becomes your ally after {n} correct answers)',
+  },
+  '🏅 {names}がシルバーに！': '🏅 Now Silver: {names}',
+  '✨ 克服！ {names}はもう苦手じゃない +{coins}': '✨ Overcome! No longer weak spots: {names} +{coins}',
+  '📜 手配書 {names} +{coins}': '📜 Wanted posters: {names} +{coins}',
+  '📜 手配書 {names} +{coins}（3件ぜんぶ +{all}）': '📜 Wanted posters: {names} +{coins} (all 3: +{all})',
+  // 入口（トップバーのチップ・設定のスイッチ）
+  'コイン {coins}（冒険へ）': 'Coins {coins} (go to Adventure)',
+  'コイン（冒険へ）': 'Coins (go to Adventure)',
+  '冒険（コイン・RPG）を表示する': 'Show the Adventure (coins and RPG)',
+  // はじめての画面
+  '国旗クエスト': 'Flag Quest',
+  '地図喰いから世界を取りもどせ': 'Win back the world from the Map Eater',
+  '旅人のすがたをえらぶ': 'Choose your Traveler’s look',
+  '旅に出る': 'Set off',
+  // 旅人カード・レベルアップ
+  '旅人': 'Traveler',
+  '旅人のすがたを変える': 'Change your Traveler’s look',
+  '仲間 {n}/{total}': 'Allies {n}/{total}',
+  'レベルアップ {coins}': 'Level up {coins}',
+  'あと{coins}': 'need {coins} more',
+  '上げられるだけ上げる': 'Level up as far as you can',
+  'Lv{lv} まで ●{coins} 使う？': 'Spend ●{coins} to reach Lv {lv}?',
+  // つぎにやること
+  'まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）': 'Start by finding allies with Draw 10 in the Flag Draw (●1,000 for World)',
+  '今日の無料ガチャが引けるよ': 'Today’s free draw is ready',
+  'レベルアップできるよ': 'You can level up',
+  '{dungeon} F{f} に挑戦！（推奨Lv{lv}）': 'Take on {dungeon} F{f}! (recommended Lv {lv})',
+  '{dungeon} ボス（{boss}）に挑戦！（推奨Lv{lv}）': 'Take on the {dungeon} boss ({boss})! (recommended Lv {lv})',
+  'ちょっときびしいかも。クイズでコインを稼ごう': 'This might be a bit tough. Earn coins in quizzes.',
+  '全クリア！ {total}か国を仲間にしよう（{owned}/{total}）': 'All cleared! Make all {total} countries your allies ({owned}/{total})',
+  '全クリア！ クイズでコインを稼いで、レベルを上げよう': 'All cleared! Earn coins in quizzes and raise your level',
+  // ホームのボタン（ガチャ・仲間・編成・冒険ランキングの画面があるときだけ）
+  '国旗ガチャ': 'Flag Draw',
+  '無料1回！': 'Free draw!',
+  '仲間': 'Allies',
+  '冒険ランキング': 'Adventure leaderboard',
+  // ダンジョンの札（図版）
+  'ボス': 'Boss',
+  '{floor}（クリア済み）': '{floor} (cleared)',
+  'まだ開いていない': 'Not open yet',
+  'テーマ: {name}（{n}か国）': { one: 'Theme: {name} ({n} country)', other: 'Theme: {name} ({n} countries)' },
+  '{name}のボスをたおすと開く': 'Opens when you defeat the {name} boss',
+  'ボス {name}': 'Boss: {name}',
+  '推奨Lv{from}〜{to}': 'Recommended Lv {from}–{to}',
+  '余裕': 'Easy',
+  'ちょうど': 'Just right',
+  'きびしい': 'Tough',
+  'ぜんぶクリア': 'All cleared',
+  'はじめてクリアでもらえる {coins}': 'First-clear reward {coins}',
+  'ボスまで あと{n}フロア': { one: '{n} floor to the boss', other: '{n} floors to the boss' },
+  // 冒険マップ・章のタブ
+  '冒険マップ': 'Adventure map',
+  'ダンジョン': 'Dungeons',
+  'フロア': 'Floors',
+  '冒険マップ（ダンジョンを押すと下にくわしく出る）': 'Adventure map (tap a dungeon to see more below)',
+  '{name}（まだ開いていない）': '{name} (not open yet)',
+  '{name}（{done}/{all}フロア）': '{name} ({done}/{all} floors)',
+  '{name}（{done}/{all}フロア・クリア）': '{name} ({done}/{all} floors · cleared)',
+  '章': 'Chapters',
+  // 英雄の塔の札
+  '自己ベスト {n}階': 'Personal best: floor {n}',
+  '1階から、どこまで登れるかな': 'Start at floor 1. How high can you climb?',
+  '地図喰いをたおすと開く': 'Opens when you defeat the Map Eater',
+  // 今日の手配書・コインのかせぎ方（設計書 §5.1 の例の表）
+  '今日の手配書': 'Today’s Wanted posters',
+  'ゲームでヒントなしの一発正解！': 'Get it right on the first try in a game, with no hints!',
+  'コインのかせぎ方': 'How to earn coins',
+  'クイズ1回の例（はじめて正解した国は、さらに +{coins}）': 'Examples for one quiz (each country you get right for the first time gives +{coins} more)',
+  'ゲーム': 'Game',
+  '練習・国旗→国名・10問（一発8・やり直し2）': 'Practice · Flag → Name · 10 questions (8 on the first try · 2 after a retry)',
+  '練習・10問・パーフェクト': 'Practice · 10 questions · Perfect',
+  '挑戦・10問・ノーミス': 'Challenge · 10 questions · No mistakes',
+  '挑戦・10問・3回目でクリア': 'Challenge · 10 questions · Cleared on the 3rd try',
+  'タイムアタック・10問・クリア': 'Time Attack · 10 questions · Cleared',
+  'タイムアタック・10問・7問目で失格': 'Time Attack · 10 questions · Out at question 7',
+  '練習・場所→国旗・全世界・全部（195問）・85%': 'Practice · Location → Flag · World · All (195 questions) · 85%',
+  '約70+50 = 120': '~70+50 = 120',
+  '約1,990+90+470 = 約2,550': '~1,990+90+470 = ~2,550',
+  'クイズで稼ぐ': 'Earn coins in quizzes',
+  // かざり（旅人カードの横・選ぶ窓）
+  'かざりを変える': 'Change decorations',
+  'かざりを選ぶ': 'Choose decorations',
+  '旅人カードと冒険ランキングに出る仲間の国旗（{max}つまで）。もう一度押すと外れる': 'Up to {max} flags of your allies to show on your Traveler card and the Adventure leaderboard. Tap one again to remove it.',
+  '決定': 'OK',
+  '✓ かざり{n}': '✓ Decoration {n}',
+  // 章の終わりのストーリーの窓
+  '冒険をつづける': 'Continue the Adventure',
+  // データ（引き継ぎコード・コードで復元・冒険データを消す）
+  'データ（引き継ぎコード）': 'Data (transfer code)',
+  '引き継ぎコード（ほかの端末の「コードで復元」に入れる）': 'Transfer code (enter it in “Restore from code” on your other device)',
+  'コードで復元（前の端末でコピーしたコードをはりつける）': 'Restore from code (paste the code you copied on your old device)',
+  'コードで復元': 'Restore from code',
+  '冒険データを消す': 'Delete Adventure data',
+  'コピーできなかったので、選んである文字をコピーしてね': 'Couldn’t copy. Please copy the selected text',
+  'コードが正しくないみたい': 'That code doesn’t look right',
+  '今のデータを上書きする？（{from} → {to}）': 'Overwrite your current data? ({from} → {to})',
+  'Lv{lv}・仲間{n}': { one: 'Lv {lv} · {n} ally', other: 'Lv {lv} · {n} allies' },
+  'まちがえた記録も入れかえる？': 'Also replace your mistake history?',
+  '引き継ぎコードで復元したよ': 'Restore from code complete. Your transfer code worked',
+  '冒険データを消す？（コイン・Lv・仲間が全部なくなる）': 'Delete your Adventure data? (You’ll lose all your coins, Lv, and allies)',
+  'ほんとうに消す？ もとにもどせないよ': 'Are you sure? This can’t be undone',
+  // 開発用パネル（?rpgdebug=1）
+  '開発用パネル（?rpgdebug=1）': 'Developer panel (?rpgdebug=1)',
+  'Lv にする': 'Set Lv',
+  '全部のフロアを開く': 'Unlock all floors',
+  '塔': 'Tower',
+  '階から': 'Start at floor',
+  '英雄の塔は地図喰いをたおすと開くよ': 'The Tower of Heroes opens after you defeat the Map Eater',
 
   // ---- ストーリー（rpg-core の STORY・STORY_END。子ども向けのやさしい英語・2人称 you, the Traveler・出来事を足さない） ----
   // 「地図喰い（ちずくい）」の（ちずくい）は読みがななので訳さない。「地球の国のなかまたち」は仲間（allies）ではなく friends

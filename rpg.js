@@ -17,9 +17,8 @@
   };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
   if (missing.length) { console.error(`[rpg] 必要なものが読み込めなかったので、冒険はお休み: ${missing.join(' ')}`); return; }
-  // 画面なしのモード（英語のページ。I18N.hide の 'rpg'。PR8 で外す）: セーブ・コインの受け取り・イベント・バッジの支払い・タブ間の同期・window.RPG は
-  // 動かし、冒険の画面・入口・チップ・設定のスイッチ・#pcoin・結果のパネル・トーストは出さない（保存の注意はコンソールへ）
-  const HEADLESS = !!window.I18N?.hide?.has('rpg');
+  // 画面の文は全部 T()（英語のページは i18n/en-rpg.js。日本語のページはキーそのまま）。国名は cName、国の並びは I18N.byName
+  const EN = LANG === 'en';
 
   const K = RPG_CORE, U = K.TUNING;
   const KEY = 'rpg', BROKEN = 'rpg-broken-';
@@ -27,19 +26,37 @@
   const KEEP_BADGES = 500;    // badgesPaid は最新500件
   const COIN = '<i class="coin" aria-hidden="true"></i>';   // コインの丸（rpg-cards.js と rpg-battle.js は RPG.COIN を使う）
   const MSG = {
-    broken: 'データを読めなかったので最初からになったよ',
-    readOnly: '新しいバージョンのデータが見つかったよ。ページを再読み込みしてね',
-    quota: '保存できなかった…',
-    firstCoin: 'コインがたまったよ！ 冒険でレベルアップやガチャに使えるよ',
+    broken: T('データを読めなかったので最初からになったよ'),
+    readOnly: T('新しいバージョンのデータが見つかったよ。ページを再読み込みしてね'),
+    quota: T('保存できなかった…'),
+    firstCoin: T('コインがたまったよ！ 冒険でレベルアップやガチャに使えるよ'),
   };
-  // 保存の注意（読めない・新しい版・保存できない）。画面なしのモードではトーストの代わりにコンソールへ
-  const notice = s => { if (HEADLESS) console.warn('[rpg]', s); else toast(s); };
+  // 保存の注意（読めない・新しい版・保存できない）
+  const notice = s => toast(s);
   const todayStr = () => K.today(new Date());
   // misses は index.html の let（記録を消すと別のオブジェクトになる）。参照を取っておかず、毎回読む
   const missesNow = () => (misses && typeof misses === 'object') ? misses : {};
-  const names = as => as.map(a => esc(byA.get(a)?.n ?? a)).join('・');
+  // 国名の並び（エスケープ済み）。知らない国コードはそのまま。区切りは T('・')（英語は ' · '）。RPG.names（rpg-battle.js も使う）
+  const names = as => as.map(a => { const c = byA.get(a); return esc(c ? cName(c) : a); }).join(T('・'));
   const JOIN_MAX = 5;   // 仲間になった国の一覧は5か国まで、あとは「ほか n か国」（結果のパネルもトーストも同じ）
-  const joinedText = as => { const j = as.slice(0, JOIN_MAX), more = as.length - j.length; return `${names(j)}${more ? `ほか${more}か国` : ''}`; };
+  const joinedText = (as, max = JOIN_MAX) => {
+    const j = as.slice(0, max), more = as.length - j.length;
+    return more ? T('{names}ほか{n}か国', { names: names(j), n: more }) : names(j);
+  };
+  // 仲間・昇格（シルバー）・克服・手配書の行（RPG.gainLines。クイズの結果のパネルとバトルの終わり・塔が使う）。joinMax: 仲間の国の数の上限
+  // （無ければ全部）、joinHint: 「（n回正解した国は仲間になるよ）」を足す。空の行は入れない
+  const gainLines = (rc, { joinMax, joinHint = false } = {}) => {
+    const joined = joinMax ? joinedText(rc.joined, joinMax) : names(rc.joined);
+    return [
+      rc.joined.length && (joinHint ? T('🤝 {names}が仲間になった！（{n}回正解した国は仲間になるよ）', { names: joined, n: U.card.frJoin })
+        : T('🤝 {names}が仲間になった！', { names: joined })),
+      rc.promoted.length && T('🏅 {names}がシルバーに！', { names: names(rc.promoted) }),
+      rc.overcome.length && T('✨ 克服！ {names}はもう苦手じゃない +{coins}', { names: names(rc.overcome), coins: fmt(U.overcome * rc.overcome.length) }),
+      rc.bounty.length && (rc.bountyAll
+        ? T('📜 手配書 {names} +{coins}（3件ぜんぶ +{all}）', { names: names(rc.bounty), coins: fmt(U.bounty * rc.bounty.length), all: fmt(U.bountyAll) })
+        : T('📜 手配書 {names} +{coins}', { names: names(rc.bounty), coins: fmt(U.bounty * rc.bounty.length) })),
+    ].filter(Boolean);
+  };
   // document のイベントを受ける。例外はクイズに伝えずコンソールに出す
   const on = (type, f) => document.addEventListener(type, e => {
     try { f(e.detail ?? {}, e); } catch (err) { console.error('[rpg]', err); }
@@ -109,8 +126,8 @@
       // 変わらなければ書かない（描き直しから tx を呼んでも、書く → 描き直す の輪にならない）
       if (str !== raw) { wrote = writeRaw(str); if (wrote) queueRefresh(); }
       // 消されにくい保存（persist）は、稼いだコインを書けたときに頼む（ページを開くごとに1回まで）。Firefox は確認を出すので、
-      // 起動時の書き直し・日付の書き直し・ゲームの開始では頼まない。冒険の表示が OFF のとき・画面なしのモード（英語のページ）でも頼まない
-      if (wrote && ls && !persisted && r.d.earned > e0 && r.d.show !== false && !HEADLESS) { persisted = true; try { navigator.storage?.persist?.()?.catch?.(() => {}); } catch {} }
+      // 起動時の書き直し・日付の書き直し・ゲームの開始では頼まない。冒険の表示が OFF のときも頼まない
+      if (wrote && ls && !persisted && r.d.earned > e0 && r.d.show !== false) { persisted = true; try { navigator.storage?.persist?.()?.catch?.(() => {}); } catch {} }
       return out;
     } catch (e) { console.error('[rpg]', e); wrote = false; return null; }
   };
@@ -120,7 +137,9 @@
   };
 
   /* ---------- コインのイベントと表示の部品 ---------- */
-  const coinHTML = n => COIN + K.shortCoins(n);
+  // コインの短い形（1万から 1.2万、英語は 12.3k）。RPG.shortCoins（rpg-cards.js などのチップも同じ）
+  const shortCoins = n => K.shortCoins(n, EN);
+  const coinHTML = n => COIN + shortCoins(n);
   // rpg:coins。coins と earned は d ではなく出す時点のセーブから読む（tx が返ってから先に出したイベントのリスナー＝badges.js が
   // 同期でバッジのコインを払っていても、いまの額になる）。呼び出しの形 (d, delta, reason) はそのまま
   const emitCoins = (_d, delta, reason) => {
@@ -146,20 +165,20 @@
   const startRun = det => {
     run = status === 'readOnly' ? null : K.newRun(det, base);   // 新しい版のデータのあいだはコインを数えない
     shown = run; last = null; answers = 0;
-    firstArmed = !HEADLESS && base.earned === 0; firstDue = false;   // 画面なしのモードでは、はじめてのコインのトーストを出さない
+    firstArmed = base.earned === 0; firstDue = false;
   };
   // #pcoin（#ppts の直後）: このゲームのコイン。直前の答えが目減りしていれば ×0.5、はじめて正解なら「はじめて！+20」（次の答えで消える）
   const drawPcoin = () => {
     let el = $('pcoin');
-    if (HEADLESS || !shown || showCache === false) { el?.remove(); return; }
+    if (!shown || showCache === false) { el?.remove(); return; }
     if (!el) {
       el = document.createElement('span');
-      el.id = 'pcoin'; el.className = 'mono'; el.title = 'コイン（冒険で使える）';
+      el.id = 'pcoin'; el.className = 'mono'; el.title = T('コイン（冒険で使える）');
       $('ppts').after(el);
     }
     const r = last;
     const note = (r && r.coin > 0 && r.decay < 1 ? `<small class="rpg-decay">×${r.decay}</small>` : '')
-      + (r && r.firstEver > 0 ? `<small class="rpg-fe">はじめて！+${r.firstEver}</small>` : '');
+      + (r && r.firstEver > 0 ? `<small class="rpg-fe">${T('はじめて！+{coins}', { coins: r.firstEver })}</small>` : '');
     // 注は1つの箱に入れる（スマホでは行の下のすき間に出すので、#pcoin の幅を変えない。rpg.css）
     el.innerHTML = `+${fmt(shown.game.coins)} ${COIN}` + (note && `<span class="rpg-pnote">${note}</span>`);
   };
@@ -219,11 +238,11 @@
     emitCoins(d, overcome, 'overcome');
     emitCoins(d, bounty, 'bounty');
     announce(rc, d);
-    if (HEADLESS || d.show === false) return;   // 画面なしのモード・冒険の表示が OFF: コインと記録は貯まるが、何も出さない
+    if (d.show === false) return;   // 冒険の表示が OFF: コインと記録は貯まるが、何も出さない
     if (det.outcome === 'clear') drawResult(rc, d);
     else {
-      if (rc.delta > 0) toast(`${COIN} +${fmt(rc.delta)} コイン`);
-      if (rc.joined.length) toast(`🤝 ${joinedText(rc.joined)}が仲間になった！`);
+      if (rc.delta > 0) toast(`${COIN} ${T('+{coins} コイン', { coins: fmt(rc.delta) })}`);
+      if (rc.joined.length) toast(T('🤝 {names}が仲間になった！', { names: joinedText(rc.joined) }));
       // 失格／にげたときはトーストに［シェア］を置けないので、節目は次に冒険ホームを開いたときに出す（開く前にまた届いたら足す）
       const sh = RPG.milestones(ownedBefore(d, rc), Object.keys(d.cards));
       if (sh.length) homeShares = [...homeShares.filter(s => !sh.some(x => x.kind === s.kind)), ...sh];
@@ -246,24 +265,22 @@
     const ext = $('r-ext');
     if (!ext) return;
     const row = (label, coins) => coins > 0 ? `<li>${label} …… ${fmt(coins)}</li>` : '';
-    const rows = row(`一発正解 ${rc.first.n}問`, rc.first.coins) + row(`やり直しで正解 ${rc.retry.n}問`, rc.retry.coins)
-      + row(`正解 ${rc.ta.n}問`, rc.ta.coins) + row('クリアボーナス', rc.clear) + row(`はじめて正解 ${rc.fe.n}か国`, rc.fe.coins);
+    const rows = row(T('一発正解 {n}問', { n: rc.first.n }), rc.first.coins) + row(T('やり直しで正解 {n}問', { n: rc.retry.n }), rc.retry.coins)
+      + row(T('正解 {n}問', { n: rc.ta.n }), rc.ta.coins) + row(T('クリアボーナス'), rc.clear) + row(T('はじめて正解 {n}か国', { n: rc.fe.n }), rc.fe.coins);
     const lines = [
-      rc.daily > 0 && `🎁 今日はじめてのクリア +${fmt(rc.daily)} ／ 無料ガチャ1回ゲット`,
-      rc.joined.length && `🤝 ${joinedText(rc.joined)}が仲間になった！（${U.card.frJoin}回正解した国は仲間になるよ）`,
-      rc.promoted.length && `🏅 ${names(rc.promoted)}がシルバーに！`,
-      rc.overcome.length && `✨ 克服！ ${names(rc.overcome)}はもう苦手じゃない +${fmt(U.overcome * rc.overcome.length)}`,
-      rc.bounty.length && `📜 手配書 ${names(rc.bounty)} +${fmt(U.bounty * rc.bounty.length)}${rc.bountyAll ? `（3件ぜんぶ +${fmt(U.bountyAll)}）` : ''}`,
-      rc.zeroed && 'タイムが速すぎたので、この回のコインはなし',
+      rc.daily > 0 && T('🎁 今日はじめてのクリア +{coins} ／ 無料ガチャ1回ゲット', { coins: fmt(rc.daily) }),
+      ...gainLines(rc, { joinMax: JOIN_MAX, joinHint: true }),
+      rc.zeroed && T('タイムが速すぎたので、この回のコインはなし'),
     ].filter(Boolean);
     // 仲間の数・地域の国を全部、に届いたらシェア（この回で仲間になった国をのぞいたのが、始める前の仲間）
     const shares = RPG.milestones(ownedBefore(d, rc), Object.keys(d.cards));
     ext.innerHTML = `<div class="rpg-res" id="rpg-res">`
-      + `<p class="rpg-res-head">${COIN} +<span class="rpg-res-n">${fmt(rc.sum)}</span> コイン <span class="rpg-now">いま ${fmt(get().coins)}</span></p>`
+      + `<p class="rpg-res-head">${COIN} +<span class="rpg-res-n">${fmt(rc.sum)}</span> ${T('コイン')} <span class="rpg-now">${T('いま {coins}', { coins: fmt(get().coins) })}</span></p>`
       + (rows ? `<ul class="rpg-res-rows">${rows}</ul>` : '')
       + lines.map(l => `<p class="rpg-res-x">${l}</p>`).join('')
       + (shares.length ? '<div class="rpg-shares" id="rpg-res-share"></div>' : '')
-      + `<button class="btn ghost" id="rpg-res-go">冒険へ →${d.intro ? '' : `（はじめてなら <span class="rpg-nowrap">${COIN}${fmt(U.start)}</span> のお祝いつき）`}</button></div>`;
+      + `<button class="btn ghost" id="rpg-res-go">${d.intro ? T('冒険へ →')
+        : T('冒険へ →（はじめてなら {coins} のお祝いつき）', { coins: `<span class="rpg-nowrap">${COIN}${fmt(U.start)}</span>` })}</button></div>`;
     RPG.drawShares($('rpg-res-share'), shares);
     $('rpg-res-go').onclick = () => { if (SCREENS.includes('rpg')) show('rpg'); };   // 冒険の画面ができるまでは何もしない
     RPG.fx('count', ext.querySelector('.rpg-res-n'), rc.sum);
@@ -276,7 +293,7 @@
   const retroToast = () => {
     const n = retroSum;
     retroSum = 0;
-    try { if (n > 0 && get().show !== false) toast(`バッジのごほうび ${COIN}+${fmt(n)}`); } catch (e) { console.error('[rpg]', e); }
+    try { if (n > 0 && get().show !== false) toast(T('バッジのごほうび {coins}', { coins: `${COIN}+${fmt(n)}` })); } catch (e) { console.error('[rpg]', e); }
   };
   document.addEventListener('badge:earned', e => {
     try {
@@ -296,7 +313,7 @@
       det.paid = paid === null ? false : paid === 0 ? 0 : wrote ? paid : false;
       if (det.paid > 0) {
         emitCoins(d, det.paid, 'badge');
-        if (det.retro === true && !HEADLESS) {   // 画面なしのモードでは「バッジのごほうび」のトーストを出さない
+        if (det.retro === true) {
           if (!retroSum) setTimeout(retroToast, 0);
           retroSum += det.paid;
         }
@@ -313,18 +330,18 @@
   // どのストーリーを、どのボスを倒したあとに出すか（上から順に見る）
   const STORY_DUE = [{ id: 'ch1', after: 'world' }, { id: 'ch2', after: 'mworld' }, { id: 'ch3start', after: 'mworld' }, { id: 'ch3', after: 'blackhole' }];
   const FLOOR_MARK = ['①', '②', '③', '④', '👑'];
-  const JUDGE = { easy: ['余裕', 'is-easy'], ok: ['ちょうど', 'is-ok'], hard: ['きびしい', 'is-hard'] };
+  const JUDGE = { easy: [T('余裕'), 'is-easy'], ok: [T('ちょうど'), 'is-ok'], hard: [T('きびしい'), 'is-hard'] };
   // 設計書 §5.1 の例の表（ゲームとコインの列）。表示するだけの文なので、計算には使わない
   const EARN = [
-    ['練習・国旗→国名・10問（一発8・やり直し2）', '80+6+20 = 106'],
-    ['練習・10問・パーフェクト', '100+20+30 = 150'],
-    ['挑戦・10問・ノーミス', '100+50+50 = 200'],
-    ['挑戦・10問・3回目でクリア', '約70+50 = 120'],
-    ['タイムアタック・10問・クリア', '50+30 = 80'],
-    ['タイムアタック・10問・7問目で失格', '30'],
-    ['練習・場所→国旗・全世界・全部（195問）・85%', '約1,990+90+470 = 約2,550'],
+    [T('練習・国旗→国名・10問（一発8・やり直し2）'), '80+6+20 = 106'],
+    [T('練習・10問・パーフェクト'), '100+20+30 = 150'],
+    [T('挑戦・10問・ノーミス'), '100+50+50 = 200'],
+    [T('挑戦・10問・3回目でクリア'), T('約70+50 = 120')],
+    [T('タイムアタック・10問・クリア'), '50+30 = 80'],
+    [T('タイムアタック・10問・7問目で失格'), '30'],
+    [T('練習・場所→国旗・全世界・全部（195問）・85%'), T('約1,990+90+470 = 約2,550')],
   ];
-  const WARN = { readOnly: MSG.readOnly, memory: 'この端末では保存できないみたい。閉じると消えるよ' };
+  const WARN = { readOnly: MSG.readOnly, memory: T('この端末では保存できないみたい。閉じると消えるよ') };
 
   const cleared = (d, id) => (d.floors || {})[id] || 0;
   // 開いているダンジョン: 1つ目、前のダンジョンのボスを倒した、または自分を1フロアでも進めた（壊れたセーブでも進んだところへは行ける）。
@@ -341,30 +358,44 @@
   // 章が開いているか（その章の1つ目のダンジョンが開いている）
   const chOpen = (d, ch) => unlocked(d, K.dungeonsOf(ch)[0].id);
   const judgeOf = (d, id, floor) => K.judge(K.battleStats(d, id, floor), K.enemy(id, floor));
+  // ダンジョンの名前と land の表示（RPG.dgName・RPG.dgLand。ほかの rpg-*.js もこれを使う）。日本語はデータのまま、英語は T(key ?? name)。
+  // 月（天体）は曜日の「月」（Mon）とぶつかるので key: '天体の月'。エスケープしない（名前はデータ）
+  const dgName = g => EN ? T(g.key ?? g.name) : g.name;
+  const dgLand = g => EN ? T(g.key ?? g.land) : g.land;
+  // モンスターの名前（RPG.monName）。鏡の手下 { nk, nb } は型の文に元の名前を入れる（日本語は n と同じ）。エスケープしない
+  const monName = m => m.nk ? T(m.nk, { name: T(m.nb) }) : T(m.n);
   // ガチャ・仲間・バトルへはここを通す。その画面が無い（rpg-cards.js / rpg-battle.js が読み込めなかった）ときは、opts を置いて冒険ホームを開く
   const open = (name, opts = {}) => { RPG.opts = opts; show(SCREENS.includes(name) ? name : 'rpg'); };
+  // 編成の名前の表示（RPG.teamLabel）: 既定の名前（セーブの '編成1' など）は T('編成{n}')（英語は Team 1）、自分で付けた名前は ugc（data-ugc に入れる）
+  const teamLabel = (n, i) => K.isDefaultTeamName(n, i) ? { text: T('編成{n}', { n: i + 1 }), ugc: false } : { text: n, ugc: true };
+  // 編成の名前を保存するとき（RPG.teamSaveName）: 表示の既定の名前（英語の Team 2）のままなら、セーブは日本語の既定の名前（'編成2'）
+  const teamSaveName = (v, i) => v.trim() === T('編成{n}', { n: i + 1 }) ? K.defaultTeamName(i) : v;
   // ガチャ・仲間の画面があるか（rpg-cards.js が登録する。読み込めなかったときは、冒険ホームにガチャ・仲間の入口を出さない）
   const hasCards = () => SCREENS.includes('gacha') && SCREENS.includes('cards');
   // 称号（badges.js が無い・空なら出さない）
   const titleOf = () => {
     try { return String(window.BADGES?.title?.() || ''); } catch (e) { console.error('[rpg]', e); return ''; }
   };
+  // 表示する称号: 英語のページはカタログの称号だけ英語（BADGES.titleLabel。無い称号は ''）。かっこはつけない・エスケープしない
+  const titleShown = () => {
+    const t = titleOf();
+    try { return t ? String(window.BADGES?.titleLabel?.(t) ?? t) : ''; } catch (e) { console.error('[rpg]', e); return ''; }
+  };
   // 称号が変わったら（badge:title）旅人カードの称号だけその場で描き直す。冒険ホームを開いていなければ、次に開いたときに出る
   on('badge:title', () => {
     const el = $('rpg-title');
     if (!el) return;
-    const t = titleOf();
-    el.textContent = t ? `〈${t}〉` : '';
+    const tl = titleShown();
+    el.textContent = tl ? T('〈{title}〉', { title: tl }) : '';   // textContent なのでエスケープしない
   });
 
   // ホームの［冒険］の小さいコインと NEW、トップバーのチップ
   const drawEntrances = (d = get()) => {
-    if (HEADLESS) return;
     const chip = $('rpg-chip');
     if (typeof homeEntry === 'function') homeEntry('home-rpg', { note: `<small class="rpg-homecoin">${coinHTML(d.coins)}</small>${d.intro ? '' : '<span class="rpg-new">NEW</span>'}` });
     if (chip) {
-      chip.innerHTML = `${COIN}<b>${K.shortCoins(d.coins)}</b><span class="rpg-chip-l"> コイン</span>`;
-      chip.setAttribute('aria-label', `コイン ${fmt(d.coins)}（冒険へ）`);
+      chip.innerHTML = `${COIN}<b>${shortCoins(d.coins)}</b><span class="rpg-chip-l"> ${T('コイン')}</span>`;
+      chip.setAttribute('aria-label', T('コイン {coins}（冒険へ）', { coins: fmt(d.coins) }));
     }
   };
 
@@ -385,7 +416,7 @@
   };
   const levelMax = () => {
     const d0 = get(), m = K.maxLevelUp(d0.lv, d0.coins);
-    if (m.to <= d0.lv || !confirm(`Lv${m.to} まで ●${fmt(m.cost)} 使う？`)) return;
+    if (m.to <= d0.lv || !confirm(T('Lv{lv} まで ●{coins} 使う？', { lv: m.to, coins: fmt(m.cost) }))) return;
     let d = null, from = 0, spent = 0;
     tx(x => {
       from = x.lv;
@@ -403,15 +434,15 @@
   // tx の中で使う: d の中身をそっくり src に入れかえる
   const replaceSave = (d, src) => { for (const k of Object.keys(d)) delete d[k]; Object.assign(d, src); };
   const wipeSave = () => tx(d => replaceSave(d, K.fresh(todayStr())));   // misses はそのまま
-  const dataHTML = full => '<details class="rpg-data" id="rpg-data"><summary>データ（引き継ぎコード）</summary><div class="rpg-data-in">'
-    + (full ? '<label class="rpg-lbl" for="rpg-code-out">引き継ぎコード（ほかの端末の「コードで復元」に入れる）</label>'
+  const dataHTML = full => `<details class="rpg-data" id="rpg-data"><summary>${T('データ（引き継ぎコード）')}</summary><div class="rpg-data-in">`
+    + (full ? `<label class="rpg-lbl" for="rpg-code-out">${T('引き継ぎコード（ほかの端末の「コードで復元」に入れる）')}</label>`
       + '<textarea class="rpg-code" id="rpg-code-out" rows="3" readonly></textarea>'
-      + '<button class="btn ghost" id="rpg-code-copy">コピー</button>' : '')
-    + '<label class="rpg-lbl" for="rpg-code-in">コードで復元（前の端末でコピーしたコードをはりつける）</label>'
+      + `<button class="btn ghost" id="rpg-code-copy">${T('コピー')}</button>` : '')
+    + `<label class="rpg-lbl" for="rpg-code-in">${T('コードで復元（前の端末でコピーしたコードをはりつける）')}</label>`
     + '<textarea class="rpg-code" id="rpg-code-in" rows="3" spellcheck="false" autocomplete="off" placeholder="CQ1.…"></textarea>'
-    + '<button class="btn ghost" id="rpg-code-load">コードで復元</button>'
+    + `<button class="btn ghost" id="rpg-code-load">${T('コードで復元')}</button>`
     + '<p class="rpg-code-msg" id="rpg-code-msg" role="status"></p>'
-    + (full ? '<button class="btn ghost rpg-danger" id="rpg-wipe">冒険データを消す</button>' : '')
+    + (full ? `<button class="btn ghost rpg-danger" id="rpg-wipe">${T('冒険データを消す')}</button>` : '')
     + '</div></details>';
   const sayData = s => { const el = $('rpg-code-msg'); if (el) el.textContent = s; };
   // 開いたとき（と描き直したとき）に、いまのセーブと misses からコードを作る
@@ -422,39 +453,40 @@
       try {
         if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('no clipboard');
         await navigator.clipboard.writeText($('rpg-code-out').value);
-        sayData('コピーしたよ');
+        sayData(T('コピーしたよ'));
       } catch {
         const out = $('rpg-code-out');   // 待つあいだに描き直していても、いまの欄を選ぶ
         out?.focus();
         out?.select();
-        sayData('コピーできなかったので、選んである文字をコピーしてね');
+        sayData(T('コピーできなかったので、選んである文字をコピーしてね'));
       }
     } catch (e) { console.error('[rpg]', e); }
   };
   // コードを読む → 上書きしてよいか聞く → 今の文字列を写す（rpg-broken-*）→ 書く → まちがえた記録も入れかえるか聞く → 描き直す
   const loadCode = () => {
     const r = K.decodeCode($('rpg-code-in')?.value ?? '', todayStr());
-    if (!r.ok) { sayData('コードが正しくないみたい'); return; }
+    if (!r.ok) { sayData(T('コードが正しくないみたい')); return; }
     if (status === 'readOnly') { sayData(MSG.readOnly); return; }
     const cur = get();
-    if (!confirm(`今のデータを上書きする？（Lv${cur.lv}・仲間${owned(cur)} → Lv${r.rpg.lv}・仲間${owned(r.rpg)}）`)) return;
+    const lvAllies = x => T('Lv{lv}・仲間{n}', { lv: x.lv, n: owned(x) });
+    if (!confirm(T('今のデータを上書きする？（{from} → {to}）', { from: lvAllies(cur), to: lvAllies(r.rpg) }))) return;
     backupRaw(readRaw());
     if (!tx(d => { replaceSave(d, r.rpg); return true; }) || !wrote) {   // 書けなかった（保存できなかったトーストは tx が出す）
       if (status === 'readOnly') sayData(MSG.readOnly);
       return;
     }
-    if (r.hasM && confirm('まちがえた記録も入れかえる？')) { misses = r.m; store.set('misses', misses); }
+    if (r.hasM && confirm(T('まちがえた記録も入れかえる？'))) { misses = r.m; store.set('misses', misses); }
     introAv = null;
     const inp = $('rpg-code-in');   // ホームのまま描き直すと持ち越されるので、はりつけたコードと前のメッセージを消しておく
     if (inp) inp.value = '';
     sayData('');
     refresh();
     window.scrollTo({ top: 0 });
-    toast('引き継ぎコードで復元したよ');
+    toast(T('引き継ぎコードで復元したよ'));
   };
   const wipeAsk = () => {
     if (status === 'readOnly') { sayData(MSG.readOnly); return; }
-    if (!confirm('冒険データを消す？（コイン・Lv・仲間が全部なくなる）') || !confirm('ほんとうに消す？ もとにもどせないよ')) return;
+    if (!confirm(T('冒険データを消す？（コイン・Lv・仲間が全部なくなる）')) || !confirm(T('ほんとうに消す？ もとにもどせないよ'))) return;
     wipeSave();
     if (wrote) emit('rpg:wipe', {});   // 冒険ランキングの記録も消してもらう（rpg-rank.js）
     introAv = null;
@@ -472,14 +504,14 @@
   // ---- 開発用パネル（?rpgdebug=1 のときだけ冒険ホームの最後に出す。RPG.debug はいつもある） ----
   const DEBUG = (() => { try { return new URLSearchParams(location.search).get('rpgdebug') === '1'; } catch { return false; } })();
   const DEBUG_GIVE = 10000;   // ●+10,000（設計書 §5.4）
-  const debugHTML = d => !DEBUG ? '' : '<div class="rpg-debug" id="rpg-debug"><p class="rpg-lbl">開発用パネル（?rpgdebug=1）</p><div class="rpg-debug-row">'
+  const debugHTML = d => !DEBUG ? '' : `<div class="rpg-debug" id="rpg-debug"><p class="rpg-lbl">${T('開発用パネル（?rpgdebug=1）')}</p><div class="rpg-debug-row">`
     + `<button class="btn ghost" id="rpg-dbg-give">${COIN}+${fmt(DEBUG_GIVE)}</button>`
     + `<span class="rpg-debug-lv"><label for="rpg-dbg-lv">Lv</label><input type="number" id="rpg-dbg-lv" min="1" max="${U.hero.maxLv}" value="${d.lv}">`
-    + '<button class="btn ghost" id="rpg-dbg-setlv">Lv にする</button></span>'
-    + '<button class="btn ghost" id="rpg-dbg-unlock">全部のフロアを開く</button>'
-    + '<span class="rpg-debug-lv"><label for="rpg-dbg-tf">塔</label><input type="number" id="rpg-dbg-tf" min="1" value="10">'
-    + '<button class="btn ghost" id="rpg-dbg-tower">階から</button></span>'
-    + '<button class="btn ghost" id="rpg-dbg-wipe">冒険データを消す</button></div></div>';
+    + `<button class="btn ghost" id="rpg-dbg-setlv">${T('Lv にする')}</button></span>`
+    + `<button class="btn ghost" id="rpg-dbg-unlock">${T('全部のフロアを開く')}</button>`
+    + `<span class="rpg-debug-lv"><label for="rpg-dbg-tf">${T('塔')}</label><input type="number" id="rpg-dbg-tf" min="1" value="10">`
+    + `<button class="btn ghost" id="rpg-dbg-tower">${T('階から')}</button></span>`
+    + `<button class="btn ghost" id="rpg-dbg-wipe">${T('冒険データを消す')}</button></div></div>`;
   const bindDebug = () => {
     if (!$('rpg-debug')) return;
     $('rpg-dbg-give').onclick = () => RPG.debug.give(DEBUG_GIVE);
@@ -489,7 +521,7 @@
     $('rpg-dbg-wipe').onclick = wipeAsk;
     // 英雄の塔をその階から（RPG_BATTLE.debugTower。地図喰いを倒していないセーブでは始まらない）
     $('rpg-dbg-tower').onclick = () => {
-      if (!window.RPG_BATTLE?.debugTower?.(+$('rpg-dbg-tf').value)) toast('英雄の塔は地図喰いをたおすと開くよ');
+      if (!window.RPG_BATTLE?.debugTower?.(+$('rpg-dbg-tf').value)) toast(T('英雄の塔は地図喰いをたおすと開くよ'));
     };
   };
 
@@ -499,11 +531,11 @@
   const introHTML = d => {
     const av = introAv ?? d.av;
     return `<div class="rpg-intro" id="rpg-intro">${warnHTML()}`
-      + '<h2 class="rpg-h1">国旗クエスト</h2><p class="rpg-sub">地図喰いから世界を取りもどせ</p>'
+      + `<h2 class="rpg-h1">${T('国旗クエスト')}</h2><p class="rpg-sub">${T('地図喰いから世界を取りもどせ')}</p>`
       + `<div class="rpg-story">${STORY.map(s => `<p>${T(s)}</p>`).join('')}</div>`
-      + '<p class="rpg-lbl" id="rpg-avlbl">旅人のすがたをえらぶ</p>'
+      + `<p class="rpg-lbl" id="rpg-avlbl">${T('旅人のすがたをえらぶ')}</p>`
       + `<div class="rpg-avpick" role="group" aria-labelledby="rpg-avlbl">${AV.map((e, i) => `<button type="button" data-av="${i}" aria-pressed="${i === av}">${e}</button>`).join('')}</div>`
-      + `<button class="btn" id="rpg-go">旅に出る</button>${dataHTML(false)}</div>${debugHTML(d)}`;
+      + `<button class="btn" id="rpg-go">${T('旅に出る')}</button>${dataHTML(false)}</div>${debugHTML(d)}`;
   };
   const bindIntro = d => {
     const box = $('scr-rpg').querySelector('.rpg-avpick');
@@ -533,20 +565,21 @@
   const nextAction = (d, nf) => {
     const gacha = hasCards();   // ガチャの画面が無ければ（rpg-cards.js が読み込めなかった）ガチャはすすめない
     if (gacha && d.pulls === 0 && d.coins >= U.gacha.ten)
-      return { text: 'まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）', go: () => open('gacha', { region: 'all' }) };
-    if (gacha && d.day.first && !d.day.free) return { text: '今日の無料ガチャが引けるよ', go: () => open('gacha') };
+      return { text: T('まずは国旗ガチャ10連で仲間をさがそう（全世界なら●1,000）'), go: () => open('gacha', { region: 'all' }) };
+    if (gacha && d.day.first && !d.day.free) return { text: T('今日の無料ガチャが引けるよ'), go: () => open('gacha') };
     const en = nf && K.enemy(nf.id, nf.floor);
-    if (en && d.coins >= K.levelCost(d.lv) && d.lv < en.recLv) return { text: 'レベルアップできるよ', go: () => $('rpg-lvup')?.focus() };
+    if (en && d.coins >= K.levelCost(d.lv) && d.lv < en.recLv) return { text: T('レベルアップできるよ'), go: () => $('rpg-lvup')?.focus() };
     if (en) {
-      const g = K.dungeonOf(nf.id), where = en.boss ? `${g.name} ボス（${K.MONSTERS[nf.id][BOSS - 1].n}）` : `${g.name} F${nf.floor} `;
+      const g = K.dungeonOf(nf.id);
       return {
-        text: `${where}に挑戦！（推奨Lv${en.recLv}）`,
-        warn: judgeOf(d, nf.id, nf.floor) === 'hard' ? 'ちょっときびしいかも。クイズでコインを稼ごう' : '',
+        text: en.boss ? T('{dungeon} ボス（{boss}）に挑戦！（推奨Lv{lv}）', { dungeon: dgName(g), boss: monName(K.MONSTERS[nf.id][BOSS - 1]), lv: en.recLv })
+          : T('{dungeon} F{f} に挑戦！（推奨Lv{lv}）', { dungeon: dgName(g), f: nf.floor, lv: en.recLv }),
+        warn: judgeOf(d, nf.id, nf.floor) === 'hard' ? T('ちょっときびしいかも。クイズでコインを稼ごう') : '',
         go: () => open('battle', { id: nf.id, floor: nf.floor }),
       };
     }
-    return hasCards() ? { text: `全クリア！ ${TOTAL}か国を仲間にしよう（${owned(d)}/${TOTAL}）`, go: () => open('cards') }
-      : { text: '全クリア！ クイズでコインを稼いで、レベルを上げよう', go: () => open('rpg') };
+    return hasCards() ? { text: T('全クリア！ {total}か国を仲間にしよう（{owned}/{total}）', { total: TOTAL, owned: owned(d) }), go: () => open('cards') }
+      : { text: T('全クリア！ クイズでコインを稼いで、レベルを上げよう'), go: () => open('rpg') };
   };
   // ダンジョンの図版。開いていないものは 🔒 と押せないフロアだけ（ボスは見せない）
   // sel は冒険マップで選んでいるダンジョン。ほかの図版は隠す（DOM にはいまの章の7つとも置く）
@@ -554,20 +587,21 @@
     const n = cleared(d, g.id), on = unlocked(d, g.id), boss = K.MONSTERS[g.id][BOSS - 1];
     const fls = FLOOR_MARK.map((mark, i) => {
       const f = i + 1, cls = !on ? '' : f <= n ? ' is-done' : f === n + 1 ? ' is-next' : '';
-      return `<button type="button" class="rpg-fl${cls}" data-d="${g.id}" data-f="${f}" aria-label="${f === BOSS ? 'ボス' : `F${f}`}${on && f <= n ? '（クリア済み）' : ''}"`
+      const fl = f === BOSS ? T('ボス') : `F${f}`;
+      return `<button type="button" class="rpg-fl${cls}" data-d="${g.id}" data-f="${f}" aria-label="${on && f <= n ? T('{floor}（クリア済み）', { floor: fl }) : fl}"`
         + `${on && f <= n + 1 ? '' : ' disabled'}>${mark}</button>`;
     }).join('');
     const head = `<div class="rpg-plate${on ? '' : ' rpg-locked'}" data-d="${g.id}" style="--rpg-c: var(--rpg-r-${g.id}, ${g.color})"${g.id === sel ? '' : ' hidden'}><p class="rpg-plate-no">${g.plate}</p>`;
     const prev = DG[DG.findIndex(x => x.id === g.id) - 1];
     // 宇宙の星は、出る国のテーマを1行（星喰いの巣は全部のテーマなので出さない）
-    const theme = g.t ? `<p class="rpg-plate-meta rpg-plate-theme">テーマ: ${K.THEMES[g.t].n}（${K.THEMES[g.t].a.length}か国）</p>` : '';
-    if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="まだ開いていない">🔒</span><b>${g.name}</b></p>`
-      + `${theme}<p class="rpg-plate-meta rpg-plate-lock">${prev ? `${esc(prev.name)}のボスをたおすと開く` : ''}</p><div class="rpg-fls">${fls}</div></div>`;
+    const theme = g.t ? `<p class="rpg-plate-meta rpg-plate-theme">${T('テーマ: {name}（{n}か国）', { name: T(K.THEMES[g.t].n), n: K.THEMES[g.t].a.length })}</p>` : '';
+    if (!on) return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" role="img" aria-label="${T('まだ開いていない')}">🔒</span><b>${dgName(g)}</b></p>`
+      + `${theme}<p class="rpg-plate-meta rpg-plate-lock">${prev ? T('{name}のボスをたおすと開く', { name: esc(dgName(prev)) }) : ''}</p><div class="rpg-fls">${fls}</div></div>`;
     const left = restReward(g.id, n);
     const rec = f => K.recLv(K.stageOf(g.id, f)), [jt, jc] = JUDGE[judgeOf(d, g.id, Math.min(n + 1, BOSS))];
-    return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" aria-hidden="true">${boss.e}</span><b>${g.name}</b><small>ボス ${boss.n}</small></p>`
-      + `${theme}<p class="rpg-plate-meta"><span>推奨Lv${rec(1)}〜${rec(BOSS)}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? '<span>ぜんぶクリア</span>' : ''}</p>`
-      + (left ? `<p class="rpg-plate-meta rpg-plate-gain"><span>はじめてクリアでもらえる ${COIN}<b>${fmt(left)}</b></span><span>ボスまで あと${BOSS - n}フロア</span></p>` : '')
+    return `${head}<p class="rpg-plate-name"><span class="rpg-plate-e" aria-hidden="true">${boss.e}</span><b>${dgName(g)}</b><small>${T('ボス {name}', { name: monName(boss) })}</small></p>`
+      + `${theme}<p class="rpg-plate-meta"><span>${T('推奨Lv{from}〜{to}', { from: rec(1), to: rec(BOSS) })}</span><span class="rpg-judge ${jc}">${jt}</span>${n >= BOSS ? `<span>${T('ぜんぶクリア')}</span>` : ''}</p>`
+      + (left ? `<p class="rpg-plate-meta rpg-plate-gain"><span>${T('はじめてクリアでもらえる {coins}', { coins: `${COIN}<b>${fmt(left)}</b>` })}</span><span>${T('ボスまで あと{n}フロア', { n: BOSS - n })}</span></p>` : '')
       + `<div class="rpg-fls">${fls}</div></div>`;
   };
   // まだはじめてクリアしていないフロア（n より先）のコインの合計
@@ -648,14 +682,15 @@
     const R = 33, RING = 2 * Math.PI * (R + 5);
     for (const g of list) {
       const [x, y] = at[g.id], n = Math.min(BOSS, cleared(d, g.id)), state = st(g), on = state !== 'is-locked';
-      const label = `${g.name}${on ? `（${n}/${BOSS}フロア${n >= BOSS ? '・クリア' : ''}）` : '（まだ開いていない）'}`;
+      const label = !on ? T('{name}（まだ開いていない）', { name: dgName(g) })
+        : n >= BOSS ? T('{name}（{done}/{all}フロア・クリア）', { name: dgName(g), done: n, all: BOSS }) : T('{name}（{done}/{all}フロア）', { name: dgName(g), done: n, all: BOSS });
       s += `<g class="rpg-am-node ${state}${g.id === sel ? ' is-sel' : ''}${nf?.id === g.id ? ' is-here' : ''}" data-d="${g.id}" style="${c(g)}" transform="translate(${x} ${y})"`
         + ` role="button" tabindex="0" aria-pressed="${g.id === sel}" aria-label="${label}">`
         + `<circle class="rpg-am-hit" r="${R + 14}"></circle>`
         + (on ? `<circle class="rpg-am-track" r="${R + 5}"></circle><circle class="rpg-am-ring" r="${R + 5}" transform="rotate(-90)" stroke-dasharray="${(RING * n / BOSS).toFixed(1)} ${RING.toFixed(1)}"></circle>` : '')
         // 宇宙は星の絵（DUNGEONS の e）、地球と鏡の地球はボスの絵
         + `<circle class="rpg-am-dot" r="${R}"></circle><text class="rpg-am-e" dy=".35em">${on ? g.e ?? K.MONSTERS[g.id][BOSS - 1].e : '🔒'}</text>`
-        + `<text class="rpg-am-name" y="${R + 24}">${g.name}</text>`
+        + `<text class="rpg-am-name" y="${R + 24}">${dgName(g)}</text>`
         + (state === 'is-done' ? `<g class="rpg-am-ok" transform="translate(${R - 3} ${-R + 3})"><circle r="13"></circle><path d="M-6 0l4 4 7-8"></path></g>` : '')
         + '</g>';
     }
@@ -663,32 +698,32 @@
       const [x, y] = at[nf.id];
       s += `<g class="rpg-am-hero" transform="translate(${x} ${y - 72})" aria-hidden="true"><text dy=".35em">${AV[d.av] ?? AV[0]}</text></g>`;
     }
-    return `<div class="rpg-amap-h"><b>冒険マップ</b><span>ダンジョン <b>${done}</b>/${list.length}・フロア <b>${floors}</b>/${list.length * BOSS}</span></div>`
+    return `<div class="rpg-amap-h"><b>${T('冒険マップ')}</b><span>${T('ダンジョン')} <b>${done}</b>/${list.length}${T('・')}${T('フロア')} <b>${floors}</b>/${list.length * BOSS}</span></div>`
       + `<div class="rpg-amap-bar" aria-hidden="true"><i style="width: ${(100 * floors / (list.length * BOSS)).toFixed(1)}%"></i></div>`
-      + `<svg class="map rpg-amap-svg${mirror ? ' is-mirror' : ''}${space ? ' is-space' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="冒険マップ（ダンジョンを押すと下にくわしく出る）">${s}</svg>`;
+      + `<svg class="map rpg-amap-svg${mirror ? ' is-mirror' : ''}${space ? ' is-space' : ''}" viewBox="0 0 ${W} ${H}" role="group" aria-label="${T('冒険マップ（ダンジョンを押すと下にくわしく出る）')}">${s}</svg>`;
   };
   // 章タブ（冒険マップの上）。開いていない章は 🔒 で押せない
-  const chtabsHTML = (d, ch) => `<div class="rpg-chtabs" id="rpg-chtabs" role="group" aria-label="章">${CH.map(c => {
+  const chtabsHTML = (d, ch) => `<div class="rpg-chtabs" id="rpg-chtabs" role="group" aria-label="${T('章')}">${CH.map(c => {
     const isOpen = chOpen(d, c.ch);
     return `<button type="button" class="chip" id="rpg-ch${c.ch}" data-ch="${c.ch}" aria-pressed="${c.ch === ch}"${isOpen ? '' : ' disabled'}>`
-      + `<span aria-hidden="true">${isOpen ? c.e : '🔒'}</span> ${c.name}</button>`;
+      + `<span aria-hidden="true">${isOpen ? c.e : '🔒'}</span> ${T(c.name)}</button>`;
   }).join('')}</div>`;
   // いま見せる章: タブで選んだ章（開いていれば）→ 次に挑むフロアの章 → 全部クリアなら最後の章
   const chNow = (d, nf) => CH.some(c => c.ch === chSel) && chOpen(d, chSel) ? chSel : nf ? K.chapterOf(nf.id) : CH[CH.length - 1].ch;
   const bountyHTML = d => {
     const b = d.bounty, n = b.a.filter(a => b.done.includes(a)).length;
     const li = a => {
-      const nm = esc(byA.get(a)?.n ?? a), done = b.done.includes(a);
-      return `<li class="rpg-wf${done ? ' is-done' : ''}"><img src="${flag(a)}" alt="${nm}" title="${nm}">${done ? '<span class="rpg-check" role="img" aria-label="達成">✓</span>' : ''}</li>`;
+      const c = byA.get(a), nm = esc(c ? cName(c) : a), done = b.done.includes(a);
+      return `<li class="rpg-wf${done ? ' is-done' : ''}"><img src="${flag(a)}" alt="${nm}" title="${nm}">${done ? `<span class="rpg-check" role="img" aria-label="${T('達成')}">✓</span>` : ''}</li>`;
     };
-    return `<div class="rpg-bounty" id="rpg-bounty"${b.a.length ? '' : ' hidden'}><p class="rpg-bounty-h">今日の手配書 <b>${n}/${b.a.length}</b></p>`
-      + `<ul class="rpg-wanted">${b.a.map(li).join('')}</ul><p class="hint">ゲームでヒントなしの一発正解！</p></div>`;
+    return `<div class="rpg-bounty" id="rpg-bounty"${b.a.length ? '' : ' hidden'}><p class="rpg-bounty-h">${T('今日の手配書')} <b>${n}/${b.a.length}</b></p>`
+      + `<ul class="rpg-wanted">${b.a.map(li).join('')}</ul><p class="hint">${T('ゲームでヒントなしの一発正解！')}</p></div>`;
   };
-  const earnHTML = () => '<details class="rpg-earn" id="rpg-earn"><summary>コインのかせぎ方</summary>'
-    + `<table class="rpg-earn-t"><caption>クイズ1回の例（はじめて正解した国は、さらに +${U.quiz.firstEver}）</caption>`
-    + '<thead><tr><th scope="col">ゲーム</th><th scope="col">コイン</th></tr></thead>'
+  const earnHTML = () => `<details class="rpg-earn" id="rpg-earn"><summary>${T('コインのかせぎ方')}</summary>`
+    + `<table class="rpg-earn-t"><caption>${T('クイズ1回の例（はじめて正解した国は、さらに +{coins}）', { coins: U.quiz.firstEver })}</caption>`
+    + `<thead><tr><th scope="col">${T('ゲーム')}</th><th scope="col">${T('コイン')}</th></tr></thead>`
     + `<tbody>${EARN.map(([g, c]) => `<tr><td>${g}</td><td>${c}</td></tr>`).join('')}</tbody></table>`
-    + '<button class="btn ghost" id="rpg-earn-go">クイズで稼ぐ</button></details>';
+    + `<button class="btn ghost" id="rpg-earn-go">${T('クイズで稼ぐ')}</button></details>`;
   // ---- かざり（旅人カードの名前の横に、好きな仲間の国旗を3つまで。冒険ランキングにも出る: rpg-rank.js） ----
   // 仲間が0枚・rpg-cards.js が無いときは出さない。出すのは deco のうち持っている仲間（cards）の国だけ。空きは点線の四角
   const DECO_MAX = 3;
@@ -696,9 +731,9 @@
   const canDeco = d => hasCards() && typeof RPG.cardHTML === 'function' && owned(d) > 0;
   const decoHTML = d => {
     if (!canDeco(d)) return '';
-    const as = decoOwned(d), slots = as.map(a => { const nm = esc(byA.get(a).n); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; });
+    const as = decoOwned(d), slots = as.map(a => { const nm = esc(cName(byA.get(a))); return `<img src="${flag(a)}" alt="${nm}" title="${nm}">`; });
     while (slots.length < DECO_MAX) slots.push('<span class="rpg-deco-empty"></span>');
-    return `<button type="button" class="rpg-deco" id="rpg-deco" aria-label="かざりを変える">${slots.join('')}</button>`;
+    return `<button type="button" class="rpg-deco" id="rpg-deco" aria-label="${T('かざりを変える')}">${slots.join('')}</button>`;
   };
   // 選ぶ画面（<dialog id="rpg-deco-dlg">。冒険ホームの描き直しで消えないよう body に1つ）。押すたびに入れる／外す（3つ埋まっていたら入らない）。
   // ［決定］で保存して rpg:deco。Esc・閉じる・外を押したときは保存しない
@@ -717,20 +752,20 @@
     let pick = decoOwned(d);
     const star = a => d.cards[a][0];
     const list = Object.keys(d.cards).filter(a => byA.has(a))
-      .sort((x, y) => star(y) - star(x) || byA.get(x).n.localeCompare(byA.get(y).n, 'ja'));
+      .sort((x, y) => star(y) - star(x) || I18N.byName(byA.get(x), byA.get(y)));
     const ro = status === 'readOnly';
-    dlg.innerHTML = '<div class="inner"><button type="button" class="close">閉じる</button>'
-      + `<h2 id="rpg-deco-h" class="rpg-deco-h">かざりを選ぶ <small id="rpg-deco-n"></small></h2>`
-      + `<p class="hint">旅人カードと冒険ランキングに出る仲間の国旗（${DECO_MAX}つまで）。もう一度押すと外れる</p>`
+    dlg.innerHTML = `<div class="inner"><button type="button" class="close">${T('閉じる')}</button>`
+      + `<h2 id="rpg-deco-h" class="rpg-deco-h">${T('かざりを選ぶ')} <small id="rpg-deco-n"></small></h2>`
+      + `<p class="hint">${T('旅人カードと冒険ランキングに出る仲間の国旗（{max}つまで）。もう一度押すと外れる', { max: DECO_MAX })}</p>`
       + `<div class="rpg-cd-grid rpg-deco-grid" id="rpg-deco-grid">${list.map(a => RPG.cardHTML(a, d, { lazy: true })).join('')}</div>`
-      + `<button type="button" class="btn" id="rpg-deco-ok"${ro ? ' disabled' : ''}>決定</button></div>`;
+      + `<button type="button" class="btn" id="rpg-deco-ok"${ro ? ' disabled' : ''}>${T('決定')}</button></div>`;
     const mark = () => {
       for (const b of dlg.querySelectorAll('.rpg-card[data-a]')) {
         const i = pick.indexOf(b.dataset.a), lab = b.querySelector('.rpg-lab');
         b.classList.toggle('is-in', i >= 0);
         b.setAttribute('aria-pressed', String(i >= 0));
         if (i >= 0 && !lab) b.querySelector('.rpg-card-face')?.insertAdjacentHTML('afterbegin', '<span class="rpg-lab"></span>');
-        if (i >= 0) b.querySelector('.rpg-lab').textContent = `✓ かざり${i + 1}`;
+        if (i >= 0) b.querySelector('.rpg-lab').textContent = T('✓ かざり{n}', { n: i + 1 });
         else lab?.remove();
       }
       $('rpg-deco-n').textContent = `${pick.length}/${DECO_MAX}`;
@@ -774,9 +809,9 @@
       document.body.append(dlg);
     }
     dlg.dataset.story = id;
-    dlg.innerHTML = '<div class="inner"><button type="button" class="close">閉じる</button>'
+    dlg.innerHTML = `<div class="inner"><button type="button" class="close">${T('閉じる')}</button>`
       + STORY_END[id].map((x, i) => `<h2 class="rpg-story-h"${i ? '' : ' id="rpg-story-h"'}>${T(x.h)}</h2><div class="rpg-story">${x.p.map(s => `<p>${T(s)}</p>`).join('')}</div>`).join('')
-      + '<button type="button" class="btn" id="rpg-story-ok">冒険をつづける</button></div>';
+      + `<button type="button" class="btn" id="rpg-story-ok">${T('冒険をつづける')}</button></div>`;
     dlg.querySelector('.close').onclick = $('rpg-story-ok').onclick = () => dlg.close();
     dlg.showModal();
   };
@@ -785,9 +820,9 @@
     if (!SCREENS.includes('battle')) return '';
     const on = K.towerOpen(d), best = d.tower?.best || 0;
     return `<div class="rpg-tower${on ? '' : ' rpg-locked'}" id="rpg-tower"><p class="rpg-tower-h">`
-      + (on ? '<span class="rpg-tower-e" aria-hidden="true">🗼</span>' : '<span class="rpg-tower-e" role="img" aria-label="まだ開いていない">🔒</span>')
-      + `<b>英雄の塔</b><span class="rpg-tower-s">${on ? (best ? `自己ベスト ${fmt(best)}階` : '1階から、どこまで登れるかな') : '地図喰いをたおすと開く'}</span></p>`
-      + `<button type="button" class="btn" id="rpg-tower-go"${on ? '' : ' disabled'}>挑戦</button></div>`;
+      + (on ? '<span class="rpg-tower-e" aria-hidden="true">🗼</span>' : `<span class="rpg-tower-e" role="img" aria-label="${T('まだ開いていない')}">🔒</span>`)
+      + `<b>${T('英雄の塔')}</b><span class="rpg-tower-s">${on ? (best ? T('自己ベスト {n}階', { n: fmt(best) }) : T('1階から、どこまで登れるかな')) : T('地図喰いをたおすと開く')}</span></p>`
+      + `<button type="button" class="btn" id="rpg-tower-go"${on ? '' : ' disabled'}>${T('挑戦')}</button></div>`;
   };
   // スマホは上から 旅人・レベルアップ・つぎにやること・塔・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
@@ -796,23 +831,25 @@
     // マップと図版は ch の章だけ。選ぶダンジョンは マップで選んだもの → 次に挑むダンジョン → その章の最後
     const ch = chNow(d, nf), list = K.dungeonsOf(ch);
     const sel = list.some(g => g.id === dgSel) ? dgSel : list.some(g => g.id === nf?.id) ? nf.id : list[list.length - 1].id;
-    // 名前はサイト共通のプロフィールのもの（無ければ前に使った nickname）
-    const nick = window.PROFILE?.get?.()?.name ?? store.get('nickname', ''), name = typeof nick === 'string' && nick.trim() ? esc(nick) : '旅人', title = titleOf();
+    // 名前はサイト共通のプロフィールのもの（無ければ前に使った nickname）。自分の名前は data-ugc（訳さない）、無ければ T('旅人')
+    const nick = window.PROFILE?.get?.()?.name ?? store.get('nickname', ''), title = titleShown();
+    const name = typeof nick === 'string' && nick.trim() ? `<b id="rpg-name" data-ugc>${esc(nick)}</b>` : `<b id="rpg-name">${T('旅人')}</b>`;
     const max = d.lv >= U.hero.maxLv, cost = K.levelCost(d.lv), can = d.coins >= cost, upTo = K.maxLevelUp(d.lv, d.coins).to;
-    const lvup = max ? 'MAX' : `レベルアップ ${COIN}${fmt(cost)}${can ? '' : ` <small class="rpg-short">あと${COIN}${fmt(cost - d.coins)}</small>`}`;
+    const lvup = max ? 'MAX' : T('レベルアップ {coins}', { coins: `${COIN}${fmt(cost)}` })
+      + (can ? '' : ` <small class="rpg-short">${T('あと{coins}', { coins: `${COIN}${fmt(cost - d.coins)}` })}</small>`);
     return `<div class="rpg-side">${warnHTML()}`
       + '<div class="rpg-hero" id="rpg-hero">'
-      + `<button type="button" class="rpg-av" id="rpg-av" aria-label="旅人のすがたを変える">${AV[d.av] ?? AV[0]}</button>`
-      + `<p class="rpg-who"><b id="rpg-name">${name}</b><span class="rpg-ttl" id="rpg-title">${title ? `〈${esc(title)}〉` : ''}</span>${decoHTML(d)}</p>`
-      + `<p class="rpg-stats" id="rpg-stats"><span class="rpg-lvnum">Lv ${d.lv}</span><span>❤️ ${fmt(st.hp)}</span><span>⚔️ ${fmt(st.atk)}</span><span>仲間 ${owned(d)}/${TOTAL}</span></p></div>`
+      + `<button type="button" class="rpg-av" id="rpg-av" aria-label="${T('旅人のすがたを変える')}">${AV[d.av] ?? AV[0]}</button>`
+      + `<p class="rpg-who">${name}<span class="rpg-ttl" id="rpg-title">${title ? T('〈{title}〉', { title: esc(title) }) : ''}</span>${decoHTML(d)}</p>`
+      + `<p class="rpg-stats" id="rpg-stats"><span class="rpg-lvnum">Lv ${d.lv}</span><span>❤️ ${fmt(st.hp)}</span><span>⚔️ ${fmt(st.atk)}</span><span>${T('仲間 {n}/{total}', { n: owned(d), total: TOTAL })}</span></p></div>`
       + `<div class="rpg-lv"><button class="btn" id="rpg-lvup"${max || !can ? ' disabled' : ''}>${lvup}</button>`
-      + `<button class="linkbtn" id="rpg-lvmax"${upTo > d.lv ? '' : ' disabled'}>上げられるだけ上げる</button></div>`
+      + `<button class="linkbtn" id="rpg-lvmax"${upTo > d.lv ? '' : ' disabled'}>${T('上げられるだけ上げる')}</button></div>`
       + `<button type="button" class="rpg-next" id="rpg-next"><span class="rpg-next-k" aria-hidden="true">▸</span>`
       + `<span>${nx.text}${nx.warn ? `<small class="rpg-next-w">${nx.warn}</small>` : ''}</span></button>${towerHTML(d)}`
-      + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 国旗ガチャ${d.day.first && !d.day.free ? ' <small class="rpg-free">無料1回！</small>' : ''}</button>`
-        + '<button class="btn ghost" id="rpg-to-cards">🗂 仲間</button>'
-        + (SCREENS.includes('team') ? '<button class="btn ghost" id="rpg-to-team">⚔️ 編成</button>' : '') + '</div>' : '')
-      + (SCREENS.includes('rpgrank') ? '<button class="btn ghost rpg-to-rank" id="rpg-to-rank">🏆 冒険ランキング</button>' : '') + '</div>'
+      + (hasCards() ? `<div class="rpg-go"><button class="btn ghost" id="rpg-to-gacha">🎴 ${T('国旗ガチャ')}${d.day.first && !d.day.free ? ` <small class="rpg-free">${T('無料1回！')}</small>` : ''}</button>`
+        + `<button class="btn ghost" id="rpg-to-cards">🗂 ${T('仲間')}</button>`
+        + (SCREENS.includes('team') ? `<button class="btn ghost" id="rpg-to-team">⚔️ ${T('編成')}</button>` : '') + '</div>' : '')
+      + (SCREENS.includes('rpgrank') ? `<button class="btn ghost rpg-to-rank" id="rpg-to-rank">🏆 ${T('冒険ランキング')}</button>` : '') + '</div>'
       + `<div class="rpg-main"><div class="rpg-shares rpg-home-share" id="rpg-home-share" hidden></div>${chtabsHTML(d, ch)}<div class="rpg-amap" id="rpg-amap">${amapHTML(d, sel, nf, ch)}</div><div class="rpg-dgs" id="rpg-dgs">${list.map(g => plateHTML(d, g, sel)).join('')}</div>${earnHTML()}${dataHTML(true)}${debugHTML(d)}</div>`
       + `<div class="rpg-aside">${bountyHTML(d)}<div id="rpg-map"></div></div>`;
   };
@@ -926,7 +963,7 @@
     if ($('set-rpg')) $('set-rpg').checked = d.show !== false;
     // パネルを描いたあとに払ったバッジのコイン（badges.js の drill:result はこちらのあと）も「いま」に入れる
     const now = document.querySelector('#rpg-res .rpg-now');
-    if (now) now.textContent = `いま ${fmt(d.coins)}`;
+    if (now) now.textContent = T('いま {coins}', { coins: fmt(d.coins) });
     if (screen === 'rpg') renderHome();
     RPG.redraw(screen, d);   // ガチャ・仲間の画面（rpg-cards.js）・編成の画面（rpg-team.js）
   };
@@ -964,12 +1001,12 @@
 
     if (typeof homeEntry === 'function') homeEntry('home-rpg', { open: () => show('rpg') });   // ホームの入口は index.html にある（hidden で始まる）
     const chip = document.createElement('button');
-    chip.type = 'button'; chip.className = 'rpg-chip'; chip.id = 'rpg-chip'; chip.title = 'コイン（冒険へ）';
+    chip.type = 'button'; chip.className = 'rpg-chip'; chip.id = 'rpg-chip'; chip.title = T('コイン（冒険へ）');
     chip.onclick = () => show('rpg');
     ($('topbar-extra') || $('to-book')?.parentElement)?.prepend(chip);
     const field = document.createElement('div');
     field.className = 'field';
-    field.innerHTML = '<span class="lbl">冒険</span><label class="switch"><input type="checkbox" id="set-rpg"> 冒険（コイン・RPG）を表示する</label>';
+    field.innerHTML = `<span class="lbl">${T('冒険')}</span><label class="switch"><input type="checkbox" id="set-rpg"> ${T('冒険（コイン・RPG）を表示する')}</label>`;
     $('set-dopa')?.closest('.field')?.after(field);
     const sw = $('set-rpg');
     if (sw) sw.checked = get().show !== false;   // #settings の直リンクは rpg.js より前に設定を開く（その drill:screen は聞きのがす）
@@ -991,10 +1028,12 @@
   /* ---------- window.RPG ---------- */
   const RPG = window.RPG = {
     tx, get, emitCoins, announce, coinHTML, COIN,
+    // 表示の部品（ほかの rpg-*.js も使う）: 国名の並び・モンスター・ダンジョンの名前と land・編成の名前・コインの短い形・仲間などの行
+    names, monName, dgName, dgLand, teamLabel, teamSaveName, shortCoins, gainLines,
     get status() { return status; },
     get wrote() { return wrote; },             // 最後の tx の書きこみが届いたか
     get warn() { return WARN[status] || ''; },   // 保存の注意（新しい版のデータ・この端末では保存できない）。無ければ ''
-    refresh, open: HEADLESS ? () => {} : open, nextFloor, unlocked, snapshot,   // 画面なしのモードでは冒険の画面を開かない
+    refresh, open, nextFloor, unlocked, snapshot,
     opts: {},   // RPG.open で渡したもの（開いた画面が読む）
     // ここから下の6つは rpg-cards.js（仲間の世界地図・シェア・演出、ガチャと仲間の画面）が本物に入れかえる（cardHTML・openCard も足す）。
     // rpg-cards.js が読み込めなかったときは、地図・シェア・演出なしで冒険ホーム・クイズのコイン・バトル（の保存）が動く
@@ -1036,10 +1075,10 @@
   if (status === 'readOnly') notice(MSG.readOnly);
   base = get();
   showCache = base.show;
-  if (!HEADLESS) setupEntrances();   // 画面なしのモードでは画面・入口・チップ・設定のスイッチを作らない
+  setupEntrances();
   emit('rpg:ready', { intro: base.intro, lv: base.lv, coins: base.coins, owned: owned(base) });
   // 直リンク（index.html の起動処理は #rpg を知らないので、画面を登録したあとでここから開く）
-  if (location.hash === '#rpg' && !HEADLESS) show('rpg');
+  if (location.hash === '#rpg') show('rpg');
   // そのときはまだ後ろのスクリプト（rpg-cards.js のガチャ・仲間の入口と世界地図、badges.js の称号など）が無いので、読み込みが終わったらもう1回描く
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { if (document.body.dataset.screen === 'rpg') renderHome(); }, { once: true });
 })();

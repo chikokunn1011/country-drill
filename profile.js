@@ -428,8 +428,8 @@
     if (n !== meLoading || !r.ok || !box || now?.token !== p.token) return;
     box.innerHTML = cardHTML(myCard(now, r));
   };
-  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］（英語版は冒険の画面が無いあいだ＝I18N.hide の 'rpg' は出さない）
-  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function' && !I18N.hide.has('rpg'); };
+  // 冒険を始めていて、冒険を隠していなければ［冒険でかざりを選ぶ］
+  const canDeco = () => { const d = typeof window.RPG?.get === 'function' ? window.RPG.get() : null; return !!d?.intro && d.show !== false && typeof RPG.open === 'function'; };
   const field = (lbl, body) => `<div class="field"><span class="lbl">${lbl}</span>${body}</div>`;
   // プロフィール画面を開いたら、まだ使えるか確かめる（別の端末に引き継がれていたら not_found → lost で作るフォームに）
   const checkMe = async p => {
@@ -515,9 +515,9 @@
         + '<input id="pf-rename-in" type="text" autocomplete="nickname" enterkeyhint="done">'
         + `<button class="btn ghost" id="pf-rename">${T('変える')}</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>`
         + `<p class="hint">${T('ランキングの名前は、前の記録もふくめて新しい名前になるよ')}</p>` + NAME_NOTE)
-      // かざりは冒険で選ぶ。英語版は冒険（PR8）が無いあいだ、欄ごと出さない
-      + (EN && !canDeco() ? '' : field(T('かざり'), `<p class="hint">${T('冒険の仲間の国旗を3つまで、名前の横にかざれるよ')}</p>`
-        + (canDeco() ? `<button type="button" class="linkbtn pf-deco" id="pf-deco">${T('冒険でかざりを選ぶ')}</button>` : '')))
+      // かざりは冒険で選ぶ
+      + field(T('かざり'), `<p class="hint">${T('冒険の仲間の国旗を3つまで、名前の横にかざれるよ')}</p>`
+        + (canDeco() ? `<button type="button" class="linkbtn pf-deco" id="pf-deco">${T('冒険でかざりを選ぶ')}</button>` : ''))
       + field(T('設定'), `<label class="switch"><input type="checkbox" id="pf-public"> ${T('プロフィールを公開する')}</label>`
         + `<p class="hint">${T('オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ')}</p>`
         + `<label class="switch"><input type="checkbox" id="pf-auto"> ${T('記録をランキングに自動で載せる')}</label>`

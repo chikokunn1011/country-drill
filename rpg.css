@@ -113,6 +113,13 @@
   .rpg-chip { gap: 2px; padding: 2px 5px; }
   body:not(.rpg-off) #topbar:has(#rpg-chip) { gap: 6px; }
   body:not(.rpg-off) #topbar:has(#rpg-chip) .row:has(> #to-book) { gap: 4px; }
+  /* 英語は Gallery・Settings が長いので、チップがあるときは字とすき間をもう少しつめる（日本語は変えない） */
+  body:not(.rpg-off) #topbar:has(#rpg-chip):lang(en) { gap: 4px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) :is(.linkbtn, .rpg-chip):lang(en) { font-size: .82rem; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) .linkbtn:lang(en) { padding-inline: 2px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) .row:has(> #to-book):lang(en) { gap: 2px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) .rpg-chip:lang(en) { padding-inline: 4px; }
+  body:not(.rpg-off) #topbar:has(#rpg-chip) #brand small:lang(en) { letter-spacing: .04em; }
 }
 /* 設定の「冒険（コイン・RPG）を表示する」が OFF: ボタン・チップ・クイズ中のコインを出さない（コインは裏で貯まる） */
 body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !important; }
@@ -307,6 +314,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 .rpg-earn-t { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: .85rem; }
 .rpg-earn-t caption { text-align: left; font-size: .78rem; color: var(--muted); padding-bottom: 4px; }
 .rpg-earn-t :is(th, td) { text-align: left; vertical-align: top; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.rpg-earn-t th:lang(en) { text-transform: capitalize; }   /* 英語の列見出しの coins（チップと同じキー）を Coins に */
 .rpg-earn-t :is(th, td):last-child { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 #rpg-earn-go { margin-top: 10px; }
 

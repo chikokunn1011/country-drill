@@ -1,7 +1,7 @@
 // D2 アプリ化: オフラインでも遊べるように、サイトのファイルを端末に保存する service worker。
 // 一覧（PRECACHE）と版（VERSION）は tools/make_sw.mjs が書く。手で書かない（node tools/make_sw.mjs）
 // precache:start
-const VERSION = '17bb5260e224';
+const VERSION = 'dac02f716974';
 const PRECACHE = [
   "./",
   "index.html",
@@ -12,20 +12,20 @@ const PRECACHE = [
   "icons/apple-touch-icon.png",
   "manifest.webmanifest",
   "pc.css?v=7",
-  "rpg.css?v=23",
+  "rpg.css?v=24",
   "badges.css?v=2",
   "daily.css?v=2",
   "profile.css?v=3",
   "streak.css?v=2",
   "dojo.css?v=1",
-  "i18n.js?v=3",
+  "i18n.js?v=4",
   "countries.js?v=2",
   "themes.js?v=2",
   "ranking.js?v=6",
   "daily-core.js?v=2",
   "trivia.js",
   "sound.js?v=1",
-  "profile.js?v=9",
+  "profile.js?v=10",
   "rpg-core.js?v=16",
   "rpg.js?v=17",
   "rpg-cards.js?v=7",
