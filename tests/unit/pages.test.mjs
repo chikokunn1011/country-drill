@@ -1,5 +1,5 @@
 // 読み物のページ（privacy・about・howto）とフッターを、ファイルの文字のまま確かめる
-// （B1 の country/*.html も PAGES に入る。PR9 の embed.html は BLOCKS・PAGE_VARS・varsOf で変数を比べる）
+// （B1 の country/*.html と E1 の themes/*.html も PAGES に入る。PR9 の embed.html は BLOCKS・PAGE_VARS・varsOf で変数を比べる）
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -11,7 +11,8 @@ const read = p => readFileSync(new URL(p, root), 'utf8');
 
 // フッター（<!-- footer:start -->〜<!-- footer:end -->）を持つページ
 export const PAGES = ['index.html', 'privacy.html', 'about.html', 'howto.html',
-  ...readdirSync(new URL('country/', root)).filter(f => f.endsWith('.html')).sort().map(f => `country/${f}`)];
+  ...readdirSync(new URL('country/', root)).filter(f => f.endsWith('.html')).sort().map(f => `country/${f}`),
+  ...readdirSync(new URL('themes/', root)).filter(f => f.endsWith('.html')).sort().map(f => `themes/${f}`)];
 // 目印の間の href（先頭の ../ は外す）
 export const footerHrefs = html => {
   const m = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/.exec(html);
@@ -57,7 +58,7 @@ export const themeScript = html => {
 };
 
 test('footer_links_same', () => {
-  for (const p of PAGES) assert.deepEqual(footerHrefs(read(p)), ['howto.html', 'about.html', 'about.html#contact', 'privacy.html', 'country/'], p);
+  for (const p of PAGES) assert.deepEqual(footerHrefs(read(p)), ['howto.html', 'about.html', 'about.html#contact', 'privacy.html', 'country/', 'themes/'], p);
 });
 
 test('footer_not_in_admin', () => assert.ok(!read('admin.html').includes('footer:start')));

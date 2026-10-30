@@ -1,0 +1,21 @@
+/* themes.css — テーマ別のまとめ（themes/*.html）だけの決まり。pages.css・country/country.css のあとに読む。
+   色は pages.css の変数（3か所で定義）だけを使い、ここでは色の変数を作らない（tests/unit/theme-pages.test.mjs） */
+
+/* 数え方（決まりの文） */
+.trule { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+
+/* 似ている国旗: 1組ずつ */
+.sgroup { margin: 0 0 24px; }
+.sgroup h2 { font-size: 1rem; }
+.stip { margin: 8px 0 0; padding-left: 10px; border-left: 4px solid var(--accent); }
+
+/* 面積のランキング */
+.trank { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.trank th, .trank td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+.trank th { color: var(--muted); font-weight: 700; }
+.trank td:first-child, .trank td:last-child, .trank th:last-child { text-align: right; white-space: nowrap; }
+.trank img { display: block; width: 48px; height: auto; aspect-ratio: 4/3; object-fit: cover; border: 1px solid var(--line); background: var(--surface); }
+
+/* ほかのまとめ・入口 */
+.page .tothers { padding-left: 1.2em; columns: 2 12em; }
+.tindex small { color: var(--muted); }

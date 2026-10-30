@@ -8,15 +8,25 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const SITE = 'https://chikokunn1011.github.io/country-drill/';
+export const SITE = 'https://chikokunn1011.github.io/country-drill/';
 const OGP = SITE + 'icons/ogp.png';
 const TRIVIA_LABEL = { flag: '国旗', geo: '地理', culture: '文化' };
-const DESC_MAX = 120;
+export const DESC_MAX = 120;
 const FOOTER_RE = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/;
 const MARK_START = '<!-- country:start -->', MARK_END = '<!-- country:end -->';
 
-const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-const fmt = n => n.toLocaleString('en-US');   // 本編の fmt（ja-JP）と同じ3桁区切り
+export const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+export const fmt = n => n.toLocaleString('en-US');   // 本編の fmt（ja-JP）と同じ3桁区切り
+// 漢字をふくむ国名の読み（五十音順に並べるため）。漢字の国名はここに全部書く（tests/unit/theme-pages.test.mjs）
+export const KANA = {
+  ae: 'アラブシュチョウコクレンポウ', cd: 'コンゴミンシュキョウワコク', cf: 'チュウオウアフリカ', cg: 'コンゴキョウワコク', cn: 'チュウゴク',
+  dm: 'ドミニカコク', do: 'ドミニカキョウワコク', fm: 'ミクロネシアレンポウ', gq: 'セキドウギニア', jp: 'ニホン', kp: 'キタチョウセン',
+  kr: 'カンコク', mh: 'マーシャルショトウ', mk: 'キタマケドニア', sb: 'ソロモンショトウ', ss: 'ミナミスーダン', tl: 'ヒガシティモール',
+  us: 'アメリカガッシュウコク', vc: 'セントビンセントオヨビグレナディーンショトウ', za: 'ミナミアフリカ',
+};
+export const yomi = c => KANA[c.a] ?? c.n;
+// 国名の五十音順（読みで比べる。同じならコード順）
+export const byJa = (x, y) => yomi(x).localeCompare(yomi(y), 'ja') || (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 const byCode = (x, y) => (x.a < y.a ? -1 : x.a > y.a ? 1 : 0);
 const hasText = x => typeof x?.t === 'string' && x.t.trim() !== '';
 
@@ -64,15 +74,16 @@ const playHref = r => `../index.html#play=${encodeURIComponent(r)}`;
 // 似ている国（SIMILAR のグループの順、自分を除く。2つのグループに入っていても1回だけ）
 const similarOf = (inp, byA, a) => [...new Set(inp.SIMILAR.filter(g => g.includes(a)).flat())].filter(b => b !== a).map(b => byA.get(b));
 const flagSrc = (inp, a) => `../flags/${a}.svg?v=${inp.FLAG_V}`;
-const flagImg = (inp, a, alt, lazy) => `<img src="${flagSrc(inp, a)}" alt="${esc(alt)}" width="640" height="480"${lazy ? ' loading="lazy"' : ''}>`;
+export const flagImg = (inp, a, alt, lazy) => `<img src="${flagSrc(inp, a)}" alt="${esc(alt)}" width="640" height="480"${lazy ? ' loading="lazy"' : ''}>`;
 // フッター: 相対 href の頭に ../ を付ける（http・# で始まるものはそのまま）
-const footerHTML = inp => `<footer>
+export const footerHTML = inp => `<footer>
   <!-- footer:start -->
   ${inp.footer.replace(/href="(?!https?:|#)([^"]*)"/g, 'href="../$1"')}
   <!-- footer:end -->
 </footer>`;
 
-function head(inp, { title, description, url, crumbs }) {
+// css: 国のページは country.css。まとめページ（tools/make_theme_pages.mjs）はほかの css も渡す
+export function head(inp, { title, description, url, crumbs, css = ['country.css?v=1'] }) {
   const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList',
     itemListElement: crumbs.map(([name, item], i) => ({ '@type': 'ListItem', position: i + 1, name, item })) };
   return `<!doctype html>
@@ -108,7 +119,7 @@ ${inp.fontLink}
 ${inp.themeScript}
 </script>
 <link rel="stylesheet" href="../pages.css?v=${inp.PAGES_V}">
-<link rel="stylesheet" href="country.css?v=1">
+${css.map(h => `<link rel="stylesheet" href="${h}">`).join('\n')}
 </head>
 `;
 }

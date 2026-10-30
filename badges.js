@@ -935,6 +935,7 @@
     else return;
     store.set('setup', P);
     $('detail').close();
+    window.leaveTheme?.();   // まとめページのテーマ（index.html の THEME）が残っていると、選んだ地域ではなくテーマで出題してしまう
     show('setup');
   }
   // 取った一番上の段で文を作る。navigator.share が無ければクリップボードにコピーする。btn は押した［シェア］

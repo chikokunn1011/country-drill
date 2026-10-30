@@ -162,6 +162,20 @@ t('lose_no_revive_practice', async page => {
   assert.equal(await phase(page), null);
 });
 
+// まとめページのテーマ（index.html の THEME）が残っていても、［この地域を練習する］はテーマをやめてその地域で開く
+t('practice_leaves_theme', async page => {
+  await writeSave(page, saveWith({}));
+  await page.evaluate(() => { const d = THEMES_DATA.stars; THEME = { id: 'stars', n: d.n, a: new Set(d.a) }; history.replaceState(null, '', '#theme=stars'); });
+  await startBattle(page, 'samerica', 1);
+  for (let i = 0; i < 4; i++) await battleAnswer(page, false);
+  assert.equal(await phase(page), 'end');
+  await page.click('#bt-practice');
+  assert.equal(await page.isVisible('#scr-setup'), true);
+  assert.deepEqual(await page.evaluate(() => [S.region, THEME, location.hash]), ['南アメリカ', null, '']);
+  assert.equal(await page.isVisible('#theme-field'), false);
+  assert.equal(await page.getAttribute('#regions .chip[data-r="南アメリカ"]', 'aria-pressed'), 'true');
+});
+
 t('gauge_shows_and_resets', async page => {
   await writeSave(page, saveWith({ gauge: { 'samerica:1': 2 } }));
   await page.evaluate(() => RPG_BATTLE.start('samerica', 1));

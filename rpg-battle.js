@@ -515,6 +515,7 @@
   const practice = () => {
     S.region = B.dg.ch === 3 ? 'all' : B.dg.r; store.set('settings', S);   // 宇宙は地域で絞らない（前に選んでいた地域ではなく全世界で練習する）
     P.kind = 'practice'; store.set('setup', P);
+    window.leaveTheme?.();   // まとめページのテーマ（index.html の THEME）が残っていると、この地域ではなくテーマで出題してしまう
     show('setup');
   };
 
