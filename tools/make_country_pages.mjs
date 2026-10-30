@@ -320,13 +320,19 @@ ${footerHTML(inp)}
 }
 
 // ---- 英語のページ（en/country/）。文はこの表に書く（ブラウザの辞書は使わない）。豆知識の節は出さない ----
+// 「of」のあとに置く英語の国名（the を付ける）。e が "The " で始まれば小文字に、THE_NAMES にあれば "the " を付ける。
+// 見出し・一覧・リンクの文字は e のまま。THE_NAMES は countries.js の e から選んだもの（複数形・Republic・Islands・United など）
+export const THE_NAMES = new Set(['Central African Republic', 'Comoros', 'Czech Republic', 'Democratic Republic of the Congo', 'Dominican Republic',
+  'Federated States of Micronesia', 'Maldives', 'Marshall Islands', 'Netherlands', 'Philippines', 'Republic of the Congo', 'Seychelles',
+  'Solomon Islands', 'United Arab Emirates', 'United Kingdom', 'United States', 'Vatican City']);
+export const theName = e => (e.startsWith('The ') ? 'the ' + e.slice(4) : THE_NAMES.has(e) ? 'the ' + e : e);
 export const EN = {
   site: 'Flag Master',
   back: '← Play Flag Master',
   crumbsLabel: 'Breadcrumb',
   allCountries: 'All countries',
-  title: e => `Flag of ${e} – Meaning & Neighbors | Flag Master`,
-  flagAlt: e => `Flag of ${e}`,
+  title: e => `Flag of ${theName(e)} – Meaning & Neighbors | Flag Master`,
+  flagAlt: e => `Flag of ${theName(e)}`,
   region: 'Region', area: 'Area', capital: 'Capital', iso: 'ISO',
   meaning: 'What the flag means',
   neighbors: 'Neighboring countries',
@@ -339,10 +345,10 @@ export const EN = {
   play: 'Play Flag Master',
   book: 'See it in the Gallery',
   prevnextLabel: r => `Previous and next countries in ${r}`,
-  descHead: (e, s) => `Flag of ${e}: ${s}`,
-  descRegion: (e, r) => `${e} (${r}): flag, capital, area and neighbors.`,
+  descHead: (e, s) => `Flag of ${theName(e)}: ${s}`,
+  descRegion: (e, r) => `${e} (${r}): flag, capital, area, and neighbors.`,
   descSimilar: names => `Similar flags: ${names.join(', ')}.`,
-  descTail: 'Learn flags, names and locations with the Flag Master quiz.',
+  descTail: 'Learn flags, names, and locations with the Flag Master quiz.',
   indexTitle: n => `All countries (${n} flags) | Flag Master`,
   indexDesc: n => `Flags and names of all ${n} countries in the world, grouped into six regions. Choose a country to see its capital, area, neighbors, and similar flags.`,
   indexLead: n => `Flags and names of all ${n} countries. Choose a country to see its capital, area, neighbors, and more.`,

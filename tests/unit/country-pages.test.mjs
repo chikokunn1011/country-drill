@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-import { readInputs, check, render, neighborsOf, byJa } from '../../tools/make_country_pages.mjs';
+import { readInputs, check, render, neighborsOf, byJa, theName, THE_NAMES } from '../../tools/make_country_pages.mjs';
 import { JA_RE } from '../../tools/i18n_scan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -382,12 +382,12 @@ test('en_country_head', () => {            // 196枚。lang・title・canonical�
   }
   for (const c of C) {
     const h = read(`en/country/${c.a}.html`);
-    assert.equal(unesc(attr(h, /<title>([^<]*)<\/title>/)), `Flag of ${c.e} – Meaning & Neighbors | Flag Master`, c.a);
+    assert.equal(unesc(attr(h, /<title>([^<]*)<\/title>/)), `Flag of ${theName(c.e)} – Meaning & Neighbors | Flag Master`, c.a);
     const first = /^[\s\S]*?[.!?]["”)]?(?=\s+[A-Z"“(]|$)/.exec(MEANING_EN.get(c.a))[0];
-    const d = desc(h), head = `Flag of ${c.e}: ${first}`;
+    const d = desc(h), head = `Flag of ${theName(c.e)}: ${first}`;
     assert.ok(head.length <= 160 ? d.startsWith(head) : d.endsWith('…') && head.startsWith(d.slice(0, -1)), c.a);
   }
-  assert.equal(desc(read('en/country/fr.html')), `Flag of France: ${MEANING_EN.get('fr').split('. ')[0]}. France (Europe): flag, capital, area and neighbors. Similar flags: Netherlands, Luxembourg, Paraguay.`);
+  assert.equal(desc(read('en/country/fr.html')), `Flag of France: ${MEANING_EN.get('fr').split('. ')[0]}. France (Europe): flag, capital, area, and neighbors. Similar flags: Netherlands, Luxembourg, Paraguay.`);
 });
 
 test('en_country_content', () => {
@@ -458,4 +458,19 @@ test('en_country_no_japanese', () => {     // 見える文字に日本語が無�
     assert.doesNotMatch(desc(h), JA_RE, p);
     assert.doesNotMatch(JSON.stringify(ldJson(h)), JA_RE, p);
   }
+});
+
+test('en_the_name', () => {                // 「Flag of」のあとは the を付ける国がある。h1・一覧は e のまま
+  const us = read('en/country/us.html');
+  assert.ok(us.includes('<title>Flag of the United States – Meaning &amp; Neighbors | Flag Master</title>'));
+  assert.ok(us.includes('alt="Flag of the United States"') && us.includes('<h1>United States</h1>'));
+  assert.ok(desc(us).startsWith('Flag of the United States: '));
+  const bs = read('en/country/bs.html');
+  assert.ok(bs.includes('<title>Flag of the Bahamas – Meaning &amp; Neighbors | Flag Master</title>') && bs.includes('<h1>The Bahamas</h1>'));
+  assert.equal(theName('The Gambia'), 'the Gambia');
+  assert.equal(theName('France'), 'France');
+  // 名前に Republic・Islands・United・States のある国は、みな THE_NAMES に入っている。THE_NAMES は e にある名前だけ
+  const es = new Set(C.map(c => c.e));
+  for (const e of es) if (/Republic|Islands|United|States/.test(e)) assert.ok(THE_NAMES.has(e), e);
+  for (const e of THE_NAMES) assert.ok(es.has(e), e);
 });
