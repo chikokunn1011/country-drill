@@ -24,7 +24,40 @@ const load = (src, name) => { const ctx = { window: {} }; vm.runInNewContext(src
 
 // 数の確かめ（trivia_en_numbers）の例外。id → 理由。
 // 入れるときは「確かめた AI の名前: 理由」を書く（例: 'xx-1': 'B1 確かめ1（<AI>）: 1億2000万 → 120 million と書くため'）
-const NUM_OK = {};
+const NUM_OK = {
+  'mm-1': '数の確かめの総ざらい: 横3色 → yellow, green, and red horizontal stripes（3つの色を並べて言うので数字の 3 が無い）',
+  'ph-3': '数の確かめの総ざらい: フェリペ2世 → Philip II（王の何世はローマ数字）',
+  'ro-3': '数の確かめの総ざらい: ヴラド3世 → Vlad III（何世はローマ数字）',
+  'sg-2': '数の確かめの総ざらい: 2割以上 → more than 20%（割を % にする）',
+  'tj-2': '数の確かめの総ざらい: 9割以上 → more than 90%（割を % にする）',
+  'bw-2': '数の確かめの総ざらい: 約7割 → about 70%（割を % にする）',
+  'mc-3': '数の確かめの総ざらい: F1 → Formula One（英語の正式な名前）',
+  'bf-4': '数の確かめの総ざらい: 2年に1度 → once every 2 years（1度 は once）',
+};
+
+// 日本語の「N月」は英語の月の名前（2月21日 → February 21）で言うので、英語にその月の名前があれば数として数えない
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function jaNumbers(ja, en) {
+  const z = String(ja).replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+  return numbersOf(z.replace(/(?<![\d.,])(\d{1,2})月/g, (m, n) => {
+    const name = MONTHS[Number(n) - 1];
+    return name && new RegExp(`\\b${name}\\b`).test(en) ? '月' : m;
+  }));
+}
+
+// 文の終わり: . か、かぎかっこを閉じる前の .（アメリカ式の “… .”）
+const endsWithPeriod = t => t.endsWith('.') || t.endsWith('.”');
+
+// 唯一／最大／初めて／最も の英語の言い方。
+// only・first・largest など、the／its／’s の後の -est の形（the busiest）、方角の -most（westernmost）、more … than any other
+const NOT_EST = 'west|rest|test|forest|interest|harvest|contest|request|protest|conquest|quest|guest|nest|chest|vest|crest|honest|modest|southwest|northwest|midwest|everest|arrest|suggest|digest|invest|manifest|attest';
+const SUPERLATIVE_RE = new RegExp(
+  '\\b(only|first|largest|smallest|highest|longest|oldest|most|biggest|tallest|deepest|lowest|fewest|earliest|least)\\b'
+  + '|world’s|in the world'
+  + `|\\b(?:the|its|their)\\s+(?!(?:${NOT_EST})\\b)[a-z]{2,}est\\b`
+  + '|’s\\s+(?!(?:' + NOT_EST + ')\\b)[a-z]{2,}est\\b'
+  + '|\\b(?:north|south|east|west)(?:ern)?most\\b|\\b(?:upper|inner|outer|utter|top)most\\b'
+  + '|\\b(?:more|fewer|less)\\b[^.]*?\\bthan any other\\b', 'i');
 
 // tools と data だけを写した一時のルートで fn を動かす（CLI が本物の英訳を書きかえないように）
 function withTmpRoot(fn) {
@@ -76,7 +109,7 @@ test('trivia_en_text_rules', () => {
     assert.equal(typeof t, 'string', `${id} の t`);
     assert.ok(t.length >= 15 && t.length <= 200, `${id} の t は15〜200字（${t.length}字）`);
     assert.ok(!JA_RE.test(t), `${id} に日本語: ${t}`);
-    assert.ok(t.endsWith('.'), `${id} が . で終わらない: ${t}`);
+    assert.ok(endsWithPeriod(t), `${id} が . か .” で終わらない: ${t}`);
     assert.ok(!/[?{}'"]/.test(t), `${id} に ? { } ' " のどれか: ${t}`);
     assert.equal(t, t.trim(), `${id} の前後に空白`);
     assert.ok(!/\s\s/.test(t), `${id} に2つ続く空白`);
@@ -94,11 +127,27 @@ test('trivia_en_numbers_fixture', () => {
   assert.deepEqual(numbersOf('数字なし'), []);
 });
 
+test('trivia_en_rules_fixture', () => {
+  assert.ok(endsWithPeriod('Means “low land.”'));
+  assert.ok(endsWithPeriod('Plain.'));
+  assert.ok(!endsWithPeriod('Means “low land”'));
+  assert.ok(!endsWithPeriod('Ends “inside.” then'));
+  assert.deepEqual(jaNumbers('2月21日の記念日', 'on February 21'), ['21']);
+  assert.deepEqual(jaNumbers('毎年8月', 'Every August'), []);
+  assert.deepEqual(jaNumbers('2月21日の記念日', 'on day 21'), ['2', '21'], '月の名前が無ければ数のまま');
+  assert.deepEqual(jaNumbers('3月に3回', 'three times in March'), ['3'], '月の分だけ消す');
+  assert.deepEqual(jaNumbers('2か月', 'for 2 months'), ['2'], 'か月は月の名前でない');
+  for (const s of ['more times than any other country', 'the only country', 'the first to', 'the largest lake', 'the busiest port', 'Europe’s coldest city', 'the westernmost point', 'the world’s tallest'])
+    assert.match(s, SUPERLATIVE_RE, s);
+  for (const s of ['in the west of the country', 'a dense forest', 'a big lake', 'more than 100 islands', 'with great interest', 'almost 100 islands', 'best known for its tea'])
+    assert.doesNotMatch(s, SUPERLATIVE_RE, s);
+});
+
 test('trivia_en_numbers', () => {
   EN.forEach((r, i) => {
     if (NUM_OK[r.id]) return;
     const have = new Set(numbersOf(r.t));
-    for (const n of numbersOf(JA[i].t)) assert.ok(have.has(n), `${r.id}: 日本語の数 ${n} が英語に無い: ${r.t}`);
+    for (const n of jaNumbers(JA[i].t, r.t)) assert.ok(have.has(n), `${r.id}: 日本語の数 ${n} が英語に無い: ${r.t}`);
   });
 });
 
@@ -115,7 +164,7 @@ test('trivia_en_hedges', () => {
 test('trivia_en_superlatives', () => {
   EN.forEach((r, i) => {
     if (/唯一|世界で|世界一|最[大小高長古多深低]|いちばん|一番|初めて|最初/.test(JA[i].t)) {
-      assert.match(r.t, /\b(only|first|largest|smallest|highest|longest|oldest|most|biggest|tallest|deepest|lowest|fewest|earliest)\b|world’s|in the world/i, `${r.id}: 唯一／最大／初めて が消えた: ${r.t}`);
+      assert.match(r.t, SUPERLATIVE_RE, `${r.id}: 唯一／最大／初めて が消えた: ${r.t}`);
     }
   });
 });
