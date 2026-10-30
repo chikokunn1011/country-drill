@@ -17,6 +17,7 @@ const read = p => readFileSync(join(ROOT, p), 'utf8');
 const load = (file, name) => { const ctx = { window: {} }; vm.runInNewContext(read(file), ctx); return ctx.window[name]; };
 const C = load('countries.js', 'COUNTRIES');
 const TRIVIA = load('trivia.js', 'TRIVIA');
+const TRIVIA_EN = load('trivia-en.js', 'TRIVIA');
 const SIMILAR = (() => { const ctx = {}; vm.runInNewContext(read('daily-core.js'), ctx); return ctx.DAILY_CORE.SIMILAR; })();
 const FLAG_V = +/const FLAG_V = (\d+);/.exec(read('index.html'))[1];
 
@@ -53,13 +54,14 @@ function withTmp(fn) {
 }
 // 生成スクリプトが読むものを一時の root に写す
 const copyInputs = dir => {
-  for (const f of ['countries.js', 'trivia.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
+  for (const f of ['countries.js', 'trivia.js', 'trivia-en.js', 'daily-core.js', 'index.html', 'privacy.html', 'sitemap.xml', 'world.js']) cpSync(join(ROOT, f), join(dir, f));
   for (const d of ['flags', 'themes', 'en/themes']) cpSync(join(ROOT, d), join(dir, d), { recursive: true });
   for (const f of ['en/index.html', 'i18n/en-core.js', 'data/en/flag_meanings.json']) { mkdirSync(dirname(join(dir, f)), { recursive: true }); cpSync(join(ROOT, f), join(dir, f)); }
   for (const f of ['neighbors_fix.json', 'flag_meanings.json']) cpSync(join(ROOT, 'data', f), join(dir, 'data', f));
 };
 const edit = (dir, f, fn) => writeFileSync(join(dir, f), fn(readFileSync(join(dir, f), 'utf8')));
 const setTrivia = (dir, a, list) => edit(dir, 'trivia.js', () => `window.TRIVIA = ${JSON.stringify({ ...TRIVIA, [a]: list })};\n`);
+const setTriviaEn = (dir, a, list) => edit(dir, 'trivia-en.js', () => `window.TRIVIA = ${JSON.stringify({ ...TRIVIA_EN, [a]: list })};\n`);
 const similarAdd = code => dir => edit(dir, 'daily-core.js', s => s.replace("'qa bh',", `'qa bh ${code}',`));
 const triviaEmpty = a => dir => setTrivia(dir, a, []);
 const rmFlag = a => dir => rmSync(join(dir, 'flags', `${a}.svg`));
@@ -409,10 +411,9 @@ test('en_country_content', () => {
   assert.ok(h.includes(`<a class="play-region" href="../#play=${encodeURIComponent('西ヨーロッパ')}">Play this region: Western Europe</a>`));
   assert.ok(h.includes('<a href="../">Play Flag Master</a>') && h.includes('<a href="../#book">See it in the Gallery</a>'));
   assert.ok(!h.includes('index.html#'));
-  assert.ok(!/豆知識|Trivia/i.test(h) && !h.includes('class="trivia"'));
-  // 並び: 国旗 → 地域など → 意味 → となり → 似ている → まとめ → 遊ぶ → 前後 → フッター
+  // 並び: 国旗 → 地域など → 意味 → 豆知識 → となり → 似ている → まとめ → 遊ぶ → 前後 → フッター（日本語のページと同じ）
   const at = s => { const i = h.indexOf(s); assert.ok(i >= 0, s); return i; };
-  const order = ['class="cflag"', 'class="cfacts"', '<h2>What the flag means</h2>', '<h2>Neighboring countries</h2>', '<h2>Look-alike flags</h2>',
+  const order = ['class="cflag"', 'class="cfacts"', '<h2>What the flag means</h2>', '<h2>Fun facts</h2>', '<h2>Neighboring countries</h2>', '<h2>Look-alike flags</h2>',
     '<h2>Flag collections with this flag</h2>', 'class="cplay"', 'class="prevnext"', '<footer>'].map(at);
   assert.deepEqual(order, [...order].sort((x, y) => x - y));
   assert.ok(hrefsIn(h, 'ul.cthemes').includes('../themes/vtricolor.html'));
@@ -436,6 +437,41 @@ test('en_country_content', () => {
     assert.ok(sec.includes(`href="../#play=${encodeURIComponent(r)}"`), r);
   }
 });
+
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const TRIVIA_LABEL_EN = { flag: 'Flag', geo: 'Geography', culture: 'Culture' };
+
+test('en_country_trivia', () => {          // 英語のページに Fun facts。英訳のファイルの順で全件、意味のあと・となりの前。日本語の豆知識は出さない
+  const h = read('en/country/fr.html');
+  const facts = JSON.parse(read('data/en/trivia_facts.json')).filter(x => x.a === 'fr');
+  assert.equal(facts.length, 4);
+  const want = facts.map(x => `    <li><span class="tv-k">${TRIVIA_LABEL_EN[x.k]}</span>${escHtml(x.t)}</li>`).join('\n');
+  assert.ok(h.includes(`  <h2>Fun facts</h2>\n  <ul class="trivia">\n${want}\n  </ul>\n`));
+  const i = h.indexOf('<h2>Fun facts</h2>');
+  assert.ok(h.indexOf('<h2>What the flag means</h2>') < i && i < h.indexOf('<h2>Neighboring countries</h2>'));
+  for (const x of TRIVIA.fr) assert.ok(!h.includes(escHtml(x.t)), x.t);
+  for (const c of C) {
+    const p = read(`en/country/${c.a}.html`);
+    assert.equal(count(p, /<h2>Fun facts<\/h2>/g), 1, c.a);
+    assert.equal(count(between(p, '<ul class="trivia">', '</ul>'), /<li>/g), TRIVIA_EN[c.a].length, c.a);
+  }
+  // title・description は変えない（豆知識の語を足さない）
+  assert.equal(attr(h, /<title>([^<]*)<\/title>/), 'Flag of France: meaning and neighbors | Flag Master');
+  assert.ok(!/fun facts|trivia/i.test(desc(h)));
+});
+
+test('en_country_trivia_escape', () => withTmp(dir => {   // 英語の豆知識に `<b>&"x` → &lt;b&gt;&amp;&quot;x、<b> タグは無い
+  copyInputs(dir); setTriviaEn(dir, 'fr', [{ k: 'flag', t: '<b>&"x' }]);
+  const h = render(readInputs(dir))['en/country/fr.html'];
+  assert.ok(h.includes('<li><span class="tv-k">Flag</span>&lt;b&gt;&amp;&quot;x</li>')); assert.ok(!h.includes('<b>&'));
+}));
+
+test('en_country_trivia_missing', () => withTmp(dir => {   // ある国の英語の豆知識が空 → 止まる。何も書かない
+  copyInputs(dir); setTriviaEn(dir, 'fr', []);
+  const r = spawnSync('node', ['tools/make_country_pages.mjs', '--root', dir, '--out', dir], { cwd: ROOT, encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stderr); assert.match(r.stderr, /英語の豆知識が0件: fr/);
+  assert.ok(!existsSync(join(dir, 'en/country')));
+}));
 
 test('en_prevnext_edges', () => {          // 同じ6地域の中で e の ABC 順。端に前・次は無い
   const { REGIONS } = readInputs(ROOT);
