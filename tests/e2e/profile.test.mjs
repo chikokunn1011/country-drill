@@ -142,6 +142,16 @@ t('toggles', async (page, { db }) => {
   assert.equal((await stored(page, 'profile')).auto, false);
 });
 
+// 日本語版のかざりの欄は、冒険を始めていなくても出す（英語版だけ、冒険が無いあいだは隠す）
+t('deco field shown on ja', async (page, { db }) => {
+  await openWithProfile(page, db);
+  await openProfile(page);
+  assert.equal(await page.evaluate(() => !!RPG.get()?.intro), false);   // 冒険を始めていない（［冒険でかざりを選ぶ］は出ない）
+  assert.equal(await page.locator('#pf-deco').count(), 0);
+  assert.deepEqual(await page.locator('#pf-main .field > .lbl').allInnerTexts(), ['名前を変える', 'かざり', '設定']);
+  assert.match(await text(page, '#pf-main'), /冒険の仲間の国旗を3つまで、名前の横にかざれるよ/);
+});
+
 t('rename', async (page, { db }) => {
   await openWithProfile(page, db);
   await openProfile(page);

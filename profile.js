@@ -238,19 +238,22 @@
   };
 
   // ---- 結果画面の「載せる」箱 ----
-  // send(token) は Promise<{ ok, reason?, text? }>（text は載せたときの文）。箱を描いた時点でプロフィールがあって自動 ON ならすぐ送る、そうでなければ［載せる］、
+  // send(token) は Promise<{ ok, reason?, text?, html? }>（text は載せたときの文。名前などを data-ugc で包みたいときは、esc 済みの html で渡す）。箱を描いた時点でプロフィールがあって自動 ON ならすぐ送る、そうでなければ［載せる］、
   // 無ければ名前の入力と［プロフィールを作って載せる］。失敗はわけと［もう一回送る］。not_found ならプロフィールを消して描き直す。
   // 自動で送るのは描いた時点だけ。あとでほかの場所でプロフィールを作った・自動を ON にしたときは描き直すだけ（載せないままにした記録を、見ていないところで送らない）
   // next() は載せたあとにフォーカスを移す先（TA の［ランキングを見る］など。無い・隠れていれば状態の文。キーボードで来たときは枠が出る）
   const postBox = (el, { label = T('ランキングに載せる？'), send, next }) => {
     // state: idle（まだ）・busy（作っている・送っている）・fail（失敗。msg にわけ）・done（載せた。msg に文）
+    // msg は状態の文の HTML（say は文を esc して、sayHTML は esc 済みの HTML をそのまま）
     const st = { state: 'idle', msg: '', input: null };
-    const say = (text, cls = '') => { st.msg = text; st.cls = cls; };
+    const sayHTML = (html, cls = '') => { st.msg = html; st.cls = cls; };
+    const say = (text, cls = '') => sayHTML(esc(text), cls);
     // 外枠と状態の文（role=status）は1回だけ作り、あとは文だけ書きかえる（差し込み直した live region は読み上げられないことがあるので）。
     // 中身は状態の文の前（body: 入力や［載せる］）と後ろ（tail: ヒント）。どちらも display: contents なので並びは外枠の flex のまま
     el.innerHTML = '<div class="tabox pf-post"><div class="pf-post-body"></div><p class="tamsg" role="status" tabindex="-1"></p><div class="pf-post-tail"></div></div>';
     const body = el.querySelector('.pf-post-body'), msg = el.querySelector('[role=status]'), tail = el.querySelector('.pf-post-tail');
     let shown = null;   // いま body に出している形（同じなら作り直さない。入力の途中を消さない）
+    let said = '';      // いま状態の文に出している HTML（同じなら書きかえない）
     // 状態の文は、空のままページに入ってから少し待って書く（自動 ON で描いてすぐの「送信中…」を、中身ごと差し込んだ扱いにしない）。
     // 待つあいだに文のある状態になったら、文と中身がずれないように描くのもまとめて待つ
     let live = false;
@@ -261,7 +264,7 @@
       // 押したボタン・入力欄が箱の中にあったか（描き直しで消える前に見る）
       const had = el.contains(document.activeElement);
       msg.className = `tamsg ${st.cls ?? ''}`;
-      if (msg.textContent !== st.msg) msg.textContent = st.msg;
+      if (said !== st.msg) { said = st.msg; msg.innerHTML = st.msg; }
       const kind = st.state === 'done' || st.state === 'busy' ? 'none' : st.state === 'fail' && p ? 'retry' : !p ? 'form' : `send:${p.name}`;
       if (kind !== shown) {
         shown = kind;
@@ -290,7 +293,7 @@
       st.state = 'busy'; say(T('送信中…')); draw();
       let r;
       try { r = await send(p.token); } catch (e) { console.warn('[profile] send', e); r = { ok: false, reason: 'network' }; }
-      if (r.ok) { st.state = 'done'; say(r.text ?? T('載せたよ！'), 'ok'); draw(); return; }
+      if (r.ok) { st.state = 'done'; if (r.html != null) sayHTML(r.html, 'ok'); else say(r.text ?? T('載せたよ！'), 'ok'); draw(); return; }
       if (r.reason === 'not_found') { st.state = 'idle'; say(''); lost(p.token); draw(); return; }   // lost が描き直しを呼ぶが、箱は自分で
       st.state = 'fail'; say(RANKING.message(r.reason), 'ng'); draw();
     };
@@ -511,8 +514,9 @@
         + '<input id="pf-rename-in" type="text" autocomplete="nickname" enterkeyhint="done">'
         + `<button class="btn ghost" id="pf-rename">${T('変える')}</button></div></form><p class="tamsg" id="pf-rename-msg" role="status"></p>`
         + `<p class="hint">${T('ランキングの名前は、前の記録もふくめて新しい名前になるよ')}</p>` + NAME_NOTE)
-      + field(T('かざり'), `<p class="hint">${T('冒険の仲間の国旗を3つまで、名前の横にかざれるよ')}</p>`
-        + (canDeco() ? `<button type="button" class="linkbtn pf-deco" id="pf-deco">${T('冒険でかざりを選ぶ')}</button>` : ''))
+      // かざりは冒険で選ぶ。英語版は冒険（PR8）が無いあいだ、欄ごと出さない
+      + (EN && !canDeco() ? '' : field(T('かざり'), `<p class="hint">${T('冒険の仲間の国旗を3つまで、名前の横にかざれるよ')}</p>`
+        + (canDeco() ? `<button type="button" class="linkbtn pf-deco" id="pf-deco">${T('冒険でかざりを選ぶ')}</button>` : '')))
       + field(T('設定'), `<label class="switch"><input type="checkbox" id="pf-public"> ${T('プロフィールを公開する')}</label>`
         + `<p class="hint">${T('オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ')}</p>`
         + `<label class="switch"><input type="checkbox" id="pf-auto"> ${T('記録をランキングに自動で載せる')}</label>`

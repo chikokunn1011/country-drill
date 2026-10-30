@@ -173,6 +173,41 @@ t('en_card_other_ja', async (page, { db }) => {
   await dlg.locator('button', { hasText: 'Close' }).click();
 });
 
+// 冒険（PR8）が無いあいだ、英語版のプロフィール画面にかざりの欄は出さない。はじめの文も冒険のランキングを約束しない
+t('en_profile_no_decorations', async (page, { db }) => {
+  await openProfile(page);
+  assert.equal(await text(page, '#pf-main .pf-lead'), 'With a profile, your name appears on the Time Attack and Daily Puzzle leaderboards.');
+  assert.doesNotMatch(await text(page, '#pf-main'), /Adventure/);
+  await openWithProfile(page, db);
+  await openProfile(page);
+  await page.locator('#pf-me').waitFor();
+  assert.deepEqual(await page.locator('#pf-main .field > .lbl').allInnerTexts(), ['Change nickname', 'Settings']);
+  assert.doesNotMatch(await text(page, '#pf-main'), /Decorations|Adventure/);
+  assert.deepEqual(await jaLeft(page), []);
+});
+
+// 日本語のニックネームで載せた知らせ（結果の「載せる」箱）: 名前は data-ugc の中、ほかは英語
+t('en_post_ja_name', async (page, { db }) => {
+  await openWithProfile(page, db, { name: 'チコ' });
+  await mapLoaded(page);
+  await startDailyEn(page);
+  await answerWrong(page);
+  await page.click('#next');
+  await page.locator('#dl-post .tamsg.ok').waitFor();
+  assert.equal(await text(page, '#dl-post .tamsg'), 'Posted as チコ! #1 today');
+  assert.equal(await page.locator('#dl-post .tamsg [data-ugc]').innerText(), 'チコ');
+  assert.deepEqual(await jaLeft(page), []);
+  // 自動で載せないとき: ［Post as チコ］の名前も data-ugc
+  await page.evaluate(() => PROFILE.setAuto(false));
+  await page.evaluate(() => show('home'));
+  await clearTimeAttack(page);
+  await page.locator('#ta-post [data-pf="send"] [data-ugc]', { hasText: 'チコ' }).waitFor();
+  assert.deepEqual(await jaLeft(page), []);
+  await page.click('#ta-post [data-pf="send"]');
+  await page.locator('#ta-post .tamsg.ok').waitFor();
+  assert.deepEqual(await jaLeft(page), []);
+});
+
 // 日本語版でつけた称号・バッジの数を、英語版の同期が消さない（英語版は badges.js を読まない）
 t('en_sync_keeps_title', async (page, { db }) => {
   // 日本語版で称号とバッジの数を送ったあとの状態
@@ -418,7 +453,7 @@ t('en_daily_local_time', async page => {
 t('en_daily_local_time_yesterday', async page => {
   await page.click('#home-daily');
   assert.equal(await text(page, '#dl-main .dl-result > .hint:first-child'),
-    'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time (11:30 AM your time)');
+    'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time (11:30 AM your time).');
   assert.equal(await text(page, '#dl-main .dl-ans summary'), 'Yesterday’s questions and answers');
   assert.equal(await text(page, '#dl-start'), 'Play today’s puzzle');
   await page.locator('#dl-rank', { hasText: 'Would rank' }).waitFor();
@@ -437,7 +472,7 @@ t('en_daily_local_time_tokyo', async page => {
 
 t('en_daily_local_time_tokyo_yesterday', async page => {
   await page.click('#home-daily');
-  assert.equal(await text(page, '#dl-main .dl-result > .hint:first-child'), 'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time');
+  assert.equal(await text(page, '#dl-main .dl-result > .hint:first-child'), 'Yesterday’s (Oct 29) result. You can post it until 12:30 AM Japan time.');
 }, { timezoneId: 'Asia/Tokyo', init: at('2026-10-29T15:10:00Z'),
   storage: { badges: QUIET_BADGES, daily: { day: '2026-10-29', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
 
@@ -485,6 +520,14 @@ t('en_daily_board_no_profile', async (page, { db }) => {
   assert.equal(await page.locator('#dl-list .nick [data-ugc]', { hasText: 'たろう' }).count(), 1);
   assert.deepEqual(await jaLeft(page), []);
 }, { blockScripts: ['profile.js'] });
+
+// profile.js が無いときの「読み直して」の文
+t('en_daily_reload_note', async page => {
+  await page.click('#home-daily');
+  assert.equal(await text(page, '#dl-main .tamsg.ng'), 'To post to the leaderboard, please reload the page.');
+  assert.deepEqual(await jaLeft(page), []);
+}, { init: at('2026-10-30T03:00:00Z'), blockScripts: ['profile.js'],
+  storage: { badges: QUIET_BADGES, daily: { day: '2026-10-30', sid: 'x', status: 'done', outcome: 'fail', correct: 5, timeMs: 9000, sent: null } } });
 
 // 英語で挑戦した結果が、同じ端末の日本語版の今日の難問に「挑戦ずみ」で出る。日本語版からは挑戦できない
 t('en_daily_shared', async page => {

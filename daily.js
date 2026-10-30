@@ -140,7 +140,7 @@
       const head = clear ? T('全問正解！') : r.outcome === 'quit' ? T('とちゅうでやめた') : T('ここまで！');
       const big = clear ? `<span>${RANKING.formatTime(r.timeMs)}</span>` : `${r.correct}<small>${T(' / {n} 問正解', { n: N })}</small>`;
       main.innerHTML = `<div class="result dl-result">
-        ${r.day !== day ? `<p class="hint">${T('昨日（{d}）の挑戦の記録。0時30分（日本時間）までなら載せられるよ', { d: md(r.day) })}${yourTime(0, 30)}</p>` : ''}
+        ${r.day !== day ? `<p class="hint">${T('昨日（{d}）の挑戦の記録。0時30分（日本時間）までなら載せられるよ{t}', { d: md(r.day), t: yourTime(0, 30) })}</p>` : ''}
         <p class="qlabel">${head}</p><p class="score">${big}</p>
         ${clear ? '' : `<p class="hint">${T('タイム {t}', { t: RANKING.formatTime(r.timeMs) })}</p>`}
         <p class="tarank" id="dl-rank"></p>
@@ -212,8 +212,9 @@
       for (const b of $('dl-tabs').children) b.setAttribute('aria-pressed', String(b.dataset.t === V.tab));
       load();
     }
-    // 状態の文は textContent（profile.js の postBox）なので、名前はそのまま入れる
-    return { ok: true, text: res.ok ? (rank ? T('「{name}」で載せたよ！ {r}', { name, r: rankWord(r.day, rank) }) : T('「{name}」で載せたよ！', { name })) : RANKING.message('already') };
+    // 名前は訳さないので data-ugc の要素に（profile.js の postBox は html をそのまま状態の文にする）
+    if (!res.ok) return { ok: true, text: RANKING.message('already') };
+    return { ok: true, html: rank ? T('「{name}」で載せたよ！ {r}', { name: ugc(name), r: esc(rankWord(r.day, rank)) }) : T('「{name}」で載せたよ！', { name: ugc(name) }) };
   }
   // 画面を離れたら箱を外す（隠れた箱が、あとでプロフィールを作った・自動を ON にしたときに載せないままにした記録を送らないように。
   // postBox は箱が DOM から外れると聞くのをやめる。開き直せば render が作り直す）

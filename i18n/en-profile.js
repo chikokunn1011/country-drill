@@ -28,7 +28,7 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // プロフィール画面
   'プロフィールを作ると、タイムアタック・今日の難問・冒険のランキングにこの名前で載るよ。':
-    'With a profile, your name appears on the Time Attack, Daily Puzzle, and Adventure leaderboards.',
+    'With a profile, your name appears on the Time Attack and Daily Puzzle leaderboards.',
   'プロフィールを作る': 'Create a profile',
   '作る': 'Create',
   'ほかの人と同じニックネームは使えないよ。名前はあとから変えられる': 'You can’t use a nickname someone else has. You can change it later.',

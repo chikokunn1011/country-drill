@@ -291,17 +291,33 @@ test('dict_values_english', () => {
   assert.deepEqual(bad, []);
 });
 
-test('dict_placeholders_match', () => {
+// 辞書の穴（{n} など）がキーとそろっていないもの。{ one, other } は {n} のあるキーだけで、one（だけ）は {n} を書かなくてもよい（'played once'）
+const placeholderProblems = dict => {
   const bad = [];
-  for (const [k, v] of Object.entries(I18N_EN())) {
+  for (const [k, v] of Object.entries(dict)) {
     if (typeof v === 'object') {
       const ks = Object.keys(v).sort().join(',');
       if (ks !== 'one,other' || !/\{n\}/.test(k)) bad.push(`${k}: { one, other } は {n} のあるキーだけ・one と other だけ（${ks}）`);
     }
-    // one は {n} を書かなくてもよい（'played once'）。ほかの穴はそろえる
-    for (const x of values(v)) if (holes(x) !== holes(k) && !(typeof v === 'object' && x === v.one && holes(x) === holes(k.replace(/\{n\}/g, '')))) bad.push(`${k} → ${x}`);
+    const forms = typeof v === 'object' ? Object.entries(v) : [['', v]];
+    for (const [form, x] of forms) {
+      if (holes(x) === holes(k) || (form === 'one' && holes(x) === holes(k.replace(/\{n\}/g, '')))) continue;
+      bad.push(`${k} → ${x}`);
+    }
   }
-  assert.deepEqual(bad, []);
+  return bad;
+};
+
+test('dict_placeholders_match', () => {
+  assert.deepEqual(placeholderProblems(I18N_EN()), []);
+});
+
+// {n} を書かなくてよいのは one だけ（other が one と同じ文でも、other は {n} が要る）
+test('dict_placeholders_one_only', () => {
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: 'many times' } }), ['{n}回 → many times']);
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: 'once' } }), ['{n}回 → once']);
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: '{n} times' } }), []);
+  assert.deepEqual(placeholderProblems({ '{n}回{x}': { one: 'once', other: '{n} times{x}' } }), ['{n}回{x} → once']);
 });
 
 test('dict_no_unused', () => {
