@@ -1,6 +1,6 @@
 // 英語版（PR5）: js の中の日本語の文字列を見つける（tests/unit/i18n.test.mjs が使う）。
 // 本物の JS の構文解析はしない。コメント・文字列・テンプレート・正規表現を見分けるだけの字句の読み方:
-//   ・// と /* */ のコメントは飛ばす（// i18n-data:start 〜 // i18n-data:end の目印だけ見る）
+//   ・// と /* */ のコメントは飛ばす（// i18n-data:start 〜 // i18n-data:end、// i18n-ignore:start 〜 // i18n-ignore:end の目印だけ見る）
 //   ・/ は、直前の意味のある文字が ( , = : [ ! & | ? { } ; + > か行頭、または直前の語が return・typeof などの
 //     キーワードなら正規表現として読み飛ばす（ほかは割り算）
 //   ・テンプレートの ${…} は入れ子で読む（中の文字列も1つずつ拾う）
@@ -21,25 +21,26 @@ const unesc = s => s.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{
 });
 const ID_CHAR = /[\w$]/;
 
-// src の中の、日本語をふくむ文字列・テンプレート文字列ごとに { text, line, wrapped, exempt, data }。
+// src の中の、日本語をふくむ文字列・テンプレート文字列ごとに { text, line, wrapped, exempt, data, ignore }。
 //   wrapped: T( の第1引数（シングルクォートの文字列だけ。すぐあとが , か ) のとき。T('あ' + x) はちがう）
 //   exempt:  いちばん内側の呼び出しが console.<x>( か Error(（関数の本体 {…} の中からは外を見ない）
 // text はエスケープを読んだあとの文字（T('a\'b') のキーは a'b）
 //   data:    // i18n-data:start 〜 // i18n-data:end の中
+//   ignore:  // i18n-ignore:start 〜 // i18n-ignore:end の中（画面に出さない日本語。NG ワードの一覧だけに使う。辞書にも求めない）
 // テンプレートの text は、${…} を '${…}' に置きかえた文字の部分
 export function scanJs(src) {
   return lex(src, t => JA_RE.test(t));
 }
 
-// T('…' の第1引数（シングルクォートで直接書いたもの）
+// T('…' の第1引数（シングルクォートで直接書いたもの。i18n-ignore の中は除く）
 export function tKeys(src) {
-  return lex(src, () => true).filter(e => e.wrapped).map(e => e.text);
+  return lex(src, () => true).filter(e => e.wrapped && !e.ignore).map(e => e.text);
 }
 
 // 字句を読んで、keep(text) が真の文字列・テンプレートを返す
 function lex(src, keep) {
   const out = [];
-  let i = 0, line = 1, data = false;
+  let i = 0, line = 1, data = false, ignore = false;
   let last = null, sigOnLine = false;   // 直前の意味のある文字、この行に意味のある文字があったか
   // 開いているかっこ: { ch, callee, body }。callee は ( の前の名前（a.b.c）、無ければ null。
   // body は ) か => のあとの {（関数などの本体）
@@ -70,7 +71,7 @@ function lex(src, keep) {
     return !!c && /^(?:console\.\w+|Error)$/.test(c);
   };
   const record = (text, startLine, wrapped) => {
-    if (keep(text)) out.push({ text, line: startLine, wrapped, exempt: isExempt(), data });
+    if (keep(text)) out.push({ text, line: startLine, wrapped, exempt: isExempt(), data, ignore });
   };
 
   // 引用符 q の文字列を読む（i は開きの引用符）。中身を返す
@@ -104,7 +105,7 @@ function lex(src, keep) {
   const readTemplate = () => {
     const startLine = line;
     // 入れ子の中で記録されるより前に、外のテンプレートの場所を取っておく
-    const at = out.length, exempt = isExempt(), d = data;
+    const at = out.length, exempt = isExempt(), d = data, ig = ignore;
     let s = '';
     i++;
     while (i < src.length && src[i] !== '`') {
@@ -122,7 +123,7 @@ function lex(src, keep) {
     }
     i++;
     s = unesc(s);
-    if (keep(s)) out.splice(at, 0, { text: s, line: startLine, wrapped: false, exempt, data: d });
+    if (keep(s)) out.splice(at, 0, { text: s, line: startLine, wrapped: false, exempt, data: d, ignore: ig });
   };
 
   // コードを読む。inTpl なら、対になる } で戻る（テンプレートの ${…}）
@@ -136,6 +137,8 @@ function lex(src, keep) {
         const body = src.slice(i + 2, e < 0 ? src.length : e).trim();
         if (body === 'i18n-data:start') data = true;
         else if (body === 'i18n-data:end') data = false;
+        else if (body === 'i18n-ignore:start') ignore = true;
+        else if (body === 'i18n-ignore:end') ignore = false;
         i = e < 0 ? src.length : e;
         continue;
       }

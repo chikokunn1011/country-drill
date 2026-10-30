@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { ctxWithI18n } from './i18n-load.mjs';
 
 const read = p => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 const SRC = read('ranking.js');
@@ -20,8 +21,16 @@ function load(fetchImpl = () => Promise.reject(new Error('fetch がスタブさ�
     setTimeout: (...a) => setTimeout(...a),
     clearTimeout: (...a) => clearTimeout(...a),
   };
-  vm.runInNewContext(SRC, ctx);
-  return { R: ctx.RANKING, calls, warns };
+  const c = ctxWithI18n(ctx);
+  vm.runInContext(SRC, c, { filename: 'ranking.js' });
+  return { R: c.RANKING, calls, warns };
+}
+// 英語の画面の vm（lang="en"、i18n.js → en-core.js・en-rank.js → ranking.js の順に読む）
+function loadEn() {
+  const ctx = vm.createContext({ console, document: { documentElement: { lang: 'en' } } });
+  ctx.window = ctx;
+  for (const f of ['i18n.js', 'i18n/en-core.js', 'i18n/en-rank.js', 'ranking.js']) vm.runInContext(read(f), ctx, { filename: f });
+  return { R: ctx.RANKING };
 }
 // 決まった JSON を返す fetch スタブ
 const reply = (body, status = 200) => () =>
@@ -71,6 +80,62 @@ test('checkName_rejects_every_server_ng_word', () => {
   for (const w of words) assert.equal(R.checkName(`a${w}b`).reason, 'ng_name', w);
 });
 
+// NG ワードの一覧は ranking.js・schema.sql・本番用の pr6_ng_words_en.sql の3か所で同じ（PR6 で英語の29語を足して47語）
+const quoted = body => [...body.matchAll(/'([^']*)'/g)].map(m => m[1]);
+const ngBlock = sql => {
+  const m = sql.match(/create or replace function ng_words\(\)[\s\S]*?\$\$;/);
+  assert.ok(m, 'ng_words() の create or replace が無い');
+  return m[0];
+};
+const sqlWords = sql => quoted(ngBlock(sql).match(/select array\[([^\]]*)\]/)[1]);
+const PR6_SQL = 'supabase/pr6_ng_words_en.sql';
+const EN_NG = ['nigger', 'nigga', 'faggot', 'cunt', 'whore', 'slut', 'bastard', 'asshole', 'wanker', 'twat', 'bollocks', 'retard', 'porn',
+  'penis', 'vagina', 'pussy', 'dildo', 'blowjob', 'jizz', 'hentai', 'milf', 'boobs', 'piss', 'hitler', 'tranny', 'chink', 'kike', 'gook', 'moderator'];
+
+test('ng_lists_identical', () => {
+  const js = quoted(SRC.match(/const NG_WORDS = \[([^\]]*)\]/)[1]);
+  const schema = read('supabase/schema.sql'), pr6 = read(PR6_SQL);
+  assert.equal(js.length, 47);
+  assert.deepEqual(js.slice(18), EN_NG);
+  assert.deepEqual(sqlWords(schema), js, 'schema.sql');
+  assert.deepEqual(sqlWords(pr6), js, PR6_SQL);
+  // 本番用の関数の定義は schema.sql と1文字も同じ
+  assert.equal(ngBlock(pr6), ngBlock(schema));
+  // どれも NFKC＋小文字の形（そうでないと当たらない）
+  for (const w of js) assert.equal(w.normalize('NFKC').toLowerCase(), w, w);
+});
+
+test('pr6_sql_only_replaces_ng_words', () => {
+  // 本番用の SQL は ng_words() の入れかえ・権限の取り消し・数の確かめ・読むだけの確かめだけ。表や関数を消さない・変えない
+  const sql = read(PR6_SQL).replace(/--[^\n]*/g, '');
+  assert.doesNotMatch(sql, /\b(drop|delete|update|insert|truncate|alter)\b/i);
+  assert.equal([...sql.matchAll(/create or replace function (\w+)/gi)].map(m => m[1]).join(), 'ng_words');
+  assert.match(sql, /revoke all on function ng_words\(\) from public, anon, authenticated;/);
+  assert.match(sql, /assert array_length\(ng_words\(\), 1\) = 47/);
+});
+
+test('check_name_en_words', () => {
+  const { R } = load();
+  for (const n of ['Moderator1', 'ＰＯＲＮ', 'xHentaix', 'HITLER', 'ｐｕｓｓｙcat']) assert.equal(R.checkName(n).reason, 'ng_name', n);
+});
+
+test('check_name_no_false_positive', () => {
+  const { R } = load();
+  const names = 'Therapist Peacock Hancock Cocktail Analyst Document Japan Grape Class Glass Spice Raccoon Dickens Assassin Penguin Cucumber Arsenal Titan';
+  for (const n of names.split(' ')) assert.equal(R.checkName(n).ok, true, n);
+});
+
+test('badge_titles_pass', () => {
+  // 称号も profile_set で ng_words() を通るので、バッジの称号はどれも NG に当たらない（badges.test.mjs と同じ読み方）
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(read('countries.js'), ctx); vm.runInContext(read('badges.js'), ctx);
+  const titles = ctx.BADGES_CORE.makeCatalog(ctx.COUNTRIES).flatMap(b => b.tiers.map(t => t.title));
+  assert.ok(titles.length >= 89);
+  const { R } = load();
+  // 称号は10文字までなので checkName の長さの決まりにも入る
+  assert.deepEqual(plain(titles.filter(t => !R.checkName(t).ok)), []);
+});
+
 test('formatTime', () => {
   const { R } = load();
   assert.equal(R.formatTime(12345), '12.34秒');
@@ -91,6 +156,24 @@ test('message', () => {
   assert.equal(R.message('network'), 'ランキングに接続できなかった');
   // 知らない理由でも undefined は出さない
   assert.equal(R.message('???'), 'ランキングに接続できなかった');
+});
+
+test('message_en', () => {
+  const { R } = loadEn();
+  assert.equal(R.message('ng_name'), 'That nickname can’t be used');
+  assert.equal(R.message('bad_name'), 'Nicknames must be 1–12 characters');
+  assert.equal(R.message('old_version'), 'A new version is out. Please reload the page');
+  assert.equal(R.message('network'), 'Couldn’t connect to the leaderboard');
+  // 知らない理由は network の文
+  assert.equal(R.message('???'), 'Couldn’t connect to the leaderboard');
+});
+
+test('format_time_en', () => {
+  const { R } = loadEn();
+  assert.equal(R.formatTime(12345), '12.34s');
+  assert.equal(R.formatTime(61234), '1:01.23');
+  assert.equal(R.formatTime(0), '0.00s');
+  assert.equal(R.formatTime(600000), '10:00.00');
 });
 
 test('message_profile', () => {

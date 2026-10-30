@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
-import { startServer, openApp, pickSetup, answerCorrect, settle, settleResult, clearTimeAttack, clearByAnswering } from './helpers.mjs';
+import { startServer, openApp, pickSetup, answerCorrect, settle, settleResult, clearTimeAttack, clearByAnswering, QUIET_BADGES } from './helpers.mjs';
 
 const { chromium } = createRequire(import.meta.url)('playwright');
 let browser, server;
@@ -192,6 +192,50 @@ t('pc_result_fits', async page => {
   assert.ok(m.sh <= m.ih, JSON.stringify(m));
 }, { viewport: { width: 1366, height: 657 } });
 
+// ---- 英語版（PR6）: 文は英語・#FlagMaster・URL は英語版・ファイル名 flag-master.png。画像は日本語と同じ 1200×675 ----
+const EN = { path: 'en/', locale: 'en-US', storage: { badges: QUIET_BADGES } };
+// 渡した png を data URL にして、その大きさを読む
+const pngUrl = page => page.evaluate(async () => {
+  const f = __shared.files[0];
+  const url = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
+  const img = new Image(); img.src = url; await img.decode();
+  return { name: f.name, type: f.type, w: img.naturalWidth, h: img.naturalHeight, text: __shared.text, head: url.slice(0, 22) };
+});
+t('share_card_en', async page => {
+  await shareTA(page);
+  await page.waitForFunction(() => window.__shared);
+  assert.equal(await page.locator('#r-share').innerText(), 'Share result');
+  const s = await pngUrl(page);
+  assert.deepEqual([s.type, s.name, s.w, s.h, s.head], ['image/png', 'flag-master.png', 1200, 675, 'data:image/png;base64,']);
+  assert.match(s.text, /^Flag Master Time Attack [^\n]+\nCleared in [^\n]+!\n#FlagMaster\nhttps:\/\/chikokunn1011\.github\.io\/country-drill\/en\/$/);
+  assert.doesNotMatch(s.text, /[　-ヿ㐀-鿿！-ﾟ]/);
+  // 日本語のページで同じ条件の画像と同じ大きさ
+  await page.goto(new URL('..', page.url().split('#')[0]).href);
+  await shareTA(page);
+  await page.waitForFunction(() => window.__shared);
+  const j = await pngUrl(page);
+  assert.deepEqual([j.name, j.w, j.h], ['kokki-master.png', s.w, s.h]);
+  assert.match(j.text, /#国旗マスター\nhttps:\/\/chikokunn1011\.github\.io\/country-drill\/$/);
+}, EN);
+
+// 英語版: 画像を作り終わる前に押す → 文と英語版の URL。X の投稿画面も英語版の URL
+t('share_card_en_text_only', async page => {
+  await clearTimeAttack(page);
+  await page.click('#r-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await page.evaluate(() => ({ url: __shared.url, text: __shared.text }));
+  assert.equal(s.url, URL_ + 'en/');
+  assert.match(s.text, /^Flag Master Time Attack [\s\S]*#FlagMaster$/);
+}, { ...EN, init: holdBlob });
+
+t('share_card_en_x', async page => {
+  await shareTA(page);
+  await page.waitForFunction(() => window.__opened);
+  const u = new URL((await nothing(page)).opened[0]);
+  assert.equal(u.searchParams.get('url'), URL_ + 'en/');
+  assert.match(u.searchParams.get('text'), /^Flag Master Time Attack [\s\S]*#FlagMaster$/);
+}, { ...EN, share: { how: 'deny' } });
+
 // ---- 今日の難問（daily.js の #dl-share）----
 // 時計を日本時間の決まった時刻にする（daily.test.mjs の at と同じ）
 const at = iso => `{ const off = Date.parse('${iso}') - Date.now(), D = Date;
@@ -280,3 +324,29 @@ t('daily_fallback_url', async page => {
   assert.equal(s.url, URL_);
   assert.match(s.text, /^国旗マスター 今日の難問 10\/28\n/);
 }, { init: NOON + holdBlob, storage: dailyRec() });
+
+// 英語版の今日の難問（PR6 Task 7）: 画像の文（題・結果・順位）は英語、文は #FlagMaster で終わり、URL は英語版。
+// 画像に描いた文字は fillText を見る（__drawn）。sub が空なので、順位の前に区切り（' · '）は入らない
+const spyFill = `{
+  const f = CanvasRenderingContext2D.prototype.fillText;
+  CanvasRenderingContext2D.prototype.fillText = function (s, ...r) { (window.__drawn ||= []).push(String(s)); return f.call(this, s, ...r); };
+}`;
+t('daily_en_card', async page => {
+  await openDaily(page);
+  await dready(page);
+  const d = await page.evaluate(() => window.__data);
+  assert.equal(d.title, 'Daily Puzzle 10/28');
+  assert.equal(d.big, 'Perfect! 1:23.40');
+  assert.equal(d.sub, '');
+  assert.equal(d.rank, '#3 today');
+  assert.equal(d.text, 'Flag Master Daily Puzzle 10/28\n' + '🟩'.repeat(20) + '\nPerfect! 1:23.40\n#FlagMaster');
+  const drawn = await page.evaluate(() => window.__drawn);
+  for (const s of ['Flag Master', 'Daily Puzzle 10/28', 'Perfect! 1:23.40', '#3 today', '#FlagMaster']) assert.ok(drawn.includes(s), `${s} / ${drawn.join(' | ')}`);
+  assert.deepEqual(drawn.filter(s => /[　-ヿ㐀-鿿！-ﾟ]/.test(s)), []);
+  await page.click('#dl-share');
+  await page.waitForFunction(() => window.__shared);
+  const s = await pngUrl(page);
+  assert.deepEqual([s.name, s.w, s.h], ['flag-master.png', 1200, 675]);
+  assert.equal(s.text, d.text + '\n' + URL_ + 'en/');
+}, { ...EN, init: NOON + spyAttach + spyFill, storage: { ...EN.storage, ...dailyRec({ correct: 20, outcome: 'clear', sent: { name: 'Chiko', rank: 3 } }) } });
+

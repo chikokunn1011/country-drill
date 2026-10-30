@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { JA_RE, scanJs, inlineSections, tKeys } from '../../tools/i18n_scan.mjs';
 import { readEnInputs, renderEn } from '../../tools/make_en.mjs';
+import { ctxWithI18n } from './i18n-load.mjs';
 
 const root = new URL('../../', import.meta.url);
 const read = p => readFileSync(new URL(p, root), 'utf8');
@@ -24,10 +25,10 @@ const load = ({ lang, dict } = {}) => {
 
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
-const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all',
+const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all',
   'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '図鑑', '起動'] };
-// まだ訳さないファイル（PR6: ranking・daily・profile・streak・share-card、PR7: badges・trivia、PR8: rpg-*）
-const NOT_YET = ['ranking.js', 'daily.js', 'profile.js', 'streak.js', 'share-card.js', 'badges.js', 'trivia.js',
+// まだ訳さないファイル（PR7: badges・trivia、PR8: rpg-*）
+const NOT_YET = ['badges.js', 'trivia.js',
   'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
 // 見ないファイル（データ・管理画面・生成物の sw.js）
 const SKIP = ['countries.js', 'themes.js', 'world.js', 'admin.js', 'admin-api.js', 'admin-save.js', 'sw.js'];
@@ -51,7 +52,6 @@ test('t_en_lookup', () => {
   assert.equal(ctx.cName({ n: '日本', e: 'Japan' }), 'Japan');
   assert.equal(ctx.cCap({ c: '東京', ec: 'Tokyo' }), 'Tokyo');
   assert.equal(ctx.I18N.locale, 'en-US');
-  assert.ok(ctx.I18N.hide.has('ta'));
   // 辞書ファイルの形（Object.assign(window.I18N_EN ??= {}, …)）で、あとから足せる
   vm.runInContext("Object.assign(window.I18N_EN ??= {}, { '練習': 'Practice' });", ctx);
   assert.equal(ctx.T('練習'), 'Practice');
@@ -75,6 +75,69 @@ test('t_page_and_fold', () => {
   assert.equal(ja.I18N.page('country/'), 'country/');
   assert.equal(ja.I18N.hide.size, 0);
   assert.ok(ja.I18N.byName(a, b) > 0);
+});
+
+// PR6: 英語版はタイムアタックを選べる。隠すのは他人の称号だけ（PR7 で外す）
+test('hide_title_only', () => {
+  const en = load({ lang: 'en' }).ctx;
+  assert.equal(en.I18N.hide.has('ta'), false);
+  assert.equal(en.I18N.hide.has('title'), true);
+  assert.equal(load().ctx.I18N.hide.has('title'), false);
+});
+
+// PR6: 日本時間の区切りが、その人の時間で何時か（tz はテスト用。ふだんは端末の時間帯）
+const NOW = new Date('2026-10-30T00:00:00Z');   // 日本時間 10/30（金）9:00、ニューヨークは 10/29 20:00（夏時間）
+test('local_of_new_york', () => {
+  const { I18N } = load({ lang: 'en' }).ctx;
+  const tz = 'America/New_York';
+  assert.equal(I18N.localOf(0, 0, { now: NOW, tz }), '11:00 AM');
+  // 次の月曜0時（日本時間）は 11/1 に夏時間が終わったあと
+  assert.equal(I18N.localOf(0, 0, { weekly: true, now: NOW, tz }), 'Sunday 10:00 AM');
+  assert.equal(I18N.localOf(0, 30, { now: NOW, tz }), '11:30 AM');
+});
+
+// 夏時間が終わる週・日本時間の月曜の0時の前後・now がちょうど区切り（ニューヨーク。夏時間の前後で答えの時刻が変わるので、どちらの回を指したかが見える）
+test('local_of_edges', () => {
+  const { I18N } = load({ lang: 'en' }).ctx;
+  const at = (iso, o = {}) => I18N.localOf(o.h ?? 0, o.m ?? 0, { weekly: o.weekly, now: new Date(iso), tz: 'America/New_York' });
+  // 夏時間が終わる日の中（11/1 1:30 EDT の前と、切りかわった 1:30 EST のあと）。次の日本時間0時は 11/1 15:00Z
+  for (const iso of ['2026-11-01T05:30:00Z', '2026-11-01T06:30:00Z']) {
+    assert.equal(at(iso), '10:00 AM', iso);
+    assert.equal(at(iso, { m: 30 }), '10:30 AM', iso);
+    assert.equal(at(iso, { weekly: true }), 'Sunday 10:00 AM', iso);
+  }
+  // 日本時間 11/1 0:00 の1秒前は今日の 0:00（10/31 15:00Z、EDT）、ちょうどなら次の日（11/1 15:00Z、EST）
+  assert.equal(at('2026-10-31T14:59:59Z'), '11:00 AM');
+  assert.equal(at('2026-10-31T15:00:00Z'), '10:00 AM');
+  // 今日が月曜（日本時間 10/26）: 0時の1秒前はこの月曜（10/25 15:00Z、EDT）、ちょうど・1秒あとは次の月曜（11/1 15:00Z、EST）
+  assert.equal(at('2026-10-25T14:59:59Z', { weekly: true }), 'Sunday 11:00 AM');
+  assert.equal(at('2026-10-25T15:00:00Z', { weekly: true }), 'Sunday 10:00 AM');
+  assert.equal(at('2026-10-25T15:00:01Z', { weekly: true }), 'Sunday 10:00 AM');
+  // 月曜の0時をすぎても 0:30 の前なら今日の 0:30（10/25 15:30Z、EDT）
+  assert.equal(at('2026-10-25T15:10:00Z', { weekly: true, m: 30 }), 'Sunday 11:30 AM');
+  // 日本時間の月曜 11/2 0:00 ちょうどの weekly は次の週（11/8 15:00Z、EST）
+  assert.equal(at('2026-11-01T15:00:00Z', { weekly: true }), 'Sunday 10:00 AM');
+});
+
+test('local_of_other_zones', () => {
+  const en = load({ lang: 'en' }).ctx.I18N;
+  assert.equal(en.localOf(0, 0, { now: NOW, tz: 'Asia/Kolkata' }), '8:30 PM');
+  assert.equal(en.localOf(0, 0, { now: NOW, tz: 'Asia/Tokyo' }), '');
+  assert.equal(en.localOf(0, 0, { now: NOW, tz: 'Asia/Seoul' }), '');
+  assert.equal(en.localOf(0, 0, { weekly: true, now: NOW, tz: 'Asia/Tokyo' }), '');
+  const ja = load().ctx.I18N;
+  for (const tz of ['America/New_York', 'Asia/Kolkata', 'Asia/Tokyo']) assert.equal(ja.localOf(0, 0, { now: NOW, tz }), '', tz);
+});
+
+test('day_label', () => {
+  assert.equal(load({ lang: 'en' }).ctx.I18N.dayLabel('2026-10-30'), 'Oct 30');
+  assert.equal(load().ctx.I18N.dayLabel('2026-10-30'), '10月30日');
+  assert.equal(load().ctx.I18N.dayLabel('2026-01-05'), '1月5日');
+  // ranking・share-card・streak の unit テストが使う文脈（日本語）
+  const ctx = ctxWithI18n({ x: 1 });
+  assert.equal(ctx.window, ctx);
+  assert.equal(ctx.x, 1);
+  assert.equal(vm.runInContext("T('{n}問', { n: 3 }) + I18N.dayLabel('2026-10-30')", ctx), '3問10月30日');
 });
 
 // HTTP キャッシュに前の countries.js（e・ec が無い）が残っていても、英語のページは落ちずに日本語の n・c を出す
@@ -126,6 +189,10 @@ test('scan_fixtures', () => {
   assert.equal(one("console.log(function () { return 'あ'; });").exempt, false);
   assert.equal(one("console.log({ a: 'あ' });").exempt, true);
   assert.equal(one("console.log(() => 'あ');").exempt, true);
+  // i18n-ignore:start 〜 end の中（画面に出さない日本語＝NG ワードの一覧）は ignore
+  const ig = scanJs("x = '死ね';\n// i18n-ignore:start\nconst NG = ['死ね'];\n// i18n-ignore:end\ny = '死ね';");
+  assert.deepEqual(ig.map(e => [e.line, e.ignore]), [[1, false], [3, true], [5, false]]);
+  assert.equal(one("x = 'あ';").ignore, false);
   const d = scanJs("x = 'あ';\n// i18n-data:start\nconst D = { a: 'い' };\n// i18n-data:end\ny = 'う';");
   assert.deepEqual(d.map(e => [e.text, e.data]), [['あ', false], ['い', true], ['う', false]]);
 });
@@ -133,6 +200,7 @@ test('scan_fixtures', () => {
 test('scan_helpers', async () => {
   const { tKeys } = await import('../../tools/i18n_scan.mjs');
   assert.deepEqual(tKeys("T('あ'); x.T('い'); T('{n}問', { n }); T(\"え\"); T('it\\'s'); T('お' + x)"), ['あ', '{n}問', "it's"]);
+  assert.deepEqual(tKeys("// i18n-ignore:start\nT('あ');\n// i18n-ignore:end\nT('い');"), ['い']);
   assert.ok(JA_RE.test('あ') && JA_RE.test('漢') && JA_RE.test('・') && JA_RE.test('！') && !JA_RE.test('São Tomé'));
   const s = inlineSections(read('index.html'));
   assert.ok('先読み' in s && 'データ' in s && 'クイズ' in s && 'ドパガキ向けの演出' in s && '起動' in s, Object.keys(s).join(','));
@@ -142,7 +210,7 @@ test('scan_helpers', async () => {
 test('no_ja_outside_T', () => {
   const bad = [];
   const check = (name, src) => {
-    for (const e of scanJs(src)) if (!(e.wrapped || e.exempt || e.data)) bad.push(`${name}:${e.line}: ${e.text}`);
+    for (const e of scanJs(src)) if (!(e.wrapped || e.exempt || e.data || e.ignore)) bad.push(`${name}:${e.line}: ${e.text}`);
   };
   const sections = inlineSections(read('index.html'));
   for (const [f, what] of Object.entries(COVER)) {
@@ -206,8 +274,9 @@ const dictFiles = () => Object.fromEntries(readdirSync(new URL('i18n/', root)).f
   return [f, { ...ctx.window.I18N_EN }];
 }));
 const I18N_EN = () => Object.assign({}, ...Object.values(dictFiles()));
+// i18n-ignore の中（画面に出さない日本語）は辞書に求めない
 const codeKeys = () => coverSources().flatMap(tKeys);
-const dataStrings = () => coverSources().flatMap(src => scanJs(src).filter(e => e.data).map(e => e.text));
+const dataStrings = () => coverSources().flatMap(src => scanJs(src).filter(e => e.data && !e.ignore).map(e => e.text));
 const values = v => typeof v === 'object' ? [v.one, v.other] : [v];
 const holes = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join(',');
 
@@ -222,16 +291,33 @@ test('dict_values_english', () => {
   assert.deepEqual(bad, []);
 });
 
-test('dict_placeholders_match', () => {
+// 辞書の穴（{n} など）がキーとそろっていないもの。{ one, other } は {n} のあるキーだけで、one（だけ）は {n} を書かなくてもよい（'played once'）
+const placeholderProblems = dict => {
   const bad = [];
-  for (const [k, v] of Object.entries(I18N_EN())) {
+  for (const [k, v] of Object.entries(dict)) {
     if (typeof v === 'object') {
       const ks = Object.keys(v).sort().join(',');
       if (ks !== 'one,other' || !/\{n\}/.test(k)) bad.push(`${k}: { one, other } は {n} のあるキーだけ・one と other だけ（${ks}）`);
     }
-    for (const x of values(v)) if (holes(x) !== holes(k)) bad.push(`${k} → ${x}`);
+    const forms = typeof v === 'object' ? Object.entries(v) : [['', v]];
+    for (const [form, x] of forms) {
+      if (holes(x) === holes(k) || (form === 'one' && holes(x) === holes(k.replace(/\{n\}/g, '')))) continue;
+      bad.push(`${k} → ${x}`);
+    }
   }
-  assert.deepEqual(bad, []);
+  return bad;
+};
+
+test('dict_placeholders_match', () => {
+  assert.deepEqual(placeholderProblems(I18N_EN()), []);
+});
+
+// {n} を書かなくてよいのは one だけ（other が one と同じ文でも、other は {n} が要る）
+test('dict_placeholders_one_only', () => {
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: 'many times' } }), ['{n}回 → many times']);
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: 'once' } }), ['{n}回 → once']);
+  assert.deepEqual(placeholderProblems({ '{n}回': { one: 'once', other: '{n} times' } }), []);
+  assert.deepEqual(placeholderProblems({ '{n}回{x}': { one: 'once', other: '{n} times{x}' } }), ['{n}回{x} → once']);
 });
 
 test('dict_no_unused', () => {

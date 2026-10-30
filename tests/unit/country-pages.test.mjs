@@ -363,6 +363,8 @@ test('en_country_head', () => {            // 196枚。lang・title・canonical�
     assert.ok(h.includes(`<meta property="og:url" content="${url}">`), p);
     assert.ok(h.includes('<meta property="og:site_name" content="Flag Master">'), p);
     assert.ok(h.includes('<meta property="og:locale" content="en_US">'), p);
+    assert.ok(h.includes(`<meta property="og:image" content="${SITE}icons/ogp-en.png">`), p);
+    assert.ok(!h.includes('icons/ogp.png'), p);
     const d = desc(h);
     assert.ok(d.length >= 20 && d.length <= 160, `${p} ${d.length}`);
     const lines = [`<link rel="alternate" hreflang="ja" href="${ja}">`, `<link rel="alternate" hreflang="en" href="${url}">`,

@@ -17,6 +17,7 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const topojson = createRequire(import.meta.url)(join(REPO, 'vendor/topojson-client-3.1.0.min.js'));
 export const SITE = 'https://chikokunn1011.github.io/country-drill/';
 const OGP = SITE + 'icons/ogp.png';
+export const OGP_EN = SITE + 'icons/ogp-en.png';
 const TRIVIA_LABEL = { flag: '国旗', geo: '地理', culture: '文化' };
 export const DESC_MAX = 120;
 const FOOTER_RE = /<!-- footer:start -->([\s\S]*?)<!-- footer:end -->/;
@@ -188,7 +189,7 @@ export function head(inp, { title, description, url, crumbs, css = ['country.css
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${url}">
-<meta property="og:image" content="${OGP}">
+<meta property="og:image" content="${en ? OGP_EN : OGP}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="${en ? 'en_US' : 'ja_JP'}">

@@ -1119,6 +1119,33 @@ end $$;
 reset role;
 drop table src, parts;
 
+\echo '- ng_words_en'
+-- PR6 で足した英語の NG ワード（supabase/pr6_ng_words_en.sql と同じ一覧）。全角・大文字でもはじき、ふつうの英単語・名前ははじかない
+reset role; truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade; set role anon;
+do $$ declare t text := '00000000-0000-4000-8000-0000000000a1'; r jsonb; n text; begin
+  assert profile_create('00000000-0000-4000-8000-0000000000b1', 'Moderator1')->>'reason' = 'ng_name', 'Moderator1';
+  assert profile_create('00000000-0000-4000-8000-0000000000b1', 'xHentaix')->>'reason' = 'ng_name', 'xHentaix';
+  -- submit_score2 は名前を受け取らずプロフィールの名前で載せるので、hentai はプロフィールが作れず載らない
+  assert profile_create('00000000-0000-4000-8000-0000000000b2', 'hentai')->>'reason' = 'ng_name', 'hentai';
+  assert submit_score2('00000000-0000-4000-8000-0000000000b2', 'f2n:asia:10', 8000, 10)->>'reason' = 'not_found', 'hentai は載らない';
+  r := profile_create(t, 'Therapist');
+  assert (r->>'ok')::boolean, format('Therapist: %s', r);
+  r := profile_create('00000000-0000-4000-8000-0000000000a2', 'Peacock');
+  assert (r->>'ok')::boolean, format('Peacock: %s', r);
+  assert profile_rename(t, 'ＰＯＲＮ')->>'reason' = 'ng_name', 'ＰＯＲＮ';
+  assert profile_set(t, null, 'Hitler', null, null, null)->>'reason' = 'ng_name', '称号 Hitler';
+  foreach n in array array['Hancock', 'Cocktail', 'Analyst', 'Document', 'Japan', 'Grape', 'Class', 'Spice', 'Raccoon', 'Dickens'] loop
+    r := profile_rename(t, n);
+    assert (r->>'ok')::boolean, format('%s は通る: %s', n, r);
+  end loop;
+  assert profile_me(t)->>'nickname' = 'Dickens', '最後の名前';
+end $$;
+reset role;
+do $$ begin
+  assert array_length(ng_words(), 1) = 47, format('ng_words の数: %s', array_length(ng_words(), 1));
+  assert (select count(*) from scores) = 0, '何も載らない';
+end $$;
+
 -- ---- 古い関数（前の版のページ用） ----
 \echo '- old_version_all'
 -- 名前をプロフィールと別に送れる道は残さない。7つとも old_version を返して、表には何も入らない

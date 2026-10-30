@@ -4,18 +4,37 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { ctxWithI18n } from './i18n-load.mjs';
 
 const read = p => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
-const ctx = { window: {} };
-ctx.globalThis = ctx;
-vm.createContext(ctx);
+// 日本語の画面（i18n.js を先に読む。document が無いので日本語）
+const ctx = ctxWithI18n();
 vm.runInContext(read('share-card.js'), ctx);
+// 英語の画面の vm（lang="en"、i18n.js → en-core.js・en-rank.js → share-card.js の順に読む）
+function loadEn() {
+  const c = vm.createContext({ console, document: { documentElement: { lang: 'en' } } });
+  c.window = c;
+  for (const f of ['i18n.js', 'i18n/en-core.js', 'i18n/en-rank.js', 'share-card.js']) vm.runInContext(read(f), c, { filename: f });
+  return c.SHARECARD;
+}
 const plain = x => JSON.parse(JSON.stringify(x));
 const S = ctx.SHARECARD, codes = n => Array.from({ length: n }, (_, i) => `x${i}`);
 
 test('share_const', () => {
   assert.deepEqual(plain(S.SHARE), { url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', w: 1200, h: 675, maxFlags: 24 });
   assert.equal(Object.isFrozen(S.SHARE), true);
+  // 日本語の画面: タグと URL は今のまま
+  assert.equal(S.tag(), '#国旗マスター');
+  assert.equal(S.url(), 'https://chikokunn1011.github.io/country-drill/');
+});
+
+// 英語の画面: タグは #FlagMaster、URL は英語版（SHARE そのものは日本語のまま）
+test('share_en', () => {
+  const E = loadEn();
+  assert.equal(E.tag(), '#FlagMaster');
+  assert.equal(E.url(), 'https://chikokunn1011.github.io/country-drill/en/');
+  assert.equal(E.SHARE.tag, '#国旗マスター');
+  assert.equal(E.SHARE.url, 'https://chikokunn1011.github.io/country-drill/');
 });
 
 test('layout_counts', () => {

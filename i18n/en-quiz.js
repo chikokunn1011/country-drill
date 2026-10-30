@@ -1,4 +1,4 @@
-// v=1
+// v=2
 // 英語版（PR5）: index.html のモード選択とクイズ（インラインの節 モード選択・クイズ）。
 // キーは T('…') の日本語。タイムアタック・ランキングの文は en-rank.js
 Object.assign(window.I18N_EN ??= {}, {
@@ -15,7 +15,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '{m}では遊べない': 'Not available in {m}',
   // テーマ（まとめページの［このテーマでクイズ］）
   'テーマ: {t}（{n}か国）': { one: 'Collection: {t} ({n} country)', other: 'Collection: {t} ({n} countries)' },
-  // 今日の難問をやめるとき（英語版では今日の難問は出ない）
+  // 今日の難問をやめるとき
   'やめると、今日の挑戦はここまでの正答数で終わりになるよ。やめる？': 'If you quit now, today’s Daily Puzzle ends with your score so far. Quit?',
 
   // クイズ: やめるボタン・じゅんび

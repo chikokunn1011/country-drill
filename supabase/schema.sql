@@ -11,6 +11,7 @@
 -- 本番に流すとき: ① 「>>> SQL Editor」〜「<<< SQL Editor」の間と「>>> old_version」〜「<<< old_version」の間を除いた部分を流す（MCP の apply_migration。中に delete は無い）。
 -- ② 「>>> SQL Editor」〜「<<< SQL Editor」の間（中に delete がある関数）は SQL Editor で Run する。
 -- ⑤ サイトを公開した後に「>>> old_version」〜「<<< old_version」の間を流す（古い関数を止めて、その間に残った冒険ランキングの行も引っ越す）。
+-- PR6（英語の NG ワード）: 本番では ng_words() の中身だけを入れかえる supabase/pr6_ng_words_en.sql を SQL Editor で1回 Run する（表は変えない）。
 -- 変な記録は Table Editor の scores から行を消せばランキングからも消える。
 
 create table if not exists scores (
@@ -29,11 +30,13 @@ revoke all on scores from anon, authenticated;
 
 -- 関数はどれも search_path を public, pg_temp に固定する（security definer の関数が別のスキーマの同名の物を拾わないように）
 
--- NGワード（ranking.js の NG_WORDS と同じ中身。NFKC＋小文字にした名前に部分一致したらだめ）
+-- NGワード（ranking.js の NG_WORDS・supabase/pr6_ng_words_en.sql と同じ中身。NFKC＋小文字にした名前に部分一致したらだめ）
 create or replace function ng_words() returns text[]
 language sql immutable set search_path = public, pg_temp as $$
   select array['死ね', 'しね', 'シネ', '殺す', 'ころす', 'ちんこ', 'ちんぽ', 'まんこ', 'うんこ',
-               'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人']
+               'せっくす', 'セックス', 'fuck', 'shit', 'bitch', 'sex', 'admin', '運営', '管理人',
+               'nigger', 'nigga', 'faggot', 'cunt', 'whore', 'slut', 'bastard', 'asshole', 'wanker', 'twat', 'bollocks', 'retard', 'porn',
+               'penis', 'vagina', 'pussy', 'dildo', 'blowjob', 'jizz', 'hentai', 'milf', 'boobs', 'piss', 'hitler', 'tranny', 'chink', 'kike', 'gook', 'moderator']
 $$;
 revoke all on function ng_words() from public, anon, authenticated;
 

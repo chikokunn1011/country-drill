@@ -1,6 +1,7 @@
 // れんぞく日数（A5）: クイズ・今日の難問・冒険のバトルを終えた日を数え、ホームの #home-status に1行で出す。出題には一切かかわらない。
 // 前半は DOM にさわらない計算（globalThis.STREAK_CORE。テストでは vm で読み込む）、後半はホームの行と数えるリスナー。
 // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
+// 画面の文は T()（i18n.js）。英語の訳は i18n/en-daily.js。日付の区切りは英語版でも日本時間の0時のまま（英語の画面でだけ、その人の時間を I18N.localOf で添える）
 
 // ---------- 前半: STREAK_CORE（どれも引数を書きかえない） ----------
 // 形: { v:1, cur, best, last:'YYYY-MM-DD'|null, played:[…], rest:[…] }。played・rest は直近14日ぶん。
@@ -78,54 +79,79 @@
 // ---------- 後半: ホームの行（#home-status の最後）と、遊んだ日を数えるリスナー。描き直すのは drill:screen {name:'home'} のときと読み込み時だけ ----------
 (() => {
   'use strict';
-  const NEED = { store: typeof store, emit: typeof emit, $: typeof $, DAILY_CORE: typeof DAILY_CORE, STREAK_CORE: typeof globalThis.STREAK_CORE };
+  const NEED = { store: typeof store, emit: typeof emit, $: typeof $, T: typeof T, I18N: typeof I18N, DAILY_CORE: typeof DAILY_CORE, STREAK_CORE: typeof globalThis.STREAK_CORE };
   const missing = Object.keys(NEED).filter(k => NEED[k] === 'undefined');
   if (missing.length) { console.error(`[streak] 必要なものが読み込めなかったので、れんぞく日数はお休み: ${missing.join(' ')}`); return; }
   const status = $('home-status');
   if (!status) { console.error('[streak] #home-status が無いので、れんぞく日数はお休み'); return; }
 
   const K = globalThis.STREAK_CORE, KEY = 'streak';
+  // 表示は T() を通す（英語は Mon〜Sun、Played・Rest pass・Missed・Today）
+  // i18n-data:start
   const WD = ['月', '火', '水', '木', '金', '土', '日'];
   const MARK = { play: 'あそんだ', rest: 'お休み券', miss: 'お休み', today: '今日', future: '' };
+  // i18n-data:end
   const load = () => K.sanitize(store.get(KEY, null));
   const today = () => DAILY_CORE.jstDay();
-  const md = day => `${+day.slice(5, 7)}/${+day.slice(8, 10)}`;
+  // 日本時間の日付の表示: 日本語 '10/28'・英語 'Oct 28'（I18N.dayLabel）
+  const md = day => I18N.lang === 'en' ? I18N.dayLabel(day) : `${+day.slice(5, 7)}/${+day.slice(8, 10)}`;
+  // 数の入る文の数だけ太字に（数は T の { one, other } を選ぶので、そのまま渡してから包む。文には数がほかに無い）
+  const boldNum = s => s.replace(/\d+/, '<b>$&</b>');
 
   let el = null;
   function build() {
     el = document.createElement('div');
     el.id = 'streak'; el.className = 'home-streak';   // .streak はクイズの連続正解（#pstreak）が使っている
-    el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'れんぞく日数');
+    el.setAttribute('role', 'group'); el.setAttribute('aria-label', T('れんぞく日数'));
+    // .sk-pop は7マス（と、小窓のときは .sk-tz）。.sk-tz は英語の画面でだけ出す「日付は日本時間の0時で変わる（あなたの時間で…）」:
+    // 7マスが行に見えているときは行の下の1行、小窓のときは小窓の7マスの下（開いたときだけ）。置き場所は fit() が決める
     el.innerHTML = '<p class="sk-text"></p><div class="sk-sub">' +
-      '<button type="button" class="sk-open" aria-expanded="false" aria-controls="sk-week">今週</button>' +
-      '<span id="sk-week" class="sk-week" role="list" aria-label="今週（月〜日）"></span><span class="sk-hint"></span></div>';
+      `<button type="button" class="sk-open" aria-expanded="false" aria-controls="sk-week">${T('今週')}</button>` +
+      `<span class="sk-pop"><span id="sk-week" class="sk-week" role="list" aria-label="${T('今週（月〜日）')}"></span><span class="sk-tz" hidden></span></span>` +
+      '<span class="sk-hint"></span></div>';
     el.querySelector('.sk-open').addEventListener('click', () => setOpen(!el.classList.contains('open')));
   }
   function setOpen(on) {
     el.classList.toggle('open', on);
     el.querySelector('.sk-open').setAttribute('aria-expanded', String(on));
+    showTz();
+  }
+  function showTz() {
+    const tz = el.querySelector('.sk-tz'), narrow = el.classList.contains('narrow');
+    tz.hidden = !tz.textContent || (narrow && !el.classList.contains('open'));
+    el.classList.toggle('tzline', !narrow && !tz.hidden);
   }
   // 幅は CSS で決めうちせず、実際にはみ出すかで決める: 横1行に収まれば .oneline、2行（本文／7マスと今日あそぶと…）なら何も付けず、
-  // それでも収まらなければ .narrow（7マスを隠して［今週］で小窓を開く）
+  // それでも収まらなければ .narrow（7マスを隠して［今週］で小窓を開く）。
+  // .sk-tz（添え書き）は測るあいだ隠し、決まったあとで置き場所（行の下／小窓の中）に入れる
   function fit() {
     if (!el) return;
     const over = () => el.scrollWidth > el.clientWidth;
+    const tz = el.querySelector('.sk-tz');
+    tz.hidden = true; el.classList.remove('tzline');
     el.classList.remove('narrow');
     el.classList.add('oneline');
-    if (!over()) return;
-    el.classList.remove('oneline');
-    if (over()) el.classList.add('narrow');
+    if (over()) {
+      el.classList.remove('oneline');
+      if (over()) el.classList.add('narrow');
+    }
+    if (el.classList.contains('narrow')) el.querySelector('.sk-pop').append(tz); else el.append(tz);
+    showTz();
   }
   function render() {
     const v = K.view(load(), today());
     if (!el) build();
     if (status.lastElementChild !== el) status.append(el);   // 称号の札（prepend）より後ろ
-    el.querySelector('.sk-text').innerHTML = `🔥 <b>${v.cur}</b>日れんぞく` + (v.best > v.cur ? `（さいこう<b>${v.best}</b>日）` : '') + `・お休み券<b>${v.tickets}</b>枚`;
-    el.querySelector('.sk-hint').textContent = { keep: `今日あそぶと${v.next}日に！`, rest: 'きのうはお休み券でつながるよ', start: '今日あそぶと1日目', today: '' }[v.state];
+    el.querySelector('.sk-text').innerHTML = '🔥 ' + boldNum(T('{n}日れんぞく', { n: v.cur })) + (v.best > v.cur ? T('（さいこう{b}日）', { b: `<b>${v.best}</b>` }) : '') +
+      T('・') + boldNum(T('お休み券{n}枚', { n: v.tickets }));
+    el.querySelector('.sk-hint').textContent = { keep: T('今日あそぶと{n}日に！', { n: v.next }), rest: T('きのうはお休み券でつながるよ'), start: T('今日あそぶと1日目'), today: '' }[v.state];
     el.querySelector('.sk-week').innerHTML = v.week.map((w, i) => {
-      const label = `${md(w.day)}（${WD[i]}）${MARK[w.mark] ? ' ' + MARK[w.mark] : ''}`;
+      const vars = { d: md(w.day), w: T(WD[i]), m: MARK[w.mark] ? T(MARK[w.mark]) : '' };
+      const label = vars.m ? T('{d}（{w}） {m}', vars) : T('{d}（{w}）', vars);
       return `<i class="sk-day" role="listitem" data-mark="${w.mark}" data-day="${w.day}" title="${label}" aria-label="${label}"></i>`;
     }).join('');
+    const t = I18N.localOf(0, 0);   // 日本語のページ・日本時間と同じずれの時間帯では ''（添えない）
+    el.querySelector('.sk-tz').textContent = t ? T('日付は日本時間の0時で変わるよ（あなたの時間で{t}）', { t }) : '';
     setOpen(false);
     fit();
   }

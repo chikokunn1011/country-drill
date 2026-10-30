@@ -2,10 +2,17 @@
   'use strict';
   // 結果画像のシェア（タイムアタックのクリア画面・今日の難問の結果）。外から使うのは SHARECARD.attach(btn, data) だけ。
   // 前半（SHARE・normalize・layout）は DOM にさわらない（tests/unit/share-card.test.mjs が vm で読む）。
+  // 画面の文は T()（i18n.js）。英語の訳は i18n/en-rank.js
   // index.html のインライン script の後に読むクラシック script なので、外側に const / let / function を書かない（名前がぶつかると SyntaxError）
   // 画像にも data にも国名・首都・プロフィールの名前を入れない。今日の難問は国旗を出さない（答えは明日まで隠す）
 
+  // i18n-data:start
   const SHARE = Object.freeze({ url: 'https://chikokunn1011.github.io/country-drill/', tag: '#国旗マスター', w: 1200, h: 675, maxFlags: 24 });
+  // i18n-data:end
+  // 画面の言語のタグと URL（英語版は #FlagMaster と …/en/。SHARE は日本語のまま）
+  const en = () => I18N.lang === 'en';
+  const tag = () => T(SHARE.tag);
+  const url = () => en() ? SHARE.url + 'en/' : SHARE.url;
   const COLS = 8;
   const GRID = ['ok', 'ng', 'skip'];
   const str = v => typeof v === 'string' ? v : '';
@@ -52,7 +59,7 @@
     try {
       const fonts = document.fonts;
       if (!fonts?.load) return Promise.resolve();
-      const txt = Object.values(d || {}).filter(v => typeof v === 'string' || typeof v === 'number').join('') + '国旗マスター' + SHARE.tag + SHARE.url;
+      const txt = Object.values(d || {}).filter(v => typeof v === 'string' || typeof v === 'number').join('') + T('国旗マスター') + tag() + url();
       const p = Promise.all(['900 80px', '700 28px'].map(w => Promise.resolve(fonts.load(`${w} "Zen Maru Gothic"`, txt)).catch(() => {})));
       return Promise.race([p, new Promise(ok => setTimeout(ok, FONT_MS))]);
     } catch { return Promise.resolve(); }
@@ -88,12 +95,12 @@
     c.fillStyle = col.bg; c.fillRect(0, 0, W, H);
     box(col.surface, c, 24, 24, W - 48, H - 48, 28);
     // 上: 国旗マスター と 条件
-    text('国旗マスター', 80, 100, 40, col.accent, { weight: 900 });
+    text(T('国旗マスター'), 80, 100, 40, col.accent, { weight: 900 });
     text(d.title, W - 80, 98, 28, col.muted, { align: 'right', max: W - 480 });
     // まん中: 結果
     const cx = W / 2;
     text(d.big, cx, 236, d.kind === 'daily' ? 96 : 128, col.ink, { weight: 900, align: 'center', max: W - 160 });
-    const line = [d.sub, d.rank].filter(Boolean).join('　');
+    const line = [d.sub, d.rank].filter(Boolean).join(T('　'));   // 結果と順位のあいだ（日本語は全角の空白、英語は ' · '）
     if (line) text(line, cx, 292, 34, col.muted, { align: 'center', max: W - 160 });
     // 国旗（タイムアタック）
     const urls = [];
@@ -119,25 +126,25 @@
       d.grid.forEach((g, i) => box(col[g === 'ok' ? 'ok' : g === 'ng' ? 'ng' : 'line'], c, left + i * (BAR + BAR_GAP), 392, BAR, BAR, 8));
     }
     // 下: サイトとタグ
-    text(SHARE.url.replace(/^https:\/\//, '').replace(/\/$/, ''), 80, H - 64, 26, col.muted);
-    text(SHARE.tag, W - 80, H - 64, 28, col.accent, { weight: 900, align: 'right' });
+    text(url().replace(/^https:\/\//, '').replace(/\/$/, ''), 80, H - 64, 26, col.muted);
+    text(tag(), W - 80, H - 64, 28, col.accent, { weight: 900, align: 'right' });
     return cv;
   }
 
-  const toFile = cv => new Promise((ok, ng) => cv.toBlob(b => b ? ok(new File([b], 'kokki-master.png', { type: 'image/png' })) : ng(new Error('toBlob')), 'image/png'));
+  const toFile = cv => new Promise((ok, ng) => cv.toBlob(b => b ? ok(new File([b], en() ? 'flag-master.png' : 'kokki-master.png', { type: 'image/png' })) : ng(new Error('toBlob')), 'image/png'));
 
   // 押したとき。File があって渡せるなら画像と文、作り中・失敗なら文と URL。渡せない・失敗（AbortError 以外）は X の投稿画面（rpg-cards.js の share と同じ）
   function share(d, file) {
-    const tweet = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(d.text)}&url=${encodeURIComponent(SHARE.url)}`, '_blank', 'noopener');
+    const tweet = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(d.text)}&url=${encodeURIComponent(url())}`, '_blank', 'noopener');
     const failed = e => { if (e?.name !== 'AbortError') tweet(); };
     const send = o => { try { Promise.resolve(navigator.share(o)).catch(failed); } catch (e) { failed(e); } };
     const canShare = typeof navigator.share === 'function';
     if (file) {
       let files = false;
       try { files = canShare && !!navigator.canShare?.({ files: [file] }); } catch {}
-      return files ? send({ files: [file], text: `${d.text}\n${SHARE.url}` }) : tweet();
+      return files ? send({ files: [file], text: `${d.text}\n${url()}` }) : tweet();
     }
-    if (canShare) send({ text: d.text, url: SHARE.url }); else tweet();
+    if (canShare) send({ text: d.text, url: url() }); else tweet();
   }
 
   // ボタンに付ける。画像は今のうちに作って File を持っておき、押されたら同期で navigator.share に渡す（Safari は押した処理の中で呼ぶ必要がある）。
@@ -166,5 +173,5 @@
     });
   }
 
-  globalThis.SHARECARD = { SHARE, normalize, layout, attach };
+  globalThis.SHARECARD = { SHARE, tag, url, normalize, layout, attach };
 })();

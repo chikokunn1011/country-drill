@@ -39,6 +39,9 @@ SQL
 # 2回流しても壊れないことも確認する
 sql -f supabase/schema.sql
 sql -f supabase/schema.sql
+# 本番用の PR6 の SQL（ng_words() の入れかえだけ）も2回流す。最後の読むだけの表（空）は捨てる
+sql -f supabase/pr6_ng_words_en.sql >/dev/null
+sql -f supabase/pr6_ng_words_en.sql >/dev/null
 # Supabase の auth.uid() の代わり（ログインした人の id。admin.sql には書かない）
 sql <<'SQL'
 create schema if not exists auth;
@@ -124,4 +127,23 @@ if ! wait "$P" || ! grep -q 'profile-lock:' "$TMP/p2.out" || ! grep -q 'score-lo
   echo "FAIL: admin_rename（プロフィールの行）が名前の鍵より先に行の鍵を取っている"; cat "$TMP/p2.out"; exit 1
 fi
 grep -q '"pid": "pidlocktest1"' "$TMP/a2.out" || { echo "FAIL: admin_rename（プロフィールの行）の結果"; cat "$TMP/a2.out"; exit 1; }
+echo 'ok'
+
+echo '- pr6_ng_words_en_lists_existing_names'
+# PR6 の SQL の最後の表に、もう使われている名前・称号のうち新しい一覧に当たるものが出る（ほかの名前は出ない・何も変えない）
+sql <<'SQL'
+truncate profile_transfers, profiles, scores, daily_scores, rpg_players cascade;
+insert into profiles (pid, token_hash, nickname, title) values ('pidng0000001', '\x81', 'Moderator', ''), ('pidng0000002', '\x82', 'チコ', 'ＨＩＴＬＥＲ'),
+  ('pidng0000003', '\x83', 'Therapist', '');
+insert into scores (board, nickname, time_ms, questions) values ('f2n:asia:10', 'xPornx', 8000, 10), ('f2n:asia:10', 'xPornx', 9000, 10),
+  ('f2n:asia:10', 'Peacock', 8000, 10);
+insert into daily_scores (day, nickname, correct, total, time_ms) values ('2026-10-30', 'Hentai', 20, 20, 30000);
+insert into rpg_players (token_hash, nickname, lv, dungeons, floors) values ('\x84', 'Raccoon', 5, 1, 5);
+SQL
+sql -t -A -F '|' -f supabase/pr6_ng_words_en.sql >"$TMP/ng.out"
+expected=$'daily_scores|Hentai|\nprofiles|Moderator|\nprofiles|チコ|ＨＩＴＬＥＲ\nscores|xPornx|'
+if [ "$(grep '|' "$TMP/ng.out")" != "$expected" ]; then
+  echo "FAIL: pr6_ng_words_en.sql の最後の表"; cat "$TMP/ng.out"; exit 1
+fi
+[ "$(sql -t -A -c 'select count(*) from profiles')" = 3 ] || { echo "FAIL: pr6_ng_words_en.sql が行を変えた"; exit 1; }
 echo 'ok'

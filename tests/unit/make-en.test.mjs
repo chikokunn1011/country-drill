@@ -40,6 +40,8 @@ test('en_head', () => {
   assert.ok(h.includes(`<meta property="og:url" content="${SITE}en/">`));
   assert.ok(h.includes('<meta property="og:locale" content="en_US">'));
   assert.ok(h.includes('<link rel="manifest" href="en/manifest.webmanifest">'));
+  assert.ok(h.includes(`<meta property="og:image" content="${SITE}icons/ogp-en.png">`), '英語の OGP 画像');
+  assert.ok(head(read('index.html')).includes(`<meta property="og:image" content="${SITE}icons/ogp.png">`), '日本語は ogp.png のまま');
   assert.ok(h.includes('<meta name="apple-mobile-web-app-title" content="Flag Master">'));
   assert.ok(h.includes('<title>Flag Master | Flag, country, and map quiz (195 countries)</title>'));
   for (const l of HREFLANG) assert.ok(h.includes(l), l);
@@ -48,6 +50,13 @@ test('en_head', () => {
   assert.equal(ld.inLanguage, 'en');
   assert.equal(ld.url, `${SITE}en/`);
   assert.doesNotMatch(ld.description, JA_RE);
+});
+
+test('ogp_en_png', () => {                 // icons/ogp-en.png（1200x630）。作り直し: node tools/make_ogp.mjs en
+  const b = readFileSync(join(ROOT, 'icons/ogp-en.png'));
+  assert.equal(b.toString('latin1', 1, 4), 'PNG');
+  assert.equal(b.toString('latin1', 12, 16), 'IHDR');
+  assert.deepEqual([b.readUInt32BE(16), b.readUInt32BE(20)], [1200, 630]);
 });
 
 test('ja_hreflang', () => {
@@ -158,7 +167,7 @@ test('translate_css_alt', () => {
   assert.deepEqual([...css.matchAll(/content:[^;}]*/g)].map(m => m[0]).filter(s => JA_RE.test(s)), []);
 });
 
-// 埋めこみの英語版: noindex のまま、今日の難問（PR6）のリンクは外し、「もっと遊ぶ」は英語版のトップへ。日本語が残らない
+// 埋めこみの英語版: noindex のまま、今日の難問のリンクは英語版の #daily へ（PR6）、「もっと遊ぶ」は英語版のトップへ。日本語が残らない
 test('en_embed', () => {
   const out = renderEn(readEnInputs(ROOT));
   assert.ok('en/embed.html' in out, 'renderEn が en/embed.html を作る（en_current で見る）');
@@ -168,7 +177,7 @@ test('en_embed', () => {
   assert.ok(base > h.indexOf('<meta charset="utf-8">') && base < h.search(/\s(?:href|src)="(?!https?:)[^"]*"/));
   assert.ok(h.includes('<meta name="robots" content="noindex">'));
   assert.ok(h.includes('<title>Today’s flag | Flag Master</title>'));
-  assert.doesNotMatch(html, /id="e-daily"/);
+  assert.match(html, /<a id="e-daily" href="en\/#daily" target="_blank" rel="noopener">Try the Daily Puzzle \(20 questions\)<\/a>/);
   assert.match(html, /<a id="e-more" href="en\/" target="_blank" rel="noopener">Play more<\/a>/);
   const srcs = scriptSrcs(html);
   assert.deepEqual(srcs.map(s => s.split('?')[0]), ['i18n.js', 'i18n/en-embed.js', 'countries.js', 'daily-core.js', 'embed.js']);

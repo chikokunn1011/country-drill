@@ -31,12 +31,34 @@
   window.I18N = {
     lang,
     locale: en ? 'en-US' : 'ja-JP',
-    hide: new Set(en ? ['ta'] : []),   // 英語版で選べなくするモード（タイムアタックはランキングが未訳）
+    // 英語版で出さないもの。'title' は他人の称号（日本語のバッジの称号。PR7 で訳したら外す）
+    hide: new Set(en ? ['title'] : []),
     // 同じ言語のページへのリンク（ルートからの道。'./' はトップ）
     page: p => en ? (p === './' ? 'en/' : 'en/' + p) : p,
     // 検索用: アクセントを外して小文字に（São Tomé → sao tome）。かなの濁点は消さない
     fold: s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(),
     // 国の並び: 英語は e の ABC 順、日本語は n の五十音順
     byName: (x, y) => en ? (x.e ?? x.n).localeCompare(y.e ?? y.n, 'en') : x.n.localeCompare(y.n, 'ja'),
+    // 次に来る日本時間の h:m（weekly なら次の月曜の h:m）が、その人の時間帯（tz。ふだんは端末の時間帯）で何時か。
+    // 英語は '11:00 AM'・'Sunday 10:00 AM'。日本語のページと、その時刻に日本時間と同じずれ（+9:00）の時間帯では ''（添えない）。
+    // 文は返さない（添え書きの文は呼ぶ側の辞書）
+    localOf: (h, m, { weekly = false, now = new Date(), tz } = {}) => {
+      if (!en) return '';
+      const DAY = 864e5, n = +now, j = new Date(n + 9 * 3600e3);   // j の UTC の年月日・曜日が日本時間のもの
+      let at = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate(), h - 9, m);
+      if (weekly) at += (8 - j.getUTCDay()) % 7 * DAY;   // 日本時間の次の月曜（今日が月曜なら今日）
+      if (at <= n) at += weekly ? 7 * DAY : DAY;
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+        .formatToParts(at).map(x => [x.type, +x.value]));
+      if (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - at === 9 * 3600e3) return '';
+      return new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit', weekday: weekly ? 'long' : undefined })
+        .format(at).replace(/[\u202f\u00a0]/g, ' ');   // ICU によっては AM の前が狭い空白
+    },
+    // 日本時間の日付 'YYYY-MM-DD' の表示: 英語は 'Oct 30'、日本語は '10月30日'
+    // （日本語の形も Intl で作る。i18n.js は日本語の文字を持たない）
+    dayLabel: day => {
+      const [y, mo, d] = day.split('-').map(Number);
+      return new Intl.DateTimeFormat(en ? 'en-US' : 'ja-JP', { month: en ? 'short' : 'long', day: 'numeric', timeZone: 'UTC' }).format(Date.UTC(y, mo - 1, d));
+    },
   };
 })();

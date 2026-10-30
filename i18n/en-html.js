@@ -27,6 +27,8 @@ Object.assign(window.I18N_EN ??= {}, {
   '国旗・国名・場所を当てる': 'Guess the flag, name, or location',
   '今日の難問': 'Daily Puzzle',
   '毎日かわる問題で、みんなと競う': 'A new puzzle every day. Compete with other players.',
+  // 埋めこみ（embed.html）の今日の難問へのリンク
+  '今日の難問（20問）に挑戦': 'Try the Daily Puzzle (20 questions)',
   '冒険': 'Adventure',
   'コインで仲間を集めてダンジョンへ': 'Recruit allies with coins and head into dungeons',
   'ランキング': 'Leaderboard',
