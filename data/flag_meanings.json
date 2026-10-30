@@ -191,13 +191,13 @@
 },
 {
 "a": "cg",
-"t": "緑は豊かな森林と希望、黄色は友情と国の豊かさ、赤は独立のための戦いを表すとされる。",
-"note": "Wikipedia Flag of the Republic of the Congo; hedged"
+"t": "緑は農業と豊かな森林、黄色は人々の友情と誇り高さを表すとされる。赤の意味ははっきりしないが、独立のための戦いと結びつけて説明されることがある。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_the_Republic_of_the_Congo"
 },
 {
 "a": "cd",
-"t": "憲法の説明では、空色は平和、赤は国の殉教者の血、黄色は国の豊かさ、星は国の輝かしい未来を表す。",
-"note": "Constitution of the DRC (2006) art. 1"
+"t": "空色は平和、赤は国のために命を落とした人々の血、黄色は国の豊かさ、左上の黄色い星は国の輝かしい未来を表すとされる。",
+"note": "Revised after fact-check; source: https://www.icla.up.ac.za/images/constitutions/drc_constitution.pdf"
 },
 {
 "a": "cr",
@@ -461,8 +461,8 @@
 },
 {
 "a": "xk",
-"t": "6つの白い星は、コソボに暮らすおもな6つの民族を表すとされる。青と金色の配色は、ヨーロッパの旗を意識したものと説明されることが多い。",
-"note": "Wikipedia Flag of Kosovo (2008); stars = six main ethnic groups (commonly stated); EU-style colours hedged; no political framing"
+"t": "6つの白い星は、コソボに暮らすおもな6つの民族の調和を表すとされる。星の下には、青地に金色でコソボの地形がかたどられている。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Kosovo ; https://ja.wikipedia.org/wiki/コソボの国旗"
 },
 {
 "a": "kw",
@@ -471,8 +471,8 @@
 },
 {
 "a": "kg",
-"t": "赤は英雄マナスの勇気を表すとされる。太陽の中の模様は遊牧民の住まいユルトの天窓「トゥンドゥク」で、家族のぬくもりや世界の一体性を表すとされる。",
-"note": "Wikipedia Flag of Kyrgyzstan (1992; 2023 redesign kept tunduk); hedged"
+"t": "赤は勇敢さと勇気を表し、英雄マナスが掲げた旗の色にちなむとも言われる。太陽の中の模様は遊牧民の住まいユルトの天窓「トゥンドゥク」で、祖国や家庭、世界の一体性を表すとされる。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Kyrgyzstan ; https://ja.wikipedia.org/wiki/キルギスの国旗"
 },
 {
 "a": "la",
@@ -506,8 +506,8 @@
 },
 {
 "a": "li",
-"t": "青は空、赤は家々でともされる夕暮れの炉の火を表すとされる。左上の王冠は、侯爵が治める公国であることを示している。",
-"note": "Britannica / Wikipedia Flag of Liechtenstein; colour meanings hedged; crown = principality"
+"t": "青は空、赤は家々でともされる夕暮れの炉の火を表すとされる。左上の王冠は侯国であることを示し、そっくりだったハイチの国旗と見分けるために1937年に加えられた。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Liechtenstein"
 },
 {
 "a": "lt",
@@ -526,8 +526,8 @@
 },
 {
 "a": "mw",
-"t": "黒はアフリカの人々、赤は自由のために流された血、緑はいつも緑が絶えない自然を表す。昇る太陽は、アフリカの希望と自由の夜明けを表すとされる。",
-"note": "Malawi government / Wikipedia Flag of Malawi"
+"t": "黒はアフリカの人々、赤は自由のために流された血、緑は一年中青々とした自然を表す。昇る太陽は、アフリカの希望と自由の夜明けを表すとされる。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Malawi"
 },
 {
 "a": "my",
@@ -571,8 +571,8 @@
 },
 {
 "a": "fm",
-"t": "水色の地は島々を囲む太平洋を表すとされる。かつての国連の信託統治領の旗と同じ水色と白の配色で、その旗から受け継がれた。",
-"note": "Wikipedia Flag of the FSM (Trust Territory flag); hedged"
+"t": "青い地は太平洋を、4つの白い星はチューク・ポンペイ・コスラエ・ヤップの4つの州を表す。かつての国連の信託統治領の青い旗をもとにしたデザインになっている。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_the_Federated_States_of_Micronesia"
 },
 {
 "a": "md",
@@ -626,8 +626,8 @@
 },
 {
 "a": "nl",
-"t": "色の意味は公式には決まっていない。オレンジ・白・青の旗は、独立戦争を率いたオラニエ公ウィレムの紋章や服の色に由来するとされる。",
-"note": "No official meaning; Wikipedia Flag of the Netherlands (Prinsenvlag); hedged"
+"t": "色の意味は公式には決まっていない。オラニエ公ウィレムの「オレンジ・白・青」の旗がもとになり、17世紀ごろにオレンジが赤に変わって今の赤・白・青の旗になったとされる。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_the_Netherlands"
 },
 {
 "a": "nz",
@@ -746,8 +746,8 @@
 },
 {
 "a": "ws",
-"t": "赤は勇気、青は自由、白い星は清らかさを表すとされる。1949年に今の形になり、1962年の独立後も引き継がれた。",
-"note": "Wikipedia Flag of Samoa; hedged"
+"t": "赤は勇気、白は清らかさ、青は自由を表すとされる。5つの白い星は南十字星をかたどっている。1949年に今の形になり、1962年の独立後も引き継がれた。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Samoa"
 },
 {
 "a": "sm",
@@ -851,13 +851,13 @@
 },
 {
 "a": "sy",
-"t": "赤・白・黒・緑の汎アラブ色は、アラブの反乱の旗や歴史上のイスラム王朝の旗に由来するとされる。星の数や色は時代によって変わり、2025年からは緑・白・黒に赤い3つの星の旗が使われている。",
-"note": "Site shows the red-white-black 2-star flag; text is version-neutral and mentions the 2025 constitutional declaration flag factually"
+"t": "赤・白・黒・緑の汎アラブ色は、アラブの反乱の旗や歴史上のイスラム王朝の旗に由来するとされる。2つの緑の星は、1958年にエジプトと作ったアラブ連合共和国の2つの地域を表すとされる。",
+"note": "Describes the two-star flag shown on the site (SVG). Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Syria"
 },
 {
 "a": "tj",
-"t": "赤は国の独立と勝利、白は綿花と清らかさ、緑は豊かな谷と大地を表すとされる。王冠は国名の「タジク」と「タージ（冠）」を結びつけて説明されることが多い。",
-"note": "Wikipedia Flag of Tajikistan; meanings unofficial, hedged"
+"t": "赤は国の団結と勝利、白は綿花と清らかさ、緑は豊かな自然と谷を表すとされる。王冠はタジク人を表し、国名の「タジク」と「タージ（冠）」を結びつけて説明されることが多い。",
+"note": "Revised after fact-check; source: https://en.wikipedia.org/wiki/Flag_of_Tajikistan"
 },
 {
 "a": "tz",
