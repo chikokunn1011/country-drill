@@ -108,7 +108,11 @@ const SCREENS = [
   }],
 ];
 
-// 冒険の全画面の見える文とトーストを url のサイトで集める。{ 画面: { text: 行の並び, toasts: そこまでに出たトースト } }
+// 冒険の画面の aria-label・title（T() を通るようになった属性。最終レビューの Minor 8）。要素の id かクラスと組にして並べる
+const attrs = page => page.evaluate(() => [...document.querySelectorAll(':is(#scr-rpg, #scr-team, #scr-battle, #topbar) :is([aria-label], [title]), #pcoin')]
+  .flatMap(el => ['aria-label', 'title'].filter(a => el.hasAttribute(a)).map(a => `${el.id || el.className}[${a}] ${el.getAttribute(a)}`)));
+
+// 冒険の全画面の見える文とトーストを url のサイトで集める。{ 画面: { text: 行の並び, toasts: そこまでに出たトースト, attrs: aria-label・title } }
 // （トーストは読み込み直してからの分。openRpg の RECORD が origin/main でも __toasts を積む）
 async function rpgTexts(browser, url) {
   const app = await openRpg(browser, { url, blockScripts: [], seed: 1, reducedMotion: 'reduce', storage: { badges: QUIET_BADGES } });
@@ -116,7 +120,7 @@ async function rpgTexts(browser, url) {
   try {
     for (const [name, go] of SCREENS) {
       try { await go(app.page, app); } catch (e) { throw new Error(`${name}: ${e.message}`); }
-      out[name] = { text: await lines(app.page), toasts: await toastTexts(app.page) };
+      out[name] = { text: await lines(app.page), toasts: await toastTexts(app.page), attrs: await attrs(app.page) };
     }
     assert.deepEqual(app.errors.map(String), [], url);
   } finally { await app.close(); }
@@ -138,10 +142,13 @@ test('ja_rpg_unchanged', { timeout: 300_000 }, async t => {
     execFileSync('sh', ['-c', 'git -C "$1" archive origin/main | tar -x -C "$2"', 'sh', REPO, root]);
     base = await startServer({ root });
     const main = await rpgTexts(browser, base.url), now = await rpgTexts(browser, server.url);
+    const all = Object.values(main).flatMap(v => v.attrs).join('\n');
+    for (const re of [/旅人のHP/, /まだ開いていない/, /（外す）/]) assert.match(all, re);   // 属性を集められている
     for (const [name] of SCREENS) {
       assert.ok(main[name].text.length > 3, `${name}: ${main[name].text.join('\n')}`);
       assert.deepEqual(now[name].text, main[name].text, `${name} の見える文が origin/main とちがう`);
       assert.deepEqual(now[name].toasts, main[name].toasts, `${name} のトーストが origin/main とちがう`);
+      assert.deepEqual(now[name].attrs, main[name].attrs, `${name} の aria-label・title が origin/main とちがう`);
     }
   } finally {
     await base?.close();
@@ -433,7 +440,7 @@ te('en_profile_decorations', async (page, { db }) => {
   // はじめた: ［Choose decorations in Adventure］→ 冒険ホーム
   await writeSave(page, JA_SAVE);
   await openProfile();
-  assert.equal((await txt(page, '#pf-deco')).trim(), 'Choose decorations in Adventure');
+  assert.equal((await txt(page, '#pf-deco')).trim(), 'Choose decorations in the Adventure');
   assert.deepEqual(await jaLeft(page), []);
   await page.click('#pf-deco');
   await shown(page, '#rpg-hero');
@@ -814,7 +821,7 @@ te('en_battle_win', async page => {
   await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
   assert.ok(['Which country has this flag?', 'Which flag belongs to this country?', 'Which flag belongs to the highlighted country?']
     .includes((await txt(page, '#bt-q .qlabel')).trim()));
-  assert.match(await txt(page, '#bt-left'), /^Misses left \d+$/);
+  assert.match(await txt(page, '#bt-left'), /^Mistakes left \d+$/);
   assert.deepEqual(await jaLeft(page), []);
   // まちがえる: 答え合わせと反撃のログ
   const a = await missOnce(page);
@@ -939,7 +946,7 @@ te('en_tower', async page => {
   await openHome(page, JA_SAVE);
   let card = await txt(page, '#rpg-tower');
   assert.ok(card.includes('Tower of Heroes') && card.includes('Personal best: floor 7'), card);
-  assert.equal((await txt(page, '#rpg-tower-go')).trim(), 'Challenge');
+  assert.equal((await txt(page, '#rpg-tower-go')).trim(), 'Climb');
   assert.deepEqual(await jaLeft(page), []);
   await openHome(page, saveWith({ lv: 30, floors: { world: 4 } }));
   card = await txt(page, '#rpg-tower');
@@ -1019,6 +1026,32 @@ te('en_battle_fit', async page => {
   assert.equal(await page.evaluate(() => RPG_BATTLE.debugTower(10)), true);
   await shown(page, '#bt-fight');
   await check();
+}, { viewport: PHONE });
+
+// 390px: 英語のログの最新の行は2行まで（日本語より長いので1行の … で切らない）。2行でも問題の4択は最初の画面に入る
+te('en_battle_log_two_lines', async page => {
+  await writeSave(page, saveWith({ lv: 99, cards: { br: [1, 0], ar: [1, 0], cl: [1, 0] }, teams: [{ n: '編成1', c: ['br', 'ar', 'cl'] }], floors: { samerica: 4 } }));
+  await page.evaluate(() => RPG_BATTLE.start('samerica', 5));
+  await shown(page, '#bt-fight');
+  await page.click('#bt-fight');
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question');
+  await battleAnswer(page, true);
+  await page.waitForFunction(() => RPG_BATTLE.state().phase === 'question' && !document.querySelector('#scr-battle .choice[disabled]'));
+  const m = async () => page.evaluate(() => {
+    const p = $('bt-log').lastElementChild, lh = parseFloat(getComputedStyle(p).lineHeight), r = p.getBoundingClientRect();
+    const last = [...document.querySelectorAll('#bt-q .choice')].map(e => e.getBoundingClientRect().bottom);
+    return { text: p.textContent, lines: Math.round(r.height / lh), cut: p.scrollHeight > p.clientHeight + 1 || p.scrollWidth > p.clientWidth + 1,
+      choices: Math.max(...last), ih: innerHeight, iw: innerWidth, sw: document.documentElement.scrollWidth };
+  });
+  let r = await m();
+  assert.match(r.text, /\(with help from .+\)\.?$/);
+  assert.ok(r.lines <= 2 && !r.cut, JSON.stringify(r));
+  // いちばん長い国名の援護でも2行で止まり、4択は画面に入る
+  await page.evaluate(() => { $('bt-log').lastElementChild.textContent = 'Critical hit! Saint Vincent and the Grenadines! 18 damage to Chatty Parrot (with help from Bosnia and Herzegovina · Liechtenstein)'; });
+  r = await m();
+  assert.equal(r.lines, 2, JSON.stringify(r));
+  assert.ok(r.choices <= r.ih, JSON.stringify(r));
+  assert.ok(r.sw <= r.iw, JSON.stringify(r));
 }, { viewport: PHONE });
 
 // en_team_custom_name_ugc のバトルの半分（preflight C6）: 自分で付けた編成名は data-ugc、既定の名前は Team 1

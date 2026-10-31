@@ -26,7 +26,7 @@ const ID_CHAR = /[\w$]/;
 //   exempt:  いちばん内側の呼び出しが console.<x>( か Error(（関数の本体 {…} の中からは外を見ない）
 // text はエスケープを読んだあとの文字（T('a\'b') のキーは a'b）
 //   data:    // i18n-data:start 〜 // i18n-data:end の中
-//   ignore:  // i18n-ignore:start 〜 // i18n-ignore:end の中（画面に出さない日本語。NG ワードの一覧だけに使う。辞書にも求めない）
+//   ignore:  // i18n-ignore:start 〜 // i18n-ignore:end の中（辞書にも求めない日本語。画面に出さないもの（NG ワードの一覧）と、日本語のページだけで出す i18n-data の値の日本語だけの組み立て（rpg-battle.js の日本語のシェアの文）に使う）
 // テンプレートの text は、${…} を '${…}' に置きかえた文字の部分
 export function scanJs(src) {
   return lex(src, t => JA_RE.test(t));

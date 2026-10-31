@@ -48,7 +48,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '音': 'Sound',
   '効果音を鳴らす': 'Play sound effects',
   '音量': 'Volume',
-  '正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。': 'Sounds play for right and wrong answers, finishing a quiz, Adventure battles, draws, and level-ups, earning badges, and more.',
+  '正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。': 'Sounds play for right and wrong answers, finishing a quiz, Adventure battles, Flag Draws, level-ups, earning badges, and more.',
   '進み方': 'Pacing',
   '正解したらすぐ次の問題へ': 'Go straight to the next question after a right answer',
   'プレイのクイズで、正解なら答えを出さずに次へ（まちがえたら正解を見せる）。': 'In quizzes, a right answer skips the answer card and moves on (a wrong answer still shows the right one).',

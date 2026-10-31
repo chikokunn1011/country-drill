@@ -1,6 +1,6 @@
 // v=1
 // 英語版（PR8）: 冒険（国旗クエスト → Flag Quest）の文。rpg-core.js のデータ（// i18n-data の名前: ダンジョン・land・章・モンスター・
-// 鏡の手下の型の文・宇宙のテーマ・塔の番人・既定の編成名の頭・コインの単位）。ストーリー（rpg-core の STORY・STORY_END）。あとのタスクで rpg.js・2つ以上の rpg-*.js が使う文を足す。
+// 鏡の手下の型の文・宇宙のテーマ・塔の番人・既定の編成名の頭・コインの単位）。ストーリー（rpg-core の STORY・STORY_END）。rpg.js と2つ以上の rpg-*.js が使う冒険の文（ホーム・塔の札など）もここ。
 // 名前は Title Case・28字まで。鏡の手下は 'Mirror {name}'・'Upside-Down {name}' に元の名前を入れる（Upside-Down に入る名前は16字まで）。
 // 月（天体）は曜日の '月'（en-daily.js の Mon）とぶつかるので、表示のキーは '天体の月'（DUNGEONS の key）。
 // 冒険の語（PR7）: Adventure・Tower of Heroes・Dungeon（文の中は dungeon）・Traveler（Traveler level）・battle・boss / region boss・
@@ -13,7 +13,7 @@
 // Personal best・Transfer code・Restore from code・Decorations（一覧は tools/dict_sheet.mjs の GLOSSARY）。
 // ほかの辞書のキーをそのまま使う（ここに書かない）: '英雄の塔'・'{n}階'（en-badges.js）、地域名・細かい地域名・'全世界'（en-core.js）、
 // '#国旗マスター'（en-rank.js）、'・'（en-daily.js）、'〈{title}〉'（en-profile.js）、'すべて'・'シェア'・'まだ'（en-badges.js）
-// rpg.js が使うほかの辞書のキー: '冒険'・'達成'（en-badges.js）、'閉じる'（en-book.js）、'コピー'・'コピーしたよ'（en-profile.js）、'挑戦'（en-core.js）
+// rpg.js が使うほかの辞書のキー: '冒険'・'達成'（en-badges.js）、'閉じる'（en-book.js）、'コピー'・'コピーしたよ'（en-profile.js）
 // rpg-cards.js の文は en-rpg-cards.js。rpg-cards.js も使うこの辞書のキー: '← 冒険'・'国旗ガチャ'・'あと{coins}'
 // rpg-team.js の文も en-rpg-cards.js。rpg-team.js も使うこの辞書のキー: '← 冒険'・'編成'・'編成{n}'・'仲間 {n}/{total}'・'あと{coins}'・'＋{p}%'
 // rpg-battle.js の文は en-rpg-battle.js。rpg-battle.js も使うこの辞書のキー: '冒険ホームへ'・'編成'・'＋{p}%'（'まちがえた国' は en-quiz.js にあるのでそれを使う）
@@ -216,7 +216,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '{dungeon} F{f} に挑戦！（推奨Lv{lv}）': 'Take on {dungeon} F{f}! (recommended Lv {lv})',
   '{dungeon} ボス（{boss}）に挑戦！（推奨Lv{lv}）': 'Take on the {dungeon} boss ({boss})! (recommended Lv {lv})',
   'ちょっときびしいかも。クイズでコインを稼ごう': 'This might be a bit tough. Earn coins in quizzes.',
-  '全クリア！ {total}か国を仲間にしよう（{owned}/{total}）': 'All cleared! Make all {total} countries your allies ({owned}/{total})',
+  '全クリア！ {total}か国を仲間にしよう（{owned}/{total}）': 'All cleared! Make all {total} countries your allies ({owned}/{total}).',
   '全クリア！ クイズでコインを稼いで、レベルを上げよう': 'All cleared! Earn coins in quizzes and raise your level.',
   // ホームのボタン（ガチャ・仲間・編成・冒険ランキングの画面があるときだけ）
   '国旗ガチャ': 'Flag Draw',
@@ -250,6 +250,8 @@ Object.assign(window.I18N_EN ??= {}, {
   '自己ベスト {n}階': 'Personal best: floor {n}',
   '1階から、どこまで登れるかな': 'Start at floor 1. How high can you climb?',
   '地図喰いをたおすと開く': 'Opens when you defeat the Map Eater',
+  // 塔の札のボタン（日本語は「挑戦」のまま。英語は en-core の 'Challenge'＝クイズのモードの名前と読まれないように別のキー）
+  '塔に挑戦する': 'Climb',
   // 今日の手配書・コインのかせぎ方（設計書 §5.1 の例の表）
   '今日の手配書': 'Today’s Wanted posters',
   'ゲームでヒントなしの一発正解！': 'Get it right on the first try in a game, with no hints!',
@@ -330,14 +332,14 @@ Object.assign(window.I18N_EN ??= {}, {
   '夜空を見上げると、星がひとつ、またひとつと消えていく。':
     'When you looked up at the night sky, the stars were vanishing, one after another.',
   '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。':
-    'The Star Eater, the mother of the Map Eater, had been targeting Earth from space.',
+    'The Star Eater, the mother of the Map Eater, had been targeting Earth from Space.',
   '🪐 第3章 宇宙': '🪐 Chapter 3: Space',
   '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。':
     'The Star Eater is swallowing the stars one by one as it comes closer to Earth.',
   '星には、地球の国のなかまたちの記憶が眠っている。':
     'Memories of the friendly countries of Earth are sleeping inside the stars.',
   '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！':
-    'Look down at Earth from space, remember where the countries are, and stop the Star Eater!',
+    'Look down at Earth from Space, remember where the countries are, and stop the Star Eater!',
   '🌟 エンディング': '🌟 Ending',
   '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。':
     'When the Star Eater disappeared, all the stars it had swallowed began to shine at once.',

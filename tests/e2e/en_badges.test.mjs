@@ -11,7 +11,7 @@ before(async () => { server = await startServer(); browser = await chromium.laun
 after(async () => { await browser?.close(); await server?.close(); });
 
 // 英語版を ?bdgdebug=1 で開いて fn(page, app) を呼び、最後にページの例外と [i18n] の warn（辞書に無いキー）が無いかも見る。
-// rpg.js は英語版でも画面なしで読む（Task 13）ので、冒険のバッジも出て、バッジのコインも払われる
+// rpg.js は英語版でも読む（PR7 は画面なし・PR8 から冒険の画面も英語）ので、冒険のバッジも出て、バッジのコインも払われる
 const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => {
   const { hash = '', ...rest } = opts;
   const app = await openApp(browser, { path: 'en/?bdgdebug=1' + hash, locale: 'en-US', ...rest });
@@ -187,7 +187,7 @@ t('en_badge_share', async (page, app) => {
   assert.equal(clip, 'I earned the “Across Asia” badge (Silver) in Flag Master! Title: “Asia Buff” https://chikokunn1011.github.io/country-drill/en/');
 }, { storage: { badges: saveOf(['reg-asia@1', 'reg-asia@2']) } });
 
-// 英語でバッジを取ると、冒険のコインも払われる（rpg.js を画面なしで読む。Task 13）。パネルの行に ●+50
+// 英語でバッジを取ると、冒険のコインも払われる（rpg.js は英語版でも読む）。パネルの行に ●+50
 t('en_badge_coin_paid', async page => {
   const before = (await stored(page, 'rpg'))?.coins ?? 0;
   await playPractice(page);

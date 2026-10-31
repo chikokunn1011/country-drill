@@ -23,7 +23,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '旅人のHP': 'Traveler’s HP',
   '取りもどした旗': 'Flags won back',
   '旗 {got}/{all}': 'Flags {got}/{all}',
-  'のこりミス{n}': 'Misses left {n}',
+  'のこりミス{n}': 'Mistakes left {n}',
   '地域ボーナス ×{mul}': 'Region bonus ×{mul}',
   'チームボーナス ＋{p}%': 'Team bonus +{p}%',
 
@@ -53,10 +53,10 @@ Object.assign(window.I18N_EN ??= {}, {
   '{country}！ {mon}に{dmg}ダメージ（{mates}の援護）': '{country}! {dmg} damage to {mon} (with help from {mates})',
   '会心！ {country}！ {mon}に{dmg}ダメージ': 'Critical hit! {country}! {dmg} damage to {mon}',
   '会心！ {country}！ {mon}に{dmg}ダメージ（{mates}の援護）': 'Critical hit! {country}! {dmg} damage to {mon} (with help from {mates})',
-  '{country}！ 旗を取りもどした': '{country}! You won back a flag',
-  '{country}！ 旗を取りもどした（{mates}の援護）': '{country}! You won back a flag (with help from {mates})',
-  '会心！ {country}！ 旗を取りもどした': 'Critical hit! {country}! You won back a flag',
-  '会心！ {country}！ 旗を取りもどした（{mates}の援護）': 'Critical hit! {country}! You won back a flag (with help from {mates})',
+  '{country}！ 旗を取りもどした': '{country}! You won back a flag.',
+  '{country}！ 旗を取りもどした（{mates}の援護）': '{country}! You won back a flag (with help from {mates}).',
+  '会心！ {country}！ 旗を取りもどした': 'Critical hit! {country}! You won back a flag.',
+  '会心！ {country}！ 旗を取りもどした（{mates}の援護）': 'Critical hit! {country}! You won back a flag (with help from {mates}).',
   '{mon}の反撃！ {dmg}ダメージ': '{mon} counterattacks! {dmg} damage',
   'ざんねん。正解は「{n}」': 'Not quite. The answer is {n}.',
   // 宇宙: テーマの一言（テーマの名前は Title Case。Southern Hemisphere もあるので “is one of the …” にしない）

@@ -38,7 +38,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '名前を変えたよ': 'Nickname changed',
   'かざり': 'Decorations',
   '冒険の仲間の国旗を3つまで、名前の横にかざれるよ': 'Show up to 3 flags of your Adventure allies next to your nickname.',
-  '冒険でかざりを選ぶ': 'Choose decorations in Adventure',
+  '冒険でかざりを選ぶ': 'Choose decorations in the Adventure',
   '設定': 'Settings',
   'プロフィールを公開する': 'Make my profile public',
   'オフにすると、ランキングで名前を押した人には名前とかざりだけ見えるよ': 'When off, people who tap your nickname on the leaderboard see only your nickname and decorations.',

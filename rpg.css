@@ -449,6 +449,7 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
 
 /* ---- バトルの並べ方（スマホは上の列を画面の上に固定・短いスマホは上の列を1行・PC は画面の高さいっぱいの2列のステージ） ---- */
 .rpg-flags::before { content: "取りもどした旗"; content: "取りもどした旗" / ""; margin-right: 4px; font-size: .75rem; color: var(--muted); }
+.rpg-flags:lang(en)::before { content: "Flags won back"; content: "Flags won back" / ""; }   /* 英語のページ（CSS の字は辞書を通らない） */
 /* スマホ（〜899px）: 上の列は画面の上に固定する横いっぱいの帯（背景は --surface、下に線）。
    中は［にげる］とダンジョン名・モンスター・敵の HP・旅人の HP とのこりミス・仲間（国旗 28px と★の1行）・取りもどした旗・ログの最新1行 */
 @media (max-width: 899.98px) {
@@ -464,6 +465,8 @@ body.rpg-off :is(#home-rpg, #rpg-chip, #pcoin, #rk-to-rpg) { display: none !impo
   .rpg-btop .rpg-stars { font-size: .6rem; }
   .rpg-log p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }   /* 1行のまま（帯の高さを変えない） */
   .rpg-log p:not(:last-child) { display: none; }
+  /* 英語のログは日本語より長い（援護の国名つき）ので、最新の行は2行まで（390×844 で4択はまだ画面に入る） */
+  .rpg-log p:last-child:lang(en) { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
   /* 登場画面を詰める（ボスで仲間3枚・枠2つでも 390×844 で［たたかう］が最初の画面に入る）。
      編成の行は「◀ 編成1 ▶ 南アメリカ×3 ＋25% ［へんせい］」の1行（「編成」「チーム」の字は隠す） */
   .rpg-bintro { padding: 12px; gap: 6px; }

@@ -823,7 +823,7 @@
     return `<div class="rpg-tower${on ? '' : ' rpg-locked'}" id="rpg-tower"><p class="rpg-tower-h">`
       + (on ? '<span class="rpg-tower-e" aria-hidden="true">🗼</span>' : `<span class="rpg-tower-e" role="img" aria-label="${T('まだ開いていない')}">🔒</span>`)
       + `<b>${T('英雄の塔')}</b><span class="rpg-tower-s">${on ? (best ? T('自己ベスト {n}階', { n: fmt(best) }) : T('1階から、どこまで登れるかな')) : T('地図喰いをたおすと開く')}</span></p>`
-      + `<button type="button" class="btn" id="rpg-tower-go"${on ? '' : ' disabled'}>${T('挑戦')}</button></div>`;
+      + `<button type="button" class="btn" id="rpg-tower-go"${on ? '' : ' disabled'}>${EN ? T('塔に挑戦する') : T('挑戦')}</button></div>`;
   };
   // スマホは上から 旅人・レベルアップ・つぎにやること・塔・手配書・ガチャと仲間・図版・かせぎ方（rpg.css の order）。
   // PC は .rpg-side（左）・.rpg-main（図版）・.rpg-aside（手配書。1400px 以上は右の列）
