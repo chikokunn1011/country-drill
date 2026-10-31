@@ -25,11 +25,10 @@ const load = ({ lang, dict } = {}) => {
 
 // 日本語の文字を見るファイル。'all' はファイル全体（index.html の節はあとのタスクで足す）
 // sound.js・pwa.js・daily-core.js は日本語が console・Error の中だけなので、はじめから見る
-const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all', 'badges.js': 'all',
+const COVER = { 'i18n.js': 'all', 'dojo.js': 'all', 'sound.js': 'all', 'pwa.js': 'all', 'daily-core.js': 'all', 'embed.js': 'all', 'ranking.js': 'all', 'profile.js': 'all', 'share-card.js': 'all', 'daily.js': 'all', 'streak.js': 'all', 'badges.js': 'all', 'rpg-core.js': 'all', 'rpg.js': 'all', 'rpg-cards.js': 'all', 'rpg-team.js': 'all', 'rpg-battle.js': 'all', 'rpg-rank.js': 'all',
   'index.html': ['先読み', 'データ', '地図', 'ドパガキ向けの演出', '画面切り替え', '設定', 'モード選択', 'クイズ', 'ランキング', '図鑑', '起動'] };
-// まだ訳さないファイル（PR8: rpg-*）
-const NOT_YET = [
-  'rpg-core.js', 'rpg.js', 'rpg-cards.js', 'rpg-battle.js', 'rpg-team.js', 'rpg-rank.js'];
+// まだ訳さないファイル（PR8 で全部訳した。しくみは残す）
+const NOT_YET = [];
 // 見ないファイル（データ・管理画面・生成物の sw.js）。trivia.js は日本語のデータで、英語のページは trivia-en.js（英訳のデータ。tests/unit/en-trivia.test.mjs が見る）に差しかえる
 const SKIP = ['countries.js', 'themes.js', 'world.js', 'admin.js', 'admin-api.js', 'admin-save.js', 'sw.js', 'trivia.js', 'trivia-en.js'];
 
@@ -77,15 +76,13 @@ test('t_page_and_fold', () => {
   assert.ok(ja.I18N.byName(a, b) > 0);
 });
 
-// PR7: 英語版は冒険（rpg）の画面・入口・コインの表示を隠す（rpg.js は画面なしで読む。PR8 で外す）。ほかの人の称号は英語で出す（'title' は無い）
-test('hide_rpg', () => {
-  const en = load({ lang: 'en' }).ctx;
-  assert.equal(en.I18N.hide.has('ta'), false);
-  assert.equal(en.I18N.hide.has('rpg'), true);
-  assert.equal(en.I18N.hide.has('title'), false);   // 他人の称号は BADGES.titleLabel で英語にして出す
-  assert.deepEqual([...en.I18N.hide], ['rpg']);
-  assert.equal(load().ctx.I18N.hide.size, 0);
-  assert.equal(load().ctx.I18N.hide.has('rpg'), false);
+// PR8: I18N.hide は両方の言語で空（冒険も英語で出す）。しくみは残す（これから未訳の機能を足すとき用）。ほかの人の称号は BADGES.titleLabel で英語
+test('hide_empty', () => {
+  const en = load({ lang: 'en' }).ctx, ja = load().ctx;
+  assert.equal(en.I18N.hide.size, 0);
+  assert.equal(ja.I18N.hide.size, 0);
+  assert.equal(en.I18N.hide.has('rpg'), false);
+  assert.equal(typeof en.I18N.hide.has, 'function');
 });
 
 // PR6: 日本時間の区切りが、その人の時間で何時か（tz はテスト用。ふだんは端末の時間帯）
@@ -335,6 +332,56 @@ test('dict_no_conflict', () => {
   for (const [f, d] of Object.entries(dictFiles())) for (const [k, v] of Object.entries(d)) {
     if (seen.has(k) && JSON.stringify(seen.get(k).v) !== JSON.stringify(v)) bad.push(`${k}: ${seen.get(k).f} と ${f}`);
     if (!seen.has(k)) seen.set(k, { f, v });
+  }
+  assert.deepEqual(bad, []);
+});
+
+// CSS の content: の字は T() も辞書も jaLeft の文字の見張りも通らない（PR8 の最終の直し: rpg.css の「取りもどした旗」が英語のバトルに出ていた）。
+// *.css の content: に日本語があるルールは、同じセレクタに :lang(en) をつけた英語のルールが同じファイルにあること（英語は辞書の訳と同じ字）。
+// ない場合は CSS_JA_ALLOW に理由を書く。index.html の <style> は make_en が訳す（make-en.test が見る）ので、ここは外の *.css だけ
+const CSS_JA_ALLOW = {};   // 'file|selector': '理由'
+const splitTop = s => {   // ( ) の中のカンマでは切らない
+  const out = []; let depth = 0, cur = '';
+  for (const ch of s) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && !depth) { out.push(cur.trim()); cur = ''; } else cur += ch;
+  }
+  return [...out, cur.trim()].filter(Boolean);
+};
+const cssContentJa = css => {
+  css = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [];
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const sels = splitTop(m[1].split(';').pop());
+    const contents = [...m[2].matchAll(/(?:^|[;\s])content\s*:\s*([^;]+)/g)].map(x => x[1].trim());
+    rules.push({ sels, contents });
+  }
+  const strs = c => [...c.matchAll(/"([^"]*)"|'([^']*)'/g)].map(x => x[1] ?? x[2]);
+  const bad = [];
+  for (const r of rules) for (const c of r.contents.filter(c => JA_RE.test(c)).slice(0, 1)) for (const sel of r.sels) {   // content: を2回書く（読み上げの字つき）ルールも1回だけ数える
+    const ja = strs(c).find(s => JA_RE.test(s));
+    const en = rules.find(o => o.sels.some(s => s.includes(':lang(en)') && s.replace(/:lang\(en\)/g, '') === sel) && o.contents.length && o.contents.every(x => !JA_RE.test(x)));
+    bad.push({ sel, ja, en: en && strs(en.contents[0])[0] });
+  }
+  return bad;
+};
+
+test('css_content_ja_scan', () => {
+  assert.deepEqual(cssContentJa('.a::before { content: "旗"; }'), [{ sel: '.a::before', ja: '旗', en: undefined }]);
+  assert.deepEqual(cssContentJa('/* content: "旗" */ .a::before { content: "x"; }'), []);
+  assert.deepEqual(cssContentJa('@media (x) { .a::before, :is(.b, .c)::after { content: "旗" / ""; } }\n.a:lang(en)::before { content: "Flag" / ""; }').map(b => [b.sel, b.en]),
+    [['.a::before', 'Flag'], [':is(.b, .c)::after', undefined]]);
+});
+
+test('css_content_ja_has_en', () => {
+  const dict = I18N_EN(), bad = [];
+  const files = readdirSync(fileURLToPath(root), { recursive: true }).filter(f => f.endsWith('.css') && !/(^|\/)(node_modules|docs|\.)/.test(f));
+  assert.ok(files.includes('rpg.css'), files.join(' '));
+  for (const f of files) for (const b of cssContentJa(read(f))) {
+    if (Object.hasOwn(CSS_JA_ALLOW, `${f}|${b.sel}`)) continue;
+    if (!b.en) bad.push(`${f}: ${b.sel} の「${b.ja}」に :lang(en) の英語のルールがない`);
+    else if (Object.hasOwn(dict, b.ja) && dict[b.ja] !== b.en) bad.push(`${f}: ${b.sel} の英語「${b.en}」が辞書の「${dict[b.ja]}」と違う`);
   }
   assert.deepEqual(bad, []);
 });

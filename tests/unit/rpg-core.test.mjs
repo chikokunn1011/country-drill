@@ -1590,3 +1590,152 @@ test('tower_sanitize', () => {
   assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: 2.6 } }, T0).tower), { best: 3 });
   assert.deepEqual(plain(K.sanitize({ ...K.fresh(T0), tower: { best: 1e12 } }, T0).tower), { best: K.TUNING.tower.maxFloor });
 });
+
+// ---- 英語版（PR8）: 名前はデータ（i18n-data）。日本語は今のまま ----
+test('core_names_same', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.DUNGEONS.map(d => [d.name, d.land])), [
+    ['アマゾンの密林', '南アメリカ'], ['サンゴ礁の海', 'オセアニア'], ['大峡谷', '北・中央アメリカ'], ['古城の迷宮', 'ヨーロッパ'],
+    ['天空の山脈', 'アジア'], ['サバンナの大地', 'アフリカ'], ['地図喰いの巣', '世界'],
+    ['鏡のアマゾン', '鏡の南アメリカ'], ['鏡のサンゴ礁', '鏡のオセアニア'], ['鏡の大峡谷', '鏡の北・中央アメリカ'], ['鏡の古城', '鏡のヨーロッパ'],
+    ['鏡の山脈', '鏡のアジア'], ['鏡のサバンナ', '鏡のアフリカ'], ['鏡の地図喰いの巣', '鏡の世界'],
+    ['月', '月'], ['水星', '水星'], ['金星', '金星'], ['火星', '火星'], ['木星', '木星'], ['土星', '土星'], ['星喰いの巣', '宇宙'],
+  ]);
+  assert.deepEqual(plain(K.CHAPTERS.map(c => c.name)), ['地球', '鏡の地球', '宇宙']);
+  assert.deepEqual(plain(Object.fromEntries(Object.entries(K.MONSTERS).map(([id, ms]) => [id, ms.map(m => m.n)]))), {
+    samerica: ['おしゃべりオウム', 'ヤドクガエル', 'つばとばしアルパカ', '大アナコンダ', 'ジャガー王'],
+    oceania: ['ヤシガニ', 'ボクサーカンガルー', 'イリエワニ', 'ホホジロザメ', '怒れる火山'],
+    namerica: ['ハクトウワシ', 'いたずらアライグマ', 'サボテンナイト', 'グリズリー', '大竜巻'],
+    europe: ['古城のコウモリ', '森のオオカミ', '物知りフクロウ', '古城の大グモ', '赤い竜'],
+    asia: ['温泉ザル', 'ねぼすけパンダ', '森のゾウ', 'ベンガルトラ', '青い竜'],
+    africa: ['砂漠のサソリ', 'のっぽキリン', '怒りんぼカバ', '突進サイ', '百獣の王'],
+    world: ['白紙の霧', 'やぶれた地図', 'くるった方位磁針', '地図喰いの影', '地図喰い'],
+    msamerica: ['鏡のおしゃべりオウム', 'さかさヤドクガエル', '鏡のつばとばしアルパカ', 'さかさ大アナコンダ', 'うつしジャガー'],
+    moceania: ['鏡のヤシガニ', 'さかさボクサーカンガルー', '鏡のイリエワニ', 'さかさホホジロザメ', 'さかさ火山'],
+    mnamerica: ['鏡のハクトウワシ', 'さかさいたずらアライグマ', '鏡のサボテンナイト', 'さかさグリズリー', 'さかさ竜巻'],
+    meurope: ['鏡の古城のコウモリ', 'さかさ森のオオカミ', '鏡の物知りフクロウ', 'さかさ古城の大グモ', '白い竜'],
+    masia: ['鏡の温泉ザル', 'さかさねぼすけパンダ', '鏡の森のゾウ', 'さかさベンガルトラ', '金の竜'],
+    mafrica: ['鏡の砂漠のサソリ', 'さかさのっぽキリン', '鏡の怒りんぼカバ', 'さかさ突進サイ', '影の百獣の王'],
+    mworld: ['鏡の白紙の霧', 'さかさやぶれた地図', '鏡のくるった方位磁針', 'さかさ地図喰いの影', '鏡の地図喰い'],
+    moon: ['ちびUFO', 'クレーター岩', 'まいご流れ星', '月面ロボ', '月のウサギ大王'],
+    mercury: ['じりじり太陽風', 'ちび小惑星', 'まよい衛星', '温度計おばけ', 'ほうき星'],
+    venus: ['硫酸の雲', '金星火山', 'かみなり雲', 'あつがり星人', '金星の炎'],
+    mars: ['探査ロボ', '赤い砂あらし', '火星UFO', 'タコ型火星人', '火星人の将軍'],
+    jupiter: ['ガリレオ衛星', 'ガスのいなずま', '磁場のうず', 'ふわふわガス', '大赤斑'],
+    saturn: ['氷のかけら', '輪っかの石', 'もやもや衛星', '迷子ロケット', '輪っかの番人'],
+    blackhole: ['ゆがんだ銀河', '吸いこまれ星', '小さな穴', '星喰いの目', '星喰い'],
+  });
+  assert.deepEqual(plain(Object.values(K.THEMES).map(t => t.n)), ['島国', '小さい国', '赤道の国', '内陸国', '大きい国', '南半球の国']);
+  assert.equal(K.TOWER.name, '英雄の塔'); assert.equal(K.TOWER.land, '英雄の塔');
+  assert.equal(K.TOWER_MONSTERS.boss.n, '塔の番人');
+  // 鏡の手下 F1〜F4（28）: n は日本語の名前（今と同じ）、nk は型の文、nb は元の名前
+  const minions = K.dungeonsOf(2).flatMap(g => K.MONSTERS[g.id].slice(0, 4).map((m, i) => [g, m, i]));
+  assert.equal(minions.length, 28);
+  for (const [g, m, i] of minions) {
+    assert.equal(m.nk, i % 2 ? 'さかさ{name}' : '鏡の{name}', m.n);
+    assert.equal(m.nb, K.MONSTERS[g.base][i].n, m.n);
+    assert.equal(m.n, K.fillJa(m.nk, { name: m.nb }));
+  }
+  // ボスと地球・宇宙の名前は型の文を持たない
+  for (const m of Object.values(K.MONSTERS).flat()) if (!m.nk) assert.equal(m.nb, undefined, m.n);
+  // 月は曜日の「月」と同じキーなので、表示のキー（key）を別に持つ
+  assert.equal(K.dungeonOf('moon').key, '天体の月');
+  assert.equal(K.DUNGEONS.filter(d => d.key).length, 1);
+  assert.equal(K.fillJa('鏡の{name}', { name: 'x' }), '鏡のx');
+  assert.equal(K.fillJa('{a}{b}', { a: '{b}' }), '{b}{b}');
+});
+
+test('short_coins_en', () => {
+  const K = loadCore();
+  assert.equal(K.shortCoins(0, true), '0');
+  assert.equal(K.shortCoins(9999, true), '9,999');
+  assert.equal(K.shortCoins(10000, true), '10k');
+  assert.equal(K.shortCoins(12345, true), '12.3k');
+  assert.equal(K.shortCoins(19999, true), '19.9k');
+  assert.equal(K.shortCoins(123456, true), '123.4k');
+  // 切り捨て（四捨五入しない）と 100万から
+  assert.equal(K.shortCoins(10099, true), '10k');
+  assert.equal(K.shortCoins(10100, true), '10.1k');
+  assert.equal(K.shortCoins(99999, true), '99.9k');
+  assert.equal(K.shortCoins(999999, true), '999.9k');
+  assert.equal(K.shortCoins(1e6, true), '1000k');
+  assert.equal(K.shortCoins(1234567, true), '1234.5k');
+  assert.equal(K.shortCoins(1e9, true), '1000000k');
+  // 日本語は今のまま（en を渡さない・false）
+  assert.equal(K.shortCoins(9999), '9,999');
+  assert.equal(K.shortCoins(12345, false), '1.2万');
+  assert.equal(K.shortCoins(123456), '12.3万');
+});
+
+test('default_team_name', () => {
+  const K = loadCore();
+  assert.equal(K.isDefaultTeamName('編成2', 1), true);
+  assert.equal(K.isDefaultTeamName('編成1', 0), true);
+  assert.equal(K.isDefaultTeamName('編成2', 0), false);
+  assert.equal(K.isDefaultTeamName('Team 2', 1), false);
+  assert.equal(K.isDefaultTeamName('あか', 0), false);
+  // 文字でない名前は既定の名前ではない
+  for (const n of [undefined, null, 1, 2, ['編成1'], { n: '編成1' }]) assert.equal(K.isDefaultTeamName(n, 0), false, String(n));
+  // 既定の名前を作る（セーブに書く日本語）
+  assert.equal(K.TEAM_PREFIX, '編成');
+  assert.equal(K.defaultTeamName(0), '編成1');
+  assert.equal(K.defaultTeamName(4), '編成5');
+  for (let i = 0; i < 5; i++) assert.equal(K.isDefaultTeamName(K.defaultTeamName(i), i), true);
+  // 既定の名前は同じ頭から作る
+  assert.deepEqual(plain(K.fresh(T0).teams), [{ n: '編成1', c: null }]);
+  assert.ok(K.sanitize({ ...K.fresh(T0), teams: [{ n: '', c: null }, 5] }, T0).teams.every((t, i) => K.isDefaultTeamName(t.n, i)));
+});
+
+// ストーリーは rpg-core のデータ（// i18n-data）。文と並びは rpg.js にあったものと1文字も同じ
+const STORY_JA = [
+  '世界地図をかじる怪物「地図喰い（ちずくい）」と、その手下のモンスターたちが、世界中の国旗を持っていっちゃった。',
+  '旅人のきみは、クイズで集めたコインで力をつけ、国のカードの仲間といっしょに6つの地域を旅する。',
+  '国を思い出すたびに、国旗がひとつ戻ってくる。地図喰いの巣で親玉をたおして、195の旗を取りもどそう！',
+];
+const STORY_END_JA = {
+  ch1: [
+    { h: '🌍 地球クリア！', p: [
+      '地図喰いをたおすと、195の旗が空に舞いもどった。',
+      'でも、地図喰いのいた場所に、鏡のような裂け目がひとつ残っている。',
+      'のぞきこむと、そこにはそっくりだけど少しちがう、もうひとつの地球があった…',
+    ] },
+    { h: '🪞 第2章 鏡の地球', p: [
+      '鏡の地球では、国旗がみんな似たものに化けている。',
+      '本物の旗を見分けられるのは、旅人のきみだけ。',
+      '鏡の地図喰いをたおして、ふたつの地球をつなぐ裂け目を閉じよう！',
+    ] },
+  ],
+  ch2: [
+    { h: '🪞 第2章クリア！', p: [
+      '裂け目が閉じる直前、鏡の地図喰いがさけんだ。「母さま、あとはたのむ…」',
+      '夜空を見上げると、星がひとつ、またひとつと消えていく。',
+      '地図喰いを生んだ「星喰い」が、宇宙から地球をねらっていたんだ。',
+    ] },
+  ],
+  ch3start: [
+    { h: '🪐 第3章 宇宙', p: [
+      '星喰いは、星をひとつずつ飲みこみながら地球へ近づいている。',
+      '星には、地球の国のなかまたちの記憶が眠っている。',
+      '宇宙から地球を見下ろして、国の場所を思い出し、星喰いを止めよう！',
+    ] },
+  ],
+  ch3: [
+    { h: '🌟 エンディング', p: [
+      '星喰いが消えると、飲みこまれた星たちがいっせいに光りはじめた。',
+      '地球も、鏡の地球も、宇宙も、もう安心だ。',
+      'でも旅は終わらない。英雄の塔のてっぺんは、まだだれも見たことがない――',
+    ] },
+  ],
+};
+
+test('story_same', () => {
+  const K = loadCore();
+  assert.deepEqual(plain(K.STORY), STORY_JA);
+  assert.deepEqual(plain(K.STORY_END), STORY_END_JA);
+  assert.deepEqual(Object.keys(K.STORY_END), plain(K.STORY_IDS));
+  // rpg.js は文を持たない（rpg-core のデータを読む）
+  const src = read('rpg.js');
+  assert.match(src, /K\.STORY\b/);
+  assert.match(src, /K\.STORY_END\b/);
+  for (const s of [...STORY_JA, ...Object.values(STORY_END_JA).flat().flatMap(x => [x.h, ...x.p])]) assert.ok(!src.includes(s), s);
+});

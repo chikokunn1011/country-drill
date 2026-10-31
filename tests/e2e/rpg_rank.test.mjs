@@ -183,6 +183,9 @@ t('auto_update_with_profile', async (page, app) => {
   await page.evaluate(() => RPG.open('rpgrank'));
   assert.equal(await page.isVisible('#rr-auto'), true);
   assert.equal(await text(page, '#rr-auto-name'), 'チコ');
+  // 文は前の版と1文字も同じ（PR8 で T() のキーに。名前の <b> は data-ugc）
+  assert.equal((await text(page, '#rr-auto p')).trim(), '✅ チコ で載ってるよ。レベルアップやダンジョンクリアのたびに自動で記録が新しくなる');
+  assert.equal(await page.getAttribute('#rr-auto-name', 'data-ugc'), '');
   await page.evaluate(() => RPG.open('rpg'));
   await page.click('#rpg-lvup');
   await page.waitForTimeout(3000);

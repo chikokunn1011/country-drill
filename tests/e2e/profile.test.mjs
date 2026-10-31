@@ -142,7 +142,7 @@ t('toggles', async (page, { db }) => {
   assert.equal((await stored(page, 'profile')).auto, false);
 });
 
-// 日本語版のかざりの欄は、冒険を始めていなくても出す（英語版だけ、冒険が無いあいだは隠す）
+// かざりの欄は、冒険を始めていなくても出す（英語版も同じ。PR8）
 t('deco field shown on ja', async (page, { db }) => {
   await openWithProfile(page, db);
   await openProfile(page);

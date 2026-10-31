@@ -23,10 +23,11 @@ const t = (name, fn, opts = {}) => test(name, { timeout: 120_000 }, async () => 
 t('en_home', async page => {
   assert.equal(await page.evaluate(() => document.documentElement.lang), 'en');
   assert.deepEqual(await jaLeft(page), []);
-  // 未訳の機能の入口は出さない（冒険は PR8）。今日の難問（PR6）とバッジ（PR7）は出る
+  // 今日の難問（PR6）・バッジ（PR7）・冒険（PR8）の入口が出る
   assert.equal(await page.isVisible('#home-daily'), true);
   assert.equal(await page.isVisible('#home-badges'), true);
-  assert.equal(await page.isVisible('#home-rpg'), false);
+  assert.equal(await page.isVisible('#home-rpg'), true);
+  assert.equal((await page.innerText('#home-rpg .hb-title')).trim(), 'Adventure');
   assert.match(await page.title(), /Flag Master/);
   assert.equal((await page.innerText('#home-play .hb-title')).trim(), 'Play the quiz');
 });
@@ -93,15 +94,21 @@ test('topbar_height_390', { timeout: 120_000 }, async () => {
   }
 });
 
-// rpg_home.test.mjs の topbar_one_line_360 の英語版。コインのセーブがあっても 360px のトップバーは1行で、切りかえは「JA」と見えて名前は「日本語」
-t('en_topbar_one_line_360', async page => {
+// rpg_home.test.mjs の topbar_one_line_360 の英語版。コインのチップ（123.4k）が出ても 360px のトップバーは1行で、切りかえは「JA」と見えて名前は「日本語」
+t('en_topbar_chip_360', async page => {
   await page.evaluate(() => show('setup'));
+  assert.equal(await page.isVisible('#rpg-chip'), true);
+  assert.equal((await page.innerText('#rpg-chip b')).trim(), '123.4k');
+  // badges.js のさかのぼりのごほうび（●+50 など）が足されることがあるので、額はセーブから読む
+  const coins = await page.evaluate(() => RPG.get().coins);
+  assert.ok(coins >= 123400 && coins < 123500, String(coins));
+  assert.equal(await page.getAttribute('#rpg-chip', 'aria-label'), `Coins ${coins.toLocaleString('en-US')} (go to the Adventure)`);
   const r = await page.evaluate(() => {
-    const els = [...['brand', 'to-book', 'to-settings'].map(id => document.getElementById(id)), document.querySelector('#topbar .langsw a')];
+    const els = [...['brand', 'rpg-chip', 'to-book', 'to-settings'].map(id => document.getElementById(id)), document.querySelector('#topbar .langsw a')];
     const rects = els.map(e => e.getBoundingClientRect());
     return { tops: rects.map(x => x.top), bottoms: rects.map(x => x.bottom), rights: rects.map(x => x.right),
       h: document.getElementById('topbar').getBoundingClientRect().height, iw: innerWidth, sw: document.documentElement.scrollWidth,
-      after: getComputedStyle(els[3], '::after').content };
+      after: getComputedStyle(els[4], '::after').content };
   });
   const at = JSON.stringify(r);
   assert.ok(Math.max(...r.tops) < Math.min(...r.bottoms), `1行になっていない: ${at}`);
@@ -111,7 +118,7 @@ t('en_topbar_one_line_360', async page => {
   assert.match(r.after, /^"JA"/);
   assert.equal(await page.locator('#topbar').getByRole('link', { name: '日本語', exact: true }).count(), 1);
   assert.deepEqual(await jaLeft(page), []);
-}, { viewport: { width: 360, height: 640 }, storage: { badges: QUIET_BADGES, rpg: { v: 1, intro: true, coins: 123456 } } });
+}, { viewport: { width: 360, height: 640 }, storage: { badges: QUIET_BADGES, rpg: { v: 1, intro: true, coins: 123400 } } });
 
 // PR6: 端末の時間帯（timezoneId）で I18N.localOf が「その人の時間」を出す。ニックネーム（data-ugc）の日本語は jaLeft が数えない
 t('en_local_time_and_ugc', async page => {
@@ -329,10 +336,11 @@ t('en_result_practice', async page => {
   assert.equal((await page.textContent('#r-side .qlabel')).trim(), 'Countries you missed');
   assert.deepEqual(await texts(page, '.misslist li b'), [missed.e]);
   assert.deepEqual(await texts(page, '.misslist li span'), [missed.ec]);
-  // シェア・タイムアタックの箱・ほかのファイルの欄は出ない
+  // シェア・タイムアタックの箱は出ない。ほかのファイルの欄は冒険のコインの欄だけ（PR8: 英語）
   assert.equal(await page.locator('#r-share').count(), 0);
   assert.equal(await page.locator('.tabox').count(), 0);
-  assert.equal((await page.innerHTML('#r-ext')).trim(), '');
+  assert.equal(await page.locator('#r-ext > *').count(), 1);
+  assert.match((await page.textContent('#r-ext .rpg-res-head')).trim(), /^\+[\d,]+ coins You have [\d,]+$/);
   assert.equal((await page.textContent('#r-setup')).trim(), 'Change mode');
   assert.equal((await page.textContent('#r-again')).trim(), 'Play again');
   await page.waitForTimeout(400);   // TA_GUARD_MS

@@ -7,12 +7,12 @@ Object.assign(window.I18N_EN ??= {}, {
 
   // head
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。地域しぼり、タイムアタックとランキング、国旗図鑑、冒険RPGも。登録なしでスマホ・PCからすぐ遊べる。':
-    'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries. Filter by region and browse the Gallery. No sign-up: play right away on your phone or computer.',
+    'A free 4-choice quiz on the flags, names, and locations of all 195 countries. Region filters, Time Attack, leaderboards, Gallery, and Adventure RPG. No sign-up.',
   '国旗マスター｜国旗・国名・場所を覚える4択クイズ（195か国）': 'Flag Master | Flag, country, and map quiz (195 countries)',
   '国旗マスター': 'Flag Master',
   '国旗マスター｜国旗・国名・場所を覚える4択クイズ': 'Flag Master | Flag, country, and map quiz',
   '世界195か国の国旗・国名・場所を4択クイズで覚えよう。タイムアタック、国旗図鑑、冒険RPGも。':
-    'Learn the flags, names, and locations of all 195 countries with a 4-choice quiz. Plus a flag gallery.',
+    'Learn the flags, names, and locations of all 195 countries with a 4-choice quiz. Plus Time Attack, a flag gallery, and an Adventure RPG.',
   '世界195か国の国旗・国名・場所を4択クイズで覚える無料サイト。': 'A free 4-choice quiz to learn the flags, names, and locations of all 195 countries.',
 
   // トップバー・地図の読みこみ
@@ -48,7 +48,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '音': 'Sound',
   '効果音を鳴らす': 'Play sound effects',
   '音量': 'Volume',
-  '正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。': 'Sounds play for right and wrong answers, finishing a quiz, and more.',
+  '正解・不正解・クリア、冒険のバトル・ガチャ・レベルアップ、バッジゲットなどで音が鳴るよ。': 'Sounds play for right and wrong answers, finishing a quiz, Adventure battles, Flag Draws, level-ups, earning badges, and more.',
   '進み方': 'Pacing',
   '正解したらすぐ次の問題へ': 'Go straight to the next question after a right answer',
   'プレイのクイズで、正解なら答えを出さずに次へ（まちがえたら正解を見せる）。': 'In quizzes, a right answer skips the answer card and moves on (a wrong answer still shows the right one).',

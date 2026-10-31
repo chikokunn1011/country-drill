@@ -618,7 +618,7 @@ export const recordEvents = page => page.evaluate(types => {
 export const events = (page, type) => page.evaluate(type => window.__ev.filter(e => !type || e.type === type), type);
 
 // 英語版（PR5）: 見えている日本語の一覧。見えている要素（checkVisibility()）の文字と、aria-label・title・alt・placeholder・
-// value（ボタン）、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）と、
+// value（ボタン）、::before・::after の content、document.title のうち JA_RE に当たるもの。lang="ja" の要素（言語の切りかえの「日本語」）と、
 // data-ugc の要素（PR6: ほかの人が入れた文字＝ニックネーム。訳さない）の中は除く
 export const jaLeft = async page => {
   const { JA_RE } = await import('../../tools/i18n_scan.mjs');
@@ -631,6 +631,8 @@ export const jaLeft = async page => {
       if (!shown(el)) continue;
       for (const a of ['aria-label', 'title', 'alt', 'placeholder']) { const v = el.getAttribute(a); if (v && re.test(v)) out.push(`[${a}] ${v}`); }
       if ((el.tagName === 'BUTTON' || (el.tagName === 'INPUT' && /^(button|submit|reset)$/.test(el.type))) && re.test(el.value ?? '')) out.push(`[value] ${el.value}`);
+      // CSS の content: で出す字（::before / ::after）。T() も辞書も通らないので、ここで見る
+      for (const ps of ['::before', '::after']) { const cs = getComputedStyle(el, ps), c = cs.content; if (cs.display !== 'none' && c && c !== 'none' && c !== 'normal' && re.test(c)) out.push(`[${ps}] ${c}`); }
     }
     if (re.test(document.title)) out.push(`[title] ${document.title}`);
     return out;
