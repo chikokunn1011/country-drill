@@ -54,20 +54,33 @@ t('answer_wrong_then_right', async () => {
     assert.equal(await page.locator('.e-opt:enabled').count(), 3, mode);
     assert.match(await text(page, '#e-msg'), /ちがう/);
     assert.ok(await page.isVisible('#e-links'), mode);
-    for (const [sel, href] of [['#e-daily', './#daily'], ['#e-more', './']]) {
+    const play = './#play=' + encodeURIComponent(byA.get(q.a).r);
+    for (const [sel, href] of [['#e-daily', './#daily'], ['#e-more', play], ['#e-brand', './']]) {
       assert.equal(await page.getAttribute(sel, 'href'), href);
       assert.equal(await page.getAttribute(sel, 'target'), '_blank');
       assert.equal(await page.getAttribute(sel, 'rel'), 'noopener');
     }
     assert.match(await text(page, '#e-daily'), /今日の難問（20問）に挑戦/);
+    assert.equal(await text(page, '#e-more > span >> nth=0'), `${byA.get(q.a).r}の国旗をもっと解く`);
+    // 国のページと次の1問までは、正解するまで出さない（国名が分かってしまう）
+    assert.equal(await page.locator('#e-page').count(), 0, mode);
+    assert.ok(await page.isHidden('#e-next'), mode);
+    { const [, mo, d] = DAYS[mode].split('-').map(Number); assert.equal(await text(page, '#e-day'), `${mo}月${d}日`, mode); }
     await page.click(`.e-opt[data-a="${q.a}"]`);
     assert.equal(await page.locator(`.e-opt.ok[data-a="${q.a}"]`).count(), 1, mode);
     assert.equal(await page.locator('.e-opt:disabled').count(), 4, mode);
     assert.match(await text(page, '#e-msg'), /せいかい/);
+    assert.equal(await page.getAttribute('#e-page', 'href'), `country/${q.a}.html`);
+    assert.equal(await page.getAttribute('#e-page', 'target'), '_blank');
+    assert.equal(await text(page, '#e-page'), `${byA.get(q.a).n}の国旗の意味`);
+    assert.match(await text(page, '#e-next'), /^次の1問まで あと(11時間59分|12時間0分)$/, mode);   // 日本時間の正午
+    assert.ok(await page.isHidden('#e-day'), mode);
     await page.click('#e-again');
     assert.equal(await page.locator('.e-opt.ok, .e-opt.ng').count(), 0, mode);
     assert.equal(await page.locator('.e-opt:enabled').count(), 4, mode);
     assert.ok(await page.isHidden('#e-again'), mode);
+    assert.equal(await page.locator('#e-page').count(), 0, mode);
+    assert.ok(await page.isHidden('#e-next') && await page.isVisible('#e-day'), mode);
   });
 });
 
@@ -104,14 +117,16 @@ t('narrow_280', async () => {
 });
 
 t('fits_snippet_box', async () => {
-  for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width: 400, height: 460 } }, async page => {
+  // 貼り付けコードは width="100%"・max-width:400px。スマホのブログの本文幅（340・280）でも、正解のあとまで収まる
+  for (const width of [400, 340, 280]) for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width, height: 460 } }, async page => {
     await page.click(`.e-opt[data-a="${wrongOf(mode)}"]`);
     assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 縦に収まらない`);
     const box = await page.locator('#e-more').boundingBox();
     assert.ok(box && box.y >= 0 && box.y + box.height <= 460, mode);
     // 正解して「もう一度」が出ても収まる
     await page.click(`.e-opt[data-a="${Q(mode).a}"]`);
-    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 正解のあと縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${width} ${mode} 正解のあと縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width} ${mode} 横にはみ出す`);
   });
 });
 
@@ -170,11 +185,17 @@ t('embed_en', async () => {
     assert.equal(await text(page, '#e-msg'), 'Not quite. Pick again.');
     assert.equal(await text(page, '#e-daily'), 'Try the Daily Puzzle (20 questions)');
     assert.equal(await page.$eval('#e-daily', a => { const u = new URL(a.href); return u.pathname + u.hash; }), '/en/#daily');
-    assert.equal(await text(page, '#e-more'), 'Play more');
-    assert.equal(await page.$eval('#e-more', a => new URL(a.href).pathname), '/en/');
+    const reg = { 'アジア': 'Asia', 'ヨーロッパ': 'Europe', 'アフリカ': 'Africa', '北・中央アメリカ': 'North & Central America', '南アメリカ': 'South America', 'オセアニア': 'Oceania' }[byA.get(q.a).r];
+    assert.equal(await text(page, '#e-more > span >> nth=0'), `More flags from ${reg}`);
+    assert.equal(await page.$eval('#e-more', a => { const u = new URL(a.href); return u.pathname + decodeURIComponent(u.hash); }), '/en/#play=' + byA.get(q.a).r);
+    assert.equal(await page.$eval('#e-brand', a => new URL(a.href).pathname), '/en/');
+    assert.equal(await text(page, '#e-brand small'), 'Flag Master');
     assert.deepEqual(await jaLeft(page), [], mode);
     await page.click(`.e-opt[data-a="${q.a}"]`);
     assert.equal(await text(page, '#e-msg'), 'Correct!');
+    assert.equal(await text(page, '#e-page'), `What the flag of ${byA.get(q.a).e} means`);
+    assert.equal(await page.$eval('#e-page', a => new URL(a.href).pathname), `/en/country/${q.a}.html`);
+    assert.match(await text(page, '#e-next'), /^Next flag in (11h 59m|12h 0m)$/);
     assert.equal(await text(page, '#e-again'), 'Try again');
     assert.deepEqual(await jaLeft(page), [], mode);
     assert.equal(await warned(app.warnings, /\[i18n\]/), false, app.warnings.join('\n'));
@@ -191,4 +212,25 @@ t('embed_en_fallbacks', async () => {
     assert.equal(await text(page, '.e-noflag >> nth=0'), 'Can’t show the flag');
     assert.deepEqual(await jaLeft(page), []);
   });
+});
+
+// 正解の紙ふぶきはカードの中だけ（はみ出さない）。動きを減らす設定では出さない
+t('confetti', async () => {
+  for (const reducedMotion of ['no-preference', 'reduce']) await open({ mode: 'n2f', reducedMotion, viewport: { width: 400, height: 460 } }, async page => {
+    await page.click(`.e-opt[data-a="${Q('n2f').a}"]`);
+    assert.equal(await page.locator('.e-bit').count() > 0, reducedMotion === 'no-preference', reducedMotion);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460 && document.documentElement.scrollWidth <= 400), reducedMotion);
+    if (reducedMotion === 'no-preference') await page.waitForFunction(() => !document.querySelector('.e-bit'), null, { timeout: 4000 });
+  });
+});
+
+// 日本時間の0時をまたいだら、次の1問までの時間は数えず「新しい1問が出たよ」にする
+t('countdown_after_midnight', async () => {
+  const app = await openApp(browser, { url: server.url, path: 'embed.html', init: at(DAYS.n2f + 'T14:59:59Z') });
+  try {
+    const q = D.oneOfDay(DAYS.n2f, C);
+    await app.page.click(`.e-opt[data-a="${q.a}"]`);
+    await app.page.waitForFunction(() => document.getElementById('e-next').textContent === '新しい1問が出たよ', null, { timeout: 5000 });
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
 });
