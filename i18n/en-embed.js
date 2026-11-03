@@ -14,6 +14,7 @@ Object.assign(window.I18N_EN ??= {}, {
   '{r}の国旗をもっと解く': 'More flags from {r}',
   '{name}の国旗の意味': 'What the flag of {name} means',
   '次の1問まで あと{h}時間{m}分': 'Next flag in {h}h {m}m',
+  '新しい1問が出たよ': 'A new flag is out',
   // 地域の名前（en-core.js と同じ訳）
   'アジア': 'Asia',
   'ヨーロッパ': 'Europe',

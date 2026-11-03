@@ -117,14 +117,16 @@ t('narrow_280', async () => {
 });
 
 t('fits_snippet_box', async () => {
-  for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width: 400, height: 460 } }, async page => {
+  // 貼り付けコードは width="100%"・max-width:400px。スマホのブログの本文幅（340・280）でも、正解のあとまで収まる
+  for (const width of [400, 340, 280]) for (const mode of ['n2f', 'f2n']) await open({ mode, viewport: { width, height: 460 } }, async page => {
     await page.click(`.e-opt[data-a="${wrongOf(mode)}"]`);
     assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 縦に収まらない`);
     const box = await page.locator('#e-more').boundingBox();
     assert.ok(box && box.y >= 0 && box.y + box.height <= 460, mode);
     // 正解して「もう一度」が出ても収まる
     await page.click(`.e-opt[data-a="${Q(mode).a}"]`);
-    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${mode} 正解のあと縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460), `${width} ${mode} 正解のあと縦に収まらない`);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width} ${mode} 横にはみ出す`);
   });
 });
 
@@ -220,4 +222,15 @@ t('confetti', async () => {
     assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= 460 && document.documentElement.scrollWidth <= 400), reducedMotion);
     if (reducedMotion === 'no-preference') await page.waitForFunction(() => !document.querySelector('.e-bit'), null, { timeout: 4000 });
   });
+});
+
+// 日本時間の0時をまたいだら、次の1問までの時間は数えず「新しい1問が出たよ」にする
+t('countdown_after_midnight', async () => {
+  const app = await openApp(browser, { url: server.url, path: 'embed.html', init: at(DAYS.n2f + 'T14:59:59Z') });
+  try {
+    const q = D.oneOfDay(DAYS.n2f, C);
+    await app.page.click(`.e-opt[data-a="${q.a}"]`);
+    await app.page.waitForFunction(() => document.getElementById('e-next').textContent === '新しい1問が出たよ', null, { timeout: 5000 });
+    assert.deepEqual(app.errors.map(String), []);
+  } finally { await app.close(); }
 });

@@ -93,9 +93,11 @@
     // 次の1問まで（日本時間の0時）。1分ごとに書きかえる
     let timer = 0;
     function tick() {
+      // 日本時間の0時をまたいだら、数えるのをやめて「新しい1問」を知らせる（この画面の問題は前の日のまま）
+      if (D.jstDay() !== q.day) { next.textContent = T('新しい1問が出たよ'); return; }
       const ms = D.msToNextDay(new Date()), h = Math.floor(ms / 3600e3), m = Math.floor(ms % 3600e3 / 60e3);
       next.textContent = T('次の1問まで あと{h}時間{m}分', { h, m });
-      timer = setTimeout(tick, 60e3);
+      timer = setTimeout(tick, Math.min(60e3, ms + 500));
     }
 
     function answer(b) {
