@@ -322,5 +322,21 @@ test('en_privacy_sections', () => {
   assert.match(h, /<h3 id="transfer">/);
   assert.ok(h.includes('offline'));   // サイトのファイルを端末に保存する（PWA）の1行
   for (const s of ['Supabase', 'IP address', 'GitHub Pages', 'Google Fonts', 'Cookie', 'https://adssettings.google.com', 'https://policies.google.com/technologies/ads', 'may use', 'analytics']) assert.ok(h.includes(s), s);
-  assert.match(h, /Last updated: October 29, 2026/);
+  assert.match(h, /Last updated: November 3, 2026/);
+});
+
+test('contact_collects_no_email', () => {
+  // お問い合わせフォームではメールアドレスを集めない・返事はしない（2026-11-03）
+  for (const f of ['about.html', 'privacy.html']) {
+    const h = read(f);
+    assert.ok(h.includes('メールアドレスを集めません') || h.includes('メールアドレスを集めない'), f);
+    assert.ok(h.includes('返事はできません'), f);
+    assert.ok(!/メールアドレスを書いて|メールアドレスも）|返事をするため/.test(h), f);
+  }
+  for (const f of ['en/about.html', 'en/privacy.html']) {
+    const h = read(f);
+    assert.ok(h.includes('does not collect email addresses'), f);
+    assert.ok(h.includes('can’t reply'), f);
+    assert.ok(!/Include your email|used only to reply/.test(h), f);
+  }
 });
