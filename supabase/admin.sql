@@ -4,7 +4,7 @@
 -- 中で行を消す（admin_delete）ので、SQL Editor から流す。
 -- 呼べるのは「ログインしていて admins に居る人」だけ。anon は execute 権限が無い。ログインしただけの人は 'admin only'（42501）で断る。
 -- 管理する人を足すとき（user_id は Authentication → Users の UID）:
---   insert into admins (user_id, note) values ('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', 'チコ');
+--   insert into admins (user_id, note) values ('xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx', '運営者');
 
 -- 管理する人。RLS ON・ポリシー無し＝関数を通さないと誰も読めない・書けない
 create table if not exists admins (

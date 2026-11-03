@@ -156,6 +156,7 @@ test('privacy_text', () => {
 test('about_text', () => {
   const h = read('about.html');
   assert.ok(h.includes('出題は国旗・国名・場所だけ。首都は答えのあとの説明と図鑑で見られる（首都を当てる問題はない）'));
+  assert.ok(!h.includes('チコ'));   // 運営者の名前は出さない
   for (const s of ['大学生の個人運営', '外務省', 'Natural Earth', '日本政府の立場を表すものではありません', 'flag-icons', 'world-atlas', 'world-countries', 'ODbL', 'd3', 'topojson-client']) assert.ok(h.includes(s), s);
 });
 
@@ -307,7 +308,8 @@ test('en_about_text', () => {
   const h = read('en/about.html');
   for (const id of ['purpose', 'operator', 'rules', 'country-names', 'borders', 'credits', 'contact']) assert.match(h, new RegExp(`<h2 id="${id}"`), id);
   assert.match(h, /<a id="contact-form" href="https:\/\/forms\.gle\/66hqFeGYF47CggGS7"/);
-  for (const s of ['Chiko', 'university student', 'Claude', 'Anthropic', 'English Wikipedia', 'Natural Earth', 'flag-icons', 'world-atlas', 'world-countries', 'ODbL', 'in English']) assert.ok(h.includes(s), s);
+  for (const s of ['university student', 'Claude', 'Anthropic', 'English Wikipedia', 'Natural Earth', 'flag-icons', 'world-atlas', 'world-countries', 'ODbL', 'in English']) assert.ok(h.includes(s), s);
+  assert.ok(!h.includes('Chiko'));   // 運営者の名前は出さない
   assert.ok(!h.includes('<table'));   // 日本語の国名の例外の表は訳さない
 });
 
